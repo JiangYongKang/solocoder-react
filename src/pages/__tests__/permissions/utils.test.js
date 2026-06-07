@@ -250,17 +250,26 @@ describe('updateUser', () => {
 })
 
 describe('deleteUser', () => {
-  it('用户不存在时返回失败', () => {
+  it('用户不存在时返回失败并给出正确错误信息', () => {
     const result = deleteUser([{ id: '1' }], 'not-exist')
     expect(result.success).toBe(false)
     expect(result.users.length).toBe(1)
+    expect(result.error).toBe('用户不存在')
+  })
+
+  it('删除不存在用户时优先报"不存在"而非"至少保留一个"', () => {
+    const users = [{ id: 'only-user' }]
+    const result = deleteUser(users, 'not-exist')
+    expect(result.success).toBe(false)
+    expect(result.error).toBe('用户不存在')
+    expect(result.error).not.toBe('至少保留一个用户')
   })
 
   it('禁止删除最后一个用户', () => {
     const users = [{ id: '1', username: 'u1' }]
     const result = deleteUser(users, '1')
     expect(result.success).toBe(false)
-    expect(result.error).toBeTruthy()
+    expect(result.error).toBe('至少保留一个用户')
     expect(result.users.length).toBe(1)
   })
 
@@ -284,13 +293,18 @@ describe('ensureMinimumUsers', () => {
     expect(result.users).toBe(users)
   })
 
-  it('用户列表为空时只恢复一个默认管理员用户', () => {
+  it('用户列表为空时只恢复一个默认管理员用户（从 MOCK_USERS 复用）', () => {
+    const before = Date.now()
     const result = ensureMinimumUsers([])
+    const after = Date.now()
     expect(result.reset).toBe(true)
     expect(result.users.length).toBe(1)
     expect(result.users[0].username).toBe('admin')
     expect(result.users[0].id).toBe('u_admin')
+    expect(result.users[0].email).toBe('admin@example.com')
     expect(result.users[0].roleIds).toContain('r_admin')
+    expect(result.users[0].createdAt).toBeGreaterThanOrEqual(before)
+    expect(result.users[0].createdAt).toBeLessThanOrEqual(after)
   })
 
   it('用户列表为 undefined 时只恢复一个默认管理员用户', () => {
@@ -309,13 +323,18 @@ describe('ensureMinimumRoles', () => {
     expect(result.roles).toBe(roles)
   })
 
-  it('角色列表为空时只恢复一个默认管理员角色', () => {
+  it('角色列表为空时只恢复一个默认管理员角色（从 MOCK_ROLES 复用，动态 createdAt）', () => {
+    const before = Date.now()
     const result = ensureMinimumRoles([])
+    const after = Date.now()
     expect(result.reset).toBe(true)
     expect(result.roles.length).toBe(1)
     expect(result.roles[0].name).toBe('超级管理员')
     expect(result.roles[0].id).toBe('r_admin')
     expect(result.roles[0].permissions.length).toBeGreaterThan(0)
+    expect(result.roles[0].permissions).toContain('user:view')
+    expect(result.roles[0].createdAt).toBeGreaterThanOrEqual(before)
+    expect(result.roles[0].createdAt).toBeLessThanOrEqual(after)
   })
 })
 
@@ -349,10 +368,20 @@ describe('updateRole', () => {
 })
 
 describe('deleteRole', () => {
-  it('角色不存在时返回失败', () => {
+  it('角色不存在时返回失败并给出正确错误信息', () => {
     const result = deleteRole([{ id: 'r1' }], 'not-exist', [])
     expect(result.success).toBe(false)
     expect(result.roles.length).toBe(1)
+    expect(result.error).toBe('角色不存在')
+  })
+
+  it('删除不存在角色时优先报"不存在"而非"至少保留一个"', () => {
+    const roles = [{ id: 'only-role' }]
+    const users = [{ id: 'u1', roleIds: [] }]
+    const result = deleteRole(roles, 'not-exist', users)
+    expect(result.success).toBe(false)
+    expect(result.error).toBe('角色不存在')
+    expect(result.error).not.toBe('至少保留一个角色')
   })
 
   it('禁止删除最后一个角色', () => {
@@ -360,7 +389,7 @@ describe('deleteRole', () => {
     const users = [{ id: 'u1', roleIds: ['r1'] }]
     const result = deleteRole(roles, 'r1', users)
     expect(result.success).toBe(false)
-    expect(result.error).toBeTruthy()
+    expect(result.error).toBe('至少保留一个角色')
     expect(result.roles.length).toBe(1)
   })
 

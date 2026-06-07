@@ -1,0 +1,6 @@
+当前项目 src/pages/permissions/ 下的权限管理系统页面有几个遗留问题，请在该目录下修复它们。
+
+1. deleteUser 和 deleteRole 中"禁止删除最后一个用户/角色"的守卫写在了存在性检查的前面。当列表只有 1 个用户时，尝试删除一个不存在的用户 ID 会返回"至少保留一个用户"，但实际根本问题是目标用户不在列表里，错误信息语义不对。需要调整这两处守卫的顺序，让存在性检查先于"最后一个"保护。
+2. 针对第 1 点，对应测试用例在上一轮被改了入参来绕开顺序问题，但没有校验 error 字段的具体值。需要让测试也验证删除不存在用户时返回的 error 信息是正确的。
+3. ensureMinimumUsers 和 ensureMinimumRoles 里用了模块级的 DEFAULT_ADMIN_USER / DEFAULT_ADMIN_ROLE 常量，其中 createdAt 用 Date.now() 硬编码在模块加载时刻。作为兜底数据这样做不合适，应该在实际执行函数时动态生成日期。另外，如果 constants.js 里原本就定义了 MOCK_USERS 和 MOCK_ROLES，应该直接复用其中的 admin 条目而非手写一份重复数据。
+4. 重新运行 pnpm run test，需要让所有测试通过。

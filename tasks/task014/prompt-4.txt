@@ -1,0 +1,5 @@
+当前项目 src/pages/rich-editor/ 下的富文本编辑器页面有两个遗留问题，请在该目录下修复它们。
+
+1. handleFileSelect（对话框上传图片）中 commitPendingInput() 放在了 await fileToBase64(file) 之后。如果用户在图片读取过程中继续在编辑器里打字，这些输入要等到图片插入时才被一起提交进历史单元，和工具栏、快捷键"先提交再执行操作"的惯例不一致。commitPendingInput 应该在 await 之前调用。
+2. 375px 移动端适配写在了 @media (max-width: 400px) 上，和要求的 375px 阈值不一致。把断点改成 375px，避免 376px~400px 区间的设备意外触发窄屏样式。
+3. 重新运行 pnpm run test，需要让所有测试通过。

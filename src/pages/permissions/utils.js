@@ -164,49 +164,38 @@ export function updateUser(users, id, data) {
 }
 
 export function deleteUser(users, id) {
-  if (users.length <= 1) {
-    return { success: false, users, error: '至少保留一个用户' }
-  }
   const exists = users.some((u) => u.id === id)
   if (!exists) {
-    return { success: false, users }
+    return { success: false, users, error: '用户不存在' }
+  }
+  if (users.length <= 1) {
+    return { success: false, users, error: '至少保留一个用户' }
   }
   return { success: true, users: users.filter((u) => u.id !== id) }
 }
 
-const DEFAULT_ADMIN_USER = {
-  id: 'u_admin',
-  username: 'admin',
-  email: 'admin@example.com',
-  roleIds: ['r_admin'],
-  createdAt: Date.now(),
+function makeDefaultAdminUser() {
+  const template = MOCK_USERS.find((u) => u.id === 'u_admin') || MOCK_USERS[0]
+  return { ...template, createdAt: Date.now() }
 }
 
-const DEFAULT_ADMIN_ROLE = {
-  id: 'r_admin',
-  name: '超级管理员',
-  description: '拥有系统所有权限',
-  permissions: [
-    'user:view', 'user:edit', 'user:delete',
-    'role:view', 'role:edit', 'role:delete',
-    'permission:view', 'permission:assign',
-    'settings:view', 'settings:edit',
-  ],
-  createdAt: Date.now(),
+function makeDefaultAdminRole() {
+  const template = MOCK_ROLES.find((r) => r.id === 'r_admin') || MOCK_ROLES[0]
+  return { ...template, createdAt: Date.now() }
 }
 
 export function ensureMinimumUsers(users) {
   if (users && users.length > 0) {
     return { users, reset: false }
   }
-  return { users: [DEFAULT_ADMIN_USER], reset: true }
+  return { users: [makeDefaultAdminUser()], reset: true }
 }
 
 export function ensureMinimumRoles(roles) {
   if (roles && roles.length > 0) {
     return { roles, reset: false }
   }
-  return { roles: [DEFAULT_ADMIN_ROLE], reset: true }
+  return { roles: [makeDefaultAdminRole()], reset: true }
 }
 
 export function createRole(roles, data) {
@@ -244,12 +233,12 @@ export function updateRole(roles, id, data) {
 }
 
 export function deleteRole(roles, id, users) {
-  if (roles.length <= 1) {
-    return { success: false, roles, users, error: '至少保留一个角色' }
-  }
   const exists = roles.some((r) => r.id === id)
   if (!exists) {
-    return { success: false, roles, users }
+    return { success: false, roles, users, error: '角色不存在' }
+  }
+  if (roles.length <= 1) {
+    return { success: false, roles, users, error: '至少保留一个角色' }
   }
   const updatedRoles = roles.filter((r) => r.id !== id)
   const updatedUsers = users.map((u) => ({

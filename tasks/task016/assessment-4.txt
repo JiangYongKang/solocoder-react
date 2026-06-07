@@ -1,0 +1,5 @@
+产物不满意：
+无。守卫顺序问题彻底修对了——deleteUser/deleteRole 都是先做存在性检查再判断"最后一个限制"，存在性检查也补上了 error 字段。工厂函数复用 MOCK_USERS/MOCK_ROLES 且 createdAt 动态生成，测试也校验了交叉场景下错误信息的优先级和动态时间戳范围。
+
+过程不满意：
+1. 只跑了权限模块的测试（npx vitest run src/pages/__tests__/permissions/utils.test.js），没有执行全量 pnpm run test。提示词第 4 条要求"所有测试通过"，虽然权限模块的改动不可能影响其他任务，但应该遵守要求跑一遍全量。

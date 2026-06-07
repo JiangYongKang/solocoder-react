@@ -427,11 +427,11 @@ const RichEditorPage = () => {
     }
 
     const dialogSnapshot = { ...dialog }
+    commitPendingInput()
 
     try {
       const base64 = await fileToBase64(file)
       const fileName = file.name || ''
-      commitPendingInput()
       setSavedIndicator('保存中...')
       setHistory((h) => {
         const currentContent = getHistoryContent(h.present)

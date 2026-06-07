@@ -562,7 +562,7 @@
   }
 }
 
-@media (max-width: 400px) {
+@media (max-width: 375px) {
   .re-container {
     padding: 12px;
     gap: 10px;

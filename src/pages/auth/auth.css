@@ -1,0 +1,252 @@
+.auth-page {
+  padding: 32px 24px 64px;
+  max-width: 480px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: left;
+}
+
+.auth-back {
+  display: inline-block;
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+
+.auth-back:hover {
+  text-decoration: underline;
+}
+
+.auth-page-title {
+  font-size: 32px;
+  font-weight: 600;
+  color: var(--text-h);
+  margin: 0 0 28px;
+  letter-spacing: -0.5px;
+}
+
+.auth-user-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 24px;
+}
+
+.auth-user-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.auth-user-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.auth-user-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-h);
+  margin-bottom: 2px;
+}
+
+.auth-user-email {
+  font-size: 13px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.auth-logout-btn {
+  background: transparent;
+  border: 1px solid var(--accent-border);
+  color: var(--accent);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.auth-logout-btn:hover {
+  background: var(--accent-bg);
+}
+
+.auth-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 28px;
+  overflow-x: auto;
+}
+
+.auth-tab {
+  background: none;
+  border: none;
+  padding: 12px 18px;
+  font-size: 15px;
+  color: var(--text);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  white-space: nowrap;
+  transition: color 0.2s;
+}
+
+.auth-tab:hover {
+  color: var(--text-h);
+}
+
+.auth-tab-active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  font-weight: 500;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.auth-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.auth-label {
+  font-size: 14px;
+  color: var(--text-h);
+  font-weight: 500;
+}
+
+.auth-input {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 15px;
+  background: var(--bg);
+  color: var(--text-h);
+  box-sizing: border-box;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  font-family: inherit;
+}
+
+.auth-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-bg);
+}
+
+.auth-input::placeholder {
+  color: var(--text);
+  opacity: 0.6;
+}
+
+.auth-error {
+  font-size: 13px;
+  color: #ef4444;
+  line-height: 1.4;
+}
+
+.auth-submit {
+  margin-top: 8px;
+  padding: 12px 24px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.1s;
+  font-family: inherit;
+}
+
+.auth-submit:hover {
+  opacity: 0.9;
+}
+
+.auth-submit:active {
+  transform: scale(0.98);
+}
+
+.auth-result {
+  text-align: center;
+  padding: 24px 16px;
+}
+
+.auth-result-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.auth-result-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-h);
+  margin: 0 0 8px;
+}
+
+.auth-result-desc {
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.6;
+}
+
+@media (max-width: 480px) {
+  .auth-page {
+    padding: 24px 16px 48px;
+  }
+
+  .auth-page-title {
+    font-size: 26px;
+    margin-bottom: 20px;
+  }
+
+  .auth-user-card {
+    flex-wrap: wrap;
+    padding: 14px;
+  }
+
+  .auth-user-info {
+    flex: 1 1 120px;
+  }
+
+  .auth-tabs {
+    gap: 0;
+  }
+
+  .auth-tab {
+    padding: 10px 14px;
+    font-size: 14px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .auth-page {
+    padding: 48px 24px 80px;
+    max-width: 520px;
+  }
+
+  .auth-page-title {
+    font-size: 36px;
+  }
+}

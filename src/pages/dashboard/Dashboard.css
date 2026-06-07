@@ -1,0 +1,366 @@
+.db-page {
+  padding: 24px 20px 48px;
+  min-height: 100%;
+  box-sizing: border-box;
+  text-align: left;
+}
+
+.db-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.db-back-btn {
+  background: var(--accent-bg);
+  color: var(--accent);
+  border: 1px solid var(--accent-border);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.db-back-btn:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
+.db-title {
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--text-h);
+  margin: 0;
+}
+
+.db-date-filter {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+}
+
+.db-date-filter-label {
+  font-size: 15px;
+  color: var(--text-h);
+  font-weight: 500;
+}
+
+.db-date-inputs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.db-date-input {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text-h);
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.db-date-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.db-date-separator {
+  color: var(--text);
+}
+
+.db-date-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.db-btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.db-btn-primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+.db-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.db-btn-secondary {
+  background: var(--bg);
+  color: var(--text-h);
+  border: 1px solid var(--border);
+}
+
+.db-btn-secondary:hover {
+  background: var(--accent-bg);
+  color: var(--accent);
+  border-color: var(--accent-border);
+}
+
+.db-date-error {
+  width: 100%;
+  color: #ef4444;
+  font-size: 13px;
+}
+
+.db-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+  color: var(--accent);
+  padding: 8px 12px;
+  border-radius: 20px;
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+
+.db-filter-chip button {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 4px;
+}
+
+.db-unified-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.db-grid-item {
+  min-width: 0;
+}
+
+.db-grid-item--summary {
+  grid-column: span 1;
+}
+
+.db-grid-item--chart {
+  grid-column: span 2;
+}
+
+.db-summary-card {
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  cursor: grab;
+  user-select: none;
+  transition: box-shadow 0.2s, transform 0.2s;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.db-summary-card:active {
+  cursor: grabbing;
+}
+
+.db-summary-card:hover {
+  box-shadow: var(--shadow);
+}
+
+.db-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.db-card-title {
+  font-size: 14px;
+  color: var(--text);
+}
+
+.db-card-trend {
+  font-size: 14px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+.db-card-trend.trend-up {
+  color: #16a34a;
+  background: rgba(22, 163, 74, 0.1);
+}
+
+.db-card-trend.trend-down {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.db-card-trend.trend-flat {
+  color: var(--text);
+  background: var(--code-bg);
+}
+
+.db-card-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-h);
+  margin-bottom: 4px;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.db-card-unit {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.db-card-subtitle {
+  font-size: 12px;
+  color: var(--text);
+}
+
+.db-chart-card {
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  cursor: grab;
+  transition: box-shadow 0.2s;
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+.db-chart-card:active {
+  cursor: grabbing;
+}
+
+.db-chart-card:hover {
+  box-shadow: var(--shadow);
+}
+
+.db-chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.db-chart-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-h);
+  margin: 0;
+}
+
+.db-chart-hint {
+  font-size: 12px;
+  color: var(--text);
+}
+
+.db-metric-select {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text-h);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.db-metric-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.db-chart-body {
+  width: 100%;
+  flex: 1;
+  min-height: 280px;
+}
+
+@media (max-width: 1024px) {
+  .db-unified-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .db-grid-item--summary {
+    grid-column: span 1;
+  }
+  .db-grid-item--chart {
+    grid-column: span 2;
+  }
+}
+
+@media (max-width: 640px) {
+  .db-page {
+    padding: 16px 12px 32px;
+  }
+  .db-title {
+    font-size: 22px;
+  }
+  .db-header {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .db-unified-grid {
+    grid-template-columns: 1fr;
+  }
+  .db-grid-item--summary,
+  .db-grid-item--chart {
+    grid-column: span 1;
+  }
+  .db-date-filter {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 14px;
+  }
+  .db-date-actions {
+    margin-left: 0;
+  }
+  .db-date-inputs {
+    width: 100%;
+  }
+  .db-date-input {
+    flex: 1;
+  }
+  .db-card-value {
+    font-size: 22px;
+  }
+}
+
+@media (min-width: 1440px) {
+  .db-page {
+    padding: 32px 40px 64px;
+  }
+  .db-unified-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .db-grid-item--summary {
+    grid-column: span 1;
+  }
+  .db-grid-item--chart {
+    grid-column: span 2;
+  }
+}

@@ -1,0 +1,7 @@
+产物不满意：
+四个提示词需求全部正确完成。.step-active .step-line 与 .step-completed .step-line 共享了 accent-border 高亮色，当前步骤的连接线不再灰着。手机号输入框加回了 maxLength={11}，配合 replace(/\D/g, '') 各自管长度和格式，两者独立工作不冲突。Wizard.jsx 用一个惰性初始化的 useState 缓存 loadDraft() 的结果，currentStep 和 formData 从缓存读取，localStorage 只读一次、JSON 只 parse 一次。58 个测试全部通过。
+
+过程不满意：
+1. 又是先建 TodoList 再读代码，第三个回合了惯性依然稳固。
+2. pnpm vitest --run src/pages/__tests__/wizard/ undefined，undefined 后缀照常出现。
+3. 三个修改都是用 edit_file_search_replace 精确编辑完成的，没有整文件重写，工具使用方式比上一轮有进步，总共只改了 Wizard.css 一行（加 .step-active 选择器）、Step1BasicInfo.jsx 一行（加 maxLength={11}）、Wizard.jsx 三段（惰性初始化逻辑），改动范围精准。

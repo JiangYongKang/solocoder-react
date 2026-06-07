@@ -1,0 +1,8 @@
+可视化仪表盘有以下功能需要完善，代码在 src/pages/dashboard/ 目录下。
+1. 拖拽布局目前把汇总卡片和图表卡片分别限制在两个独立的区域内各自排序，不能跨区域混排。提示词说的是"汇总卡片和图表卡片支持拖拽调整布局位置"，没有限定只能在同类卡片之间换位置。把汇总卡片和图表卡片合并到一个拖拽容器里，允许任意卡片之间自由交换位置。
+2. 图表联动做得不够完整：点击饼图扇区或柱状图柱子后确实触发了折线图切换到对应品类的时间趋势，但柱状图和饼图自己只是做了高亮，没有像需求说的"展示与该分类相关的子数据"。被点击的图表自身也应该有数据内容的联动变化，不只是高亮一下。
+3. BarChartCard 里那个 highlight 判断写了 entry.highlight || entry.category === selectedCategory，展开一下就知道后半段是重复逻辑——highlight 本身就是从 selectedCategory 推出来的，没必要两个条件都放上去。
+4. buildLineChartData 明明支持 metricKey 参数切换不同指标，但 Dashboard.jsx 里调用时直接把 metricKey 写死成 'totalSales' 了，折线图只能看销售额。让折线图也能切换总额、订单数、客户数和转化率这些指标。
+5. METRIC_CONFIG 里费劲定义了每个指标的 unit 字段（¥、单、人、%），但 SummaryCard 完全没用上，等于白配了。让 SummaryCard 在数值后面把单位显示出来。
+6. calculateTrend 函数在 up 方向的百分比计算没做绝对值——如果 previousValue 是负数，currentValue 是 0，它会算出 -100% 的涨幅，显然不对。给这个函数补上边界防御。
+7. 改完后跑 pnpm run test，所有已有测试必须通过。

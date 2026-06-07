@@ -1,0 +1,4 @@
+实时聊天页面有一个数据一致性问题需要修复，代码在 src/pages/chat/ 目录下。
+1. 首次打开某个联系人的对话窗口时，useState 惰性初始化器和 useEffect 各自独立调了 loadMessagesForContact。如果 localStorage 里没有这个联系人的历史消息，两处调用会分别生成一套不同的初始消息（ID 生成依赖时间戳，两次调用的时间不同），state 里存的是一套消息、localStorage 里持久化的又是另一套。用户在发第一条消息前刷新页面，看到的聊天记录会变——因为 localStorage 里存的是另一套。让初始消息的生成只发生一次，不要在 init 和 effect 里各跑一遍。
+2. ContactList 里用 void version 来消除未使用变量警告，虽然功能没毛病，但写法不太干净。换一种更自然的方式处理 version 参数，比如如果 UI 上不需要展示版本号，就把 data-version 属性和 void 一起清理掉。
+3. 跑 pnpm run test，所有已有测试继续通过。

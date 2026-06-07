@@ -1,0 +1,7 @@
+无限滚动列表有以下问题需要修复，代码在 src/pages/infinite-list/ 目录下。
+1. VirtualList 的 handleScroll 方法里每次 scroll 事件都调 setScrollTop 去更新 state，滚动是虚拟列表里最高频的交互，用 setState 每帧都会触发 React 重渲染，这跟虚拟滚动的性能目标直接冲突。把 scrollTop 改成用 ref 存储，不要走 React state 来驱动重渲染。
+2. 在列表中段搜索过滤后，虚拟滚动的 scrollTop 没有归零。用户在滚动到第 200 条时输了关键词，过滤结果从 200 条对应的偏移位置开始显示，他看到的是结果的中段而不是第一条。搜索行为触发过滤时，虚拟列表的滚动位置应该回到顶部。
+3. ListItem 左滑删除的阈值判断有 BUG：handleTouchEnd 里判断是否打开了左滑用的 offset 是组件闭包里的旧值，而不是通过 touchStart 和 touchMove 里记录的 ref 值来计算实际滑动距离。touchMove 和 touchEnd 之间如果没走重渲染，offset 就是过时的，导致滑动阈值判断不准。
+4. generateId 只靠 Date.now() 加 6 位随机后缀来拼 ID，在循环同步生成 10000 条 mock 数据时所有 ID 前缀完全一样，唯一性全靠 6 位随机数撑着，碰撞风险不低。让 ID 生成逻辑更可靠一些，比如加个自增序列。
+5. handleScroll 里用 isLoadingMore 这个 state 变量来做加载防重入，但 state 更新是异步的——同一个滚动帧里如果短时间内触发了多次 scroll 事件，闭包里的 isLoadingMore 全是 false，会导致 onScrollBottom 被重复调用。换一种不依赖异步 state 的方式来做防重入。
+6. 把测试文件里第 258 行那个测试名 "YYYYY-MM-DD" 多写的 Y 修掉。跑 pnpm run test 确保所有已有测试通过。

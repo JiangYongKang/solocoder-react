@@ -1,0 +1,13 @@
+产物不满意：
+1. VirtualList 的 handleScroll 里每次滚动事件都调 setScrollTop 更新 state，每帧触发 React 重渲染。虚拟滚动里滚动是最高频交互，所有位置计算都应该走 ref + requestAnimationFrame，不应该靠 setState 驱动。
+2. 搜索过滤后虚拟滚动位置没有重置回顶部，用户在列表中间位置输入关键词后，过滤结果从原来的 scrollTop 偏移量开始显示，看到的是过滤结果的中间段而不是第一条，交互体验不对。
+3. ListItem 的 handleTouchEnd 里判断左滑是否打开用的是闭包里的 offset 值，而不是通过 startOffset.current 和 touchStartX.current 计算实际滑动距离。touchMove 和 touchEnd 之间如果 React 没重渲染，offset 就是旧值，左边距阈值的判断会不准确。
+4. generateId 用 Date.now() 做前缀，在同步循环生成 10000 条数据时所有 ID 的时间戳部分完全一样，唯一性只靠 6 位随机后缀撑着。10000 条规模下碰撞概率不算低，更稳妥的做法是加一个自增计数器。
+5. data.test.js 第 258 行测试名写成了 "YYYYY-MM-DD"（多了一个 Y），虽然测试本身能过，但命名不准确。
+6. VirtualList 的 handleScroll 里 onScrollBottom 的防重复加载靠的是 isLoadingMore 这个 state 变量，但 state 更新是异步的，同一个滚动帧内如果触发了多次 scroll 事件，isLoadingMore 闭包值都是 false，会导致多次加载触发。
+
+过程不满意：
+1. 模型收到任务后直接创建 TodoList 开始写代码，没有先通读提示词分析各功能的依赖关系和技术难点。提示词里明确写了「应先分析问题再规划」，但思维过程里完全跳过了分析阶段。
+2. 模型声称「修复了 ListItem.jsx 的 setState in effect 问题，直接用初始值即可」，但实际产物中那个 useEffect 还在，只是里面用 setTimeout 做了延迟 reset，Lint 不报错了但逻辑跟声称的「直接用初始值」不是一回事，自述与实际不符。
+3. Lint 修复走了三轮：第一次全量 lint 出来一堆错误 → 改了 data.js → 再跑又有 2 个 → 再修 index.jsx → 再跑才过。没有在第一次出错时就收集全所有报错再一次性处理，改一处跑一次，过程拖沓。
+4. pnpm build 失败后模型扫了一眼就断定是其他文件的错，没有尝试仅对自己的文件做语法检查或隔离构建，排查不够踏实。

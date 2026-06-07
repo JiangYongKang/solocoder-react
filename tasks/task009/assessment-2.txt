@@ -1,0 +1,10 @@
+产物不满意：
+1. 步骤连接线颜色修正只写了一半：.step-completed .step-line 设了高亮色给已完成步骤自身的连接线，但 .step-active .step-line 的 CSS 规则被遗漏了。当前步骤（active）下方的连接线用的还是默认 var(--border) 灰色，没跟着高亮。提示词说的是"已完成打勾、当前高亮"，现在当前步骤走完的路亮了、正在走的路下的连接线却灰着，视觉意图只实现了一半。
+2. 手机号输入框移除了 maxLength 后只靠 replace(/\D/g, '') 过滤非数字字符，粘贴 "1388000123456" 这种纯数字超长字符串时没有任何截断机制，13 位数字照样存进 state。正确的做法是 maxLength 和 replace 共存，一个管长度一个管格式，两者并不冲突。
+3. Wizard.jsx 里 loadDraft() 在两个 useState 惰性初始化函数中各调了一次——第 22 行调了一次取 currentStep、第 26 行又调了一次取 data。组件的初始化阶段对 localStorage 做了两次读取和 JSON.parse，不够干净。模型自己在 session-cot 里也注意到了这个问题，但放过了。
+
+过程不满意：
+1. 依然是先建 TodoList 再分析问题，没有改进规划节奏。
+2. pnpm vitest --run src/pages/__tests__/wizard/ undefined 和 pnpm eslint ... undefined 这种带 undefined 后缀的命令再次出现。
+3. 模型在阅读完文件后一次性处理了验证逻辑、手机号输入、Wizard.jsx 初始化、storage.js 死代码清理这四项修改，设计上是对的，集中改完再验证。但跑完 lint 和测试后，对"启动 dev 服务器验证视觉效果"只做了 open_preview 打开了浏览器标签，没有任何实际的页面截图或交互观察记录。步骤指示器连接线颜色这种纯 CSS 修改，不看预览仅靠自我描述很难确认是否正确。
+4. 模型写完 storage.test.js 时用了 Write 整文件重写，其实只是删了 updateDraftStep/updateDraftData 相关的测试用例并加了 clampStep 测试。整文件重写在这种小改动上风险确实不大，但习惯性重写容易让人质疑对旧有内容的保留是否完整。

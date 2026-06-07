@@ -1,0 +1,13 @@
+产物不满意：
+1. StepIndicator 步骤连接线的 CSS 着色逻辑有误。.step-completed ~ .step-item .step-line 用后续兄弟选择器只能命中已完成步骤后面元素里的连接线，已完成步骤自身元素内部的连接线反而没被着色；而 .step-active .step-line 又把当前步骤后方的连接线高亮了。结果就是走完的路灰着、没走完的路反而亮着，跟提示词"已完成打勾、当前高亮"的视觉意图反了。
+2. validateAddress 没做纯空白字符的空值判断。用户输入一串空格时 !address 不触发（空格字符串是 truthy），trim 后长度也小于 200，空地址就这么静悄悄通过校验了，其他字段比如 validateName 都知道先 trim 再判空，就地址漏了。
+3. 手机号输入框同时设了 maxLength={11} 和 onChange 里的 replace(/\D/g, '')，两者互相打架。浏览器粘贴带格式的号码时可能先按 maxLength 截断再交给 replace 清洗，比如 "138-8000-1234" 先截成 "138-8000-12" 再洗成 "138800012" 只剩 9 位，好端端的号码反而校验失败。
+4. Wizard.jsx 里 loadDraft() 直接写在组件函数体顶层，每次重渲染都会读 localStorage 和 JSON.parse。应该放进 useState 的惰性初始化函数里，避免无意义的重复磁盘读取。
+5. mergeWithDefaults 只校验了 currentStep 是不是 number 类型，没检查数值范围。如果 localStorage 被人手动改成 5 或 -1 这种越界值，renderStep 走 default 返回 null，向导主体直接空白一片。
+6. storage.js 导出了 updateDraftStep 和 updateDraftData，但翻遍 wizard 目录没任何地方调用它们，实际草稿持续保存全靠 useEffect 里的 saveDraft，这两个函数是纯死代码。
+7. validateStep 的测试只测了 step 0 合法数据和 step 3 默认分支，step 1、step 2 的委托校验和各 step 的错误返回场景一概没覆盖，测试很不完整。
+
+过程不满意：
+1. 模型刚接手任务就连读了 jsconfig.json、eslint.config.js、vite.config.js、package.json、main.jsx、index.css、App.css、App.jsx 共 8 个文件，其中不少是跟多步骤向导页面开发无关的系统配置文件，信息收集范围开太大了，效率不高。
+2. 跑测试时先来了一发 pnpm test 全量跑，把其他模块预存的失败哗啦啦打了一屏，然后才换成只在 wizard 目录下跑，第一步的全量跑完全是多余动作。
+3. 模型最终总结声称做好了 375px 和 1440px 的响应式布局，但从头到尾只跑过单元测试和 build，一次 dev server 都没启过，步骤条连接线的视觉 BUG 正是因为缺了这步视觉验证才被漏掉的，属于没验证就喊完成的虚假完成。

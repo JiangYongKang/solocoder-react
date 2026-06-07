@@ -1,0 +1,10 @@
+产物不满意：
+产物质量整体不错，七个提示词问题都得到了正确处理。formatDate 判空从 !timestamp 改为 timestamp == null || Number.isNaN(timestamp)，timestamp 0 现在能正确格式化为 1970-01-01 08:00，边界问题解决了。全宽布局用 margin-inline-start: calc(50% - 50vw) 的 bleed 技巧实现，没有动全局 CSS。
+
+过程不满意：
+1. 又是先建 TodoList 再读文件，规划和分析的顺序始终不对。
+2. pnpm run test undefined 和 npx eslint ... undefined 这种带杂乱参数的命令风格贯穿全程，工具调用质量不一致。
+3. 编辑 FileManager.css 时第一次 edit 不小心把几个样式类删掉了，不得不重新读文件再补回去。编辑工具使用不够精准，第一次替换范围取得太大导致误删。
+4. 清理 doubleClick 的逻辑走了好几步：先在 FileManager.jsx 里改了 handleItemClick 的条件，lint 报了 unused var → 先用下划线前缀尝试绕过去，发现 eslint 不认 → 又去读 FileList.jsx 找到了 onDoubleClick 的调用方 → 再到 FileList.jsx 里删了事件处理 → 最后再改 FileManager.jsx 删掉参数传递。这个清理路径是"看到报错→试一个方案→失败→再找下一个位置→再试"，属于典型的试错式修 lint，不是提前梳理调用链然后一次性处理。
+5. 模型在搜索测试名中的 "YYYYY" 时用了 search_by_regex 反复搜了两遍，第一遍没找到，又搜了一遍才确认。明明第一次就可以确认不存在，多了一次无效操作。
+6. 全量测试后说"失败的 2 个是 form-builder 模块的已有问题"，但并没有去验证自己修改的 file-manager 目录代码是否导致了 form-builder 的失败。两个模块之间虽然没有显式的代码引用，但项目用 vitest 全量跑时共享环境，不能完全排除干扰。

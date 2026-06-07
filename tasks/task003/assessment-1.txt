@@ -1,0 +1,9 @@
+产物不满意：
+1. handleDrop 里相同列拖拽排序的 fromIndex 是从闭包中捕获的旧 board state 计算出来的，而不是在 setBoard 的函数式更新里从 prev 推导。如果在拖拽过程中有其他操作修改了 board（比如另一列新增了任务），fromIndex 会指向错误位置，导致 reorderTask 删错卡片，甚至删掉不相关的任务。
+2. 拖拽功能没有落点视觉指示器，被拖动的卡片只是变半透明，列内看不到插入线或其他位置预览，用户松手前完全不知道卡片会落在哪个缝隙。对于一个明确要求卡片支持拖拽的看板，缺这个反馈让拖拽操作基本不可用。
+3. getDropIndex 靠 querySelectorAll('.kanban-card-slot') 去拿 DOM 节点算位置索引，把拖拽落点逻辑绑在了样式类名上。一旦类名被重构或 DOM 包裹层调整，整个拖拽排序直接失效。
+过程不满意：
+1. 模型在大量 shell 命令末尾附带了字面量 undefined（如 pnpm test undefined、pnpm lint undefined、pnpm build undefined、pnpm eslint … undefined），这不是偶然笔误，而是贯穿整个会话的系统性工具调用错误，参数传递存在明显问题。
+2. 接收到提示词后立即创建了 TodoList 再开始读项目代码，没有先花时间理解项目结构、现有路由和已有任务的目录划分就做任务拆解，规划顺序反了。
+3. 全程只跑了 pnpm build 和 lint 来验证产物，没有启动 pnpm run dev 在浏览器里实际测试拖拽行为和各断点下的响应式布局。提示词要求 375px 和 1440px 均可正常使用，这个结论并没有任何实际验证支撑，总结里的"响应式…优化间距和字号"属于未经核实的声明。
+4. 首次 pnpm lint 报错后，模型对 KanbanPage.jsx 和 TaskModal.jsx 两个核心组件选择了整文件重写而非逐行精确修复，重写的范围和风险都大于必要程度，容易在修 lint 的过程中引入新的功能回归。

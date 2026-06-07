@@ -1,0 +1,8 @@
+产物不满意：
+三个提示词需求均正确完成。ensureMessagesForContact 函数首次生成即写入 localStorage，后续调用直接返回已有数据，useState 惰性初始化器调用它生成消息后，useEffect 不再重复加载/生成，只负责 clearUnread 和数据变更通知，消息一致性 BUG 从根本上解决了。ContactList 移除了 version prop、void version 语句和 data-version 属性，写法干净了。index.jsx 用 const [, setListVersion] 解构保留 setter，是 React 标准写法。47 个测试通过。
+
+过程不满意：
+1. 先建 TodoList 再读文件，老问题没改。
+2. pnpm run test undefined 和 pnpm exec eslint ... undefined 的 undefined 后缀命令继续出现。
+3. ChatWindow.jsx 和 ContactList.jsx 使用了 Write 整文件重写。ChatWindow 的重写范围还好理解——多处逻辑调整。但 ContactList 只是删 version 参数和 void 语句，完全可以一行 edit 精确完成，没必要整文件重写。
+4. 模型在总结中说 ContactList "没有被 memo 包裹，父组件重渲染时自然会重渲染，version 完全是多余的"来论证删除 version 的合理性。这个说法不太准确——ContactList 每次渲染会重新调用 loadMessagesForContact 等纯函数读取 localStorage，如果没有 version 触发额外渲染，仅靠父组件重渲染确实能保证数据新鲜度。但前提是父组件每次数据变更时都会触发重渲染，这个隐含前提模型没有验证。

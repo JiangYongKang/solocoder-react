@@ -1,0 +1,14 @@
+产物不满意：
+1. 拖拽布局把汇总卡片和图表卡片分别放在两个独立的 SortableContext 里，只能各自区域内排序，不能跨区域混排，提示词要求的是"汇总卡片和图表卡片支持拖拽调整布局位置"，没说分区域限制。
+2. 图表联动只做了一半：点击饼图扇区或柱状图柱子后，折线图确实切换到了该品类的时间趋势，但柱状图和饼图自己只做了高亮，数据内容没变，没有像提示词要求的"展示与该分类相关的子数据"。
+3. 柱状图的 BarChartCard 里 `entry.highlight || entry.category === selectedCategory` 逻辑冗余，`highlight` 字段本身就是从 `selectedCategory` 推导来的，后半段 `entry.category === selectedCategory` 完全重复了。
+4. METRIC_CONFIG 里定义了每个指标的 unit 字段（¥、单、人、%），但 SummaryCard 组件只用到了 label 和 format，unit 从头到尾没出现过，配置白写了。
+5. buildLineChartData 函数支持 metricKey 参数切换不同指标，但 Dashboard.jsx 第84行调用时把 metricKey 硬编码成了 'totalSales'，折线图只能看销售额趋势，函数的灵活性等于浪费了。
+6. calculateTrend 在 up 方向的百分比没做绝对值处理，遇到 previousValue 为负数时会算出负的涨幅百分比，函数缺少边界防御。
+过程不满意：
+1. 模型刚读完目录结构就立刻建了 12 项的 TodoList，还没分析现有代码风格和依赖情况就排计划，违反了"先分析再规划"的要求。
+2. pnpm add 安装依赖的命令末尾多了一个 undefined 参数，虽说 pnpm 容忍掉了，但构造命令不仔细。
+3. 写完测试直接跑，撞上 localStorage 不可用和导入路径错误两个问题后才去翻 wizard 和 file-manager 的测试文件学正确写法，应该先参考已有测试模式再动手。
+4. 查看 wizard/storage.test.js 参考 localStorage mock 写法时，同一个文件连续看了三遍，明显是忘了自己已经读过，重复读取很浪费。
+5. 所有组件写完才统一跑 lint，发现每个组件都有未使用的 React 导入，逐个回去修。如果写第一个组件时跑一下 lint 验证，后面的组件就不会重复同样的错误。
+6. 总结里写"响应式适配 375px / 1440px 等断点"，实际 CSS 只有 640px 和 1024px 两个断点，没有针对 375px 的专属断点，总结和实际代码对不上。

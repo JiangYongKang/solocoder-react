@@ -1,0 +1,11 @@
+产物不满意：
+产物质量总体不错，六个需求都正确实现了。addOption 用 getNextOptionIndex 扫描现有选项值找最大编号再 +1，删除后添加不会再重复。required 字段在无必填字段时统一不输出。数字输入框 placeholder 恢复了。375px 超窄屏断点已加入。
+
+有两个小问题：getNextOptionIndex 用正则 /^option(\d+)$/ 匹配选项值来推算编号，如果用户把一个选项的值手动改成了非 optionN 格式（比如 "customValue"），然后删掉中间的选项再添加，新添加的选项编号会从剩余 option 格式的选项里找最大值 +1，逻辑上没问题，但函数名和实现都假设了选项值必须是 optionN 格式，扩展性有限。另一个是 FormCanvas 的拖拽指示线渲染取决于 dragOverIndex state，这个 state 是在 onDragOver 里通过比较鼠标位置和字段上半/下半部分来计算的，但计算逻辑在 FormCanvas 组件内部用 ref 和 getBoundingClientRect 实现，如果画布内容有动画或异步布局变化，指示线位置可能偏移。
+
+过程不满意：
+1. 又是先建 TodoList 才开始分析代码，流程没改善。
+2. 命令中又出现了 npx eslint src/pages/form-builder/ src/pages/__tests__/form-builder/ undefined 和 pnpm run test undefined，undefined 参数问题依旧。
+3. 模型读 formBuilderCore.js 时同一个文件连续读了两次（view_files 调用），中间没有任何修改操作，属于重复读取浪费上下文。
+4. addOption 的实现经历了一次中途调整：先用全局计数器方案，然后发现测试中手动创建的选项不会被计数器识别，再改成扫描现有选项的 getNextOptionIndex。这说明最初的设计没有考虑到"选项可能由测试手动创建而非通过 addOption 创建"的场景，对函数的使用方式评估不够全面。
+5. 更新 CSS 时模型先 read 了 form-builder.css 的完整内容，然后通过 search_by_regex 搜索 .fb-field-container 定位，再加一段 edit 添加指示线样式，然后又 read 一遍同一个文件确认，再 edit 加 375px 断点样式。整个过程里对同一个 CSS 文件看了三次，如果第一次读完就规划好所有要加的内容一次改完，会更高效。

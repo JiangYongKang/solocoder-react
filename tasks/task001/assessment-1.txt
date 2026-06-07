@@ -1,0 +1,12 @@
+产物不满意：
+1. 注册表单的字段顺序是邮箱→昵称→密码→确认密码，但提示词列的顺序是邮箱→密码→确认密码→昵称，昵称被插到了邮箱和密码中间，表单布局跟需求不一致。
+2. Login.jsx 和 Register.jsx 提交成功时分别往 onLoginSuccess / onRegisterSuccess 回调里传了 user 参数，但 index.jsx 的 handleLoginSuccess 根本没接收这个参数，直接又从 localStorage 重新读了一遍，传参是废代码。
+3. handlePasswordChanged 回调只改了 React 状态不调 clearAuth，清理 localStorage 的实际逻辑完全挂在 ChangePassword 子组件里，如果以后其他地方复用这个回调或者子组件改逻辑，很容易漏清登录态。
+4. 找回密码的第三步渲染了一个"即将跳转到登录页…"的中间屏，然后 2 秒后才切回登录 tab。提示词只说"第三步自动跳回登录页"，没有要求这步要单独占一个页面来展示状态，反而拉长了用户等待时间。
+
+过程不满意：
+1. 模型一上来第一条工具调用就是 todo_write 建了 8 条任务，然后才去 view_folder / view_files 探索项目结构。按照标注规范，应该先分析问题再规划，这个顺序反了。
+2. 整个执行过程中多个终端命令都带了 undefined 后缀，比如 pnpm add react-router-dom undefined、pnpm test undefined、pnpm lint undefined、pnpm dev undefined，工具调用参数处理有明显问题且贯穿全程未修正。
+3. index.jsx 和 authStorage.test.js 各写了两遍——先写完第一版，跑 lint / test 之后发现问题不是做最小修改，而是把整个文件重写覆盖，效率低且不干净。
+4. 在找测试参考时，wizard/storage.test.js 这个文件被连续读了两次，中间没有修改任何东西，纯粹是重复操作浪费上下文。
+5. 执行总结里写"3375px 正常可用"，明显是 375px 的笔误，最终交付物连尺寸数字都没校对就写进去了。

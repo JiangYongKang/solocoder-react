@@ -1,0 +1,9 @@
+多步骤向导有几个 BUG 需要修复，代码在 src/pages/wizard/ 目录下。
+1. 步骤指示器的连接线颜色反了。现在的情况是已完成的步骤后面的连接线是灰的，当前步骤后面的连接线反而亮了——走完的路不亮、没走完的路亮了，跟"已完成打勾、当前高亮"的意图恰好反过来。把连接线上色逻辑调对。
+2. 地址校验 validateAddress 漏了对纯空白字符的判断。用户输入一串空格时，!address 不触发（空格是 truthy），trim 之后的长度也小于 200，空地址就这样轻松通过了。像 validateName 一样先 trim 再判空。
+3. 手机号输入框同时设了 maxLength={11} 和 onChange 里的 replace(/\D/g, '')，两个限制在粘贴时可能会互相打架——浏览器粘贴 "138-8000-1234" 这种带格式的号码时可能先被 maxLength 截成 "138-8000-12" 再被 replace 洗成 "138800012"，只剩 9 位反而通不过校验。调整一下让它别截断正常粘贴进来的格式化号码。
+4. loadDraft() 现在直接挂在 Wizard.jsx 组件的函数体顶层调用，每重渲染一次就读一次 localStorage 做 JSON.parse。把它移到 useState 的惰性初始化函数里去，只读一次。
+5. mergeWithDefaults 函数检查了 currentStep 的类型但没检查数值范围。如果有人手动把 localStorage 里的 currentStep 改成了 5 或 -1 这种越界值，renderStep 走进 default 返回 null，整个向导页面主体就空白了。给 currentStep 加上范围校验。
+6. storage.js 里导出的 updateDraftStep 和 updateDraftData 这两个函数翻遍了 wizard 目录也没有任何人调过它们，草稿保存实际全靠 useEffect 里的 saveDraft。把这两个死代码清理掉。
+7. validateStep 的测试只测了 step 0 的合法数据和一个 step 3 的默认分支，step 1 和 step 2 完全没有测到。补上这些缺失步骤的测试覆盖。
+8. 改完后用 pnpm run dev 在浏览器里实际看一眼步骤条的连接线颜色是否正确，再跑 pnpm run test 确认所有测试通过。

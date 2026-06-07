@@ -1,0 +1,12 @@
+产物不满意：
+1. 当前活跃对话中模拟对方回复时仍调用 incrementUnread 增加未读计数，桌面端左侧联系人列表上正在聊天的联系人会冒未读红点，跟用户实际看到的已读状态矛盾。
+2. 移动端进入聊天窗口后 ChatWindow 内没有返回联系人列表的按钮，用户只能点"返回首页"跳到首页再重新进入，对话和列表之间无法直接切换，交互路径断了。
+3. ChatWindow 把 markAllRead、saveMessagesForContact、clearUnread 等副作用塞进了 useState 的 lazy initializer 里执行，这些操作本该放在 render 之外的 effect 中，当前写法把副作用混入了渲染阶段。
+4. ChatInput 的光标位置跟踪只绑了 onChange/onSelect/onFocus/onClick，没覆盖键盘方向键移动光标的场景，用户用方向键挪光标后点表情会插到旧位置。
+5. utils.js 里 loadAllMessages、saveAllMessages、loadMessagesForContact、saveMessagesForContact、getUnreadCount、incrementUnread、clearUnread 这几个有 localStorage 读写和业务逻辑的纯函数完全没有单元测试覆盖，等于最核心的数据持久化链路没被验证。
+6. ContactList 每次数据刷新都靠 key 变化触发完整卸载重建，实际只需要组件重新读一次 localStorage 就行，这种做法让 markAllRead 等副作用每次切联系人都在 render 阶段重跑一遍。
+
+过程不满意：
+1. 模型收到任务后立刻创建了 TodoList，没有先读完 App.jsx 和 package.json 确认现有路由方案和依赖，规划阶段跳过了必要的上下文收集。
+2. 第一遍读 App.jsx 时没发现项目已用 react-router-dom，判断"项目没有 react-router"并计划自建 hash 路由，直到编辑 App.jsx 失败后才重新确认，有明显的阅读理解遗漏和试错式纠正。
+3. 修复 ChatWindow 的 set-state-in-effect lint 警告时没有对比 useEffect 和 lazy initializer 两种方案对副作用位置的影响，直接把副作用从 effect 搬到了 render 阶段，修好了一个 lint 红叉却造出了更严重的反模式。

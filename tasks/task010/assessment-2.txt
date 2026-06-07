@@ -1,0 +1,11 @@
+产物不满意：
+四个提示词需求完成度很高。硬编码的 rgba 全部改为 rgba(var(--te-xxx-rgb), 0.1) 的 CSS 变量形式，配套的 hexToRgbString/hexToRgba 纯函数和 applyThemeToDocument 的 -rgb 变量注入设计干净。HEX 输入有了前端校验，非法值不会写入 config。modifiedColorKeys Set 追踪用户手动修改，模式切换时保留自定义颜色。卡片 shadow 颜色通过 --te-shadow-color 变量适配暗色模式。36 个测试全部通过。
+
+1. 暗色模式下 --te-shadow-color 的值仍然是 0, 0, 0（纯黑），卡片 hover 的 box-shadow 是 15% 透明度的黑色阴影，叠在深色背景上完全不可见。.te-card:hover 的悬浮效果在暗色模式下等于没有了。提示词要的是"让阴影颜色根据当前模式适配"，15% 的黑色在深色背景上不是"看着别扭"而是直接看不见，.te-page[data-theme-mode='dark'] 里 --te-shadow-color 应该改成亮色值（比如 255, 255, 255）才对。
+
+过程不满意：
+1. 先建 TodoList 再读代码的惯例没变，规划顺序始终不对。
+2. pnpm vitest run src/pages/__tests__/theme-editor/themeUtils.test.js undefined 和 pnpm eslint ... undefined，undefined 参数问题继续存在。
+3. 用 Write 整文件重写了 useThemeEditor.js 和 ControlPanel.jsx 两个核心文件。useThemeEditor 的重写涉及复杂的模式切换保留逻辑和 importConfig/exportConfig 流程，整文件重写的风险大于逐段编辑。
+4. 在测试文件中添加 hexToRgbString/hexToRgba 测试时，连续读了同一个测试文件两次（view_files），中间没有写操作，属于不必要的重复读取。
+5. 模型的修改在"暗色模式阴影"这个点上跟提示词意图有微妙偏差——提示词说的是"看着很别扭"暗示需要改善，模型改了 CSS 变量让阴影可配置但暗色模式下的默认值还是全黑。如果真要让暗色模式下的阴影看起来协调，应该给 --te-shadow-color 在暗色模式下设置一个浅色值。这个遗漏不是因为技术实现错了，而是对需求的理解停留在"让它可变"而没做到"让它在暗色下协调"。

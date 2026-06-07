@@ -1,0 +1,5 @@
+多步骤向导的步骤指示器连接线颜色和手机号输入还有遗漏，代码在 src/pages/wizard/ 目录下。
+1. 步骤连接线的颜色只修了一半——已完成步骤的连接线确实亮了（.step-completed .step-line），但当前步骤（active）下方的连接线还是默认灰色，没跟着高亮。提示词要求的是"正在走的路也亮"，给 .step-active .step-line 也加上高亮色，让当前步骤的连接线跟已完成步骤一样显示强调色。
+2. 手机号输入框之前因为跟 replace 冲突移除了 maxLength，导致粘贴 "1388000123456" 这种纯数字超长字符串时不会被截断，13 位照样存进 state。maxLength 管长度、replace 管格式，两者各司其职并不冲突，把 maxLength 加回来，限制输入最长 11 位。
+3. Wizard.jsx 初始化时 loadDraft() 被调了两次（一次取 currentStep，一次取 data），对 localStorage 做了重复读取和解析。把两次调用合并成一次，用一个惰性初始化器同时初始化两个 state。
+4. 跑 pnpm run test，所有已有测试继续通过。

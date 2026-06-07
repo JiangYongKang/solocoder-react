@@ -1,0 +1,8 @@
+文件管理器有以下问题需要改进，代码在 src/pages/file-manager/ 目录下。
+1. 上次开发时动了 src/index.css 这个全局样式文件——把 #root 的 max-width 和 padding 限制去掉了，只是为了给文件管理器做全宽布局。这个改动影响了首页和其他所有任务页面，后来不得不在 App.css 里又补了一次居中样式来回退。现在全局样式文件已经被恢复了，但文件管理器页面因此失去了全宽布局。请只通过 file-manager 自己的 CSS 文件来实现全宽，不要再去动全局样式。
+2. InputDialog 组件定义了 dialogKey prop 也从父组件传进来了，但组件内部从头到尾没用过这个值——只在 useEffect 依赖数组里挂了个名，effect 内部连读都没读过。父组件 FileManager 里甚至还同时传了 key 和 dialogKey 两遍。把这个无效的 prop 和相关传参清理掉。
+3. handleItemClick 里双击打开文件夹的判断条件绕了一大圈写成了 (doubleClick || item.type === 'folder') && item.type === 'folder'，化简之后其实只取决于 item.type === 'folder'，doubleClick 这个 flag 在导航逻辑上根本没起作用。把条件表达式简化一下。
+4. 左侧树形目录的节点子项数量统计用的是 node.children.length（包含子文件和子文件夹），但展开后只渲染子文件夹。结果就是某个节点旁显示 (2)，用户兴冲冲点开想看看是啥，却发现只有空文件夹图标，因为它底下只有文件没有子文件夹。要么改成只统计子文件夹数量，要么把子文件也一并渲染出来，总之数出来的数字和展示出来的内容得一致。
+5. formatDate 里面判断无效时间戳用了 !timestamp，时间戳 0 对应 1970-01-01 是一个合法值，但因为这行 falsy 检查被误判成了无效、返回了 '-'。把判空条件写精确一点，别误杀 0 这种边界值。
+6. 移动端样式里 .fm-sidebar 设了 position: absolute、top: 0、left: 0，但它的父容器 .fm-body 和 .fm-page 都没有设 position: relative，侧边栏的偏移基准会往上找到更远的定位祖先，可能跟页面顶部重叠。给合适的父容器补上相对定位。
+7. 改完给 formatDate 那组测试把测试名里的 "YYYYY-MM-DD" 多打的那个 Y 修掉，然后跑 pnpm run test，所有已有测试需要通过。

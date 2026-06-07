@@ -1,0 +1,15 @@
+产物不满意：
+1. loadProducts 函数在 JSON.parse 失败时调了 console.error，导致 localStorage 数据损坏时 stderr 被污染。测试用例"loadProducts localStorage 数据损坏时返回 mock 数据"虽然返回值正确降级到了 mock 数据，但控制台输出了一整段错误堆栈，降级处理不干净，不符合静默容错的基本要求。
+2. filterByStatus 函数在 utils.js 里实现了也写了测试，但 index.jsx 中 getProductList 调用时从未传入 status 参数，UI 从头到尾没用过这个函数，属于多余代码。提示词没要求状态筛选，凭空多写了一块用不上的逻辑。
+3. searchProducts 测试中"搜索不区分大小写"的用例用 'BLUETOOTH' 去搜中文商品名，匹配结果当然是 0。中文压根没有大小写概念，这个用例根本验证不了大小写不敏感的行为，测试设计有逻辑漏洞。
+4. ProductTable 里空状态行的 colSpan 写死为 "9"，如果以后增减表格列，这个硬编码值不会自动更新，空状态提示的跨列显示会错位。
+5. MOCK_PRODUCTS 的 createdAt 全部是 Date.now() 减固定偏移量，每次模块加载时间戳都不一样，数据不具备确定性。如果后续有人要针对初始数据写精确断言就必挂。
+6. 新建和编辑表单提交失败时（比如 updateProduct 因商品不存在返回了 success: false），错误信息没有反馈到表单 UI 上，用户提交后弹窗不关也不提示任何错误，交互体验是断裂的。
+
+过程不满意：
+1. 模型第一次写完 ProductForm.jsx 时 setFormData 少了右括号，直接编译报错。写完了连最基本的语法都没自检，交付态度太糙。
+2. 模型修 lint 问题时直接把 index.jsx 和 ProductForm.jsx 整个文件重写了，而不是针对具体的 lint 规则做最小修改，伤筋动骨式的重写容易引入新问题。
+3. 执行了 pnpm add react-router-dom undefined 和 pnpm lint ... undefined，命令末尾多出 undefined 参数。虽然没导致命令失败，但工具调用明显不规范，参数处理有误。
+4. 模型刚看完项目骨架就立刻建了 TodoList，没有先对着提示词逐条拆解需求再规划子任务，任务规划太仓促，缺少分析环节。
+5. 总结里写"所有 53 个单元测试全部通过""相关代码也没有 lint 错误"，但 loadProducts 的 console.error 污染 stderr 这个问题完全没被发现，虚假完成——只盯着测试通过的数量，没关注测试执行过程干不干净。
+6. vitest 环境里 localStorage 未定义时，模型在测试文件里手写了 createMockLocalStorage 去替换 globalThis.localStorage，没有先检查 vitest 的 environment 配置（比如 environment: 'jsdom' 就自带 localStorage），绕了一大圈做了一件配置一行就能解决的事。

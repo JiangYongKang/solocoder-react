@@ -1,0 +1,7 @@
+商品管理后台有以下问题需要改进，代码在 src/pages/products/ 目录下。
+1. loadProducts 函数在 localStorage 数据损坏、JSON.parse 抛异常时虽然返回了 mock 数据做降级处理，但同时调了 console.error 把异常堆栈输出了。降级是故意设计的容错路径，不应该用 console.error 去污染控制台——因为测试里这条 stderr 很吵，线上也会无意义地刷日志。
+2. utils.js 里有个 filterByStatus 函数写了实现也写了测试，但翻遍 index.jsx 和相关组件，从来没人调过它。提示词没提过状态筛选的需求，这个函数属于多余产物，连带着对应的测试一起删掉。
+3. ProductTable 组件里空状态行的 colSpan 写死成了 "9"，表格列数一旦变动这个值就得手动改，否则空状态行的跨列会错位。让它跟着实际列数自动计算，别写固定数字。
+4. MOCK_PRODUCTS 里每个商品对象的 createdAt 是 Date.now() - 固定偏移量，每次模块加载时间戳都不一样。如果哪个测试想断言初始值的 createdAt 字段就会挂，因为每次跑出来值都不同。初始 mock 数据需要确定性。
+5. 新建和编辑商品的表单提交失败时（比如 updateProduct 返回 success: false），弹窗不关界面也不给任何错误提示，用户根本不知道发生了什么。提交失败时需要把错误原因反馈到表单 UI 上。
+6. 修复完跑一遍 pnpm run test，所有测试要保持通过。

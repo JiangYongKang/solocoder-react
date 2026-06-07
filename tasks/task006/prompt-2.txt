@@ -1,0 +1,8 @@
+实时聊天页面有以下问题需要修复，代码在 src/pages/chat/ 目录下。
+1. 最离谱的是——正在跟人聊着天呢，对方模拟回复的消息发过来之后左侧联系人列表上那个人的头像居然冒出了未读红点。你都正在跟这个人对话，消息已经显示在屏幕上了，凭什么还标成未读？在判断是否增加未读计数时，如果当前对话窗口正好就是发消息的那个联系人，就不该增加未读数。
+2. 移动端 375px 宽度下一旦点进聊天窗口就回不去了——ChatWindow 里没有返回联系人列表的按钮，用户只能点"返回首页"跳出去再重新进来。给聊天窗口顶部加一个返回按钮，点一下切回联系人列表。
+3. ChatWindow 组件把 markAllRead、saveMessagesForContact、clearUnread 这些有副作用的操作写在了 useState 的惰性初始化函数里。useState 的初始化器是 render 阶段执行的，副作用不应该在这里跑，搬到 useEffect 里去做。
+4. 表情面板插表情的时候光标位置跟踪不完全——onChange、onSelect、onFocus、onClick 都记了位置，偏偏漏了键盘方向键。用户用方向键把光标挪到别处再点表情，表情就插到旧位置去了。补上对键盘方向键事件的光标位置同步。
+5. utils.js 里面的核心数据函数——loadAllMessages、saveAllMessages、getUnreadCount、incrementUnread、clearUnread 这些——完全没有单元测试。这些函数管着 localStorage 的读写和消息持久化，是整个聊天系统最基础的数据链路，不测不行。给这些函数补上纯逻辑的单测，测试代码放在 src/pages/__tests__/chat/ 下。
+6. ContactList 组件每次数据刷新都靠改 key 来触发完整卸载和重建，这导致 markAllRead 这些副作用每次切联系人都要被重新触发一遍。改成不依赖 key 触发重建的方式来做数据刷新。
+7. 改完后跑 pnpm run test，所有测试要通过。

@@ -1,0 +1,9 @@
+产物不满意：
+本轮代码产物质量不错，三个核心问题都得到了正确修复。fromIndex 已移入 setBoard 函数式更新的 prev 推导、有了带脉冲紫色发光效果的落点指示线、getDropIndex 改用 data-role 和 data-index 属性不再依赖 CSS 类名。40 个测试全部通过。
+
+过程不满意：
+1. 和所有其他任务一样，模型接收任务后第一件事就是建 TodoList，然后才读文件，规划顺序反了。
+2. 命令行里又是 pnpm eslint src/pages/kanban/ src/pages/__tests__/kanban/ undefined 这种带多余 undefined 参数的形式，工具调用质量不行。
+3. 模型在写 KanbanPage.jsx 时用 Write 整文件重写了，而不是对原有代码做 targeted 编辑。虽然最终产物正确，但重写比精准编辑风险大，容易带进新问题。
+4. 写 getDropIndex 第一版时返回的 i 是包含 indicator 在内的 DOM children 索引而非卡片索引，模型自己发现后又追加了一次 edit 修正。这种第一版就有逻辑漏洞的情况说明写的时候对 DOM 结构的理解不够，做了一遍才发现问题。
+5. 模型跑了 pnpm dev 启动服务器并声称做了浏览器验证，但没有给出具体的浏览器中拖拽行为和 375px 响应式验证的截图或观察记录，只说了"可以打开验证"。声称验证了但证据不充分。

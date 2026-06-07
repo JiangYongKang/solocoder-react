@@ -1,0 +1,8 @@
+产物不满意：
+三个提示词需求中前两项处理了 Tooltip，但 Y 轴的修复方向跟需求有偏差。提示词明确说的是"子指标视图下柱状图的 Y 轴把销售额也当普通数字格式化了，没带 ¥ 符号"，要求的是修复 Y 轴的显示。模型的解决方案是在 Tooltip 里根据 entry.metric 区分 currency/number 格式，但 Y 轴仍然保持统一 number 格式，销售额在轴上依然没有 ¥ 前缀。模型在思考过程中阐述的理由是"三个量纲不同的值不能在一根轴上同时显示两种格式"，这个判断技术上是对的，但提示词没有要求"三个指标在一根轴上各显各的格式"，而是要求销售额在子指标视图里保持 currency。可以在子指标视图下检测 data 中是否全是 sales/single metric 来决定 Y 轴格式，模型没有朝这个方向探索。
+Tooltip 的标签修复和格式修复本身是正确到位的：BarChartCard 用了 entry.category、PieChartCard 用了 entry.name 做标签，Tooltip 里 sales 用 currency 格式带 ¥ 符号。PieChartCard 清理了未使用的 isCategory 变量。
+
+过程不满意：
+1. 又是先建 TodoList 再读代码，十轮了还是没改掉这个惯性。
+2. pnpm test -- src/pages/__tests__/dashboard/dataUtils.test.js undefined 照样带着 undefined 后缀。
+3. 模型在 COT 里长篇解释了"Y 轴不能做多格式"的理由，但没有尝试寻找折中方案（比如只在子指标视图下检查 data 的第一项 metric 来决定整个 Y 轴格式），直接跳过了需求要求的 Y 轴修复，转而只修了 Tooltip。从修复效果看 Tooltip 确实比 Y 轴更重要，但模型对需求没有被完全满足这件事没有在总结里坦诚说明，而是用技术解释来代代替了"没做到"的事实。

@@ -1,0 +1,10 @@
+产物不满意：
+1. ChatWindow 在首次进入某个联系人对话时，useState 惰性初始化器（第 19-22 行）和 useEffect（第 36-43 行）各自独立调用了 loadMessagesForContact。如果 localstorage 里没有该联系人的历史消息，两个调用各生成一套不同的初始消息（createInitialMessages 用 Date.now() 生成 ID，两次调用时间戳不同），state 里存了一套、useEffect 又往 localStorage 写了一套不同的。在用户发出第一条消息之前，内存中的消息历史和持久化的消息历史是不一致的——如果用户在发消息之前刷新了页面，看到的会是另一套消息。
+2. ContactList 组件用 void version 来消除未使用变量的 lint 警告，这种写法虽然功能上没问题，但纯粹是为了绕开 lint 规则，属于代码异味。version 的值只在 data-version DOM 属性里出现，实际逻辑不依赖它。
+
+过程不满意：
+1. 模型的流程依然是"先建 TodoList 再读文件"的老毛病，没有在先分析后规划的次序上做出改进。
+2. pnpm test undefined 和 pnpm exec eslint ... undefined 这种带 undefined 后缀的命令继续出现。
+3. 修改 ChatInput.jsx 第一次 edit 时搞出了语法错误（setTimeout 的逻辑写错了），只好追加一次 edit_file_search_replace 来纠正。第一次改动没有在写入后立即校验，导致后续需要额外一轮修正。
+4. ChatWindow 的副作用重构经历了一次方向调整：先把副作用放进 useEffect + setState → ESLint 报 setState-in-effect → 又改回用 key 触发组件重建的方案。这说明一开始写 useEffect 方案时没考虑清楚 ESLint 规则的影响，写完被 lint 打回来才回头重新设计。
+5. 在解释 ChatWindow 用 key 重建的合理性时，模型说"不同联系人就是不同会话"来辩护，但提示词要求 ContactList 不靠 key 重建时，模型对这个要求的理解是对的——ContactList 改成了 version prop——但 ChatWindow 用 key 的方案本身也是合理的，模型没必要在总结里花大段解释这个决策，显得像在为自己的设计做辩解。

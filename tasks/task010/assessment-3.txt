@@ -1,0 +1,7 @@
+产物不满意：
+两个提示词需求均正确完成。暗色模式下 --te-shadow-color 从 0, 0, 0 改为 255, 255, 255，15% 透明度的白色阴影叠在深色背景上能形成可见的悬浮光晕效果。36 个测试全部通过。
+
+过程不满意：
+1. 先建 TodoList 再读代码，顺序又没对。
+2. pnpm vitest run src/pages/__tests__/theme-editor/themeUtils.test.js undefined 又出现了 undefined 后缀。
+3. 修改只占了 CSS 里一行（--te-shadow-color: 0, 0, 0 → 255, 255, 255），用 edit_file_search_replace 精准完成，改动量极小。但思考过程非常简短，读了一个文件、改了一行、跑了一个目录的测试就结束了，没有跑全量测试确认不破坏其他模块。虽然改动确实影响不到其他模块，但"只跑自己模块的测试就收工"这种习惯在复杂项目里是有风险的。

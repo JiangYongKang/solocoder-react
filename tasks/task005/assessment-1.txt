@@ -1,0 +1,15 @@
+产物不满意：
+1. 模型把 src/index.css 里 #root 的 max-width 和 padding 限制去掉了，这是全局样式文件，所有页面都受影响。为了给文件管理器做全宽布局就动全局 CSS，首页和其他任务页面的居中展示跟着变了，后来又得在 App.css 里补回来，改动范围没控制好。
+2. InputDialog 组件接收了 dialogKey prop，但组件代码里从头到尾没读过这个值——只在 useEffect 依赖数组里列了一下，effect 内部完全没用到它。父组件 FileManager 里还同时传了 key 和 dialogKey 两遍，等于传了个摆设参数。
+3. handleItemClick 里那个条件写成了 (doubleClick || item.type === 'folder') && item.type === 'folder'，逻辑化简之后等价于只判断 item.type === 'folder'，doubleClick 参数在导航行为上根本没发生作用，代码复杂了一圈但结果是单因素的。
+4. 左侧树目录的子项数量用的是 node.children.length（含文件和子文件夹），但展开后只渲染子文件夹节点。像「设计稿」下面有两个图片文件、没有子文件夹，节点旁显示 (2) 点开却是空的，数量和可视内容对不上，用户看到数字以为有东西点进去啥也没有。
+5. formatDate 用 !timestamp 判无效值，导致时间戳 0（对应 1970-01-01）被当成无效返回 '-'。0 是合法的时间戳，纯粹因为 falsy 检查太粗糙被误杀了。
+6. 移动端 CSS 断点下 .fm-sidebar 设了 position: absolute，但 .fm-body 和 .fm-page 都没 position: relative，侧边栏的 top: 0 / left: 0 会相对更上层的定位祖先计算，展开后可能和页面顶部的 header 重叠在一起。
+7. 测试文件里 formatDate 那组测试的名称写成了「YYYYY-MM-DD HH:mm」，比实际格式多打了一个 Y，属于测试命名的笔误。
+
+过程不满意：
+1. 模型刚扫完项目文件结构就立刻建了 TodoList，没有先对提示词逐条拆解需求再评估，属于「先列清单再想问题」的惯性操作，规划时机太早了。
+2. 跑测试时先无脑执行了 npm test，把其他任务里本来就挂掉的用例结果也打了一屏，才发现应该只跑 file-manager 目录的测试文件。正确做法是先定位目标测试文件再运行，多了一次无效的全量运行。
+3. Lint 修复分了三轮才干净——先改 FolderTree 的 map/索引问题，再改 utils.js 未使用变量和 Dialogs 的 setState-in-effect，最后又回 FolderTree 修 useMemo 依赖，同一批 lint 被拆成了断断续续的多次迭代，节奏散。
+4. 项目用 pnpm（存在 pnpm-lock.yaml），模型全程用 npm 和 npx 跑命令，日志里还出现了 npm test undefined 这种带了多余参数的无效写法，没对齐项目约定的包管理器。
+5. 模型改了 src/index.css 之后才意识到需要给首页补居中样式又在 App.css 里加回去，属于改完了才发现影响范围不对的补救式修复，说明动手前没有评估清楚全局文件变更的波及面。

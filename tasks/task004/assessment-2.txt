@@ -1,0 +1,11 @@
+产物不满意：
+1. 点击品类进入子指标视图后，BarChartCard 的 Tooltip label 传了空字符串 ''，饼图的 PieChartCard 也有同样的问题。用户鼠标悬浮在柱子上看到的是纯数字，完全不知道它代表的是销售额、订单数还是用户数，子指标视图下的数据可读性直接归零。
+2. 子指标视图下 BarChartCard 的 Y 轴 format 对所有三个子指标都用了 'number'，sales 作为销售额数据本该用 currency 格式带 ¥ 符号，结果渲染成了纯数字，跟品类视图下的 ¥ 显示不一致。
+3. SummaryCard 里 format='number' 的指标追加了单位显示，但 format='currency' 和 format='percent' 的指标虽然格式本身含了 ¥/% 符号，却没有利用 METRIC_CONFIG.unit 字段，配置的 unit 字段在 currency 和 percent 场景下仍然是摆设。
+4. 柱状图和饼图在选中品类时切换到的"子指标视图"用的是固定的 sales/orders/users 三个子维度，没有从配置中读取，如果以后 METRIC_KEYS 变化了这块逻辑不会自动跟随。
+
+过程不满意：
+1. 模型一上手又是先建 TodoList 再读文件，没有先分析需求再规划。
+2. 一条 pnpm test -- src/pages/__tests__/dashboard/dataUtils.test.js undefined 命令暴露了跟其他任务一样的 undefined 参数问题。
+3. 模型把所有组件都用 Write 整文件重写了（SummaryCard、BarChartCard、PieChartCard、LineChartCard、Dashboard.jsx、Dashboard.css），一共 6 个整文件重写。问题 3（BarChartCard 重复逻辑）和问题 5（SummaryCard 单位显示）本质上都是只需要改几行的小修小补，但模型选择了全量覆盖，风险大于必要。
+4. 模型声称"全量 pnpm test 里 2 个 form-builder 失败是已有问题"，但没有去检查 form-builder 的失败是不是自己改 dataUtils 共用逻辑时不小心引入的——dashboard 和 form-builder 虽然页面隔离，但如果 dataUtils 被跨任务引用，改动就可能波及。排查范围太窄。

@@ -1,0 +1,11 @@
+产物不满意：
+六个修复项实现质量不错。scrollTop 改成了 ref + rAF 节流、搜索过滤后虚拟列表位置归零、ListItem 左滑阈值改用 offsetRef 实时值、generateId 加了自增计数器、加载防重入用了 isLoadingMoreRef 同步标志位。32 个测试全部通过。
+
+不过 VirtualList 的 startIndex/endIndex 计算从 useMemo 改成了渲染时直接计算，理由是"已被 rAF 节流，每帧最多算一次"。但实际上 rAF 节流的机制是 scheduleRender 函数，每次 scroll 事件都会调用 scheduleRender —— 如果两个 scroll 事件落在不同帧之间，渲染次数其实没有减少过多。而且 startIndex 等变量的计算逻辑现在散落在渲染函数体里，可读性比 useMemo 方案稍差。
+
+过程不满意：
+1. 照例先建 TodoList 后分析需求，规划顺序不对。
+2. pnpm exec eslint ... undefined 和 pnpm exec vitest run ... undefined 的 undefined 参数后缀又出现了。
+3. VirtualList.jsx 的 lint 修复过程特别拖沓。useMemo 依赖了 ref（scrollTopRef）被 lint 报 warning → 改加 eslint-disable 注释 → lint 继续报 renderTick 变量未使用 → 把解构改成忽略 → 还是不行 → 最后干脆去掉 useMemo 改为直接计算。这个过程走了四步才到正解，中间两轮（disable 注释和忽略解构）都是没用的折腾。本质原因是开始就没想清楚：ref 值变化不触发 useMemo 缓存失效，用 useMemo 包装依赖 ref 的计算本身就是错误的组合。
+4. 模型用 search_by_regex 搜 "YYYYY" 没有找到，又搜了 "YYYY" 确认，然后断言"测试名已经正确"。但提示词明确说了第 258 行测试名多写了一个 Y，模型没有直接去读第 258 行附近的代码验证，只靠正则搜索就下结论，缺少针对性的核实。
+5. 跑完全量测试发现 3 个失败后直接说"是 form-builder 和 file-manager 的已有问题"，但无限列表共享了 vitest 的 jsdom 环境，模型没有排除自己的 VirtualList 修改可能影响全局 DOM 行为。

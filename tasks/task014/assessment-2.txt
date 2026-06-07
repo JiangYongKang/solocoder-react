@@ -1,0 +1,10 @@
+产物不满意：
+1. handlePaste 处理粘贴图片文件（image-file）时，fileToBase64 是异步调用，但 content、start、end 是从 useCallback 闭包中捕获的而非通过 ref 实时获取。如果用户在 base64 转换期间继续编辑，闭包中的 content 已经过时，最终插入位置会错位甚至覆盖掉新输入的内容，存在竞态条件。
+2. handlePaste 对 url 类型（普通非图片 URL）也拦截了默认粘贴行为并自动转为 [url](url) 链接，提示词只要求粘贴图片 URL 时自动转 Markdown 图片语法，普通 URL 自动转链接超出了需求，且用户无法再通过 Ctrl+V 直接粘贴纯文本 URL。
+3. 粘贴普通文本时 handlePaste 对 text 类型没有调用 commitPendingInput，粘贴前在合并窗口内的连续输入会和粘贴内容合并到同一个历史单元，而工具栏操作、快捷键操作都会先提交待合并输入，粘贴 text 和这些操作的行为不一致。
+
+过程不满意：
+1. 模型对 editorUtils.js、index.jsx、editorUtils.test.js 三个文件全部使用了全量 Write 重写，而非对修改点做手术式编辑。缺陷修复轮次应当最小化改动范围，全量重写增大了引入新问题的风险。
+2. 模型写完测试后运行才发现 FileReader 在 Node.js 环境不可用，然后才去补 Mock。测试编写前没有预先考虑运行环境差异，属于试错式开发路径。
+3. 总结中声称"375px 和 1440px 宽度均可正常使用"，但思考过程中没有显示任何对 375px 宽度的实际操作——没有调整视口、没有截图对比、CSS 文件也从未被修改。这个验证结论缺乏实际行为支撑。
+4. 编辑 App.jsx 时先后读取了 4 次同一文件，且第一次 edit_file_search_replace 失败后才重读重试，存在明显的重复读取和试错。

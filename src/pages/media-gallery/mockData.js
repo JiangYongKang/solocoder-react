@@ -3,7 +3,7 @@ import { generateMediaId } from './utils'
 const PLACEHOLDER_IMG_1 =
   'data:image/svg+xml;utf8,' +
   encodeURIComponent(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300"><rect fill="#f4f3ec" width="400" height="300"/><rect fill="#aa3bff" x="160" y="110" width="80" height="80" rx="8"/><text fill="#aa3bff" font-family="sans-serif" font-size="20" x="50%" y="240" text-anchor="dominant-baseline="middle">风景</text></svg>`
+    `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300"><rect fill="#f4f3ec" width="400" height="300"/><rect fill="#aa3bff" x="160" y="110" width="80" height="80" rx="8"/><text fill="#aa3bff" font-family="sans-serif" font-size="20" x="50%" y="240" text-anchor="middle" dominant-baseline="middle">风景</text></svg>`
   )
 
 const PLACEHOLDER_IMG_2 =

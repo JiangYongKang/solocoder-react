@@ -1,0 +1,10 @@
+当前项目 src/pages/media-gallery/ 下的媒体资源库页面存在一些问题，请在该目录下修复它们。
+
+1. mockData.js 里有一个 SVG 占位图写错了属性——text-anchor 和 dominant-baseline 两个 SVG 属性因为引号嵌套错误被合并成了一个无效属性，导致"风景照片.jpg"和"旅行记录.jpg"两个缩略图上的文字不会居中显示。
+2. 筛选栏的日期下拉选项只取了前 10 个日期，一旦上传大量历史文件，早于第 10 个日期之前的媒体项就再也无法通过日期筛选找到了，日期选项列表被截断了。
+3. formatDate 和 formatDateTime 的参数防御不充分，传入无效字符串如 "invalid" 时 Number.isNaN 对非数字参数返回 false 不会被视为无效，最终会输出 "NAN-NAN-NAN" 而不是占位符。
+4. 文件上传过程中如果 FileReader 读取失败了，会静默地创建一个 dataUrl 为 null 的条目加入资源库。用户在网格中看到一个空白残缺的缩略图，却没有任何提示说明这一个文件上传出了问题。
+5. loadMediaData 和 saveMediaData 这两个 localStorage 读写函数虽然是数据持久化的核心入口，但单元测试没有覆盖它们，如果 try-catch 里的异常分支有改动也无法发现。
+6. 修复后需要为该页面补充纯 JS 函数的单元测试，只测和页面渲染无关的逻辑。测试代码放在 src/pages/__tests__/media-gallery/ 下。
+7. 确保所有子页面在 375px 移动端宽度下布局不崩坏，使用 pnpm run dev 启动后手动验证关键页面。
+8. 重新运行 pnpm run test，需要让所有测试通过。

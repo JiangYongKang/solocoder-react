@@ -1,4 +1,4 @@
-import { formatPrice, calcCartTotal } from './utils.js';
+import { formatPrice, calcCartTotal, handleImageFallback } from './utils.js';
 
 export default function CheckoutDialog({ isOpen, onClose, cart, address, onOpenAddress, onSubmit }) {
   if (!isOpen) return null;
@@ -43,7 +43,7 @@ export default function CheckoutDialog({ isOpen, onClose, cart, address, onOpenA
               {cart.map((item) => (
                 <div key={item.productId} className="orders-checkout-product">
                   <div className="orders-checkout-product-image">
-                    <img src={item.image} alt={item.name} />
+                    <img src={item.image} alt={item.name} onError={handleImageFallback} />
                   </div>
                   <div className="orders-checkout-product-info">
                     <div className="orders-checkout-product-name">{item.name}</div>

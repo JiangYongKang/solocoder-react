@@ -61,16 +61,41 @@ export function getMediaType(filename) {
   return MEDIA_TYPES.OTHER
 }
 
+function isValidTimestamp(timestamp) {
+  if (timestamp == null) return false
+  if (typeof timestamp === 'boolean') return false
+  if (typeof timestamp === 'string' && timestamp.trim() === '') return false
+  const num = Number(timestamp)
+  if (!isNaN(num)) {
+    const d = new Date(num)
+    if (d instanceof Date && !isNaN(d.getTime())) return true
+  }
+  if (typeof timestamp === 'string' || typeof timestamp === 'number') {
+    const d = new Date(timestamp)
+    if (d instanceof Date && !isNaN(d.getTime())) return true
+  }
+  return false
+}
+
+function toDate(timestamp) {
+  const num = Number(timestamp)
+  if (!isNaN(num)) {
+    const d = new Date(num)
+    if (d instanceof Date && !isNaN(d.getTime())) return d
+  }
+  return new Date(timestamp)
+}
+
 export function formatDate(timestamp) {
-  if (timestamp == null || Number.isNaN(timestamp)) return '-'
-  const d = new Date(timestamp)
+  if (!isValidTimestamp(timestamp)) return '-'
+  const d = toDate(timestamp)
   const pad = (n) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
 export function formatDateTime(timestamp) {
-  if (timestamp == null || Number.isNaN(timestamp)) return '-'
-  const d = new Date(timestamp)
+  if (!isValidTimestamp(timestamp)) return '-'
+  const d = toDate(timestamp)
   const pad = (n) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }

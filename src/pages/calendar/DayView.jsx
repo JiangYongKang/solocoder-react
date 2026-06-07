@@ -3,13 +3,13 @@ import { HOURS, SLOT_MINUTES } from './constants.js'
 import {
   formatTime,
   filterEventsByDay,
-  getMinutesFromStart,
-  getEventDurationMinutes,
   isSameDay,
-  formatDate,
+  startOfDay,
+  endOfDay,
+  pixelsToMinutes,
+  getDayViewEventPosition,
 } from './calendarUtils.js'
 
-const PIXELS_PER_MINUTE = 1.2
 const HOUR_HEIGHT = 60
 
 export default function DayView({
@@ -21,8 +21,9 @@ export default function DayView({
   onEventDrop,
 }) {
   const dayEvents = filterEventsByDay(events, date)
-  const [dragging, setDragging] = useState(null)
-  const [resizing, setResizing] = useState(null)
+  const [draggingId, setDraggingId] = useState(null)
+  const [resizingId, setResizingId] = useState(null)
+  const dragStateRef = useRef(null)
   const scrollRef = useRef(null)
 
   const handleSlotClick = (hour, e) => {
@@ -40,42 +41,63 @@ export default function DayView({
     e.stopPropagation()
     e.preventDefault()
     const startY = e.clientY
+
     if (mode === 'move') {
-      setDragging({ id: event.id, startY, originalStart: event.startTime, originalEnd: event.endTime })
+      setDraggingId(event.id)
+      dragStateRef.current = {
+        mode: 'move',
+        id: event.id,
+        startY,
+        originalStart: event.startTime,
+        originalEnd: event.endTime,
+      }
     } else if (mode === 'resize') {
-      setResizing({ id: event.id, startY, originalEnd: event.endTime })
+      setResizingId(event.id)
+      dragStateRef.current = {
+        mode: 'resize',
+        id: event.id,
+        startY,
+        originalStart: event.startTime,
+        originalEnd: event.endTime,
+      }
     }
 
     const handleMove = (me) => {
-      const deltaMin = Math.round((me.clientY - startY) / PIXELS_PER_MINUTE / 15) * 15
-      if (mode === 'move' && draggingRef()) {
-        const d = draggingRef()
-        const origStart = new Date(d.originalStart)
-        const origEnd = new Date(d.originalEnd)
+      const state = dragStateRef.current
+      if (!state) return
+
+      const deltaPx = me.clientY - state.startY
+      const deltaMin = Math.round(pixelsToMinutes(deltaPx, HOUR_HEIGHT) / 15) * 15
+
+      if (state.mode === 'move') {
+        const origStart = new Date(state.originalStart)
+        const origEnd = new Date(state.originalEnd)
         const duration = origEnd.getTime() - origStart.getTime()
         const newStart = new Date(origStart.getTime() + deltaMin * 60 * 1000)
         const newEnd = new Date(newStart.getTime() + duration)
-        if (isSameDay(newStart, date)) {
-          onEventDrop && onEventDrop(d.id, newStart.toISOString(), newEnd.toISOString())
+        const dayStart = startOfDay(date).getTime()
+        const dayEnd = endOfDay(date).getTime()
+        if (newStart.getTime() >= dayStart && newEnd.getTime() <= dayEnd) {
+          onEventDrop && onEventDrop(state.id, newStart.toISOString(), newEnd.toISOString())
         }
-      } else if (mode === 'resize' && resizingRef()) {
-        const r = resizingRef()
-        const origEnd = new Date(r.originalEnd)
+      } else if (state.mode === 'resize') {
+        const origStart = new Date(state.originalStart)
+        const origEnd = new Date(state.originalEnd)
         const newEnd = new Date(origEnd.getTime() + deltaMin * 60 * 1000)
-        if (isSameDay(newEnd, date) && newEnd.getTime() > new Date(events.find((ev) => ev.id === r.id)?.startTime).getTime()) {
+        if (
+          isSameDay(newEnd, date) &&
+          newEnd.getTime() > origStart.getTime() + 15 * 60 * 1000
+        ) {
           onEventDrop &&
-            onEventDrop(
-              r.id,
-              events.find((ev) => ev.id === r.id)?.startTime,
-              newEnd.toISOString()
-            )
+            onEventDrop(state.id, state.originalStart, newEnd.toISOString())
         }
       }
     }
 
     const handleUp = () => {
-      setDragging(null)
-      setResizing(null)
+      dragStateRef.current = null
+      setDraggingId(null)
+      setResizingId(null)
       document.removeEventListener('mousemove', handleMove)
       document.removeEventListener('mouseup', handleUp)
     }
@@ -83,9 +105,6 @@ export default function DayView({
     document.addEventListener('mousemove', handleMove)
     document.addEventListener('mouseup', handleUp)
   }
-
-  const draggingRef = () => dragging
-  const resizingRef = () => resizing
 
   return (
     <div className="cal-day-view">
@@ -110,20 +129,17 @@ export default function DayView({
         ))}
         <div className="cal-events-layer">
           {dayEvents.map((event) => {
-            const startMin = getMinutesFromStart(event.startTime)
-            const duration = getEventDurationMinutes(event)
-            const top = startMin * (HOUR_HEIGHT / 60)
-            const height = Math.max(24, duration * (HOUR_HEIGHT / 60) - 2)
+            const pos = getDayViewEventPosition(event, date, HOUR_HEIGHT)
             const isMatched = matchedIds.has(event.id)
             return (
               <div
                 key={event.id}
                 className={`cal-event ${isMatched ? 'cal-event-highlighted' : ''} ${
-                  dragging?.id === event.id ? 'cal-event-dragging' : ''
+                  draggingId === event.id || resizingId === event.id ? 'cal-event-dragging' : ''
                 }`}
                 style={{
-                  top,
-                  height,
+                  top: pos.top,
+                  height: pos.height,
                   backgroundColor: event.color,
                   borderLeftColor: event.color,
                 }}

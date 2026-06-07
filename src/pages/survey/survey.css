@@ -724,6 +724,134 @@
   }
 }
 
+@media (max-width: 420px) {
+  .sv-page {
+    padding: 12px 10px 24px;
+  }
+
+  .sv-back-btn {
+    padding: 6px 10px;
+    font-size: 13px;
+  }
+
+  .sv-title {
+    font-size: 20px;
+  }
+
+  .sv-toolbar {
+    gap: 8px;
+  }
+
+  .sv-btn {
+    padding: 7px 12px;
+    font-size: 13px;
+  }
+
+  .sv-survey-meta-edit {
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .sv-title-input {
+    font-size: 16px;
+  }
+
+  .sv-question-card {
+    padding: 12px;
+  }
+
+  .sv-question-card-header {
+    gap: 6px;
+  }
+
+  .sv-question-actions {
+    margin-left: 0;
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .sv-question-title {
+    font-size: 14px;
+  }
+
+  .sv-editor-header {
+    padding: 12px 16px;
+  }
+
+  .sv-editor-body {
+    padding: 16px;
+    gap: 12px;
+  }
+
+  .sv-option-row {
+    flex-wrap: wrap;
+  }
+
+  .sv-answer-card {
+    padding: 14px;
+    margin-bottom: 16px;
+  }
+
+  .sv-answer-question-title {
+    font-size: 16px;
+  }
+
+  .sv-star {
+    font-size: 26px;
+  }
+
+  .sv-option-item {
+    padding: 8px 12px;
+    font-size: 14px;
+  }
+
+  .sv-matrix-table th,
+  .sv-matrix-table td {
+    padding: 8px 6px;
+    font-size: 12px;
+  }
+
+  .sv-matrix-row-label {
+    min-width: 90px;
+    font-size: 12px;
+  }
+
+  .sv-answer-nav {
+    gap: 8px;
+  }
+
+  .sv-answer-nav .sv-btn {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .sv-stats-header {
+    gap: 8px;
+  }
+
+  .sv-stats-title {
+    font-size: 16px;
+  }
+
+  .sv-stats-count {
+    font-size: 13px;
+    padding: 5px 10px;
+  }
+
+  .sv-stat-card {
+    padding: 12px;
+  }
+
+  .sv-stat-chart {
+    min-height: 200px;
+  }
+
+  .sv-text-answer-item {
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+}
+
 @media (min-width: 1440px) {
   .sv-page {
     padding: 32px 40px 64px;

@@ -164,11 +164,11 @@ describe('mapUtils', () => {
     it('should un-cluster markers at high zoom', () => {
       const markers = [
         { id: 'a', x: 0, y: 0 },
-        { id: 'b', x: 10, y: 10 },
-        { id: 'c', x: -10, y: -10 },
-        { id: 'd', x: 5, y: 5 },
+        { id: 'b', x: 200, y: 200 },
+        { id: 'c', x: -200, y: -200 },
+        { id: 'd', x: 100, y: -100 },
       ];
-      const clustered = clusterMarkers(markers, 0.5);
+      const clustered = clusterMarkers(markers, 0.2);
       expect(clustered.some((r) => r.isCluster)).toBe(true);
 
       const unclustered = clusterMarkers(markers, 10);
@@ -187,6 +187,38 @@ describe('mapUtils', () => {
       expect(cluster).toBeTruthy();
       expect(cluster.x).toBeCloseTo(10 / 3);
       expect(cluster.y).toBeCloseTo(10 / 3);
+    });
+
+    it('should cluster markers with chain distribution (A close to B, B close to C)', () => {
+      const step = 30;
+      const markers = [
+        { id: 'a', x: 0, y: 0 },
+        { id: 'b', x: step, y: 0 },
+        { id: 'c', x: step * 2, y: 0 },
+        { id: 'd', x: step * 3, y: 0 },
+      ];
+      const zoom = 0.2;
+      const result = clusterMarkers(markers, zoom);
+      const cluster = result.find((r) => r.isCluster);
+      expect(cluster).toBeTruthy();
+      expect(cluster.markers.length).toBe(4);
+    });
+
+    it('should keep separate chains as distinct clusters', () => {
+      const step = 20;
+      const markers = [
+        { id: 'a1', x: 0, y: 0 },
+        { id: 'a2', x: step, y: 0 },
+        { id: 'a3', x: step * 2, y: 0 },
+        { id: 'b1', x: 1000, y: 1000 },
+        { id: 'b2', x: 1000 + step, y: 1000 },
+        { id: 'b3', x: 1000 + step * 2, y: 1000 },
+      ];
+      const zoom = 0.3;
+      const result = clusterMarkers(markers, zoom);
+      const clusters = result.filter((r) => r.isCluster);
+      expect(clusters.length).toBe(2);
+      expect(clusters[0].markers.length + clusters[1].markers.length).toBe(6);
     });
   });
 
@@ -228,6 +260,28 @@ describe('mapUtils', () => {
       expect(points[0].y).toBeCloseTo(0);
       expect(points[points.length - 1].x).toBeCloseTo(100);
       expect(points[points.length - 1].y).toBeCloseTo(100);
+    });
+
+    it('should produce deterministic output for the same inputs', () => {
+      const start = { x: 10, y: 20 };
+      const end = { x: 100, y: 200 };
+      const result1 = generateRoute(start, end);
+      const result2 = generateRoute(start, end);
+      const result3 = generateRoute(start, end);
+      expect(result1).toEqual(result2);
+      expect(result2).toEqual(result3);
+      expect(result1.length).toBe(result3.length);
+    });
+
+    it('should produce different outputs for different endpoints', () => {
+      const start = { x: 0, y: 0 };
+      const endA = { x: 100, y: 0 };
+      const endB = { x: 0, y: 100 };
+      const resultA = generateRoute(start, endA);
+      const resultB = generateRoute(start, endB);
+      const coordsA = resultA.map((p) => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join('|');
+      const coordsB = resultB.map((p) => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join('|');
+      expect(coordsA).not.toEqual(coordsB);
     });
   });
 

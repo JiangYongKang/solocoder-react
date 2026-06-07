@@ -1,0 +1,9 @@
+当前项目 src/pages/notifications/ 下的通知中心页面存在一些问题，请在该目录下修复它们。
+
+1. 提示词要求 favicon 上显示未读数量角标，但当前只通过 document.title 把未读数量写进了页面标题栏，favicon 角标功能完全没有实现，比如用 Canvas 绘制带数字的 favicon 并在通知变化时更新。
+2. 一键标记本组已读的 markAllOfTypeAsRead 只处理了 active 列表里的通知，archived 列表里同类型的通知没被标记。但 markAllAsRead 是两边都处理的，同属标记已读一类操作但行为不一致。
+3. 通知归档时新归档的条目被插在 archived 列表头部，导致历史通知 tab 里看到的顺序是最近归档在前、最早归档在后，跟"历史通知"从早到晚的正常直觉反了。
+4. notificationsUtils.test.js 里 "should not mutate the original state" 这个测试用例放在 createNotification 的 describe 块下面，但它实际测的是 addNotification，测试组织和被测函数名不匹配。
+5. 修复后需要为该页面补充纯 JS 函数的单元测试，只测和页面渲染无关的逻辑。测试代码放在 src/pages/__tests__/notifications/ 下。
+6. 确保所有子页面在 375px 移动端宽度下布局不崩坏，使用 pnpm run dev 启动后手动验证关键页面。
+7. 重新运行 pnpm run test，需要让所有测试通过。

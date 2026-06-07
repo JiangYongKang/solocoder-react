@@ -14,6 +14,8 @@ import {
   createUser,
   updateUser,
   deleteUser,
+  ensureMinimumUsers,
+  ensureMinimumRoles,
   createRole,
   updateRole,
   deleteRole,
@@ -30,8 +32,22 @@ const TABS = [
 
 export default function PermissionsPage() {
   const navigate = useNavigate()
-  const [users, setUsers] = useState(() => loadUsers())
-  const [roles, setRoles] = useState(() => loadRoles())
+  const [users, setUsers] = useState(() => {
+    const loaded = loadUsers()
+    const ensured = ensureMinimumUsers(loaded)
+    if (ensured.reset) {
+      queueMicrotask(() => saveUsers(ensured.users))
+    }
+    return ensured.users
+  })
+  const [roles, setRoles] = useState(() => {
+    const loaded = loadRoles()
+    const ensured = ensureMinimumRoles(loaded)
+    if (ensured.reset) {
+      queueMicrotask(() => saveRoles(ensured.roles))
+    }
+    return ensured.roles
+  })
   const [currentUserId, setCurrentUserId] = useState(() => loadCurrentUserId())
 
   const [activeTab, setActiveTab] = useState('users')
@@ -114,12 +130,13 @@ export default function PermissionsPage() {
     if (!userDeleteConfirm) return
     const result = deleteUser(users, userDeleteConfirm.id)
     if (result.success) {
-      handleUsersUpdate(result.users)
-      if (currentUserId === userDeleteConfirm.id) {
-        const firstUser = result.users[0]
-        if (firstUser) {
-          handleCurrentUserChange(firstUser.id)
-        }
+      const ensured = ensureMinimumUsers(result.users)
+      handleUsersUpdate(ensured.users)
+      const targetUserId = currentUserId === userDeleteConfirm.id
+        ? (ensured.users[0] ? ensured.users[0].id : currentUserId)
+        : currentUserId
+      if (targetUserId !== currentUserId) {
+        handleCurrentUserChange(targetUserId)
       }
     }
     setUserDeleteConfirm(null)
@@ -160,7 +177,8 @@ export default function PermissionsPage() {
     if (!roleDeleteConfirm) return
     const result = deleteRole(roles, roleDeleteConfirm.id, users)
     if (result.success) {
-      handleRolesUpdate(result.roles)
+      const ensuredRoles = ensureMinimumRoles(result.roles)
+      handleRolesUpdate(ensuredRoles.roles)
       handleUsersUpdate(result.users)
     }
     setRoleDeleteConfirm(null)

@@ -1,13 +1,18 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import './rich-editor.css'
 import {
+  INPUT_MERGE_DELAY,
   canRedo,
   canUndo,
   createHistory,
+  createHistoryState,
+  detectPastedContent,
   exportAsHtml,
   exportAsMarkdown,
   fileToBase64,
+  getHistoryContent,
+  getHistoryCursor,
   insertImage,
   insertLink,
   isValidUrl,
@@ -75,11 +80,14 @@ const TOOLBAR_GROUPS = [
 const RichEditorPage = () => {
   const textareaRef = useRef(null)
   const fileInputRef = useRef(null)
+  const inputMergeTimerRef = useRef(null)
+  const pendingInputRef = useRef(null)
+
   const [history, setHistory] = useState(() => {
     const saved = loadFromStorage()
     return {
       ...createHistory(),
-      present: saved,
+      present: createHistoryState(saved),
     }
   })
   const [savedIndicator, setSavedIndicator] = useState('已保存')
@@ -87,7 +95,7 @@ const RichEditorPage = () => {
   const [dialogError, setDialogError] = useState('')
   const [savedAt, setSavedAt] = useState(null)
 
-  const content = history.present
+  const content = getHistoryContent(history.present)
   const previewHtml = useMemo(() => markdownToHtml(content), [content])
 
   useEffect(() => {
@@ -103,52 +111,145 @@ const RichEditorPage = () => {
     return () => clearTimeout(timer)
   }, [content])
 
-  const getSelection = () => {
+  useEffect(() => {
+    return () => {
+      if (inputMergeTimerRef.current) {
+        clearTimeout(inputMergeTimerRef.current)
+      }
+    }
+  }, [])
+
+  const getSelection = useCallback(() => {
     const el = textareaRef.current
     if (!el) return { start: 0, end: 0 }
     return { start: el.selectionStart, end: el.selectionEnd }
-  }
+  }, [])
 
-  const setSelection = (start, end) => {
+  const setSelection = useCallback((start, end) => {
     const el = textareaRef.current
     if (!el) return
     requestAnimationFrame(() => {
       el.focus()
       el.setSelectionRange(start, end)
     })
-  }
+  }, [])
 
-  const applyChange = (result) => {
+  const commitPendingInput = useCallback(() => {
+    if (inputMergeTimerRef.current) {
+      clearTimeout(inputMergeTimerRef.current)
+      inputMergeTimerRef.current = null
+    }
+    if (pendingInputRef.current) {
+      const pending = pendingInputRef.current
+      pendingInputRef.current = null
+      setHistory((h) => pushHistory(h, pending))
+    }
+  }, [])
+
+  const applyChange = useCallback((result, forceCommit = true) => {
     if (!result || result.text === content) return
+    if (forceCommit) commitPendingInput()
     setSavedIndicator('保存中...')
-    setHistory((h) => pushHistory(h, result.text))
+    const newState = createHistoryState(result.text, { start: result.start, end: result.end })
+    setHistory((h) => pushHistory(h, newState))
     setSelection(result.start, result.end)
-  }
+  }, [content, commitPendingInput, setSelection])
 
-  const handleUndo = () => {
+  const handleUndo = useCallback(() => {
+    commitPendingInput()
     setHistory((h) => {
       const next = undoHistory(h)
-      setSavedIndicator('保存中...')
+      if (next !== h) {
+        setSavedIndicator('保存中...')
+        const cursor = getHistoryCursor(next.present)
+        requestAnimationFrame(() => setSelection(cursor.start, cursor.end))
+      }
       return next
     })
-  }
+  }, [commitPendingInput, setSelection])
 
-  const handleRedo = () => {
+  const handleRedo = useCallback(() => {
+    commitPendingInput()
     setHistory((h) => {
       const next = redoHistory(h)
-      setSavedIndicator('保存中...')
+      if (next !== h) {
+        setSavedIndicator('保存中...')
+        const cursor = getHistoryCursor(next.present)
+        requestAnimationFrame(() => setSelection(cursor.start, cursor.end))
+      }
       return next
     })
-  }
+  }, [commitPendingInput, setSelection])
 
-  const handleTextareaChange = (e) => {
+  const handleTextareaChange = useCallback((e) => {
     const newText = e.target.value
     if (newText === content) return
-    setSavedIndicator('保存中...')
-    setHistory((h) => pushHistory(h, newText))
-  }
 
-  const handleKeyDown = (e) => {
+    const selection = { start: e.target.selectionStart, end: e.target.selectionEnd }
+
+    if (inputMergeTimerRef.current) {
+      clearTimeout(inputMergeTimerRef.current)
+    }
+
+    pendingInputRef.current = createHistoryState(newText, selection)
+
+    inputMergeTimerRef.current = setTimeout(() => {
+      commitPendingInput()
+    }, INPUT_MERGE_DELAY)
+
+    setSavedIndicator('保存中...')
+    setHistory((h) => ({
+      ...h,
+      present: createHistoryState(newText, selection),
+    }))
+  }, [content, commitPendingInput])
+
+  const handlePaste = useCallback(async (e) => {
+    const clipboardData = e.clipboardData || window.clipboardData
+    if (!clipboardData) return
+
+    const detected = detectPastedContent(clipboardData)
+    const { start, end } = getSelection()
+
+    if (detected.type === 'image-url') {
+      e.preventDefault()
+      commitPendingInput()
+      const result = insertImage(content, start, end, detected.url)
+      setSavedIndicator('保存中...')
+      const newState = createHistoryState(result.text, { start: result.start, end: result.end })
+      setHistory((h) => pushHistory(h, newState))
+      setSelection(result.start, result.end)
+      return
+    }
+
+    if (detected.type === 'image-file') {
+      e.preventDefault()
+      commitPendingInput()
+      try {
+        const base64 = await fileToBase64(detected.file)
+        const result = insertImage(content, start, end, base64, detected.file.name || '')
+        setSavedIndicator('保存中...')
+        const newState = createHistoryState(result.text, { start: result.start, end: result.end })
+        setHistory((h) => pushHistory(h, newState))
+        setSelection(result.start, result.end)
+      } catch {
+      }
+      return
+    }
+
+    if (detected.type === 'url') {
+      e.preventDefault()
+      commitPendingInput()
+      const selected = content.slice(start, end)
+      const result = insertLink(content, start, end, detected.url, selected)
+      setSavedIndicator('保存中...')
+      const newState = createHistoryState(result.text, { start: result.start, end: result.end })
+      setHistory((h) => pushHistory(h, newState))
+      setSelection(result.start, result.end)
+    }
+  }, [content, commitPendingInput, getSelection, setSelection])
+
+  const handleKeyDown = useCallback((e) => {
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
       e.preventDefault()
       handleUndo()
@@ -174,9 +275,18 @@ const RichEditorPage = () => {
       applyInline('underline')
       return
     }
-  }
 
-  const applyInline = (type) => {
+    const shouldBreakMerge = [
+      'Enter', 'Escape', 'Backspace', 'Delete',
+      'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+      'Home', 'End', 'PageUp', 'PageDown',
+    ]
+    if (shouldBreakMerge.includes(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      commitPendingInput()
+    }
+  }, [handleUndo, handleRedo, commitPendingInput])
+
+  const applyInline = useCallback((type) => {
     const { start, end } = getSelection()
     let result
     switch (type) {
@@ -196,16 +306,16 @@ const RichEditorPage = () => {
         return
     }
     applyChange(result)
-  }
+  }, [content, getSelection, applyChange])
 
-  const applyHeading = (level) => {
+  const applyHeading = useCallback((level) => {
     const { start, end } = getSelection()
     const prefix = '#'.repeat(level) + ' '
     const result = wrapLinePrefix(content, start, end, prefix)
     applyChange(result)
-  }
+  }, [content, getSelection, applyChange])
 
-  const applyBlock = (type) => {
+  const applyBlock = useCallback((type) => {
     const { start, end } = getSelection()
     let prefix
     switch (type) {
@@ -228,9 +338,10 @@ const RichEditorPage = () => {
     }
     const result = wrapLinePrefix(content, start, end, prefix)
     applyChange(result)
-  }
+  }, [content, getSelection, applyChange])
 
-  const openLinkDialog = () => {
+  const openLinkDialog = useCallback(() => {
+    commitPendingInput()
     const { start, end } = getSelection()
     const selected = content.slice(start, end)
     setDialog({
@@ -241,9 +352,10 @@ const RichEditorPage = () => {
       end,
     })
     setDialogError('')
-  }
+  }, [content, commitPendingInput, getSelection])
 
-  const openImageDialog = () => {
+  const openImageDialog = useCallback(() => {
+    commitPendingInput()
     const { start, end } = getSelection()
     setDialog({
       type: 'image',
@@ -254,13 +366,13 @@ const RichEditorPage = () => {
       mode: 'url',
     })
     setDialogError('')
-  }
+  }, [commitPendingInput, getSelection])
 
-  const handleDialogChange = (key, value) => {
+  const handleDialogChange = useCallback((key, value) => {
     setDialog((d) => (d ? { ...d, [key]: value } : d))
-  }
+  }, [])
 
-  const confirmDialog = () => {
+  const confirmDialog = useCallback(() => {
     if (!dialog) return
     setDialogError('')
 
@@ -285,7 +397,7 @@ const RichEditorPage = () => {
         fileInputRef.current?.click()
       }
     }
-  }
+  }, [dialog, content, applyChange])
 
   const handleFileSelect = async (e) => {
     const file = e.target.files?.[0]
@@ -308,7 +420,7 @@ const RichEditorPage = () => {
     }
   }
 
-  const handleToolbarClick = (itemId) => {
+  const handleToolbarClick = useCallback((itemId) => {
     switch (itemId) {
       case 'undo':
         handleUndo()
@@ -350,7 +462,7 @@ const RichEditorPage = () => {
         exportAsHtml(content)
         break
     }
-  }
+  }, [handleUndo, handleRedo, applyInline, applyHeading, applyBlock, openLinkDialog, openImageDialog, content])
 
   const savedTimeStr = savedAt
     ? savedAt.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
@@ -408,6 +520,7 @@ const RichEditorPage = () => {
               value={content}
               onChange={handleTextareaChange}
               onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
               spellCheck={false}
               placeholder="在此输入 Markdown 内容..."
             />

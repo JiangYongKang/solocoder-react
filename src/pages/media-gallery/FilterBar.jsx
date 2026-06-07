@@ -142,7 +142,7 @@ export default function FilterBar({
           <span className="mg-filter-label">日期：</span>
           <div className="mg-filter-chips">
             {allDates.length === 0 && <span className="mg-filter-empty">暂无</span>}
-            {allDates.slice(0, 10).map((d) => (
+            {allDates.map((d) => (
               <button
                 key={d}
                 type="button"

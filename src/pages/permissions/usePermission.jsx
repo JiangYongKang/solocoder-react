@@ -29,31 +29,3 @@ export function usePermission(currentUserId, users, roles) {
     canAll: checkAll,
   }
 }
-
-export function withPermission(WrappedComponent, permissionIds, { mode = 'all', hide = true } = {}) {
-  return function PermissionWrapper(props) {
-    const { currentUserId, users, roles } = props
-    if (!currentUserId || !users || !roles) {
-      return hide ? null : (
-        <span style={{ opacity: 0.5, pointerEvents: 'none' }}>
-          <WrappedComponent {...props} />
-        </span>
-      )
-    }
-    const perms = getUserPermissions(currentUserId, users, roles)
-    const hasAccess = Array.isArray(permissionIds)
-      ? mode === 'all'
-        ? permissionIds.every((p) => perms.includes(p))
-        : permissionIds.some((p) => perms.includes(p))
-      : perms.includes(permissionIds)
-
-    if (!hasAccess) {
-      return hide ? null : (
-        <span style={{ opacity: 0.5, pointerEvents: 'none' }}>
-          <WrappedComponent {...props} />
-        </span>
-      )
-    }
-    return <WrappedComponent {...props} />
-  }
-}

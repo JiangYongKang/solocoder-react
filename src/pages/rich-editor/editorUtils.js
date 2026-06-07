@@ -1,5 +1,8 @@
 export const STORAGE_KEY = 'solocoder-rich-editor-content'
 export const HISTORY_LIMIT = 100
+export const INPUT_MERGE_DELAY = 800
+
+export const IMAGE_URL_REGEX = /^(https?:\/\/\S+\.(png|jpe?g|gif|webp|svg|bmp)(\?\S*)?|data:image\/[a-z0-9+\/.-]+;base64,\S+)$/i
 
 export const DEFAULT_CONTENT = `# 欢迎使用富文本编辑器
 
@@ -7,12 +10,13 @@ export const DEFAULT_CONTENT = `# 欢迎使用富文本编辑器
 
 ## 功能特点
 
-- 支持 *加粗*、_斜体_、~~删除线~~、<u>下划线</u>
+- 支持 **加粗**、*斜体*、~~删除线~~、<u>下划线</u>（注：下划线需用 HTML 标签 \`<u>\`）
 - 支持标题 H1-H3
 - 支持引用、有序列表、无序列表、代码块
 - 支持插入图片和超链接
-- 支持撤销和重做
+- 支持撤销和重做（Ctrl+Z / Ctrl+Y）
 - 自动保存到 localStorage
+- 直接粘贴图片 URL 会自动转换为 Markdown 图片语法
 
 ### 代码示例
 
@@ -27,21 +31,38 @@ function hello() {
 [访问 React 官网](https://react.dev)
 `
 
+export const createHistoryState = (content = DEFAULT_CONTENT, cursor = null) => ({
+  content,
+  cursor: cursor || { start: content.length, end: content.length },
+})
+
 export const createHistory = () => ({
   past: [],
-  present: DEFAULT_CONTENT,
+  present: createHistoryState(),
   future: [],
 })
 
-export const pushHistory = (history, newContent, limit = HISTORY_LIMIT) => {
-  if (!history || newContent === history.present) return history
-  const newPast = [...history.past, history.present]
+export const pushHistory = (history, newState, limit = HISTORY_LIMIT) => {
+  if (!history) return history
+  const presentContent = typeof history.present === 'string' ? history.present : history.present?.content
+  const newContent = typeof newState === 'string' ? newState : newState?.content
+  if (newContent === presentContent) return history
+
+  const normalizedState = typeof newState === 'string'
+    ? createHistoryState(newState)
+    : { ...createHistoryState(newState.content), cursor: newState.cursor || { start: newState.content.length, end: newState.content.length } }
+
+  const normalizedPresent = typeof history.present === 'string'
+    ? createHistoryState(history.present)
+    : history.present
+
+  const newPast = [...history.past, normalizedPresent]
   if (newPast.length > limit) {
     newPast.shift()
   }
   return {
     past: newPast,
-    present: newContent,
+    present: normalizedState,
     future: [],
   }
 }
@@ -70,6 +91,19 @@ export const redoHistory = (history) => {
 
 export const canUndo = (history) => !!(history && history.past && history.past.length > 0)
 export const canRedo = (history) => !!(history && history.future && history.future.length > 0)
+
+export const getHistoryContent = (state) => {
+  if (typeof state === 'string') return state
+  return state?.content || ''
+}
+
+export const getHistoryCursor = (state) => {
+  if (typeof state === 'string' || !state?.cursor) {
+    const content = typeof state === 'string' ? state : state?.content || ''
+    return { start: content.length, end: content.length }
+  }
+  return state.cursor
+}
 
 export const saveToStorage = (content) => {
   try {
@@ -300,7 +334,6 @@ export const wrapCodeBlock = (content, selectionStart, selectionEnd, lang = '') 
   return { text: newText, start: blockStart, end: blockEnd }
 }
 
-
 export const isValidUrl = (str) => {
   if (typeof str !== 'string' || str.trim() === '') return false
   try {
@@ -309,6 +342,38 @@ export const isValidUrl = (str) => {
   } catch {
     return /^(data:image|\/|\.\/|\.\.\/)/.test(str)
   }
+}
+
+export const isImageUrl = (str) => {
+  if (typeof str !== 'string' || str.trim() === '') return false
+  return IMAGE_URL_REGEX.test(str.trim())
+}
+
+export const detectPastedContent = (clipboardData) => {
+  if (!clipboardData) return { type: 'text', content: '' }
+
+  const items = clipboardData.items || []
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i]
+    if (item.type && item.type.startsWith('image/')) {
+      const file = item.getAsFile?.()
+      if (file) {
+        return { type: 'image-file', file }
+      }
+    }
+  }
+
+  const text = clipboardData.getData?.('text') || ''
+  const trimmed = text.trim()
+  if (isImageUrl(trimmed)) {
+    return { type: 'image-url', url: trimmed }
+  }
+
+  if (isValidUrl(trimmed)) {
+    return { type: 'url', url: trimmed }
+  }
+
+  return { type: 'text', content: text }
 }
 
 export const triggerDownload = (content, filename, mimeType) => {

@@ -148,7 +148,10 @@ export function markAllOfTypeAsRead(state, type) {
   const newActive = state.active.map((n) =>
     n.type === type ? { ...n, read: true } : n
   );
-  return { ...state, active: newActive };
+  const newArchived = state.archived.map((n) =>
+    n.type === type ? { ...n, read: true } : n
+  );
+  return { active: newActive, archived: newArchived };
 }
 
 export function addNotification(state, notification, maxActive = MAX_ACTIVE_NOTIFICATIONS) {
@@ -158,7 +161,7 @@ export function addNotification(state, notification, maxActive = MAX_ACTIVE_NOTI
   while (newActive.length > maxActive) {
     const oldest = newActive[newActive.length - 1];
     newActive = newActive.slice(0, -1);
-    newArchived = [{ ...oldest, archived: true }, ...newArchived];
+    newArchived = [...newArchived, { ...oldest, archived: true }];
   }
 
   return { active: newActive, archived: newArchived };
@@ -227,4 +230,10 @@ export function pickRandomEnabledType(prefs) {
 
 export function updatePref(prefs, type, enabled) {
   return { ...prefs, [type]: enabled };
+}
+
+export function formatBadgeCount(count, max = 99) {
+  if (count <= 0) return '';
+  if (count > max) return `${max}+`;
+  return String(count);
 }

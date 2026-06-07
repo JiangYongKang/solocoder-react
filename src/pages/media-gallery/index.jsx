@@ -162,6 +162,17 @@ function MediaGallery() {
     })
   }, [selectedIds, showToast])
 
+  const handleUploadError = useCallback(
+    (failedNames) => {
+      if (failedNames.length === 1) {
+        showToast(`文件「${failedNames[0]}」读取失败，已跳过`, 'error')
+      } else {
+        showToast(`${failedNames.length} 个文件读取失败，已跳过`, 'error')
+      }
+    },
+    [showToast]
+  )
+
   const handleFilesAdded = useCallback(
     (newItems) => {
       setItems((prev) => {
@@ -234,7 +245,7 @@ function MediaGallery() {
       />
 
       <div ref={uploadBtnRef} style={{ display: 'none' }}>
-        <UploadButton onFilesAdded={handleFilesAdded} />
+        <UploadButton onFilesAdded={handleFilesAdded} onError={handleUploadError} />
       </div>
 
       <div className="mg-gallery-wrap">
@@ -247,7 +258,7 @@ function MediaGallery() {
             </svg>
             <p>暂无匹配的媒体文件</p>
             <span>尝试调整筛选条件，或上传新的文件</span>
-            <UploadButton onFilesAdded={handleFilesAdded}>
+            <UploadButton onFilesAdded={handleFilesAdded} onError={handleUploadError}>
               <button type="button" className="mg-btn mg-btn-primary">
                 上传文件
               </button>

@@ -1,0 +1,10 @@
+当前项目 src/pages/survey/ 下的问卷调查系统页面存在一些问题，请在该目录下修复它们。
+
+1. 提交问卷后回到问卷列表页时，已提交的作答数不会刷新。因为 responsesMap 的 useMemo 只依赖 surveys 数组，但提交答卷操作不改 surveys，所以列表页看到的作答数永远停留在提交前的旧值。
+2. 题目拖拽排序的 handleDragEnd 绕过了 surveyCore 里已经导出的 reorderQuestions 函数，自己在 UI 层用 arrayMove 直接操作数组。reorderQuestions 内部有越界和同位置的保护逻辑，但被绕开了，导出函数白白闲置。
+3. 删除问卷时 confirm 弹窗明确说了"相关的作答数据也会被删除"，但实际只调了 removeSurvey 把问卷项从数组中去掉，没有清理 localStorage 里对应的草稿和答卷数据，残留数据会一直留在 localStorage 里。
+4. 评分题的 maxRating 滑块范围设成了 3 到 10，但提示词要求的是 1-5 星。虽然默认值是 5 碰巧落在需求范围内，但用户可以拖到 10 星完全超出预期，而且 1-2 星反而选不了。
+5. 矩阵量表题的必填校验里用了 !answer[row.value] 做 falsy 判断，如果用户自定义列值恰好是数字 0 或字符串 '0'，会被误判为未填写而被拦截提交。
+6. 修复后需要为该页面补充纯 JS 函数的单元测试，只测和页面渲染无关的逻辑。测试代码放在 src/pages/__tests__/survey/ 下。
+7. 确保所有子页面在 375px 移动端宽度下布局不崩坏，使用 pnpm run dev 启动后手动验证关键页面。
+8. 重新运行 pnpm run test，需要让所有测试通过。

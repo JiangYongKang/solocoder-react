@@ -45,6 +45,7 @@ const TransactionForm = ({ initialData, onSubmit, onCancel }) => {
       if (!initialData) {
         setAmount('')
         setCategory('')
+        setDate(formatDate(new Date().toISOString()))
         setNote('')
         setErrors({})
       }

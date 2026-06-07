@@ -171,14 +171,20 @@ export function deleteUser(users, id) {
   return { success: true, users: users.filter((u) => u.id !== id) }
 }
 
-export function assignUserRoles(users, userId, roleIds) {
-  const index = users.findIndex((u) => u.id === userId)
-  if (index === -1) {
-    return { success: false, users }
+export function ensureMinimumUsers(users) {
+  if (users && users.length > 0) {
+    return { users, reset: false }
   }
-  const updated = [...users]
-  updated[index] = { ...updated[index], roleIds }
-  return { success: true, user: updated[index], users: updated }
+  const defaults = [...MOCK_USERS]
+  return { users: defaults, reset: true }
+}
+
+export function ensureMinimumRoles(roles) {
+  if (roles && roles.length > 0) {
+    return { roles, reset: false }
+  }
+  const defaults = [...MOCK_ROLES]
+  return { roles: defaults, reset: true }
 }
 
 export function createRole(roles, data) {
@@ -293,6 +299,26 @@ export function getAllLeafPermissionIds(tree = PERMISSION_TREE) {
   return ids
 }
 
+export function getLeafIdsUnderNode(nodeId, tree = PERMISSION_TREE) {
+  const ids = []
+  function walk(nodes, targetFound = false) {
+    for (const node of nodes) {
+      const isTarget = targetFound || node.id === nodeId
+      if (isTarget) {
+        if (node.children && node.children.length > 0) {
+          walk(node.children, true)
+        } else {
+          ids.push(node.id)
+        }
+      } else if (node.children) {
+        walk(node.children, false)
+      }
+    }
+  }
+  walk(tree)
+  return ids
+}
+
 export function getChildIdsByParent(parentId, tree = PERMISSION_TREE) {
   for (const node of tree) {
     if (node.id === parentId) {
@@ -352,55 +378,22 @@ export function isParentNode(nodeId, tree = PERMISSION_TREE) {
 }
 
 export function togglePermission(checkedIds, targetId, tree = PERMISSION_TREE) {
-  const checkedSet = new Set(checkedIds)
-  const isParent = isParentNode(targetId, tree)
+  const allLeafIds = getAllLeafPermissionIds(tree)
+  const leafSet = new Set(checkedIds.filter((id) => allLeafIds.includes(id)))
 
-  if (isParent) {
-    const childIds = getChildIdsByParent(targetId, tree) || []
-    if (checkedSet.has(targetId)) {
-      checkedSet.delete(targetId)
-      childIds.forEach((cid) => checkedSet.delete(cid))
-    } else {
-      checkedSet.add(targetId)
-      childIds.forEach((cid) => checkedSet.add(cid))
-    }
+  const targetLeafIds = getLeafIdsUnderNode(targetId, tree)
+  if (targetLeafIds.length === 0) {
+    return Array.from(leafSet)
+  }
+
+  const allTargetLeavesChecked = targetLeafIds.every((lid) => leafSet.has(lid))
+  if (allTargetLeavesChecked) {
+    targetLeafIds.forEach((lid) => leafSet.delete(lid))
   } else {
-    if (checkedSet.has(targetId)) {
-      checkedSet.delete(targetId)
-    } else {
-      checkedSet.add(targetId)
-    }
+    targetLeafIds.forEach((lid) => leafSet.add(lid))
   }
 
-  const parentGroups = {}
-  for (const node of tree) {
-    if (node.children && node.children.length > 0) {
-      parentGroups[node.id] = node.children.map((c) => c.id)
-    }
-  }
-
-  let changed = true
-  while (changed) {
-    changed = false
-    for (const [parentId, childIds] of Object.entries(parentGroups)) {
-      const allChecked = childIds.every((cid) => checkedSet.has(cid))
-      const someChecked = childIds.some((cid) => checkedSet.has(cid))
-      const wasChecked = checkedSet.has(parentId)
-
-      if (allChecked && !wasChecked) {
-        checkedSet.add(parentId)
-        changed = true
-      } else if (!someChecked && wasChecked) {
-        checkedSet.delete(parentId)
-        changed = true
-      } else if (someChecked && !allChecked && !wasChecked) {
-        checkedSet.add(parentId)
-        changed = true
-      }
-    }
-  }
-
-  return Array.from(checkedSet)
+  return Array.from(leafSet)
 }
 
 export function getCheckState(nodeId, checkedIds, tree = PERMISSION_TREE) {

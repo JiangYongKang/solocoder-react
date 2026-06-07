@@ -36,6 +36,10 @@ import {
   saveEvents,
   getCategoryById,
   snapTimeToSlot,
+  pixelsToMinutes,
+  minutesToPixels,
+  getDayViewEventPosition,
+  getWeekViewEventPosition,
 } from '@/pages/calendar/calendarUtils.js'
 import { STORAGE_KEY, CATEGORIES, MIN_EVENT_MINUTES } from '@/pages/calendar/constants.js'
 
@@ -69,6 +73,10 @@ function makeEvent(overrides = {}) {
     category: overrides.category || 'work',
     color: overrides.color || '#3b82f6',
   }
+}
+
+function pixelsToPixels(pixels, hourHeight) {
+  return minutesToPixels(pixelsToMinutes(pixels, hourHeight), hourHeight)
 }
 
 describe('calendarUtils - generateId', () => {
@@ -222,9 +230,126 @@ describe('calendarUtils - time utilities', () => {
 
   it('snapTimeToSlot should snap to nearest 15 minutes', () => {
     const d1 = snapTimeToSlot(new Date(2025, 0, 15, 9, 7))
+    expect(d1.getHours()).toBe(9)
     expect(d1.getMinutes()).toBe(0)
     const d2 = snapTimeToSlot(new Date(2025, 0, 15, 9, 10))
+    expect(d2.getHours()).toBe(9)
     expect(d2.getMinutes()).toBe(15)
+  })
+
+  it('snapTimeToSlot should correctly snap to next hour without double hour increment', () => {
+    const d = snapTimeToSlot(new Date(2025, 0, 15, 9, 53))
+    expect(d.getHours()).toBe(10)
+    expect(d.getMinutes()).toBe(0)
+  })
+
+  it('snapTimeToSlot should snap 23:53 to next day 00:00', () => {
+    const d = snapTimeToSlot(new Date(2025, 0, 15, 23, 53))
+    expect(d.getDate()).toBe(16)
+    expect(d.getHours()).toBe(0)
+    expect(d.getMinutes()).toBe(0)
+  })
+
+  it('snapTimeToSlot supports custom slot minutes', () => {
+    const d = snapTimeToSlot(new Date(2025, 0, 15, 9, 37), 30)
+    expect(d.getHours()).toBe(9)
+    expect(d.getMinutes()).toBe(30)
+    const d2 = snapTimeToSlot(new Date(2025, 0, 15, 9, 46), 30)
+    expect(d2.getHours()).toBe(10)
+    expect(d2.getMinutes()).toBe(0)
+  })
+})
+
+describe('calendarUtils - pixel/minute conversion', () => {
+  it('PIXELS_PER_MINUTE_RATIO with HOUR_HEIGHT=60 should be 1.0', () => {
+    expect(60 / 60).toBe(1.0)
+  })
+
+  it('pixelsToMinutes and minutesToPixels should be inverse operations', () => {
+    const hourHeight = 60
+    expect(pixelsToMinutes(60, hourHeight)).toBe(60)
+    expect(pixelsToMinutes(30, hourHeight)).toBe(30)
+    expect(minutesToPixels(60, hourHeight)).toBe(60)
+    expect(minutesToPixels(30, hourHeight)).toBe(30)
+    expect(pixelsToMinutes(minutesToPixels(90, hourHeight), hourHeight)).toBe(90)
+  })
+
+  it('conversion should be consistent with different hour heights', () => {
+    expect(pixelsToMinutes(120, 120)).toBe(60)
+    expect(minutesToPixels(60, 120)).toBe(120)
+    expect(pixelsToPixels(30, 48)).toBe(30)
+    expect(pixelsToPixels(60, 60)).toBe(60)
+  })
+})
+
+describe('calendarUtils - getDayViewEventPosition (cross-day clamping)', () => {
+  const HOUR_HEIGHT = 60
+
+  it('should position a normal same-day event correctly', () => {
+    const event = makeEvent({
+      startTime: makeISO(2025, 1, 15, 10),
+      endTime: makeISO(2025, 1, 15, 11, 30),
+    })
+    const pos = getDayViewEventPosition(event, new Date(2025, 0, 15), HOUR_HEIGHT)
+    expect(pos.top).toBe(10 * 60)
+    expect(pos.height).toBeGreaterThanOrEqual(90 - 2)
+    expect(pos.startsBeforeDay).toBe(false)
+    expect(pos.endsAfterDay).toBe(false)
+  })
+
+  it('should clamp an event starting before the day to top=0', () => {
+    const event = makeEvent({
+      startTime: makeISO(2025, 1, 14, 22),
+      endTime: makeISO(2025, 1, 15, 2),
+    })
+    const pos = getDayViewEventPosition(event, new Date(2025, 0, 15), HOUR_HEIGHT)
+    expect(pos.top).toBe(0)
+    expect(pos.height).toBe(2 * 60 - 2)
+    expect(pos.startsBeforeDay).toBe(true)
+    expect(pos.endsAfterDay).toBe(false)
+  })
+
+  it('should clamp an event ending after the day', () => {
+    const event = makeEvent({
+      startTime: makeISO(2025, 1, 15, 22),
+      endTime: makeISO(2025, 1, 16, 4),
+    })
+    const pos = getDayViewEventPosition(event, new Date(2025, 0, 15), HOUR_HEIGHT)
+    expect(pos.top).toBe(22 * 60)
+    expect(pos.height).toBeCloseTo(2 * 60 - 2)
+    expect(pos.startsBeforeDay).toBe(false)
+    expect(pos.endsAfterDay).toBe(true)
+  })
+
+  it('should clamp an event spanning the entire day', () => {
+    const event = makeEvent({
+      startTime: makeISO(2025, 1, 14, 10),
+      endTime: makeISO(2025, 1, 16, 10),
+    })
+    const pos = getDayViewEventPosition(event, new Date(2025, 0, 15), HOUR_HEIGHT)
+    expect(pos.top).toBe(0)
+    expect(pos.height).toBeGreaterThanOrEqual(24 * 60 - 2)
+    expect(pos.startsBeforeDay).toBe(true)
+    expect(pos.endsAfterDay).toBe(true)
+  })
+
+  it('should enforce minimum height for very short events', () => {
+    const event = makeEvent({
+      startTime: makeISO(2025, 1, 15, 10),
+      endTime: makeISO(2025, 1, 15, 10, 20),
+    })
+    const pos = getDayViewEventPosition(event, new Date(2025, 0, 15), HOUR_HEIGHT)
+    expect(pos.height).toBe(24)
+  })
+
+  it('getWeekViewEventPosition should delegate to getDayViewEventPosition', () => {
+    const event = makeEvent({
+      startTime: makeISO(2025, 1, 15, 9),
+      endTime: makeISO(2025, 1, 15, 10),
+    })
+    const dayPos = getDayViewEventPosition(event, new Date(2025, 0, 15), HOUR_HEIGHT)
+    const weekPos = getWeekViewEventPosition(event, new Date(2025, 0, 15), HOUR_HEIGHT)
+    expect(weekPos).toEqual(dayPos)
   })
 })
 

@@ -349,12 +349,44 @@ export function saveEvents(events, storage = typeof window !== 'undefined' ? win
 
 export function snapTimeToSlot(date, slotMinutes = 15) {
   const d = new Date(date)
-  const minutes = d.getMinutes()
-  const snapped = Math.round(minutes / slotMinutes) * slotMinutes
-  d.setMinutes(snapped, 0, 0)
-  if (snapped >= 60) {
-    d.setHours(d.getHours() + 1)
-    d.setMinutes(0)
-  }
+  const totalMinutes = d.getHours() * 60 + d.getMinutes()
+  const snappedTotal = Math.round(totalMinutes / slotMinutes) * slotMinutes
+  d.setHours(0, 0, 0, 0)
+  d.setTime(d.getTime() + snappedTotal * 60 * 1000)
   return d
+}
+
+export const PIXELS_PER_MINUTE_RATIO = (hourHeight) => hourHeight / 60
+
+export function pixelsToMinutes(pixels, hourHeight) {
+  return pixels / PIXELS_PER_MINUTE_RATIO(hourHeight)
+}
+
+export function minutesToPixels(minutes, hourHeight) {
+  return minutes * PIXELS_PER_MINUTE_RATIO(hourHeight)
+}
+
+export function getDayViewEventPosition(event, dayDate, hourHeight) {
+  const dayStart = startOfDay(dayDate)
+  const dayEndExclusive = addDays(dayStart, 1)
+  const eventStart = new Date(event.startTime)
+  const eventEnd = new Date(event.endTime)
+
+  const clampedStartMs = Math.max(dayStart.getTime(), eventStart.getTime())
+  const clampedEndMs = Math.min(dayEndExclusive.getTime(), eventEnd.getTime())
+
+  const clampedStart = new Date(clampedStartMs)
+  const minutesFromDayStart = clampedStart.getHours() * 60 + clampedStart.getMinutes() + clampedStart.getSeconds() / 60 + clampedStart.getMilliseconds() / 60000
+  const durationMin = Math.max(0, (clampedEndMs - clampedStartMs) / 60000)
+
+  return {
+    top: minutesToPixels(minutesFromDayStart, hourHeight),
+    height: Math.max(24, minutesToPixels(durationMin, hourHeight) - 2),
+    startsBeforeDay: eventStart.getTime() < dayStart.getTime(),
+    endsAfterDay: eventEnd.getTime() > dayEndExclusive.getTime(),
+  }
+}
+
+export function getWeekViewEventPosition(event, dayDate, hourHeight) {
+  return getDayViewEventPosition(event, dayDate, hourHeight)
 }

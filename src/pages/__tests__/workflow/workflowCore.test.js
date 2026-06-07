@@ -412,6 +412,32 @@ describe('importFromJson', () => {
     expect(result.error).toContain('不存在')
   })
 
+  it('should reject edge without id', () => {
+    const data = {
+      nodes: [
+        { id: 'a', type: NODE_TYPES.START, x: 0, y: 0 },
+        { id: 'b', type: NODE_TYPES.END, x: 100, y: 100 },
+      ],
+      edges: [{ source: 'a', target: 'b' }],
+    }
+    const result = importFromJson(data)
+    expect(result.valid).toBe(false)
+    expect(result.error).toContain('id')
+  })
+
+  it('should reject edge with non-string id', () => {
+    const data = {
+      nodes: [
+        { id: 'a', type: NODE_TYPES.START, x: 0, y: 0 },
+        { id: 'b', type: NODE_TYPES.END, x: 100, y: 100 },
+      ],
+      edges: [{ id: 123, source: 'a', target: 'b' }],
+    }
+    const result = importFromJson(data)
+    expect(result.valid).toBe(false)
+    expect(result.error).toContain('id')
+  })
+
   it('should accept valid data', () => {
     const data = {
       nodes: [
@@ -488,7 +514,7 @@ describe('simulateExecution', () => {
     expect(result.path).toContainEqual({ type: 'dead-end', nodeId: 't' })
   })
 
-  it('should detect loops', () => {
+  it('should detect loops gracefully without infinite processing', () => {
     const nodes = [
       { id: 's', type: NODE_TYPES.START, x: 0, y: 0 },
       { id: 't', type: NODE_TYPES.TASK, x: 100, y: 0 },
@@ -498,6 +524,63 @@ describe('simulateExecution', () => {
       { id: 'e2', source: 't', target: 's' },
     ]
     const result = simulateExecution(nodes, edges)
-    expect(result.path).toContainEqual({ type: 'loop', nodeId: 's' })
+    expect(result.error).toBe(null)
+    expect(new Set(result.visitedNodeIds)).toEqual(new Set(['s', 't']))
+    expect(new Set(result.visitedEdgeIds)).toEqual(new Set(['e1', 'e2']))
+    expect(result.visitedNodeIds.filter((id) => id === 's').length).toBe(1)
+    expect(result.visitedNodeIds.filter((id) => id === 't').length).toBe(1)
+  })
+
+  it('should traverse all branches from parallel gateway', () => {
+    const nodes = [
+      { id: 's', type: NODE_TYPES.START, x: 0, y: 0 },
+      { id: 'p', type: NODE_TYPES.PARALLEL, x: 100, y: 0 },
+      { id: 't1', type: NODE_TYPES.TASK, x: 200, y: -50 },
+      { id: 't2', type: NODE_TYPES.TASK, x: 200, y: 50 },
+      { id: 't3', type: NODE_TYPES.TASK, x: 200, y: 100 },
+      { id: 'e', type: NODE_TYPES.END, x: 300, y: 0 },
+    ]
+    const edges = [
+      { id: 'e1', source: 's', target: 'p' },
+      { id: 'e2', source: 'p', target: 't1' },
+      { id: 'e3', source: 'p', target: 't2' },
+      { id: 'e4', source: 'p', target: 't3' },
+      { id: 'e5', source: 't1', target: 'e' },
+      { id: 'e6', source: 't2', target: 'e' },
+      { id: 'e7', source: 't3', target: 'e' },
+    ]
+    const result = simulateExecution(nodes, edges)
+    expect(result.error).toBe(null)
+    expect(result.visitedNodeIds).toContain('s')
+    expect(result.visitedNodeIds).toContain('p')
+    expect(result.visitedNodeIds).toContain('t1')
+    expect(result.visitedNodeIds).toContain('t2')
+    expect(result.visitedNodeIds).toContain('t3')
+    expect(result.visitedNodeIds).toContain('e')
+    expect(result.visitedEdgeIds).toContain('e1')
+    expect(result.visitedEdgeIds).toContain('e2')
+    expect(result.visitedEdgeIds).toContain('e3')
+    expect(result.visitedEdgeIds).toContain('e4')
+    expect(result.visitedEdgeIds).toContain('e5')
+    expect(result.visitedEdgeIds).toContain('e6')
+    expect(result.visitedEdgeIds).toContain('e7')
+  })
+
+  it('should handle parallel gateway with single branch', () => {
+    const nodes = [
+      { id: 's', type: NODE_TYPES.START, x: 0, y: 0 },
+      { id: 'p', type: NODE_TYPES.PARALLEL, x: 100, y: 0 },
+      { id: 't', type: NODE_TYPES.TASK, x: 200, y: 0 },
+      { id: 'e', type: NODE_TYPES.END, x: 300, y: 0 },
+    ]
+    const edges = [
+      { id: 'e1', source: 's', target: 'p' },
+      { id: 'e2', source: 'p', target: 't' },
+      { id: 'e3', source: 't', target: 'e' },
+    ]
+    const result = simulateExecution(nodes, edges)
+    expect(result.error).toBe(null)
+    expect(result.visitedNodeIds).toEqual(['s', 'p', 't', 'e'])
+    expect(result.visitedEdgeIds).toEqual(['e1', 'e2', 'e3'])
   })
 })

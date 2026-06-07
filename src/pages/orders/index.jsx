@@ -53,8 +53,8 @@ export default function OrdersPage() {
     setProductQuantities((prev) => ({ ...prev, [productId]: value }));
   };
 
-  const handleUpdateCartQuantity = (productId, qty) => {
-    setCart((prev) => updateCartQuantity(prev, productId, qty));
+  const handleUpdateCartQuantity = (productId, qty, stock) => {
+    setCart((prev) => updateCartQuantity(prev, productId, qty, stock));
   };
 
   const handleRemoveFromCart = (productId) => {

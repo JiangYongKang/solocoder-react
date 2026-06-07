@@ -245,11 +245,14 @@ export function importFromJson(jsonData) {
     if (!edge || typeof edge !== 'object') {
       return { valid: false, error: '存在无效的连线' }
     }
-    if (!nodeIds.has(edge.source)) {
-      return { valid: false, error: `连线引用了不存在的源节点: ${edge.source}` }
+    if (!edge.id || typeof edge.id !== 'string') {
+      return { valid: false, error: '连线缺少有效的 id' }
     }
-    if (!nodeIds.has(edge.target)) {
-      return { valid: false, error: `连线引用了不存在的目标节点: ${edge.target}` }
+    if (!edge.source || !nodeIds.has(edge.source)) {
+      return { valid: false, error: `连线 ${edge.id} 引用了不存在的源节点: ${edge.source}` }
+    }
+    if (!edge.target || !nodeIds.has(edge.target)) {
+      return { valid: false, error: `连线 ${edge.id} 引用了不存在的目标节点: ${edge.target}` }
     }
   }
 
@@ -277,15 +280,17 @@ export function simulateExecution(nodes, edges, randomFn = Math.random) {
   }
 
   const visited = new Set()
-  let currentNodeId = startNode.id
-  let maxSteps = nodes.length * 3 + edges.length + 10
+  const visitedEdgesSet = new Set()
+  const queue = [startNode.id]
+  const maxSteps = (nodes.length + edges.length) * 3
   let steps = 0
 
-  while (currentNodeId && steps < maxSteps) {
+  while (queue.length > 0 && steps < maxSteps) {
     steps++
+    const currentNodeId = queue.shift()
+
     if (visited.has(currentNodeId)) {
-      path.push({ type: 'loop', nodeId: currentNodeId })
-      break
+      continue
     }
     visited.add(currentNodeId)
     visitedNodeIds.push(currentNodeId)
@@ -293,37 +298,47 @@ export function simulateExecution(nodes, edges, randomFn = Math.random) {
 
     const currentNode = getNodeById(nodes, currentNodeId)
     if (!currentNode || currentNode.type === NODE_TYPES.END) {
-      break
+      continue
     }
 
     const outEdges = getOutgoingEdges(edges, currentNodeId)
     if (outEdges.length === 0) {
       path.push({ type: 'dead-end', nodeId: currentNodeId })
-      break
-    }
-
-    let nextEdge
-    if (currentNode.type === NODE_TYPES.CONDITION && outEdges.length > 1) {
-      const idx = Math.floor(randomFn() * outEdges.length)
-      nextEdge = outEdges[idx]
-    } else if (currentNode.type === NODE_TYPES.PARALLEL) {
-      for (const edge of outEdges) {
-        visitedEdgeIds.push(edge.id)
-        path.push({ type: 'edge', edgeId: edge.id })
-      }
-      const firstEdge = outEdges[0]
-      currentNodeId = firstEdge.target
       continue
-    } else {
-      nextEdge = outEdges[0]
     }
 
-    if (nextEdge) {
-      visitedEdgeIds.push(nextEdge.id)
-      path.push({ type: 'edge', edgeId: nextEdge.id })
-      currentNodeId = nextEdge.target
+    if (currentNode.type === NODE_TYPES.PARALLEL) {
+      for (const edge of outEdges) {
+        if (!visitedEdgesSet.has(edge.id)) {
+          visitedEdgesSet.add(edge.id)
+          visitedEdgeIds.push(edge.id)
+          path.push({ type: 'edge', edgeId: edge.id })
+        }
+        if (!visited.has(edge.target)) {
+          queue.push(edge.target)
+        }
+      }
+    } else if (currentNode.type === NODE_TYPES.CONDITION && outEdges.length > 1) {
+      const idx = Math.floor(randomFn() * outEdges.length)
+      const nextEdge = outEdges[idx]
+      if (!visitedEdgesSet.has(nextEdge.id)) {
+        visitedEdgesSet.add(nextEdge.id)
+        visitedEdgeIds.push(nextEdge.id)
+        path.push({ type: 'edge', edgeId: nextEdge.id })
+      }
+      if (!visited.has(nextEdge.target)) {
+        queue.push(nextEdge.target)
+      }
     } else {
-      break
+      const nextEdge = outEdges[0]
+      if (!visitedEdgesSet.has(nextEdge.id)) {
+        visitedEdgesSet.add(nextEdge.id)
+        visitedEdgeIds.push(nextEdge.id)
+        path.push({ type: 'edge', edgeId: nextEdge.id })
+      }
+      if (!visited.has(nextEdge.target)) {
+        queue.push(nextEdge.target)
+      }
     }
   }
 

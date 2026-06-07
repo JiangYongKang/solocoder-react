@@ -2,13 +2,18 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import {
   STORAGE_KEY,
   HISTORY_LIMIT,
+  INPUT_MERGE_DELAY,
   DEFAULT_CONTENT,
+  IMAGE_URL_REGEX,
   createHistory,
+  createHistoryState,
   pushHistory,
   undoHistory,
   redoHistory,
   canUndo,
   canRedo,
+  getHistoryContent,
+  getHistoryCursor,
   saveToStorage,
   loadFromStorage,
   clearStorage,
@@ -20,9 +25,69 @@ import {
   insertLink,
   wrapCodeBlock,
   isValidUrl,
+  isImageUrl,
+  detectPastedContent,
+  fileToBase64,
 } from '../../rich-editor/editorUtils'
 
+describe('常量定义', () => {
+  it('应该定义正确的 STORAGE_KEY', () => {
+    expect(STORAGE_KEY).toBe('solocoder-rich-editor-content')
+  })
+
+  it('应该定义 HISTORY_LIMIT 为 100', () => {
+    expect(HISTORY_LIMIT).toBe(100)
+  })
+
+  it('应该定义 INPUT_MERGE_DELAY 为合理值', () => {
+    expect(typeof INPUT_MERGE_DELAY).toBe('number')
+    expect(INPUT_MERGE_DELAY).toBeGreaterThan(0)
+  })
+
+  it('DEFAULT_CONTENT 应该是合理的 Markdown 内容', () => {
+    expect(typeof DEFAULT_CONTENT).toBe('string')
+    expect(DEFAULT_CONTENT.length).toBeGreaterThan(0)
+    expect(DEFAULT_CONTENT).toContain('# 欢迎使用富文本编辑器')
+    expect(DEFAULT_CONTENT).toContain('**加粗**')
+    expect(DEFAULT_CONTENT).toContain('*斜体*')
+    expect(DEFAULT_CONTENT).toContain('~~删除线~~')
+    expect(DEFAULT_CONTENT).toContain('<u>下划线</u>')
+  })
+
+  it('IMAGE_URL_REGEX 应该是正则表达式', () => {
+    expect(IMAGE_URL_REGEX instanceof RegExp).toBe(true)
+  })
+})
+
 describe('history - 操作栈', () => {
+  describe('createHistoryState', () => {
+    it('应该创建包含 content 和 cursor 的状态对象', () => {
+      const state = createHistoryState('test content')
+      expect(state).toHaveProperty('content', 'test content')
+      expect(state).toHaveProperty('cursor')
+      expect(state.cursor).toHaveProperty('start')
+      expect(state.cursor).toHaveProperty('end')
+    })
+
+    it('不传入参数时应该使用 DEFAULT_CONTENT', () => {
+      const state = createHistoryState()
+      expect(state.content).toBe(DEFAULT_CONTENT)
+      expect(state.cursor.start).toBe(DEFAULT_CONTENT.length)
+      expect(state.cursor.end).toBe(DEFAULT_CONTENT.length)
+    })
+
+    it('应该正确保存自定义光标位置', () => {
+      const state = createHistoryState('hello', { start: 2, end: 4 })
+      expect(state.content).toBe('hello')
+      expect(state.cursor).toEqual({ start: 2, end: 4 })
+    })
+
+    it('不传入 cursor 时应该默认到内容末尾', () => {
+      const state = createHistoryState('abc')
+      expect(state.cursor).toEqual({ start: 3, end: 3 })
+    })
+  })
+
   describe('createHistory', () => {
     it('应该返回包含 past、present、future 的初始历史记录对象', () => {
       const history = createHistory()
@@ -33,22 +98,73 @@ describe('history - 操作栈', () => {
       expect(Array.isArray(history.future)).toBe(true)
       expect(history.past).toEqual([])
       expect(history.future).toEqual([])
-      expect(history.present).toBe(DEFAULT_CONTENT)
+    })
+
+    it('present 应该是包含 content 和 cursor 的状态对象', () => {
+      const history = createHistory()
+      expect(typeof history.present).toBe('object')
+      expect(history.present).toHaveProperty('content', DEFAULT_CONTENT)
+      expect(history.present).toHaveProperty('cursor')
+    })
+  })
+
+  describe('getHistoryContent', () => {
+    it('应该从状态对象中提取 content', () => {
+      expect(getHistoryContent({ content: 'hello', cursor: { start: 0, end: 0 } })).toBe('hello')
+    })
+
+    it('兼容旧的字符串格式', () => {
+      expect(getHistoryContent('plain string')).toBe('plain string')
+    })
+
+    it('null 或 undefined 应该返回空字符串', () => {
+      expect(getHistoryContent(null)).toBe('')
+      expect(getHistoryContent(undefined)).toBe('')
+    })
+  })
+
+  describe('getHistoryCursor', () => {
+    it('应该从状态对象中提取 cursor', () => {
+      expect(getHistoryCursor({ content: 'hello', cursor: { start: 2, end: 3 } })).toEqual({ start: 2, end: 3 })
+    })
+
+    it('兼容旧的字符串格式，返回末尾位置', () => {
+      expect(getHistoryCursor('abcd')).toEqual({ start: 4, end: 4 })
+    })
+
+    it('状态对象缺失 cursor 时应该返回内容末尾位置', () => {
+      expect(getHistoryCursor({ content: 'xyz' })).toEqual({ start: 3, end: 3 })
     })
   })
 
   describe('pushHistory', () => {
-    it('应该将当前内容推入 past，present 变为新内容', () => {
+    it('接受字符串状态：应该将当前内容推入 past，present 变为新内容', () => {
       const history = createHistory()
       const newHistory = pushHistory(history, 'new content')
-      expect(newHistory.past).toEqual([DEFAULT_CONTENT])
-      expect(newHistory.present).toBe('new content')
+      expect(newHistory.past.length).toBe(1)
+      expect(getHistoryContent(newHistory.past[0])).toBe(DEFAULT_CONTENT)
+      expect(getHistoryContent(newHistory.present)).toBe('new content')
       expect(newHistory.future).toEqual([])
+    })
+
+    it('接受状态对象：应该完整保存 content 和 cursor', () => {
+      const history = createHistory()
+      const newState = createHistoryState('v1', { start: 5, end: 10 })
+      const newHistory = pushHistory(history, newState)
+      expect(getHistoryContent(newHistory.present)).toBe('v1')
+      expect(getHistoryCursor(newHistory.present)).toEqual({ start: 5, end: 10 })
     })
 
     it('相同内容不应该产生新记录', () => {
       const history = createHistory()
       const newHistory = pushHistory(history, DEFAULT_CONTENT)
+      expect(newHistory).toBe(history)
+    })
+
+    it('状态对象相同内容不应该产生新记录', () => {
+      const history = createHistory()
+      const sameState = createHistoryState(DEFAULT_CONTENT, { start: 0, end: 0 })
+      const newHistory = pushHistory(history, sameState)
       expect(newHistory).toBe(history)
     })
 
@@ -60,7 +176,17 @@ describe('history - 操作栈', () => {
       expect(history.future.length).toBe(1)
       history = pushHistory(history, 'v3')
       expect(history.future).toEqual([])
-      expect(history.present).toBe('v3')
+      expect(getHistoryContent(history.present)).toBe('v3')
+    })
+
+    it('撤销重做后光标位置应该被保留', () => {
+      let history = createHistory()
+      history = pushHistory(history, createHistoryState('v1', { start: 1, end: 1 }))
+      history = pushHistory(history, createHistoryState('v2', { start: 2, end: 2 }))
+      history = undoHistory(history)
+      expect(getHistoryCursor(history.present)).toEqual({ start: 1, end: 1 })
+      history = redoHistory(history)
+      expect(getHistoryCursor(history.present)).toEqual({ start: 2, end: 2 })
     })
 
     it('应该限制历史记录数量不超过 HISTORY_LIMIT', () => {
@@ -69,7 +195,7 @@ describe('history - 操作栈', () => {
         history = pushHistory(history, `content-${i}`)
       }
       expect(history.past.length).toBe(HISTORY_LIMIT)
-      expect(history.past[0]).toBe(`content-${9}`)
+      expect(getHistoryContent(history.past[0])).toBe(`content-${9}`)
     })
 
     it('null 或 undefined 历史记录应该保持不变', () => {
@@ -79,14 +205,14 @@ describe('history - 操作栈', () => {
   })
 
   describe('undoHistory', () => {
-    it('有历史记录时应该回退到上一版本', () => {
+    it('有历史记录时应该回退到上一版本并恢复光标', () => {
       let history = createHistory()
-      history = pushHistory(history, 'v1')
-      history = pushHistory(history, 'v2')
+      history = pushHistory(history, createHistoryState('v1', { start: 1, end: 1 }))
+      history = pushHistory(history, createHistoryState('v2', { start: 2, end: 2 }))
       const undone = undoHistory(history)
-      expect(undone.present).toBe('v1')
-      expect(undone.past).toEqual([DEFAULT_CONTENT])
-      expect(undone.future).toEqual(['v2'])
+      expect(getHistoryContent(undone.present)).toBe('v1')
+      expect(getHistoryCursor(undone.present)).toEqual({ start: 1, end: 1 })
+      expect(undone.future.length).toBe(1)
     })
 
     it('没有历史记录时应该保持不变', () => {
@@ -102,14 +228,14 @@ describe('history - 操作栈', () => {
   })
 
   describe('redoHistory', () => {
-    it('有未来记录时应该前进到下一版本', () => {
+    it('有未来记录时应该前进到下一版本并恢复光标', () => {
       let history = createHistory()
-      history = pushHistory(history, 'v1')
-      history = pushHistory(history, 'v2')
+      history = pushHistory(history, createHistoryState('v1', { start: 1, end: 1 }))
+      history = pushHistory(history, createHistoryState('v2', { start: 2, end: 2 }))
       history = undoHistory(history)
       const redone = redoHistory(history)
-      expect(redone.present).toBe('v2')
-      expect(redone.past).toEqual([DEFAULT_CONTENT, 'v1'])
+      expect(getHistoryContent(redone.present)).toBe('v2')
+      expect(getHistoryCursor(redone.present)).toEqual({ start: 2, end: 2 })
       expect(redone.future).toEqual([])
     })
 
@@ -466,7 +592,7 @@ describe('文本操作 - wrapCodeBlock', () => {
   })
 })
 
-describe('isValidUrl', () => {
+describe('URL 检测 - isValidUrl', () => {
   it('应该接受标准 HTTP/HTTPS URL', () => {
     expect(isValidUrl('https://example.com')).toBe(true)
     expect(isValidUrl('http://example.com/path?q=1')).toBe(true)
@@ -491,5 +617,181 @@ describe('isValidUrl', () => {
     expect(isValidUrl(123)).toBe(false)
     expect(isValidUrl({})).toBe(false)
     expect(isValidUrl('not a url')).toBe(false)
+  })
+})
+
+describe('图片 URL 检测 - isImageUrl', () => {
+  it('应该接受常见扩展名的图片 HTTP URL', () => {
+    expect(isImageUrl('https://example.com/image.png')).toBe(true)
+    expect(isImageUrl('https://example.com/photo.jpg')).toBe(true)
+    expect(isImageUrl('https://example.com/pic.jpeg')).toBe(true)
+    expect(isImageUrl('https://example.com/anim.gif')).toBe(true)
+    expect(isImageUrl('https://example.com/v.webp')).toBe(true)
+    expect(isImageUrl('https://example.com/logo.svg')).toBe(true)
+    expect(isImageUrl('https://example.com/img.bmp')).toBe(true)
+  })
+
+  it('应该接受带查询参数的图片 URL', () => {
+    expect(isImageUrl('https://example.com/img.png?size=100&v=2')).toBe(true)
+  })
+
+  it('应该接受 data:image Base64 URL', () => {
+    expect(isImageUrl('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==')).toBe(true)
+    expect(isImageUrl('data:image/jpeg;base64,abc123')).toBe(true)
+  })
+
+  it('应该拒绝非图片 URL', () => {
+    expect(isImageUrl('https://example.com')).toBe(false)
+    expect(isImageUrl('https://example.com/page.html')).toBe(false)
+    expect(isImageUrl('https://example.com/file.pdf')).toBe(false)
+    expect(isImageUrl('https://example.com/script.js')).toBe(false)
+  })
+
+  it('应该拒绝无效输入', () => {
+    expect(isImageUrl('')).toBe(false)
+    expect(isImageUrl('   ')).toBe(false)
+    expect(isImageUrl(null)).toBe(false)
+    expect(isImageUrl(undefined)).toBe(false)
+    expect(isImageUrl(123)).toBe(false)
+    expect(isImageUrl('plain text')).toBe(false)
+  })
+
+  it('应该不区分大小写检测扩展名', () => {
+    expect(isImageUrl('https://example.com/IMAGE.PNG')).toBe(true)
+    expect(isImageUrl('https://example.com/Photo.JPG')).toBe(true)
+  })
+})
+
+describe('粘贴检测 - detectPastedContent', () => {
+  it('null/undefined clipboardData 应该返回 text 类型空内容', () => {
+    expect(detectPastedContent(null)).toEqual({ type: 'text', content: '' })
+    expect(detectPastedContent(undefined)).toEqual({ type: 'text', content: '' })
+  })
+
+  it('普通文本应该返回 text 类型', () => {
+    const clipboardData = {
+      items: [],
+      getData: () => 'hello world',
+    }
+    expect(detectPastedContent(clipboardData)).toEqual({
+      type: 'text',
+      content: 'hello world',
+    })
+  })
+
+  it('图片 URL 文本应该返回 image-url 类型', () => {
+    const clipboardData = {
+      items: [],
+      getData: () => 'https://example.com/pic.png',
+    }
+    expect(detectPastedContent(clipboardData)).toEqual({
+      type: 'image-url',
+      url: 'https://example.com/pic.png',
+    })
+  })
+
+  it('非图片 URL 文本应该返回 url 类型', () => {
+    const clipboardData = {
+      items: [],
+      getData: () => 'https://example.com/page.html',
+    }
+    expect(detectPastedContent(clipboardData)).toEqual({
+      type: 'url',
+      url: 'https://example.com/page.html',
+    })
+  })
+
+  it('剪贴板中的图片文件应该返回 image-file 类型', () => {
+    const mockFile = new Blob(['fake'], { type: 'image/png' })
+    mockFile.name = 'test.png'
+    const clipboardData = {
+      items: [
+        {
+          type: 'image/png',
+          getAsFile: () => mockFile,
+        },
+      ],
+      getData: () => '',
+    }
+    const result = detectPastedContent(clipboardData)
+    expect(result.type).toBe('image-file')
+    expect(result.file).toBe(mockFile)
+  })
+
+  it('items 中无 image 项时应该回退到文本检测', () => {
+    const clipboardData = {
+      items: [
+        { type: 'text/plain', getAsFile: () => null },
+      ],
+      getData: () => 'just text',
+    }
+    expect(detectPastedContent(clipboardData)).toEqual({
+      type: 'text',
+      content: 'just text',
+    })
+  })
+
+  it('图片文件项 getAsFile 返回 null 时应该回退', () => {
+    const clipboardData = {
+      items: [
+        { type: 'image/png', getAsFile: () => null },
+      ],
+      getData: () => 'https://example.com/img.png',
+    }
+    expect(detectPastedContent(clipboardData)).toEqual({
+      type: 'image-url',
+      url: 'https://example.com/img.png',
+    })
+  })
+
+  it('应该检测 data:image Base64 文本为 image-url', () => {
+    const clipboardData = {
+      items: [],
+      getData: () => 'data:image/png;base64,abc123',
+    }
+    expect(detectPastedContent(clipboardData)).toEqual({
+      type: 'image-url',
+      url: 'data:image/png;base64,abc123',
+    })
+  })
+})
+
+describe('fileToBase64', () => {
+  const originalFileReader = global.FileReader
+
+  beforeEach(() => {
+    class MockFileReader {
+      onload = null
+      onerror = null
+      result = null
+      error = null
+      readAsDataURL(blob) {
+        this.result = 'data:text/plain;base64,aGVsbG8gd29ybGQ='
+        setTimeout(() => this.onload?.({ target: this }), 0)
+      }
+    }
+    global.FileReader = MockFileReader
+  })
+
+  afterEach(() => {
+    if (originalFileReader) {
+      global.FileReader = originalFileReader
+    } else {
+      delete global.FileReader
+    }
+  })
+
+  it('应该将 File/Blob 转换为 Base64 data URL', async () => {
+    const mockFile = new Blob(['hello world'], { type: 'text/plain' })
+    const result = await fileToBase64(mockFile)
+    expect(typeof result).toBe('string')
+    expect(result.startsWith('data:')).toBe(true)
+    expect(result.includes('base64,')).toBe(true)
+  })
+
+  it('无效文件参数应该 reject', async () => {
+    await expect(fileToBase64(null)).rejects.toThrow()
+    await expect(fileToBase64(undefined)).rejects.toThrow()
+    await expect(fileToBase64('not a blob')).rejects.toThrow()
   })
 })

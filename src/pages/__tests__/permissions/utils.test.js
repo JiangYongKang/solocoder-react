@@ -6,7 +6,8 @@ import {
   createUser,
   updateUser,
   deleteUser,
-  assignUserRoles,
+  ensureMinimumUsers,
+  ensureMinimumRoles,
   createRole,
   updateRole,
   deleteRole,
@@ -16,6 +17,7 @@ import {
   getUserList,
   getRoleList,
   getAllLeafPermissionIds,
+  getLeafIdsUnderNode,
   getChildIdsByParent,
   getParentId,
   getAllAncestorIds,
@@ -266,17 +268,40 @@ describe('deleteUser', () => {
   })
 })
 
-describe('assignUserRoles', () => {
-  it('用户不存在时返回失败', () => {
-    const result = assignUserRoles([], 'not-exist', ['r1'])
-    expect(result.success).toBe(false)
+describe('ensureMinimumUsers', () => {
+  it('用户列表非空时不做修改', () => {
+    const users = [{ id: 'u1', username: 'test' }]
+    const result = ensureMinimumUsers(users)
+    expect(result.reset).toBe(false)
+    expect(result.users).toBe(users)
   })
 
-  it('成功分配角色', () => {
-    const existing = [{ id: '1', roleIds: ['r1'] }]
-    const result = assignUserRoles(existing, '1', ['r1', 'r2'])
-    expect(result.success).toBe(true)
-    expect(result.user.roleIds).toEqual(['r1', 'r2'])
+  it('用户列表为空时返回默认 mock 数据', () => {
+    const result = ensureMinimumUsers([])
+    expect(result.reset).toBe(true)
+    expect(result.users.length).toBeGreaterThan(0)
+    expect(result.users[0].username).toBeTruthy()
+  })
+
+  it('用户列表为 undefined 时返回默认 mock 数据', () => {
+    const result = ensureMinimumUsers(undefined)
+    expect(result.reset).toBe(true)
+    expect(result.users.length).toBeGreaterThan(0)
+  })
+})
+
+describe('ensureMinimumRoles', () => {
+  it('角色列表非空时不做修改', () => {
+    const roles = [{ id: 'r1', name: 'test' }]
+    const result = ensureMinimumRoles(roles)
+    expect(result.reset).toBe(false)
+    expect(result.roles).toBe(roles)
+  })
+
+  it('角色列表为空时返回默认 mock 数据', () => {
+    const result = ensureMinimumRoles([])
+    expect(result.reset).toBe(true)
+    expect(result.roles.length).toBeGreaterThan(0)
   })
 })
 
@@ -453,6 +478,25 @@ describe('权限树工具函数', () => {
     })
   })
 
+  describe('getLeafIdsUnderNode', () => {
+    it('获取父节点下所有叶子节点', () => {
+      const ids = getLeafIdsUnderNode('user-management', PERMISSION_TREE)
+      expect(ids).toEqual(expect.arrayContaining(['user:view', 'user:edit', 'user:delete']))
+      expect(ids).not.toContain('user-management')
+      expect(ids.length).toBe(3)
+    })
+
+    it('叶子节点返回自身', () => {
+      const ids = getLeafIdsUnderNode('user:view', PERMISSION_TREE)
+      expect(ids).toEqual(['user:view'])
+    })
+
+    it('不存在的节点返回空数组', () => {
+      const ids = getLeafIdsUnderNode('not-exist', PERMISSION_TREE)
+      expect(ids).toEqual([])
+    })
+  })
+
   describe('getChildIdsByParent', () => {
     it('获取父节点的子节点 ID', () => {
       const childIds = getChildIdsByParent('user-management', PERMISSION_TREE)
@@ -492,32 +536,58 @@ describe('权限树工具函数', () => {
 })
 
 describe('togglePermission', () => {
-  it('勾选父节点时同步勾选所有子节点', () => {
+  it('勾选父节点时同步勾选所有子节点（仅叶子节点）', () => {
     const result = togglePermission([], 'user-management', PERMISSION_TREE)
-    expect(result).toContain('user-management')
+    expect(result).not.toContain('user-management')
     expect(result).toContain('user:view')
     expect(result).toContain('user:edit')
     expect(result).toContain('user:delete')
+    expect(result.length).toBe(3)
   })
 
   it('取消父节点时同步取消所有子节点', () => {
-    const checked = ['user-management', 'user:view', 'user:edit', 'user:delete']
+    const checked = ['user:view', 'user:edit', 'user:delete']
     const result = togglePermission(checked, 'user-management', PERMISSION_TREE)
     expect(result).not.toContain('user-management')
     expect(result).not.toContain('user:view')
+    expect(result.length).toBe(0)
   })
 
-  it('勾选子节点时父节点变为半选状态（加入勾选', () => {
+  it('勾选单个子节点时仅该叶子节点加入', () => {
     const result = togglePermission([], 'user:view', PERMISSION_TREE)
-    expect(result).toContain('user:view')
-    expect(result).toContain('user-management')
+    expect(result).toEqual(['user:view'])
+    expect(result).not.toContain('user-management')
   })
 
-  it('所有子节点都勾选时父节点也勾选', () => {
+  it('取消单个子节点时仅移除该叶子节点', () => {
+    const checked = ['user:view', 'user:edit', 'user:delete']
+    const result = togglePermission(checked, 'user:view', PERMISSION_TREE)
+    expect(result).toEqual(expect.arrayContaining(['user:edit', 'user:delete']))
+    expect(result).not.toContain('user:view')
+    expect(result).not.toContain('user-management')
+  })
+
+  it('输入包含父节点ID时会被过滤掉只保留叶子节点', () => {
+    const checkedWithParent = ['user-management', 'user:view', 'role-management']
+    const result = togglePermission(checkedWithParent, 'user:edit', PERMISSION_TREE)
+    expect(result).not.toContain('user-management')
+    expect(result).not.toContain('role-management')
+    expect(result).toContain('user:view')
+    expect(result).toContain('user:edit')
+  })
+
+  it('部分勾选子节点后 getCheckState 返回 indeterminate', () => {
+    const checked = togglePermission([], 'user:view', PERMISSION_TREE)
+    const state = getCheckState('user-management', checked, PERMISSION_TREE)
+    expect(state).toBe('indeterminate')
+  })
+
+  it('所有子节点都勾选时 getCheckState 返回 checked', () => {
     let checked = togglePermission([], 'user:view', PERMISSION_TREE)
     checked = togglePermission(checked, 'user:edit', PERMISSION_TREE)
     checked = togglePermission(checked, 'user:delete', PERMISSION_TREE)
-    expect(checked).toContain('user-management')
+    expect(checked.length).toBe(3)
+    expect(checked).not.toContain('user-management')
     const state = getCheckState('user-management', checked, PERMISSION_TREE)
     expect(state).toBe('checked')
   })

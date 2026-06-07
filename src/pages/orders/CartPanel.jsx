@@ -1,4 +1,4 @@
-import { formatPrice, calcCartTotal, calcCartCount } from './utils.js';
+import { formatPrice, calcCartTotal, calcCartCount, handleImageFallback } from './utils.js';
 
 export default function CartPanel({ isOpen, onClose, cart, onUpdateQuantity, onRemove, onClear, onCheckout }) {
   const total = calcCartTotal(cart);
@@ -23,7 +23,7 @@ export default function CartPanel({ isOpen, onClose, cart, onUpdateQuantity, onR
               {cart.map((item) => (
                 <div key={item.productId} className="orders-cart-item">
                   <div className="orders-cart-item-image">
-                    <img src={item.image} alt={item.name} />
+                    <img src={item.image} alt={item.name} onError={handleImageFallback} />
                   </div>
                   <div className="orders-cart-item-info">
                     <div className="orders-cart-item-name">{item.name}</div>
@@ -33,7 +33,7 @@ export default function CartPanel({ isOpen, onClose, cart, onUpdateQuantity, onR
                         <button
                           type="button"
                           className="orders-qty-btn"
-                          onClick={() => onUpdateQuantity(item.productId, item.quantity - 1)}
+                          onClick={() => onUpdateQuantity(item.productId, item.quantity - 1, item.stock)}
                         >
                           −
                         </button>
@@ -41,7 +41,7 @@ export default function CartPanel({ isOpen, onClose, cart, onUpdateQuantity, onR
                         <button
                           type="button"
                           className="orders-qty-btn"
-                          onClick={() => onUpdateQuantity(item.productId, item.quantity + 1)}
+                          onClick={() => onUpdateQuantity(item.productId, item.quantity + 1, item.stock)}
                         >
                           +
                         </button>

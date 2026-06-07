@@ -1,5 +1,5 @@
 import { PRODUCTS } from './constants.js';
-import { formatPrice } from './utils.js';
+import { formatPrice, handleImageFallback } from './utils.js';
 
 export default function ProductList({ onAddToCart, quantities, onQuantityChange }) {
   return (
@@ -9,7 +9,7 @@ export default function ProductList({ onAddToCart, quantities, onQuantityChange 
         return (
           <div key={product.id} className="orders-product-card">
             <div className="orders-product-image">
-              <img src={product.image} alt={product.name} />
+              <img src={product.image} alt={product.name} onError={handleImageFallback} />
             </div>
             <div className="orders-product-info">
               <h3 className="orders-product-name">{product.name}</h3>

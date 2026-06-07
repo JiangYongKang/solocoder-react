@@ -3,7 +3,6 @@ import {
   STATUS_NEXT_MAP,
   LOGISTICS_TEMPLATE,
   PAGE_SIZE,
-  PRODUCTS,
 } from './constants.js';
 
 export function generateId() {
@@ -26,7 +25,11 @@ export function addToCart(cart, product, quantity = 1) {
   if (existing) {
     return cart.map((item) =>
       item.productId === product.id
-        ? { ...item, quantity: Math.min(item.quantity + safeQty, product.stock || Number.MAX_SAFE_INTEGER) }
+        ? {
+            ...item,
+            stock: product.stock,
+            quantity: Math.min(item.quantity + safeQty, product.stock || Number.MAX_SAFE_INTEGER),
+          }
         : item
     );
   }
@@ -37,6 +40,7 @@ export function addToCart(cart, product, quantity = 1) {
       name: product.name,
       price: product.price,
       image: product.image,
+      stock: product.stock,
       quantity: safeQty,
     },
   ];
@@ -213,14 +217,21 @@ export function buildLogisticsTimeline(order) {
   return timeline.reverse();
 }
 
-export function getProductById(productId) {
-  if (!productId) return null;
-  return PRODUCTS.find((p) => p.id === productId) || null;
-}
-
 export function formatDateTime(timestamp) {
   if (!timestamp) return '';
   const d = new Date(timestamp);
   const pad = (n) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+export const FALLBACK_PRODUCT_IMAGE =
+  'data:image/svg+xml;utf8,' +
+  encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><rect width="200" height="200" fill="#f3f4f6"/><rect x="30" y="50" width="140" height="100" rx="8" fill="#e5e7eb" stroke="#d1d5db" stroke-width="2"/><circle cx="100" cy="95" r="18" fill="#9ca3af"/><polygon points="60,150 90,120 110,135 135,110 160,140 160,150 60,150" fill="#9ca3af"/><text x="100" y="180" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#9ca3af">暂无图片</text></svg>`
+  );
+
+export function handleImageFallback(event) {
+  if (event && event.target && event.target.src !== FALLBACK_PRODUCT_IMAGE) {
+    event.target.src = FALLBACK_PRODUCT_IMAGE;
+  }
 }

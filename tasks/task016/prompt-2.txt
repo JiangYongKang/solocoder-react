@@ -1,0 +1,9 @@
+当前项目 src/pages/permissions/ 下的权限管理系统页面存在一些问题，请在该目录下修复它们。
+
+1. 权限树勾选时 togglePermission 有一个数据模型问题：当子节点部分勾选时，父节点的 ID（比如 "user-management" 这种页面级节点名）也会被加入角色的 permissions 数组中持久化存储。这些父节点 ID 不映射任何实际操作权限，hasPermission 用它来鉴权会返回语义错误的结果。
+2. withPermission 高阶组件定义后从未在任何地方被 import 或使用，是死代码。而且它的设计需要被包装组件通过 props 传入 currentUserId、users、roles，跟一个正常 HOC 自己从 Context 注入数据的模式对不上，即使想用也很难接入。
+3. utils.js 里的 assignUserRoles 函数有完整实现和测试，但在页面 index.jsx 里从来没被调用过——角色分配实际走的是 updateUser 全量更新路径，assignUserRoles 完全白写了。要么接入用上，要么清理掉。
+4. 如果当前登录用户就是用户列表里的最后一个人，删除这个用户后页面会掉进僵死状态：select 下拉没有可选用户，所有权限也全丢了。删除最后一个用户时需要回退到一个合理的状态而不是崩溃。
+5. 修复后需要为该页面补充纯 JS 函数的单元测试，只测和页面渲染无关的逻辑。测试代码放在 src/pages/__tests__/permissions/ 下。
+6. 确保所有子页面在 375px 移动端宽度下布局不崩坏，使用 pnpm run dev 启动后手动验证关键页面。
+7. 重新运行 pnpm run test，需要让所有测试通过。

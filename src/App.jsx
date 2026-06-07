@@ -18,6 +18,9 @@ import MediaGallery from '@/pages/media-gallery/index.jsx'
 import NotificationsPage from '@/pages/notifications/index.jsx'
 import PermissionsPage from '@/pages/permissions/index.jsx'
 import WorkflowPage from '@/pages/workflow/index.jsx'
+import FinancePage from '@/pages/finance/index.jsx'
+import MapAreaPage from '@/pages/map-area/index.jsx'
+import RichEditorPage from '@/pages/rich-editor/index.jsx'
 
 const TASKS = [
     { id: 1, title: '用户认证系统', route: 'auth', description: '登录、注册、找回密码、修改密码完整的认证流程，基于 localStorage 存储。' },
@@ -37,6 +40,9 @@ const TASKS = [
     { id: 15, title: '电商订单系统', route: 'orders', description: '商品浏览、购物车、下单支付、订单追踪的完整电商订单闭环，基于 localStorage 持久化。' },
     { id: 16, title: '流程编排器', route: 'workflow', description: '可视化流程图编辑器，支持节点拖拽、连线、属性配置、模拟执行，数据本地持久化。' },
     { id: 17, title: '通知中心', route: 'notifications', description: '系统通知、私信消息、任务提醒一站式消息盒子，支持已读管理、偏好设置、自动归档与实时推送。' },
+    { id: 18, title: '个人财务管理', route: 'finance', description: '完整的个人财务管理，支持记账、预算管理、统计图表、月度收支分析，基于 localStorage 持久化。' },
+    { id: 19, title: '交互式地图', route: 'map-area', description: '自绘 SVG 地图画布，支持拖拽平移、滚轮缩放、标记点增删改查、自动聚合与路线规划。' },
+    { id: 20, title: '富文本编辑器', route: 'rich-editor', description: 'Markdown 富文本编辑器，支持左右分栏实时预览、工具栏格式化、撤销重做、图片与链接插入、自动保存与文件导出。' },
 ]
 
 function HomePage() {
@@ -88,6 +94,9 @@ function App() {
             <Route path="/orders" element={<OrdersPage />} />
             <Route path="/workflow" element={<WorkflowPage />} />
             <Route path="/notifications" element={<NotificationsPage />} />
+            <Route path="/finance" element={<FinancePage />} />
+            <Route path="/map-area" element={<MapAreaPage />} />
+            <Route path="/rich-editor" element={<RichEditorPage />} />
         </Routes>
     )
 }

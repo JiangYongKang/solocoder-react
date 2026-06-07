@@ -9,7 +9,6 @@ import {
   useSensors,
 } from '@dnd-kit/core'
 import {
-  arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
   useSortable,
@@ -37,6 +36,7 @@ import {
   addQuestion,
   deleteQuestion,
   updateQuestion,
+  reorderQuestions,
   addOption,
   updateOption,
   deleteOption,
@@ -51,6 +51,7 @@ import {
   saveSurveys,
   upsertSurvey,
   removeSurvey,
+  deleteSurveyData,
   loadDraft,
   saveDraft,
   clearDraft,
@@ -167,8 +168,8 @@ function QuestionEditor({ question, onUpdate, onClose }) {
               <label>最高星级：{question.maxRating || 5}</label>
               <input
                 type="range"
-                min="3"
-                max="10"
+                min="1"
+                max="5"
                 value={question.maxRating || 5}
                 onChange={(e) => onUpdate(question.id, { maxRating: Number(e.target.value) })}
               />
@@ -390,8 +391,7 @@ function SurveyEditorPage({ survey, setSurvey, onBack, onSaveAndPublish }) {
       setSurvey((prev) => {
         const oldIndex = prev.questions.findIndex((q) => q.id === active.id)
         const newIndex = prev.questions.findIndex((q) => q.id === over.id)
-        const newQuestions = arrayMove(prev.questions, oldIndex, newIndex)
-        return { ...prev, questions: newQuestions, updatedAt: Date.now() }
+        return reorderQuestions(prev, oldIndex, newIndex)
       })
     }
   }
@@ -912,6 +912,7 @@ export default function SurveyPage() {
   const [surveys, setSurveys] = useState(() => loadSurveys())
   const [currentSurveyId, setCurrentSurveyId] = useState(null)
   const [editingSurvey, setEditingSurvey] = useState(null)
+  const [responseTick, setResponseTick] = useState(0)
 
   useEffect(() => {
     saveSurveys(surveys)
@@ -923,7 +924,7 @@ export default function SurveyPage() {
       map[s.id] = loadResponses(s.id).length
     })
     return map
-  }, [surveys])
+  }, [surveys, responseTick])
 
   const currentSurvey = useMemo(
     () => surveys.find((s) => s.id === currentSurveyId) || null,
@@ -970,12 +971,15 @@ export default function SurveyPage() {
 
   const handleDeleteSurvey = useCallback((id) => {
     if (window.confirm('确定要删除这份问卷吗？相关的作答数据也会被删除。')) {
+      deleteSurveyData(id)
       setSurveys((prev) => removeSurvey(prev, id))
+      setResponseTick((t) => t + 1)
     }
   }, [])
 
   const handleSubmitComplete = useCallback(() => {
     alert('问卷提交成功！感谢您的参与。')
+    setResponseTick((t) => t + 1)
     setView(VIEWS.LIST)
     setCurrentSurveyId(null)
   }, [])

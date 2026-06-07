@@ -675,6 +675,65 @@
     padding: 16px 12px;
   }
 
+  .permissions-page .page-title {
+    font-size: 20px;
+  }
+
+  .current-user-select {
+    font-size: 13px;
+  }
+
+  .form-inline-select {
+    font-size: 13px;
+    padding: 5px 10px;
+  }
+
+  .current-user-info {
+    gap: 8px;
+    font-size: 12px;
+    padding: 8px 10px;
+  }
+
+  .btn {
+    padding: 8px 14px;
+    font-size: 13px;
+  }
+
+  .tab-btn {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  .data-table {
+    min-width: 440px;
+  }
+
+  .data-table th,
+  .data-table td {
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+
+  .data-table .col-actions {
+    width: 110px;
+  }
+
+  .btn-link {
+    padding: 4px 6px;
+    font-size: 12px;
+  }
+
+  .pagination-info {
+    font-size: 12px;
+  }
+
+  .page-btn {
+    min-width: 32px;
+    height: 32px;
+    padding: 0 8px;
+    font-size: 12px;
+  }
+
   .pagination-controls {
     flex-wrap: wrap;
     justify-content: center;
@@ -707,5 +766,13 @@
   .permission-tree-wrap {
     max-height: 280px;
     padding: 12px;
+  }
+
+  .form-actions {
+    gap: 8px;
+  }
+
+  .form-actions .btn {
+    flex: 1;
   }
 }

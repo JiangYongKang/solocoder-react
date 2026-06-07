@@ -14,6 +14,7 @@ import {
   getMonthKey,
   getCurrentMonthKey,
   getLast6Months,
+  getLast6MonthsFrom,
   loadTransactions,
   saveTransactions,
   loadBudgets,
@@ -125,6 +126,37 @@ describe('getLast6Months', () => {
     months.forEach((m) => {
       expect(m.key).toMatch(/^\d{4}-\d{2}$/)
       expect(m.label).toMatch(/^\d{4}-\d{2}$/)
+    })
+  })
+})
+
+describe('getLast6MonthsFrom', () => {
+  it('从指定月份返回近6个月', () => {
+    const months = getLast6MonthsFrom('2025-06')
+    expect(months.length).toBe(6)
+    expect(months[0].key).toBe('2025-01')
+    expect(months[1].key).toBe('2025-02')
+    expect(months[2].key).toBe('2025-03')
+    expect(months[3].key).toBe('2025-04')
+    expect(months[4].key).toBe('2025-05')
+    expect(months[5].key).toBe('2025-06')
+  })
+
+  it('跨年正确处理', () => {
+    const months = getLast6MonthsFrom('2025-03')
+    expect(months.length).toBe(6)
+    expect(months[0].key).toBe('2024-10')
+    expect(months[1].key).toBe('2024-11')
+    expect(months[2].key).toBe('2024-12')
+    expect(months[3].key).toBe('2025-01')
+    expect(months[4].key).toBe('2025-02')
+    expect(months[5].key).toBe('2025-03')
+  })
+
+  it('月份key和label一致', () => {
+    const months = getLast6MonthsFrom('2025-06')
+    months.forEach((m) => {
+      expect(m.key).toBe(m.label)
     })
   })
 })
@@ -567,7 +599,7 @@ describe('calculateMonthlySummary', () => {
 })
 
 describe('buildTrendData', () => {
-  it('构建近6个月趋势数据', () => {
+  it('构建近6个月趋势数据（默认当前月份）', () => {
     const data = buildTrendData([])
     expect(data.length).toBe(6)
     data.forEach((d) => {
@@ -575,6 +607,50 @@ describe('buildTrendData', () => {
       expect(typeof d.income).toBe('number')
       expect(typeof d.expense).toBe('number')
     })
+  })
+
+  it('基于指定月份构建趋势数据', () => {
+    const data = buildTrendData([], '2025-06')
+    expect(data.length).toBe(6)
+    expect(data[0].month).toBe('01')
+    expect(data[1].month).toBe('02')
+    expect(data[2].month).toBe('03')
+    expect(data[3].month).toBe('04')
+    expect(data[4].month).toBe('05')
+    expect(data[5].month).toBe('06')
+  })
+
+  it('正确统计各月收入和支出', () => {
+    const transactions = [
+      { id: '1', type: 'income', amount: 10000, date: '2025-04-05' },
+      { id: '2', type: 'expense', amount: 3000, date: '2025-04-10' },
+      { id: '3', type: 'income', amount: 8000, date: '2025-05-05' },
+      { id: '4', type: 'expense', amount: 5000, date: '2025-05-15' },
+      { id: '5', type: 'income', amount: 12000, date: '2025-06-01' },
+      { id: '6', type: 'expense', amount: 4000, date: '2025-06-20' },
+    ]
+    const data = buildTrendData(transactions, '2025-06')
+    const april = data.find((d) => d.month === '04')
+    const may = data.find((d) => d.month === '05')
+    const june = data.find((d) => d.month === '06')
+    expect(april.income).toBe(10000)
+    expect(april.expense).toBe(3000)
+    expect(may.income).toBe(8000)
+    expect(may.expense).toBe(5000)
+    expect(june.income).toBe(12000)
+    expect(june.expense).toBe(4000)
+  })
+
+  it('跨年正确构建趋势数据', () => {
+    const transactions = [
+      { id: '1', type: 'income', amount: 10000, date: '2024-12-05' },
+      { id: '2', type: 'income', amount: 11000, date: '2025-01-05' },
+    ]
+    const data = buildTrendData(transactions, '2025-03')
+    const dec = data.find((d) => d.month === '12')
+    const jan = data.find((d) => d.month === '01')
+    expect(dec.income).toBe(10000)
+    expect(jan.income).toBe(11000)
   })
 })
 

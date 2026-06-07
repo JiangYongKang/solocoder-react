@@ -19,6 +19,8 @@ import {
   paginateOrders,
   buildLogisticsTimeline,
   formatDateTime,
+  handleImageFallback,
+  FALLBACK_PRODUCT_IMAGE,
 } from '@/pages/orders/utils.js';
 import {
   ORDER_STATUSES,
@@ -440,6 +442,105 @@ describe('orders/utils', () => {
       expect(formatDateTime(0)).toBe('');
       expect(formatDateTime(null)).toBe('');
       expect(formatDateTime(undefined)).toBe('');
+    });
+  });
+
+  describe('cart stock preservation and enforcement', () => {
+    const sampleProduct = { id: 'p1', name: '键盘', price: 399, stock: 5, image: 'x' };
+
+    it('addToCart preserves stock field on new cart item', () => {
+      const cart = addToCart([], sampleProduct, 1);
+      expect(cart[0].stock).toBe(5);
+    });
+
+    it('addToCart updates stock when adding existing product', () => {
+      let cart = addToCart([], sampleProduct, 1);
+      const updatedProduct = { ...sampleProduct, stock: 8 };
+      cart = addToCart(cart, updatedProduct, 1);
+      expect(cart[0].stock).toBe(8);
+    });
+
+    it('updateCartQuantity respects stock cap when called with stock arg (CartPanel scenario)', () => {
+      const cart = addToCart([], sampleProduct, 2);
+      const cartItem = cart[0];
+      const after = updateCartQuantity(cart, cartItem.productId, 999, cartItem.stock);
+      expect(after[0].quantity).toBe(5);
+    });
+
+    it('updateCartQuantity still caps when stock is omitted but value is within safe range', () => {
+      const cart = addToCart([], sampleProduct, 2);
+      const after = updateCartQuantity(cart, 'p1', 3);
+      expect(after[0].quantity).toBe(3);
+    });
+  });
+
+  describe('image fallback', () => {
+    it('FALLBACK_PRODUCT_IMAGE is a non-empty data URL', () => {
+      expect(typeof FALLBACK_PRODUCT_IMAGE).toBe('string');
+      expect(FALLBACK_PRODUCT_IMAGE.startsWith('data:image/svg+xml;utf8,')).toBe(true);
+      expect(FALLBACK_PRODUCT_IMAGE.length).toBeGreaterThan(50);
+    });
+
+    it('handleImageFallback sets target src to fallback URL', () => {
+      const target = { src: 'https://broken.example.com/img.png' };
+      const event = { target };
+      handleImageFallback(event);
+      expect(target.src).toBe(FALLBACK_PRODUCT_IMAGE);
+    });
+
+    it('handleImageFallback does not change src when it already equals fallback', () => {
+      const target = { src: FALLBACK_PRODUCT_IMAGE };
+      const event = { target };
+      handleImageFallback(event);
+      expect(target.src).toBe(FALLBACK_PRODUCT_IMAGE);
+    });
+
+    it('handleImageFallback handles null/undefined safely', () => {
+      expect(() => handleImageFallback(null)).not.toThrow();
+      expect(() => handleImageFallback(undefined)).not.toThrow();
+      expect(() => handleImageFallback({})).not.toThrow();
+      expect(() => handleImageFallback({ target: null })).not.toThrow();
+    });
+  });
+
+  describe('order filtering by cancelled status', () => {
+    const baseOrder = (id, status) => ({
+      id,
+      status,
+      items: [],
+      total: 0,
+      address: {},
+      createdAt: Date.now(),
+      history: [{ status, time: Date.now() }],
+    });
+
+    it('filterOrdersByStatus returns only cancelled orders', () => {
+      const list = [
+        baseOrder('o1', ORDER_STATUSES.PENDING_PAYMENT),
+        baseOrder('o2', ORDER_STATUSES.CANCELLED),
+        baseOrder('o3', ORDER_STATUSES.COMPLETED),
+        baseOrder('o4', ORDER_STATUSES.CANCELLED),
+      ];
+      const cancelled = filterOrdersByStatus(list, ORDER_STATUSES.CANCELLED);
+      expect(cancelled.length).toBe(2);
+      expect(cancelled.every((o) => o.status === ORDER_STATUSES.CANCELLED)).toBe(true);
+    });
+
+    it('cancelOrder adds cancelled status and can then be filtered', () => {
+      const validAddress = {
+        receiver: '张三',
+        phone: '13800138000',
+        province: '北京市',
+        city: '北京市',
+        district: '朝阳区',
+        detail: '某某街道1号',
+      };
+      const cart = [{ productId: 'p1', name: '键盘', price: 399, quantity: 1, image: 'x' }];
+      let order = createOrder(cart, validAddress);
+      order = cancelOrder(order);
+      const result = filterOrdersByStatus([order], ORDER_STATUSES.CANCELLED);
+      expect(result.length).toBe(1);
+      expect(result[0].id).toBe(order.id);
     });
   });
 });

@@ -25,6 +25,7 @@ import {
   getEnabledTypes,
   pickRandomEnabledType,
   updatePref,
+  formatBadgeCount,
 } from '@/pages/notifications/notificationsUtils.js';
 
 function createMockStorage() {
@@ -135,13 +136,6 @@ describe('notificationsUtils', () => {
 
     it('should throw on invalid type', () => {
       expect(() => createNotification('invalid-type')).toThrow();
-    });
-
-    it('should not mutate the original state', () => {
-      const state = createState([makeNotification()]);
-      const frozen = JSON.stringify(state);
-      addNotification(state, makeNotification());
-      expect(JSON.stringify(state)).toBe(frozen);
     });
   });
 
@@ -263,17 +257,26 @@ describe('notificationsUtils', () => {
       expect(updated.active.find((x) => x.id === 'm1').read).toBe(false);
     });
 
-    it('should not affect archived notifications', () => {
+    it('should mark archived notifications of given type as read too', () => {
       const ar = makeNotification({ id: 'ar1', type: NOTIFICATION_TYPES.SYSTEM });
       const ac = makeNotification({ id: 'ac1', type: NOTIFICATION_TYPES.SYSTEM });
-      const state = createState([ac], [ar]);
+      const arOther = makeNotification({ id: 'ar2', type: NOTIFICATION_TYPES.MESSAGE });
+      const state = createState([ac], [ar, arOther]);
       const updated = markAllOfTypeAsRead(state, NOTIFICATION_TYPES.SYSTEM);
       expect(updated.active[0].read).toBe(true);
-      expect(updated.archived[0].read).toBe(false);
+      expect(updated.archived.find((x) => x.id === 'ar1').read).toBe(true);
+      expect(updated.archived.find((x) => x.id === 'ar2').read).toBe(false);
     });
   });
 
   describe('addNotification', () => {
+    it('should not mutate the original state', () => {
+      const state = createState([makeNotification()]);
+      const frozen = JSON.stringify(state);
+      addNotification(state, makeNotification());
+      expect(JSON.stringify(state)).toBe(frozen);
+    });
+
     it('should add notification at the beginning of active list', () => {
       const existing = makeNotification({ id: 'old' });
       const state = createState([existing]);
@@ -313,7 +316,7 @@ describe('notificationsUtils', () => {
       expect(updated.active.length).toBe(2);
       expect(updated.active.map(n => n.id)).toEqual(['e', 'a']);
       expect(updated.archived.length).toBe(3);
-      expect(updated.archived.map(n => n.id)).toEqual(['b', 'c', 'd']);
+      expect(updated.archived.map(n => n.id)).toEqual(['d', 'c', 'b']);
     });
 
     it('should use MAX_ACTIVE_NOTIFICATIONS by default', () => {
@@ -463,6 +466,81 @@ describe('notificationsUtils', () => {
       expect(updated[NOTIFICATION_TYPES.SYSTEM]).toBe(false);
       expect(updated[NOTIFICATION_TYPES.MESSAGE]).toBe(true);
       expect(prefs[NOTIFICATION_TYPES.SYSTEM]).toBe(true);
+    });
+  });
+
+  describe('formatBadgeCount', () => {
+    it('should return empty string for zero or negative count', () => {
+      expect(formatBadgeCount(0)).toBe('');
+      expect(formatBadgeCount(-5)).toBe('');
+    });
+
+    it('should return number as string for positive count within max', () => {
+      expect(formatBadgeCount(1)).toBe('1');
+      expect(formatBadgeCount(42)).toBe('42');
+      expect(formatBadgeCount(99)).toBe('99');
+    });
+
+    it('should cap at max with plus sign when count exceeds max', () => {
+      expect(formatBadgeCount(100)).toBe('99+');
+      expect(formatBadgeCount(500)).toBe('99+');
+    });
+
+    it('should support custom max parameter', () => {
+      expect(formatBadgeCount(5, 10)).toBe('5');
+      expect(formatBadgeCount(10, 10)).toBe('10');
+      expect(formatBadgeCount(11, 10)).toBe('10+');
+    });
+  });
+
+  describe('immutability checks', () => {
+    it('markAllOfTypeAsRead should not mutate original state', () => {
+      const ac = makeNotification({ id: 'ac1', type: NOTIFICATION_TYPES.SYSTEM });
+      const ar = makeNotification({ id: 'ar1', type: NOTIFICATION_TYPES.SYSTEM });
+      const state = createState([ac], [ar]);
+      const frozen = JSON.stringify(state);
+      markAllOfTypeAsRead(state, NOTIFICATION_TYPES.SYSTEM);
+      expect(JSON.stringify(state)).toBe(frozen);
+    });
+
+    it('markAllAsRead should not mutate original state', () => {
+      const state = createState(
+        [makeNotification({ id: 'a' })],
+        [makeNotification({ id: 'b' })]
+      );
+      const frozen = JSON.stringify(state);
+      markAllAsRead(state);
+      expect(JSON.stringify(state)).toBe(frozen);
+    });
+
+    it('markAsRead should not mutate original state', () => {
+      const state = createState([makeNotification({ id: 'a' })]);
+      const frozen = JSON.stringify(state);
+      markAsRead(state, 'a');
+      expect(JSON.stringify(state)).toBe(frozen);
+    });
+
+    it('updatePref should not mutate original prefs', () => {
+      const prefs = { ...DEFAULT_PREFS };
+      const frozen = JSON.stringify(prefs);
+      updatePref(prefs, NOTIFICATION_TYPES.SYSTEM, false);
+      expect(JSON.stringify(prefs)).toBe(frozen);
+    });
+  });
+
+  describe('archived list ordering', () => {
+    it('should keep archived list in chronological order (earliest archived first)', () => {
+      const max = 2;
+      let state = createState([
+        makeNotification({ id: 'n1' }),
+        makeNotification({ id: 'n2' }),
+      ]);
+      state = addNotification(state, makeNotification({ id: 'n3' }), max);
+      expect(state.archived.map((n) => n.id)).toEqual(['n2']);
+      state = addNotification(state, makeNotification({ id: 'n4' }), max);
+      expect(state.archived.map((n) => n.id)).toEqual(['n2', 'n1']);
+      state = addNotification(state, makeNotification({ id: 'n5' }), max);
+      expect(state.archived.map((n) => n.id)).toEqual(['n2', 'n1', 'n3']);
     });
   });
 });

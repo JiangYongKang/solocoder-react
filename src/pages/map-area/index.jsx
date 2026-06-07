@@ -32,6 +32,7 @@ function MapAreaPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [pendingPosition, setPendingPosition] = useState(null);
   const [routePlanningMode, setRoutePlanningMode] = useState(false);
+  const [searchNoResult, setSearchNoResult] = useState(false);
 
   useEffect(() => {
     saveMarkers(markers);
@@ -107,7 +108,8 @@ function MapAreaPage() {
     setSelectedRouteIds((prev) => prev.filter((id) => id !== selectedMarkerId));
   }, [selectedMarkerId]);
 
-  const handleSearch = useCallback((keyword, preset) => {
+  const handleSearch = useCallback((keyword, preset, hasPresets) => {
+    setSearchNoResult(false);
     if (preset) {
       const x = center.x + (preset.offsetX || 0);
       const y = center.y + (preset.offsetY || 0);
@@ -138,18 +140,10 @@ function MapAreaPage() {
         setCenter({ x, y });
         setSelectedMarkerId(newMarker.id);
       } else {
-        const x = center.x + (Math.random() - 0.5) * 400;
-        const y = center.y + (Math.random() - 0.5) * 400;
-        const newMarker = {
-          id: generateId(),
-          name: keyword,
-          description: `搜索 "${keyword}" 的结果`,
-          x,
-          y,
-        };
-        setMarkers((prev) => addMarker(prev, newMarker));
-        setCenter({ x, y });
-        setSelectedMarkerId(newMarker.id);
+        if (hasPresets === false) {
+          setSearchNoResult(true);
+          setTimeout(() => setSearchNoResult(false), 2500);
+        }
       }
     }
   }, [center]);
@@ -223,6 +217,9 @@ function MapAreaPage() {
       </div>
 
       <div className="map-canvas-container">
+        {searchNoResult && (
+          <div className="map-toast">未找到匹配的地点，请尝试其他关键字</div>
+        )}
         <MapCanvas
           center={center}
           zoom={zoom}

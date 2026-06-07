@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import {
   MEDIA_TYPES,
   generateMediaId,
@@ -19,7 +19,62 @@ import {
   toggleFavorite,
   setFavoriteBatch,
   updateMediaTags,
+  loadMediaData,
+  saveMediaData,
+  readFileAsDataUrl,
 } from '@/pages/media-gallery/utils'
+
+function createMockLocalStorage() {
+  const store = new Map()
+  return {
+    getItem: (key) => (store.has(key) ? store.get(key) : null),
+    setItem: (key, value) => store.set(key, String(value)),
+    removeItem: (key) => store.delete(key),
+    clear: () => store.clear(),
+    get length() {
+      return store.size
+    },
+    key: (index) => Array.from(store.keys())[index] ?? null,
+  }
+}
+
+function createMockFileReader() {
+  return function MockFileReader() {
+    this.result = null
+    this.error = null
+    this.onload = null
+    this.onerror = null
+    this.readAsDataURL = function (file) {
+      const content = typeof file === 'object' && file !== null ? '[mock data url]' : ''
+      queueMicrotask(() => {
+        this.result = `data:application/octet-stream;base64,${btoa(content)}`
+        this.onload?.({ target: this })
+      })
+    }
+  }
+}
+
+const originalLocalStorage = globalThis.localStorage
+const originalFileReader = globalThis.FileReader
+
+beforeEach(() => {
+  globalThis.localStorage = createMockLocalStorage()
+  globalThis.FileReader = createMockFileReader()
+})
+
+afterEach(() => {
+  if (originalLocalStorage) {
+    globalThis.localStorage = originalLocalStorage
+  } else {
+    delete globalThis.localStorage
+  }
+  if (originalFileReader) {
+    globalThis.FileReader = originalFileReader
+  } else {
+    delete globalThis.FileReader
+  }
+  vi.restoreAllMocks()
+})
 
 function makeTestItems() {
   const now = 1700000000000
@@ -93,6 +148,8 @@ function makeTestItems() {
     },
   ]
 }
+
+const STORAGE_KEY = 'media-gallery-data'
 
 describe('generateMediaId', () => {
   it('生成非空字符串 ID', () => {
@@ -172,10 +229,37 @@ describe('formatDate', () => {
     expect(result).toContain('15')
   })
 
-  it('无效值返回 -', () => {
+  it('支持字符串格式的数字时间戳', () => {
+    const ts = String(new Date('2024-01-15T09:30:00').getTime())
+    const result = formatDate(ts)
+    expect(result).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  })
+
+  it('支持可解析的日期字符串', () => {
+    const result = formatDate('2024-01-15')
+    expect(result).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  })
+
+  it('null/undefined 返回 -', () => {
     expect(formatDate(null)).toBe('-')
     expect(formatDate(undefined)).toBe('-')
+  })
+
+  it('NaN 返回 -', () => {
     expect(formatDate(NaN)).toBe('-')
+  })
+
+  it('无效字符串如 "invalid" 返回 -', () => {
+    expect(formatDate('invalid')).toBe('-')
+  })
+
+  it('空字符串返回 -', () => {
+    expect(formatDate('')).toBe('-')
+  })
+
+  it('布尔值返回 -', () => {
+    expect(formatDate(true)).toBe('-')
+    expect(formatDate(false)).toBe('-')
   })
 })
 
@@ -186,10 +270,32 @@ describe('formatDateTime', () => {
     expect(result).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/)
   })
 
-  it('无效值返回 -', () => {
+  it('支持字符串格式的数字时间戳', () => {
+    const ts = String(new Date('2024-01-15T09:30:00').getTime())
+    const result = formatDateTime(ts)
+    expect(result).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/)
+  })
+
+  it('null/undefined 返回 -', () => {
     expect(formatDateTime(null)).toBe('-')
     expect(formatDateTime(undefined)).toBe('-')
+  })
+
+  it('NaN 返回 -', () => {
     expect(formatDateTime(NaN)).toBe('-')
+  })
+
+  it('无效字符串如 "invalid" 返回 -', () => {
+    expect(formatDateTime('invalid')).toBe('-')
+  })
+
+  it('空字符串返回 -', () => {
+    expect(formatDateTime('')).toBe('-')
+  })
+
+  it('布尔值返回 -', () => {
+    expect(formatDateTime(true)).toBe('-')
+    expect(formatDateTime(false)).toBe('-')
   })
 })
 
@@ -274,6 +380,27 @@ describe('getAllDates', () => {
     for (let i = 1; i < dates.length; i++) {
       expect(dates[i - 1] >= dates[i]).toBe(true)
     }
+  })
+
+  it('不截断日期列表，返回所有可用日期', () => {
+    const items = []
+    const now = 1700000000000
+    const day = 24 * 60 * 60 * 1000
+    for (let i = 0; i < 15; i++) {
+      items.push({
+        id: `d${i}`,
+        name: `test${i}.jpg`,
+        size: 100,
+        type: MEDIA_TYPES.IMAGE,
+        dataUrl: null,
+        tags: [],
+        favorite: false,
+        createdAt: now - i * day,
+        updatedAt: now - i * day,
+      })
+    }
+    const dates = getAllDates(items)
+    expect(dates.length).toBe(15)
   })
 
   it('空数组返回空', () => {
@@ -585,5 +712,128 @@ describe('updateMediaTags', () => {
     const items = makeTestItems()
     updateMediaTags(items, 'm1', ['修改'])
     expect(items.find((i) => i.id === 'm1').tags).toEqual(['风景', '自然', '旅行'])
+  })
+})
+
+describe('saveMediaData', () => {
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  it('将数组序列化为 JSON 存入 localStorage', () => {
+    const items = [{ id: 'a', name: 'test.jpg' }]
+    saveMediaData(items)
+    const raw = localStorage.getItem(STORAGE_KEY)
+    expect(raw).toBeTruthy()
+    const parsed = JSON.parse(raw)
+    expect(parsed).toEqual(items)
+  })
+
+  it('保存空数组', () => {
+    saveMediaData([])
+    const raw = localStorage.getItem(STORAGE_KEY)
+    expect(JSON.parse(raw)).toEqual([])
+  })
+
+  it('localStorage.setItem 抛出异常时不报错', () => {
+    const originalSetItem = localStorage.setItem
+    localStorage.setItem = () => {
+      throw new Error('QuotaExceededError')
+    }
+    expect(() => saveMediaData([{ id: 'a' }])).not.toThrow()
+    localStorage.setItem = originalSetItem
+  })
+})
+
+describe('loadMediaData', () => {
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  it('localStorage 为空时返回初始化数据并自动保存', () => {
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull()
+    const result = loadMediaData()
+    expect(Array.isArray(result)).toBe(true)
+    expect(result.length).toBeGreaterThan(0)
+    const saved = localStorage.getItem(STORAGE_KEY)
+    expect(saved).toBeTruthy()
+    expect(JSON.parse(saved)).toEqual(result)
+  })
+
+  it('localStorage 有合法数组时直接返回', () => {
+    const mockItems = [
+      { id: 'custom-1', name: 'custom.jpg', type: 'image' },
+      { id: 'custom-2', name: 'custom.png', type: 'image' },
+    ]
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(mockItems))
+    const result = loadMediaData()
+    expect(result).toEqual(mockItems)
+  })
+
+  it('localStorage 有非数组值时回退到初始化数据', () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ not: 'an array' }))
+    const result = loadMediaData()
+    expect(Array.isArray(result)).toBe(true)
+    expect(result.length).toBeGreaterThan(0)
+  })
+
+  it('localStorage 存储的 JSON 非法时回退到初始化数据', () => {
+    localStorage.setItem(STORAGE_KEY, 'this is not valid json {{{')
+    const result = loadMediaData()
+    expect(Array.isArray(result)).toBe(true)
+    expect(result.length).toBeGreaterThan(0)
+  })
+
+  it('localStorage.getItem 抛出异常时回退到初始化数据', () => {
+    const originalGetItem = localStorage.getItem
+    localStorage.getItem = () => {
+      throw new Error('SecurityError')
+    }
+    const result = loadMediaData()
+    expect(Array.isArray(result)).toBe(true)
+    expect(result.length).toBeGreaterThan(0)
+    localStorage.getItem = originalGetItem
+  })
+})
+
+describe('readFileAsDataUrl', () => {
+  function makeMockFile(name, content) {
+    return {
+      name,
+      size: content.length,
+      type: 'application/octet-stream',
+      _content: content,
+    }
+  }
+
+  it('返回一个 Promise', () => {
+    const file = makeMockFile('test.txt', 'hello')
+    const result = readFileAsDataUrl(file)
+    expect(result).toBeInstanceOf(Promise)
+  })
+
+  it('读取成功时 resolve 为 data URL 字符串', async () => {
+    const file = makeMockFile('test.txt', 'hello world')
+    const result = await readFileAsDataUrl(file)
+    expect(typeof result).toBe('string')
+    expect(result.startsWith('data:')).toBe(true)
+  })
+
+  it('读取失败时 reject 错误', async () => {
+    const originalFileReader = globalThis.FileReader
+    globalThis.FileReader = function () {
+      this.result = null
+      this.error = new Error('Simulated read error')
+      this.onload = null
+      this.onerror = null
+      this.readAsDataURL = function () {
+        queueMicrotask(() => {
+          this.onerror?.({ target: this })
+        })
+      }
+    }
+    const file = makeMockFile('test.txt', 'hello')
+    await expect(readFileAsDataUrl(file)).rejects.toBeDefined()
+    globalThis.FileReader = originalFileReader
   })
 })

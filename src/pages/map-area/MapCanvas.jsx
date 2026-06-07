@@ -18,6 +18,8 @@ function MapCanvas({
   const svgRef = useRef(null);
   const [size, setSize] = useState({ width: 800, height: 600 });
   const [isDragging, setIsDragging] = useState(false);
+  const isDraggingRef = useRef(false);
+  const didMoveRef = useRef(false);
   const dragStartRef = useRef({ x: 0, y: 0, centerX: 0, centerY: 0 });
 
   useEffect(() => {
@@ -37,6 +39,8 @@ function MapCanvas({
   const handleMouseDown = useCallback((e) => {
     if (e.target.closest('[data-marker]') || e.target.closest('[data-cluster]')) return;
     setIsDragging(true);
+    isDraggingRef.current = true;
+    didMoveRef.current = false;
     dragStartRef.current = {
       x: e.clientX,
       y: e.clientY,
@@ -46,16 +50,20 @@ function MapCanvas({
   }, [center]);
 
   const handleMouseMove = useCallback((e) => {
-    if (!isDragging) return;
+    if (!isDraggingRef.current) return;
     const dx = e.clientX - dragStartRef.current.x;
     const dy = e.clientY - dragStartRef.current.y;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+      didMoveRef.current = true;
+    }
     const newCenterX = dragStartRef.current.centerX - dx / zoom;
     const newCenterY = dragStartRef.current.centerY - dy / zoom;
     onCenterChange({ x: newCenterX, y: newCenterY });
-  }, [isDragging, zoom, onCenterChange]);
+  }, [zoom, onCenterChange]);
 
   const handleMouseUp = useCallback(() => {
     setIsDragging(false);
+    isDraggingRef.current = false;
   }, []);
 
   const handleWheel = useCallback((e) => {
@@ -81,13 +89,13 @@ function MapCanvas({
 
   const handleClick = useCallback((e) => {
     if (e.target.closest('[data-marker]') || e.target.closest('[data-cluster]')) return;
-    if (isDragging) return;
+    if (didMoveRef.current) return;
     const rect = svgRef.current.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
     const clickY = e.clientY - rect.top;
     const world = screenToWorld(clickX, clickY, center.x, center.y, zoom, width, height);
     onCanvasClick(world);
-  }, [center, zoom, width, height, onCanvasClick, isDragging]);
+  }, [center, zoom, width, height, onCanvasClick]);
 
   const renderGrid = () => {
     const lines = [];

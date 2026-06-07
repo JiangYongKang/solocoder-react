@@ -545,6 +545,13 @@
     font-size: 24px;
   }
 
+  .notif-badge {
+    min-width: 24px;
+    height: 24px;
+    padding: 0 6px;
+    font-size: 12px;
+  }
+
   .notif-header {
     gap: 8px;
   }
@@ -591,6 +598,16 @@
     margin-top: 0;
   }
 
+  .notif-content {
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+
+  .notif-section-title {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
   .notif-prefs-panel {
     max-width: 100%;
   }
@@ -598,6 +615,70 @@
   .notif-prefs-header,
   .notif-prefs-body {
     padding: 16px 20px;
+  }
+}
+
+@media (max-width: 375px) {
+  .notif-page {
+    padding: 12px 12px 24px;
+  }
+
+  .notif-title {
+    font-size: 20px;
+    gap: 8px;
+  }
+
+  .notif-badge {
+    min-width: 22px;
+    height: 22px;
+    padding: 0 5px;
+    font-size: 11px;
+  }
+
+  .notif-tab {
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+
+  .notif-card {
+    padding: 12px;
+    gap: 8px;
+  }
+
+  .notif-dot {
+    margin-top: 6px;
+  }
+
+  .notif-icon {
+    width: 28px;
+    height: 28px;
+    font-size: 14px;
+    border-radius: 6px;
+  }
+
+  .notif-pref-item {
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .notif-pref-icon {
+    width: 34px;
+    height: 34px;
+    font-size: 16px;
+  }
+
+  .notif-toggle {
+    width: 42px;
+    height: 22px;
+  }
+
+  .notif-toggle::after {
+    width: 16px;
+    height: 16px;
+  }
+
+  .notif-toggle-on::after {
+    transform: translateX(20px);
   }
 }
 

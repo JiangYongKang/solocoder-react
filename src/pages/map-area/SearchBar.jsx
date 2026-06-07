@@ -32,7 +32,8 @@ function SearchBar({ onSearch }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (query.trim()) {
-      onSearch(query.trim());
+      const presets = searchPresets(query.trim());
+      onSearch(query.trim(), undefined, presets.length > 0);
       setShowSuggestions(false);
     }
   };
@@ -69,6 +70,11 @@ function SearchBar({ onSearch }) {
               <span className="map-search-suggestion-cat">{item.category}</span>
             </div>
           ))}
+        </div>
+      )}
+      {showSuggestions && query.trim() && suggestions.length === 0 && (
+        <div className="map-search-suggestions">
+          <div className="map-search-no-result">未找到匹配的地点，请尝试其他关键字</div>
         </div>
       )}
     </div>

@@ -1,0 +1,8 @@
+产物不满意：
+1. notifications.css 第 506 行的 content: '' 使用了非标准 Unicode 引号字符替代 ASCII 单引号，浏览器解析该 CSS 规则时属性值异常，最终触发 React 的 "style prop expects a mapping" 运行时错误，导致通知卡片切换展开时页面报错白屏。（用户手工验证发现，此 BUG 由第二轮新增的 @media (max-width: 375px) 块中 .notif-toggle::after 和 .notif-toggle-on::after 的样式规则引入）
+2. Canvas 绘制的 favicon 角标以 18px 粗体在 32×32 画布上渲染未读数，当未读数超过 99 时 formatBadgeCount 返回 '99+' 三个字符，实际文字宽度约 36px 超出画布边界，导致角标数字右侧被裁切，99+ 场景下的 favicon 显示不全。（对应提示词第 1 条）
+3. 新增的 "archived list ordering" 测试通过多次调用 addNotification 来生成归档条目再验证顺序，但归档行为和活跃列表插入逻辑耦合在同一个 addNotification 函数里，一旦活跃列表管理逻辑被修改该测试也会失败，测试没有真正隔离归档排序这一验证目标。（对应提示词第 5 条）
+过程不满意：
+1. 模型在收到第二轮修复任务后没有任何分析步骤就直接创建了 TodoList，跳过了逐一核对每个问题根因和修复范围的规划阶段，属于标注规范中指出的 "不能在刚收到任务时就直接创建 TodoList" 的典型反面行为。
+2. 模型在修复过程中重复读取了 index.jsx 至少三次，每次都是重新打开整个文件而没有在第一次阅读时整理出所有需要修改的位置后集中批量操作，存在明显的碎片化读取问题。
+3. 运行 eslint 命令时命令行末尾出现了 undefined 作为文件参数（npx eslint ... src/App.jsx undefined），说明模型在拼接命令字符串时某处引用了未定义的变量值，命令构造不严谨。

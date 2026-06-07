@@ -24,6 +24,7 @@ import {
   createNotification,
   pickRandomEnabledType,
   updatePref,
+  formatBadgeCount,
 } from './notificationsUtils.js'
 
 import './notifications.css'
@@ -116,6 +117,8 @@ function NotificationsPage() {
   const navigate = useNavigate()
   const timerRef = useRef(null)
   const prefsRef = useRef(null)
+  const originalFaviconRef = useRef(null)
+  const faviconLinkRef = useRef(null)
 
   const [state, setState] = useState(() => loadNotifications())
   const [prefs, setPrefs] = useState(() => loadPrefs())
@@ -136,8 +139,47 @@ function NotificationsPage() {
     } else {
       document.title = '通知中心 - Solocoder React'
     }
+
+    if (!faviconLinkRef.current) {
+      let link = document.querySelector('link[rel="icon"]')
+      if (!link) {
+        link = document.createElement('link')
+        link.rel = 'icon'
+        document.head.appendChild(link)
+      }
+      faviconLinkRef.current = link
+      originalFaviconRef.current = link.href
+    }
+
+    const linkEl = faviconLinkRef.current
+    const canvas = document.createElement('canvas')
+    canvas.width = 32
+    canvas.height = 32
+    const ctx = canvas.getContext('2d')
+
+    if (totalUnread <= 0) {
+      if (originalFaviconRef.current) {
+        linkEl.href = originalFaviconRef.current
+      }
+    } else {
+      ctx.fillStyle = '#1677ff'
+      ctx.fillRect(0, 0, 32, 32)
+
+      ctx.fillStyle = '#ffffff'
+      ctx.font = 'bold 18px Arial, sans-serif'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      const text = formatBadgeCount(totalUnread)
+      ctx.fillText(text, 16, 17)
+
+      linkEl.href = canvas.toDataURL('image/png')
+    }
+
     return () => {
       document.title = prevTitle
+      if (faviconLinkRef.current && originalFaviconRef.current) {
+        faviconLinkRef.current.href = originalFaviconRef.current
+      }
     }
   }, [totalUnread])
 

@@ -11,6 +11,7 @@ import {
   buildLogisticsTimeline,
   paginateOrders,
   filterOrdersByStatus,
+  handleImageFallback,
 } from './utils.js';
 import { useState, useMemo } from 'react';
 
@@ -20,6 +21,7 @@ const TABS = [
   { key: ORDER_STATUSES.PAID, label: STATUS_LABELS[ORDER_STATUSES.PAID] },
   { key: ORDER_STATUSES.SHIPPED, label: STATUS_LABELS[ORDER_STATUSES.SHIPPED] },
   { key: ORDER_STATUSES.COMPLETED, label: STATUS_LABELS[ORDER_STATUSES.COMPLETED] },
+  { key: ORDER_STATUSES.CANCELLED, label: STATUS_LABELS[ORDER_STATUSES.CANCELLED] },
 ];
 
 export default function OrderList({ orders, onAdvance, onCancel }) {
@@ -94,7 +96,7 @@ export default function OrderList({ orders, onAdvance, onCancel }) {
                         {order.items.map((item) => (
                           <div key={item.productId} className="orders-item-product">
                             <div className="orders-item-product-image">
-                              <img src={item.image} alt={item.name} />
+                              <img src={item.image} alt={item.name} onError={handleImageFallback} />
                             </div>
                             <div className="orders-item-product-info">
                               <div className="orders-item-product-name">{item.name}</div>

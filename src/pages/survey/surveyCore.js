@@ -414,6 +414,13 @@ export function clearResponses(surveyId) {
   }
 }
 
+export function deleteSurveyData(surveyId) {
+  if (typeof window === 'undefined' || !window.localStorage) return { draft: false, responses: false }
+  const draftCleared = clearDraft(surveyId)
+  const responsesCleared = clearResponses(surveyId)
+  return { draft: draftCleared, responses: responsesCleared }
+}
+
 export function validateAnswer(question, answer) {
   if (!question) return { valid: true }
   if (!question.required) return { valid: true }
@@ -445,7 +452,8 @@ export function validateAnswer(question, answer) {
       }
       const rowValues = question.rows || []
       for (const row of rowValues) {
-        if (!answer[row.value] || answer[row.value] === '') {
+        const val = answer[row.value]
+        if (val === undefined || val === null || val === '') {
           return { valid: false, message: '请完成所有维度的评分' }
         }
       }

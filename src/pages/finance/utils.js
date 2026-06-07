@@ -39,10 +39,15 @@ export function getCurrentMonthKey() {
 }
 
 export function getLast6Months() {
+  return getLast6MonthsFrom(getCurrentMonthKey())
+}
+
+export function getLast6MonthsFrom(baseMonthKey) {
   const months = []
-  const now = new Date()
+  const [year, month] = (baseMonthKey || getCurrentMonthKey()).split('-').map(Number)
+  const baseDate = new Date(year, (month || 1) - 1, 1)
   for (let i = 5; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const d = new Date(baseDate.getFullYear(), baseDate.getMonth() - i, 1)
     months.push({
       key: getMonthKey(d.toISOString()),
       label: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
@@ -300,8 +305,8 @@ export function calculateMonthlySummary(transactions, monthKey) {
   }
 }
 
-export function buildTrendData(transactions) {
-  const months = getLast6Months()
+export function buildTrendData(transactions, baseMonthKey) {
+  const months = getLast6MonthsFrom(baseMonthKey)
   return months.map((m) => {
     const summary = calculateMonthlySummary(transactions, m.key)
     return {

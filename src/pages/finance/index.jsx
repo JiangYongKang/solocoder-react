@@ -73,7 +73,7 @@ const FinancePage = () => {
     [transactions, budgets, selectedMonth]
   )
 
-  const trendData = useMemo(() => buildTrendData(transactions), [transactions])
+  const trendData = useMemo(() => buildTrendData(transactions, selectedMonth), [transactions, selectedMonth])
   const pieData = useMemo(() => buildPieData(transactions, selectedMonth), [transactions, selectedMonth])
 
   const availableCategories = useMemo(() => {

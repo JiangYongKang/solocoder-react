@@ -11,6 +11,8 @@ import {
   buildBezierPath,
   getNodeById,
   deleteEdge,
+  deleteNode,
+  deleteEdgesByNodeId,
 } from './workflowCore'
 
 function WorkflowCanvas({
@@ -49,7 +51,7 @@ function WorkflowCanvas({
 
   const handleCanvasWheel = useCallback((e) => {
     e.preventDefault()
-    const delta = e.deltaY > 0 ? 0.9 : 1.1
+    const delta = e.deltaY > 0 ? 1 / 1.2 : 1.2
     setScale((prev) => Math.min(Math.max(prev * delta, 0.25), 3))
   }, [])
 
@@ -173,8 +175,8 @@ function WorkflowCanvas({
 
   const handleDeleteNode = useCallback((e, nodeId) => {
     e.stopPropagation()
-    onNodesChange((prev) => prev.filter((n) => n.id !== nodeId))
-    onEdgesChange((prev) => prev.filter((ed) => ed.source !== nodeId && ed.target !== nodeId))
+    onNodesChange((prev) => deleteNode(prev, nodeId))
+    onEdgesChange((prev) => deleteEdgesByNodeId(prev, nodeId))
     if (selectedNodeId === nodeId) {
       onSelectNode(null)
     }

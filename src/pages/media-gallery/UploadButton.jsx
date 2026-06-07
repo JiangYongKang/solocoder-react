@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 import { createMediaItem, getMediaType, readFileAsDataUrl } from './utils'
 
-export default function UploadButton({ onFilesAdded, children }) {
+export default function UploadButton({ onFilesAdded, onError, children }) {
   const inputRef = useRef(null)
 
   const handleClick = () => {
@@ -12,7 +12,9 @@ export default function UploadButton({ onFilesAdded, children }) {
     const files = Array.from(e.target.files || [])
     if (files.length === 0) return
 
-    const items = []
+    const successItems = []
+    const failedNames = []
+
     for (const file of files) {
       try {
         const dataUrl = await readFileAsDataUrl(file)
@@ -24,20 +26,18 @@ export default function UploadButton({ onFilesAdded, children }) {
           type,
           tags: [],
         })
-        items.push(item)
+        successItems.push(item)
       } catch {
-        const item = createMediaItem({
-          name: file.name,
-          size: file.size,
-          dataUrl: null,
-          tags: [],
-        })
-        items.push(item)
+        failedNames.push(file.name)
       }
     }
 
-    if (items.length > 0) {
-      onFilesAdded?.(items)
+    if (successItems.length > 0) {
+      onFilesAdded?.(successItems)
+    }
+
+    if (failedNames.length > 0) {
+      onError?.(failedNames)
     }
 
     if (inputRef.current) {

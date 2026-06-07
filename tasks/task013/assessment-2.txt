@@ -1,0 +1,7 @@
+产物不满意：
+1. 提示词第1条明确要求补 map-area 的 import、任务卡片和 Route，但模型在 App.jsx 中一并添加了 finance、map-area、rich-editor 三个新页面的注册，多出来的两个任务路由不在本轮修复范围内。
+2. SearchBar 的 handleSubmit 在传参时调用了一次 searchPresets 判断 hasPresets，index.jsx 的 handleSearch 收到参数后又自己调用了一次 searchPresets，同一关键词被执行了两次搜索，存在不必要的重复查询。
+3. handleSearch 中 hasPresets 参数的传参链路绕了一圈：SearchBar 先算一遍看有没有结果，然后传到 handleSearch 里再算一遍，如果两边都能搜到结果，hasPresets 这个 flag 实际上没派上用场，逻辑冗余让理解意图变得困难。
+过程不满意：
+1. 模型收到提示词后第一个动作就是创建 TodoList，然后才批量读取文件，没有先分析问题再规划，不符合标注规范要求的流程顺序。
+2. 模型在给 App.jsx 加路由时把 finance 和 rich-editor 的 import、卡片、Route 也带了上去，说明对任务边界不够敏感，本轮提示词只要求给 map-area 补路由，不需要动其他任务的入口。

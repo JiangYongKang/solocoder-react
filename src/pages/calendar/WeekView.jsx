@@ -4,10 +4,11 @@ import {
   formatTime,
   getWeekDates,
   filterEventsByWeek,
-  getMinutesFromStart,
-  getEventDurationMinutes,
   isSameDay,
-  formatDate,
+  startOfWeek,
+  endOfWeek,
+  pixelsToMinutes,
+  getWeekViewEventPosition,
 } from './calendarUtils.js'
 
 const HOUR_HEIGHT = 60
@@ -22,8 +23,10 @@ export default function WeekView({
 }) {
   const weekDates = getWeekDates(date)
   const weekEvents = filterEventsByWeek(events, date)
-  const [dragging, setDragging] = useState(null)
-  const [resizing, setResizing] = useState(null)
+  const [draggingId, setDraggingId] = useState(null)
+  const [resizingId, setResizingId] = useState(null)
+  const dragStateRef = useRef(null)
+  const columnsContainerRef = useRef(null)
   const scrollRef = useRef(null)
 
   const handleSlotClick = (dayDate, hour, e) => {
@@ -37,57 +40,77 @@ export default function WeekView({
     onSlotClick && onSlotClick(start, end)
   }
 
+  const getColumnWidth = () => {
+    if (!columnsContainerRef.current) return 180
+    const firstCol = columnsContainerRef.current.querySelector('.cal-week-day-column')
+    if (!firstCol) return 180
+    return firstCol.getBoundingClientRect().width
+  }
+
   const handleEventMouseDown = (e, event, mode) => {
     e.stopPropagation()
     e.preventDefault()
     const startY = e.clientY
     const startX = e.clientX
-    const initialDay = new Date(event.startTime)
+    const columnWidth = getColumnWidth()
+
     if (mode === 'move') {
-      setDragging({
+      setDraggingId(event.id)
+      dragStateRef.current = {
+        mode: 'move',
         id: event.id,
         startY,
         startX,
+        columnWidth,
         originalStart: event.startTime,
         originalEnd: event.endTime,
-        originalDay: formatDate(initialDay),
-      })
+      }
     } else if (mode === 'resize') {
-      setResizing({ id: event.id, startY, originalEnd: event.endTime })
+      setResizingId(event.id)
+      dragStateRef.current = {
+        mode: 'resize',
+        id: event.id,
+        startY,
+        originalStart: event.startTime,
+        originalEnd: event.endTime,
+      }
     }
 
     const handleMove = (me) => {
-      const deltaMin = Math.round((me.clientY - startY) / 1.2 / 15) * 15
-      const deltaDay = Math.round((me.clientX - startX) / 180)
-      if (mode === 'move' && draggingRef()) {
-        const d = draggingRef()
-        const origStart = new Date(d.originalStart)
-        const origEnd = new Date(d.originalEnd)
+      const state = dragStateRef.current
+      if (!state) return
+
+      const deltaPx = me.clientY - state.startY
+      const deltaMin = Math.round(pixelsToMinutes(deltaPx, HOUR_HEIGHT) / 15) * 15
+
+      if (state.mode === 'move') {
+        const deltaXPx = me.clientX - state.startX
+        const deltaDay = state.columnWidth > 0 ? Math.round(deltaXPx / state.columnWidth) : 0
+        const origStart = new Date(state.originalStart)
+        const origEnd = new Date(state.originalEnd)
         const duration = origEnd.getTime() - origStart.getTime()
         let newStart = new Date(origStart.getTime() + deltaMin * 60 * 1000)
         newStart = new Date(newStart.getTime() + deltaDay * 24 * 60 * 60 * 1000)
         const newEnd = new Date(newStart.getTime() + duration)
-        const weekStart = weekDates[0]
-        const weekEnd = weekDates[6]
-        const weekEndEOD = new Date(weekEnd)
-        weekEndEOD.setHours(23, 59, 59, 999)
-        if (newStart >= weekStart && newEnd <= weekEndEOD) {
-          onEventDrop && onEventDrop(d.id, newStart.toISOString(), newEnd.toISOString())
+        const weekStart = startOfWeek(date).getTime()
+        const weekEnd = endOfWeek(date).getTime()
+        if (newStart.getTime() >= weekStart && newEnd.getTime() <= weekEnd) {
+          onEventDrop && onEventDrop(state.id, newStart.toISOString(), newEnd.toISOString())
         }
-      } else if (mode === 'resize' && resizingRef()) {
-        const r = resizingRef()
-        const origEnd = new Date(r.originalEnd)
+      } else if (state.mode === 'resize') {
+        const origStart = new Date(state.originalStart)
+        const origEnd = new Date(state.originalEnd)
         const newEnd = new Date(origEnd.getTime() + deltaMin * 60 * 1000)
-        const foundEvent = events.find((ev) => ev.id === r.id)
-        if (foundEvent && newEnd.getTime() > new Date(foundEvent.startTime).getTime()) {
-          onEventDrop && onEventDrop(r.id, foundEvent.startTime, newEnd.toISOString())
+        if (newEnd.getTime() > origStart.getTime() + 15 * 60 * 1000) {
+          onEventDrop && onEventDrop(state.id, state.originalStart, newEnd.toISOString())
         }
       }
     }
 
     const handleUp = () => {
-      setDragging(null)
-      setResizing(null)
+      dragStateRef.current = null
+      setDraggingId(null)
+      setResizingId(null)
       document.removeEventListener('mousemove', handleMove)
       document.removeEventListener('mouseup', handleUp)
     }
@@ -95,9 +118,6 @@ export default function WeekView({
     document.addEventListener('mousemove', handleMove)
     document.addEventListener('mouseup', handleUp)
   }
-
-  const draggingRef = () => dragging
-  const resizingRef = () => resizing
 
   return (
     <div className="cal-week-view">
@@ -120,9 +140,15 @@ export default function WeekView({
             </div>
           ))}
         </div>
-        <div className="cal-week-columns">
+        <div className="cal-week-columns" ref={columnsContainerRef}>
           {weekDates.map((dayDate, dayIdx) => {
-            const dayEvents = weekEvents.filter((e) => isSameDay(e.startTime, dayDate))
+            const dayEvents = weekEvents.filter((e) => {
+              const eStart = new Date(e.startTime).getTime()
+              const eEnd = new Date(e.endTime).getTime()
+              const dStart = new Date(dayDate).setHours(0, 0, 0, 0)
+              const dEnd = new Date(dayDate).setHours(23, 59, 59, 999)
+              return eStart < dEnd && eEnd > dStart
+            })
             return (
               <div key={dayIdx} className="cal-week-day-column">
                 {HOURS.map((h) => (
@@ -138,20 +164,17 @@ export default function WeekView({
                 ))}
                 <div className="cal-events-layer">
                   {dayEvents.map((event) => {
-                    const startMin = getMinutesFromStart(event.startTime)
-                    const duration = getEventDurationMinutes(event)
-                    const top = startMin * (HOUR_HEIGHT / 60)
-                    const height = Math.max(24, duration * (HOUR_HEIGHT / 60) - 2)
+                    const pos = getWeekViewEventPosition(event, dayDate, HOUR_HEIGHT)
                     const isMatched = matchedIds.has(event.id)
                     return (
                       <div
                         key={event.id}
                         className={`cal-event cal-event-compact ${
                           isMatched ? 'cal-event-highlighted' : ''
-                        } ${dragging?.id === event.id ? 'cal-event-dragging' : ''}`}
+                        } ${draggingId === event.id || resizingId === event.id ? 'cal-event-dragging' : ''}`}
                         style={{
-                          top,
-                          height,
+                          top: pos.top,
+                          height: pos.height,
                           backgroundColor: event.color,
                           borderLeftColor: event.color,
                         }}

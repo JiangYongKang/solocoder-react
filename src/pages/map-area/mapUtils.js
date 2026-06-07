@@ -30,49 +30,64 @@ export function clusterMarkers(markers, zoom) {
   if (!Array.isArray(markers) || markers.length === 0) return [];
 
   const effectiveDistance = CLUSTER_DISTANCE / zoom;
+  const n = markers.length;
 
-  const clusters = [];
-  const visited = new Set();
-
-  for (let i = 0; i < markers.length; i++) {
-    if (visited.has(markers[i].id)) continue;
-
-    const cluster = {
-      id: `cluster_${generateId()}`,
-      markers: [markers[i]],
-      x: markers[i].x,
-      y: markers[i].y,
-    };
-    visited.add(markers[i].id);
-
-    for (let j = i + 1; j < markers.length; j++) {
-      if (visited.has(markers[j].id)) continue;
-      const dist = getDistance(markers[i], markers[j]);
-      if (dist <= effectiveDistance) {
-        cluster.markers.push(markers[j]);
-        visited.add(markers[j].id);
+  const adjacency = Array.from({ length: n }, () => []);
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      if (getDistance(markers[i], markers[j]) <= effectiveDistance) {
+        adjacency[i].push(j);
+        adjacency[j].push(i);
       }
     }
+  }
 
-    if (cluster.markers.length >= CLUSTER_THRESHOLD) {
+  const visited = new Array(n).fill(false);
+  const components = [];
+
+  for (let i = 0; i < n; i++) {
+    if (visited[i]) continue;
+    const queue = [i];
+    visited[i] = true;
+    const component = [];
+    while (queue.length > 0) {
+      const cur = queue.shift();
+      component.push(cur);
+      for (const neighbor of adjacency[cur]) {
+        if (!visited[neighbor]) {
+          visited[neighbor] = true;
+          queue.push(neighbor);
+        }
+      }
+    }
+    components.push(component);
+  }
+
+  const result = [];
+  for (const comp of components) {
+    const compMarkers = comp.map((idx) => markers[idx]);
+    if (compMarkers.length >= CLUSTER_THRESHOLD) {
       let sumX = 0;
       let sumY = 0;
-      cluster.markers.forEach((m) => {
+      compMarkers.forEach((m) => {
         sumX += m.x;
         sumY += m.y;
       });
-      cluster.x = sumX / cluster.markers.length;
-      cluster.y = sumY / cluster.markers.length;
-      cluster.isCluster = true;
-      clusters.push(cluster);
+      result.push({
+        id: `cluster_${generateId()}`,
+        markers: compMarkers,
+        x: sumX / compMarkers.length,
+        y: sumY / compMarkers.length,
+        isCluster: true,
+      });
     } else {
-      cluster.markers.forEach((m) => {
-        clusters.push({ ...m, isCluster: false });
+      compMarkers.forEach((m) => {
+        result.push({ ...m, isCluster: false });
       });
     }
   }
 
-  return clusters;
+  return result;
 }
 
 export function splitCluster(cluster) {
@@ -83,10 +98,21 @@ export function splitCluster(cluster) {
 export function generateRoute(start, end) {
   if (!start || !end) return [];
 
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const perpX = -dy;
+  const perpY = dx;
+  const len = Math.sqrt(perpX * perpX + perpY * perpY) || 1;
+  const offsetScale = Math.min(Math.sqrt(dx * dx + dy * dy) * 0.15, 40);
+
+  const seed = (Math.abs(start.x + start.y * 31 + end.x * 7 + end.y * 127) % 100) / 100;
+  const offsetDir = seed > 0.5 ? 1 : -1;
+
+  const midX = (start.x + end.x) / 2 + (perpX / len) * offsetScale * offsetDir;
+  const midY = (start.y + end.y) / 2 + (perpY / len) * offsetScale * offsetDir;
+
   const points = [];
   const steps = 10;
-  const midX = (start.x + end.x) / 2 + (Math.random() - 0.5) * 80;
-  const midY = (start.y + end.y) / 2 + (Math.random() - 0.5) * 80;
 
   for (let i = 0; i <= steps; i++) {
     const t = i / steps;

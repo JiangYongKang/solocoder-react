@@ -29,6 +29,7 @@ import {
   loadResponses,
   saveResponse,
   clearResponses,
+  deleteSurveyData,
   validateAnswer,
   validateAllAnswers,
   calculateStatistics,
@@ -709,5 +710,130 @@ describe('exportStatisticsToCSV', () => {
     const csv = exportStatisticsToCSV(questions, stats)
     expect(csv).toContain('"含,逗号和""引号"')
     expect(csv).toContain('"hello, world"')
+  })
+})
+
+describe('validateAnswer matrix edge cases', () => {
+  const baseMatrixQ = {
+    id: 'q1',
+    type: QUESTION_TYPES.MATRIX,
+    required: true,
+    rows: [{ value: 'row1' }, { value: 'row2' }],
+    columns: [],
+  }
+
+  it('should treat numeric 0 as a valid answer', () => {
+    const result = validateAnswer(baseMatrixQ, { row1: 0, row2: 1 })
+    expect(result.valid).toBe(true)
+  })
+
+  it('should treat string "0" as a valid answer', () => {
+    const result = validateAnswer(baseMatrixQ, { row1: '0', row2: '1' })
+    expect(result.valid).toBe(true)
+  })
+
+  it('should treat boolean false as a valid answer', () => {
+    const result = validateAnswer(baseMatrixQ, { row1: false, row2: true })
+    expect(result.valid).toBe(true)
+  })
+
+  it('should still reject undefined/null/empty string', () => {
+    expect(validateAnswer(baseMatrixQ, { row1: undefined, row2: '1' }).valid).toBe(false)
+    expect(validateAnswer(baseMatrixQ, { row1: null, row2: '1' }).valid).toBe(false)
+    expect(validateAnswer(baseMatrixQ, { row1: '', row2: '1' }).valid).toBe(false)
+  })
+})
+
+describe('deleteSurveyData', () => {
+  let mockStorage
+
+  beforeEach(() => {
+    mockStorage = createMockLocalStorage()
+    vi.stubGlobal('window', { localStorage: mockStorage })
+    mockStorage.clear()
+  })
+
+  it('should clear both draft and responses for a survey', () => {
+    saveDraft('s1', { q1: 'a' })
+    saveResponse('s1', { q1: 'a' })
+    expect(loadDraft('s1')).not.toBe(null)
+    expect(loadResponses('s1')).toHaveLength(1)
+
+    const result = deleteSurveyData('s1')
+    expect(result.draft).toBe(true)
+    expect(result.responses).toBe(true)
+    expect(loadDraft('s1')).toBe(null)
+    expect(loadResponses('s1')).toEqual([])
+  })
+
+  it('should not affect other surveys data', () => {
+    saveDraft('s1', {})
+    saveResponse('s1', {})
+    saveDraft('s2', {})
+    saveResponse('s2', {})
+
+    deleteSurveyData('s1')
+    expect(loadDraft('s2')).not.toBe(null)
+    expect(loadResponses('s2')).toHaveLength(1)
+  })
+
+  it('should handle missing window.localStorage gracefully', () => {
+    vi.stubGlobal('window', undefined)
+    const result = deleteSurveyData('s1')
+    expect(result).toEqual({ draft: false, responses: false })
+  })
+})
+
+describe('reorderQuestions edge cases', () => {
+  let survey
+  beforeEach(() => {
+    survey = createSurvey()
+    survey = addQuestion(survey, QUESTION_TYPES.SINGLE)
+    survey = addQuestion(survey, QUESTION_TYPES.TEXT)
+    survey = addQuestion(survey, QUESTION_TYPES.RATING)
+  })
+
+  it('should return survey unchanged when fromIndex is out of bounds (negative)', () => {
+    const result = reorderQuestions(survey, -1, 0)
+    expect(result).toBe(survey)
+  })
+
+  it('should return survey unchanged when fromIndex is out of bounds (>= length)', () => {
+    const result = reorderQuestions(survey, 99, 0)
+    expect(result).toBe(survey)
+  })
+
+  it('should return survey unchanged when toIndex is out of bounds', () => {
+    const result = reorderQuestions(survey, 0, 99)
+    expect(result).toBe(survey)
+  })
+
+  it('should return survey unchanged when fromIndex equals toIndex', () => {
+    const result = reorderQuestions(survey, 1, 1)
+    expect(result).toBe(survey)
+  })
+
+  it('should return survey unchanged when survey is null', () => {
+    expect(reorderQuestions(null, 0, 1)).toBe(null)
+  })
+
+  it('should return survey unchanged when questions is not array', () => {
+    const badSurvey = { ...survey, questions: null }
+    expect(reorderQuestions(badSurvey, 0, 1)).toBe(badSurvey)
+  })
+
+  it('should correctly move first question to last', () => {
+    const originalTypes = survey.questions.map((q) => q.type)
+    const result = reorderQuestions(survey, 0, 2)
+    const newTypes = result.questions.map((q) => q.type)
+    expect(newTypes).toEqual([originalTypes[1], originalTypes[2], originalTypes[0]])
+    expect(result.updatedAt).toBeGreaterThanOrEqual(survey.updatedAt)
+  })
+})
+
+describe('createQuestion rating default maxRating', () => {
+  it('should default rating maxRating to 5 (1-5 star requirement)', () => {
+    const q = createQuestion(QUESTION_TYPES.RATING)
+    expect(q.maxRating).toBe(5)
   })
 })

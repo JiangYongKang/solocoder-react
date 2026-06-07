@@ -1,0 +1,13 @@
+产物不满意：
+1. 提交问卷后返回列表页，作答数不会刷新——responsesMap 的 useMemo 只依赖 surveys 数组，提交答卷时 surveys 没有变化导致 memo 不重新计算，列表页显示的作答数永远停在提交前的旧值。
+2. 拖拽排序的 handleDragEnd 没有使用 surveyCore 里已导出的 reorderQuestions 函数，而是内联了 dnd-kit 的 arrayMove 直接操作数组。reorderQuestions 本身做了越界和同位置判断，但 UI 层完全绕过了这些保护，且导出的函数白白闲置，代码重复不一致。
+3. 删除问卷时 confirm 弹窗明确说「相关的作答数据也会被删除」，但 handleDeleteSurvey 只调了 removeSurvey 把问卷从数组里去掉了，没有调用 clearDraft 和 clearResponses 清理 localStorage。草稿和已提交的作答数据会一直残留在 localStorage 里，跟弹窗承诺矛盾。
+4. 评分题的 maxRating 滑块范围设成了 min=3 max=10，但提示词要求的评分题是 1-5 星。虽然默认值碰巧是 5，但用户可以调到 10 星完全偏离了需求，而且连 1-2 星都选不了。
+5. 矩阵量表题必填校验中用了 !answer[row.value] 做 falsy 判断，如果用户自定义列值为数字 0 或字符串 '0' 会被错误判为未填。虽然默认列值是 '1'~'5'，但编辑弹窗允许用户改列值，存在误判风险。
+6. 作答页面 SurveyAnswerPage 在提交后跳回列表时，handleSubmitComplete 只调了 setView 切视图，没有触发 surveys 更新，导致列表页显示的任何依赖于 surveys 状态的数据（如 responsesMap、状态标签）都不会反映刚刚的提交操作。
+过程不满意：
+1. 模型编辑 App.jsx 时第一轮编辑出错了，没能用精确替换修复，而是选择 Write 重写整个文件覆盖掉错误。从 session-cot 可以看到第一次 edit_file_search_replace 之后紧跟着「我发现编辑出现了问题，让我重新整理修复它」然后直接 Write 了整份 App.jsx，说明第一次修改操作缺乏精确度导致文件损坏。
+2. 运行测试命令末尾挂了 undefined 字面量：npm test -- src/pages/__tests__/survey/surveyCore.test.js undefined，连续三次运行测试都带上了这个多余参数，操作不严谨。
+3. 模型没有启动 pnpm run dev 实际验证页面在浏览器中的表现，整个 session 没有任何一次启动 dev server 的记录。提示词明确要求 375px 和 1440px 宽度下均可用，但模型只靠 CSS 媒体查询就断定满足要求，属于没有验证就声称完成。
+4. 修复 index.jsx 的 lint 问题时，对同一个文件反复读-改-搜索-再读-再改（session-cot 第 438-501 行），对同一个文件做了至少三轮读取和编辑才把所有 lint 错误改完，期间还有内容搜索确认调用处，流程拖沓，体现出边改边查的试错式修复。
+5. 总结中声称「响应式断点：≤768px 单列、≥1440px 三列问卷网格，375px 移动端可用」，但从未在浏览器中实际缩放到 375px 和 1440px 确认过布局效果，属于总结中的虚假完成陈述。

@@ -1,0 +1,10 @@
+产物不满意：
+1. mockData.js 中 PLACEHOLDER_IMG_1 的 SVG 属性写成了 text-anchor="dominant-baseline="middle"，引号嵌套错误导致 text-anchor 的值变成无效字符串 "dominant-baseline="，该 SVG 的文字不会居中显示，对应的"风景照片.jpg"和"旅行记录.jpg"两个缩略图实际渲染异常。
+2. FilterBar 中日期筛选选项只取了 allDates.slice(0, 10)，上传了大量历史文件后早于第 10 个日期之前的媒体项将无法通过日期筛选找到，筛选能力存在上限截断。
+3. formatDate 和 formatDateTime 的参数校验只做了 ==null 和 Number.isNaN，如果意外传入无效日期字符串（如"invalid"），Number.isNaN 对此返回 false，new Date 后 getFullYear 会返回 NaN，最终输出"NAN-NAN-NAN"而非占位符"-"，防御不充分。
+4. 文件上传失败（FileReader 读取错误）时静默创建了一个 dataUrl 为 null 的条目并加入资源库，没有任何 toast 通知用户哪个文件失败了，用户会在网格中看到一个无预览的残缺条目却不知道原因。
+5. 单元测试未覆盖 loadMediaData 和 saveMediaData 这两个 localStorage 直接读写函数，而这两个函数是数据持久化的核心入口，如果存储异常分支（try-catch 内的）未被验证，测试覆盖存在缺口。
+过程不满意：
+1. 模型在收到任务后第一个 tool call 就是创建 TodoList，没有任何前置的代码库探索和理解步骤，违反了"应先分析问题再规划"的评估准则。
+2. 修改 App.jsx 时连续 3 次 edit_file_search_replace 全部失败（第一次失败后未分析原因又用相同方式重试），随后放弃增量修改直接重写整个 App.jsx 文件，对失败原因缺乏针对性分析和最小化修正策略，属于试错后换方案重写的模式。
+3. 模型在总结中声称"所有新增文件零错误零警告"，但 PLACEHOLDER_IMG_1 的 SVG 属性错误说明模型在整个过程中从未实际用浏览器预览验证过瀑布流渲染效果，也未对 data URL 中的 SVG 做任何检查，存在虚假完成嫌疑。

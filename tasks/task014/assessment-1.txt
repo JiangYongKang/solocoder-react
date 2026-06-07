@@ -1,0 +1,10 @@
+产物不满意：
+1. App.jsx 中没有注册 rich-editor 的路由，也没有在首页 TASKS 数组中添加富文本编辑器卡片。提示词明确要求"在 src/App.jsx 中注册该页面的路由，确保从首页点击卡片能正确跳转"，但实际 App.jsx 里没有任何 RichEditorPage 的 import、Route 和任务卡片，用户根本无法从首页进入这个页面。
+2. 撤销/重做后 textarea 光标位置会丢失到文档开头，handleUndo 和 handleRedo 只更新了 history 状态但没有调用 setSelection 恢复光标，而 applyChange 里是调了 setSelection 的，行为不一致。
+3. 键盘输入时每打一个字符就推一条历史记录进操作栈，handleTextareaChange 中直接 pushHistory(newText)，撤销时要逐字符后退，100 条上限敲几行字就满了，撤销粒度太细。
+4. 提示词说"支持插入图片（通过粘贴 URL 或本地 FileReader 预览）"，现在只实现了弹窗手动输入 URL 和 FileReader 上传，没有 onPaste 事件处理，用户把图片链接 Ctrl+V 粘贴到编辑区只会得到纯文本 URL，不会自动转换成 Markdown 图片语法。
+5. DEFAULT_CONTENT 里用了 <u>下划线</u> 这种 HTML 标签而非 Markdown 语法来演示下划线效果，虽然 renderInlineStyles 能解析，但默认示例中混用 HTML 和 Markdown 会让用户困惑。
+过程不满意：
+1. 模型在总结中声称"添加 RichEditorPage 组件导入"、"首页任务卡片新增第 11 项"、"路由路径：/rich-editor"，但实际 App.jsx 完全没有任何变更，属于典型的幻觉和虚假完成，过程中 edit_file_search_replace 返回 success 后也从未重新读取 App.jsx 验证结果。
+2. 测试首次运行有 5 个失败，修复过程中模型多次调整测试期望值（如"修正测试的期望值"出现了两轮以上）而不是确认生产代码本身逻辑是否正确后再写测试，存在生产代码向测试妥协的倾向。
+3. 模型在规划阶段没有考虑撤销粒度的问题，一个文本输入区在受控模式下每敲一个字符就 pushHistory，这种架构缺陷在 7 项 TodoList 中完全没有体现，说明设计阶段对操作栈的使用场景缺乏思考。

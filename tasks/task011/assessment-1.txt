@@ -1,0 +1,15 @@
+产物不满意：
+1. DayView 和 WeekView 的拖拽功能核心实现有闭包缺陷：draggingRef / resizingRef 被定义为普通函数 `() => dragging`，在 handleEventMouseDown 里被 handleMove 闭包捕获时 dragging 仍是 null，即使 setDragging 触发了重渲染，事件监听器里的旧 draggingRef 也始终返回 null，`if (mode === 'move' && draggingRef())` 永远不成立，拖拽实际上完全不生效。提示词要求事件条目支持拖拽调整起止时间与持续时长，这个功能等于没做。
+2. 拖拽的位移计算和渲染定位使用了不一致的比例：事件显示定位用 HOUR_HEIGHT=60px 隐式约定 1px=1min，但拖拽时用 PIXELS_PER_MINUTE=1.2 换算像素到分钟，deltaMin = Math.round(deltaPx/1.2/15)*15。同一段 60px 的鼠标移动，视图上事件移动了 60px，但实际时间只改了 45 分钟，拖拽后事件位置会跳变，即便闭包问题修好了也会出现定位不准。
+3. snapTimeToSlot 存在 double-increment bug：当 snapped 等于 60 时（如 9:53 四舍五入到 60 分），setMinutes(60) 已经自动将小时进位到 10 点，后面 setHours(d.getHours()+1) 又把小时加了一次，导致最终变为 11:00 而非预期的 10:00。虽然该函数当前未被任何组件调用，但工具函数本身的逻辑是错误的。
+4. 跨日事件在日视图中渲染位置错误：filterEventsByDay 能正确筛选当天范围内的事件（包括昨夜开始今早结束的跨夜事件），但渲染时 top 位置全都基于 event.startTime 用 getMinutesFromStart 计算。一个昨晚 22:00 开始、今天 02:00 结束的事件，在今天视图中的 top=1320px，完全跑到了可视区域之外，用户看不到这个事件。
+5. handleSaveEvent 未处理 createEvent/updateEvent 返回失败的情况：无论返回值是 success 还是 errors，handleSaveEvent 都在第 100 行直接 setModalOpen(false) 关闭弹窗。虽然 EventModal 内部 handleSubmit 做了前置校验，但如果因状态竞争等原因导致内层校验失败，用户看不到任何错误提示，输入的数据静默丢失。
+6. 月视图中搜索高亮被 overflow:hidden 裁剪：cal-month-event 设置了 overflow: hidden 来截断过长标题，而 cal-event-highlighted 的 box-shadow 高亮效果被 overflow:hidden 裁掉，实际视觉上搜索匹配的事件在月视图中几乎看不出高亮差异。
+7. WeekView 水平拖拽的 deltaDay 硬编码了 180px 作为一天列宽：`deltaDay = Math.round((me.clientX - startX) / 180)`，但周视图列的实际宽度随视口 flex 自适应变化（375px 下约 50px，1440px 下远超 180px），移动同样鼠标距离在不同宽度下跳的天数不一样，计算基准与实际布局解耦。
+
+过程不满意：
+1. 模型先后对 App.jsx 进行了至少六轮读写操作：先用 Write 覆盖整文件，再用 edit_file_search_replace 调了两次，发现不对后又 Write 重写一遍，随后又 edit_file_search_replace 试图移除 permissions 模块的引用来解决 pnpm build 报错，最后还用 search_by_regex 做确认。同一个文件反复折腾，没有做到"先读准当前内容再一次性最小化修改"。
+2. 执行 pnpm build 时遇到 permissions 模块的预存编译错误后，模型没有尝试定位权限模块自己的问题，而是直接去 App.jsx 里删掉 permissions 的导入来绕过，之后也没有重新跑 pnpm build 确认整体是否通过，项目仍然无法构建。
+3. 模型在最终总结中声称"事件可拖拽移动（调整起止时间），底部拖拽手柄可调整持续时长"，但 draggingRef 的闭包设计导致拖拽逻辑根本不会进入，说明模型只是写了代码就宣称完成，没有启动项目肉眼验证拖拽在页面上是否真的生效，是典型的虚假完成。
+4. 模型对 App.jsx 的第一次操作用 Write 覆盖了整个文件，随后读回发现磁盘内容变了又说"文件被破坏了"，然后又 Write 了一遍。在不了解完整文件内容的情况下直接用 Write 覆盖，而不是用精确的 edit 方式插入新增部分，工具选择存在明显问题。
+5. pnpm test 确实 54 个用例全通过了，但 snapTimeToSlot 的两个测试只验证了分钟值，没有覆盖 snapped=60 导致小时跳变的边界条件。测试虽然全部绿了，但并没测出工具函数的 bug，覆盖深度不够。

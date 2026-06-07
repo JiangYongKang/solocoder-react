@@ -2,15 +2,22 @@ import '@/App.css'
 import { Route, Routes, useNavigate } from 'react-router-dom'
 
 import AuthPage from '@/pages/auth/index.jsx'
+import CalendarPage from '@/pages/calendar/index.jsx'
 import ChatPage from '@/pages/chat/index.jsx'
 import Dashboard from '@/pages/dashboard/Dashboard.jsx'
 import FileManager from '@/pages/file-manager/FileManager.jsx'
 import FormBuilder from '@/pages/form-builder/FormBuilder.jsx'
 import InfiniteListPage from '@/pages/infinite-list/index.jsx'
 import KanbanPage from '@/pages/kanban/KanbanPage.jsx'
+import OrdersPage from '@/pages/orders/index.jsx'
 import ProductsPage from '@/pages/products/index.jsx'
 import ThemeEditorPage from '@/pages/theme-editor/index.jsx'
 import Wizard from '@/pages/wizard/Wizard.jsx'
+import SurveyPage from '@/pages/survey/index.jsx'
+import MediaGallery from '@/pages/media-gallery/index.jsx'
+import NotificationsPage from '@/pages/notifications/index.jsx'
+import PermissionsPage from '@/pages/permissions/index.jsx'
+import WorkflowPage from '@/pages/workflow/index.jsx'
 
 const TASKS = [
     { id: 1, title: '用户认证系统', route: 'auth', description: '登录、注册、找回密码、修改密码完整的认证流程，基于 localStorage 存储。' },
@@ -23,6 +30,13 @@ const TASKS = [
     { id: 8, title: '无限滚动列表', route: 'infinite-list', description: '虚拟滚动 + 无限加载长列表，支持搜索、排序、编辑与批量删除。' },
     { id: 9, title: '多步骤向导', route: 'wizard', description: '分步表单向导，支持上一步/下一步、步骤跳转、各步骤数据汇总提交。' },
     { id: 10, title: '主题定制系统', route: 'theme-editor', description: '实时可视化主题编辑器，支持颜色、字体、间距等令牌的实时预览与导出。' },
+    { id: 11, title: '问卷调查系统', route: 'survey', description: '完整问卷创建、发布、作答、统计全链路，支持多种题型与数据可视化，基于 localStorage 存储。' },
+    { id: 12, title: '日程日历', route: 'calendar', description: '日/周/月三种视图切换，事件拖拽调整，搜索高亮与冲突检测，数据本地持久化。' },
+    { id: 13, title: '权限管理系统', route: 'permissions', description: '基于 RBAC 模型的用户-角色-权限三级管理，支持权限树父子联动、按钮级权限控制。' },
+    { id: 14, title: '媒体资源库', route: 'media-gallery', description: '瀑布流布局的本地相册管理，支持懒加载缩略图、灯箱预览、标签/日期/类型筛选、批量收藏删除、本地上传。' },
+    { id: 15, title: '电商订单系统', route: 'orders', description: '商品浏览、购物车、下单支付、订单追踪的完整电商订单闭环，基于 localStorage 持久化。' },
+    { id: 16, title: '流程编排器', route: 'workflow', description: '可视化流程图编辑器，支持节点拖拽、连线、属性配置、模拟执行，数据本地持久化。' },
+    { id: 17, title: '通知中心', route: 'notifications', description: '系统通知、私信消息、任务提醒一站式消息盒子，支持已读管理、偏好设置、自动归档与实时推送。' },
 ]
 
 function HomePage() {
@@ -67,6 +81,13 @@ function App() {
             <Route path="/infinite-list" element={<InfiniteListPage />} />
             <Route path="/wizard" element={<Wizard />} />
             <Route path="/theme-editor" element={<ThemeEditorPage />} />
+            <Route path="/survey" element={<SurveyPage />} />
+            <Route path="/calendar" element={<CalendarPage />} />
+            <Route path="/permissions" element={<PermissionsPage />} />
+            <Route path="/media-gallery" element={<MediaGallery />} />
+            <Route path="/orders" element={<OrdersPage />} />
+            <Route path="/workflow" element={<WorkflowPage />} />
+            <Route path="/notifications" element={<NotificationsPage />} />
         </Routes>
     )
 }

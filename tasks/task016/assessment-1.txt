@@ -1,0 +1,15 @@
+产物不满意：
+1. togglePermission 在处理子节点部分勾选的情况下会把父节点 ID（如 'user-management'）也加入返回数组，这些父节点 ID 会被持久化到角色的 permissions 字段中。如果用 hasPermission 校验这类父节点 ID 会返回 true，但父节点本身并不对应任何可执行的操作权限，数据模型有语义错误。
+2. usePermission.jsx 中定义的 withPermission 高阶组件在整个项目中没有任何地方 import 或使用，是纯死代码。而且它的设计要求被包装组件通过 props 显式接收 currentUserId、users、roles，跟标准 HOC 注入上下文的模式完全不同，即使想用也接入不了。
+3. utils.js 中的 assignUserRoles 函数有完整实现和对应的单元测试，但在实际页面 index.jsx 里从未被导入和调用。角色分配的实际逻辑走了 updateUser 的全量更新路径，assignUserRoles 白写了一套。
+4. 删除最后一名用户且该用户恰好是当前登录用户时，handleUserDelete 里找不到替代用户来更新 currentUserId，页面会陷入 select 下拉为空、所有权限丢失的不可恢复状态。
+5. 总结中把 withPermission HOC 列为已交付的按钮级权限控制方案之一，但实际上页面从来没接入过这个 HOC，实际用的只有 usePermission Hook。总结描述和代码实际之间存在落差。
+
+过程不满意：
+1. 模型在刚浏览项目结构和一两个文件后就立即创建了 TodoList（思考过程第 107 行），没有先完整分析需求、规划组件拆分和状态流再动手，导致后面多次被迫回转修改。
+2. usePermission 文件初始写了 .js 后缀但里面包含返回 JSX 的高阶组件，第一次 npm run build 直接失败才意识到要改 .jsx，前期没有考虑文件扩展名和内容的匹配关系。
+3. UserEditPanel 和 RoleEditModal 一开始用 useEffect 里调 setState 同步 props，lint 报了 react-hooks/set-state-in-effect 后模型没有做定点修复，而是将两个组件全部重写了一遍（思考过程第 802-846 行），属于"不行就推倒重来"的试错调试模式。
+4. 修改 App.jsx 路由和卡片注册的过程中反复读了至少 4 遍文件、做了 4 轮 edit_file_search_replace（第 427-587 行），明显是边改边读、改完发现不对再读再改，没有先完整理解现有结构后一次改到位。
+5. 测试文件第一版自带语法错误（多了一对括号），修复过后测试期望值又写错了（search 'example' 预期返回 2 条实际只有 1 条），一份测试文件修了两轮才跑通，初版代码质量把关不够。
+6. 全程命令都用的 npm（npm test、npm run build、npm run lint、npm run dev），项目实际指定的包管理器是 pnpm，虽然本地碰巧能执行，但反映模型没有遵循项目设定的工具链。
+7. 总结中提到"启动开发服务器验证页面功能"但思考过程中没有任何关于在 375px 和 1440px 宽度下验证响应式布局的证据，提示词要求的效果验证可能并未执行。

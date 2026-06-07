@@ -1,0 +1,10 @@
+产物不满意：
+1. 购物车面板修改数量时未将商品库存传给 updateCartQuantity，CartPanel.jsx 中 onUpdateQuantity(item.productId, item.quantity + 1) 调用缺少 stock 参数，导致 updateCartQuantity 内 maxStock 取 safeQty 而非真实库存，购物车数量可无限累加不受库存约束，与商品列表中 addToCart 受库存上限控制的行为不一致。对应提示词第 2 点"支持修改数量"。
+2. utils.js 中导入了 PRODUCTS 常量并定义了 getProductById 函数，但该函数在 orders 目录下全部组件中均未被调用，属于残留死代码。同时 utils.js 文件中 import 的 PRODUCTS 也因此变成无效导入。
+3. 商品图片 URL 直接指向外部 API(trae-api-cn.mchost.guru)且 img 标签没有 onError fallback，提示词要求的是"图片占位符"，依赖外部实时生成图片在服务不可用时会导致所有产品图全部破裂，不够稳健。
+4. 订单列表按状态分 tab 时缺少"已取消"tab，取消后的订单只能在"全部"tab 中看到，而待付款/已付款/已发货/已完成各有独立 tab，筛选维度不完整。对应提示词第 5 点"订单列表按状态分 tab 展示"。
+5. 空购物车状态只显示文字"购物车是空的，快去添加商品吧～"，没有提供关闭面板或跳转回商品区的快捷操作按钮，用户需要自行关闭面板再回到商品区，操作路径不顺畅。对应提示词第 2 点关于购物车面板的交互体验。
+过程不满意：
+1. 模型首次编辑 App.jsx 时遇到并发冲突，连续读取同一文件 4 次（324、340、352、366 行）后判定文件"corrupted"，直接用 Write 工具全量覆盖整个 App.jsx 文件，而非分析差异做增量修改，有清除其他 agent 并发改动的高风险。
+2. 修复测试失败时模型在 utils.js 和测试文件之间来回修改三轮以上（428 行改 utils 逻辑→468 行再调 utils→497 行改测试断言），缺少先一次性梳理三个失败用例根因再统一修改的过程，存在试错式调试。
+3. 模型在 661 行发现 App.jsx 再次被其他 agent 覆盖，随后分三次独立的 edit 操作分别添加 import/Route/task card（666、678、690 行），但最终未检查 App.jsx 全局 lint 状态就标记完成，该文件存在 PermissionsPage is not defined 的 lint 错误未被关注。

@@ -209,6 +209,12 @@ const RichEditorPage = () => {
     if (!clipboardData) return
 
     const detected = detectPastedContent(clipboardData)
+
+    if (detected.type === 'text') {
+      commitPendingInput()
+      return
+    }
+
     const { start, end } = getSelection()
 
     if (detected.type === 'image-url') {
@@ -227,11 +233,19 @@ const RichEditorPage = () => {
       commitPendingInput()
       try {
         const base64 = await fileToBase64(detected.file)
-        const result = insertImage(content, start, end, base64, detected.file.name || '')
+        const fileName = detected.file?.name || ''
         setSavedIndicator('保存中...')
-        const newState = createHistoryState(result.text, { start: result.start, end: result.end })
-        setHistory((h) => pushHistory(h, newState))
-        setSelection(result.start, result.end)
+        setHistory((h) => {
+          const currentContent = getHistoryContent(h.present)
+          const currentCursor = getHistoryCursor(h.present)
+          const selection = getSelection()
+          const useStart = selection.start !== 0 || selection.end !== 0 ? selection.start : currentCursor.start
+          const useEnd = selection.start !== 0 || selection.end !== 0 ? selection.end : currentCursor.end
+          const result = insertImage(currentContent, useStart, useEnd, base64, fileName)
+          const newState = createHistoryState(result.text, { start: result.start, end: result.end })
+          requestAnimationFrame(() => setSelection(result.start, result.end))
+          return pushHistory(h, newState)
+        })
       } catch {
       }
       return
@@ -401,17 +415,37 @@ const RichEditorPage = () => {
 
   const handleFileSelect = async (e) => {
     const file = e.target.files?.[0]
-    if (!file || !dialog) return
-
-    if (!file.type.startsWith('image/')) {
-      setDialogError('请选择图片文件')
+    if (!file || !dialog) {
+      e.target.value = ''
       return
     }
 
+    if (!file.type.startsWith('image/')) {
+      setDialogError('请选择图片文件')
+      e.target.value = ''
+      return
+    }
+
+    const dialogSnapshot = { ...dialog }
+
     try {
       const base64 = await fileToBase64(file)
-      const result = insertImage(content, dialog.start, dialog.end, base64, dialog.alt || file.name)
-      applyChange(result)
+      const fileName = file.name || ''
+      commitPendingInput()
+      setSavedIndicator('保存中...')
+      setHistory((h) => {
+        const currentContent = getHistoryContent(h.present)
+        const result = insertImage(
+          currentContent,
+          dialogSnapshot.start,
+          dialogSnapshot.end,
+          base64,
+          dialogSnapshot.alt || fileName
+        )
+        const newState = createHistoryState(result.text, { start: result.start, end: result.end })
+        requestAnimationFrame(() => setSelection(result.start, result.end))
+        return pushHistory(h, newState)
+      })
       setDialog(null)
     } catch {
       setDialogError('图片读取失败')

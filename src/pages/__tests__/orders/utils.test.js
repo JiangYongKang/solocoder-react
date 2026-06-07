@@ -21,10 +21,12 @@ import {
   formatDateTime,
   handleImageFallback,
   FALLBACK_PRODUCT_IMAGE,
+  migrateCartItems,
 } from '@/pages/orders/utils.js';
 import {
   ORDER_STATUSES,
   PAGE_SIZE,
+  PRODUCTS,
 } from '@/pages/orders/constants.js';
 
 function createMockStorage() {
@@ -474,6 +476,62 @@ describe('orders/utils', () => {
     });
   });
 
+  describe('legacy cart migration and stock fallback', () => {
+    it('migrateCartItems adds stock to items missing it', () => {
+      const legacyCart = [
+        { productId: 'p1', name: '机械键盘', price: 399, quantity: 2 },
+        { productId: 'p2', name: '无线鼠标', price: 159, quantity: 1 },
+      ];
+      const migrated = migrateCartItems(legacyCart, PRODUCTS);
+      const p1 = PRODUCTS.find((p) => p.id === 'p1');
+      const p2 = PRODUCTS.find((p) => p.id === 'p2');
+      expect(migrated[0].stock).toBe(p1.stock);
+      expect(migrated[1].stock).toBe(p2.stock);
+      expect(migrated[0].quantity).toBe(2);
+      expect(migrated[1].quantity).toBe(1);
+    });
+
+    it('migrateCartItems preserves original when all items already have stock', () => {
+      const modernCart = [
+        { productId: 'p1', name: 'x', price: 1, quantity: 1, stock: 99 },
+      ];
+      const migrated = migrateCartItems(modernCart, PRODUCTS);
+      expect(migrated).toBe(modernCart);
+      expect(migrated[0].stock).toBe(99);
+    });
+
+    it('migrateCartItems handles unknown product IDs gracefully', () => {
+      const legacyCart = [{ productId: 'unknown_ghost', name: 'x', price: 1, quantity: 1 }];
+      const migrated = migrateCartItems(legacyCart, PRODUCTS);
+      expect(migrated.length).toBe(1);
+      expect(migrated[0].stock).toBeUndefined();
+    });
+
+    it('migrateCartItems handles invalid inputs safely', () => {
+      expect(migrateCartItems(null, PRODUCTS)).toEqual([]);
+      expect(migrateCartItems(undefined, PRODUCTS)).toEqual([]);
+      const cart = [{ productId: 'p1', quantity: 1 }];
+      expect(migrateCartItems(cart, null)).toEqual(cart);
+    });
+
+    it('updateCartQuantity falls back to item.stock (migrated cart scenario)', () => {
+      const legacyCart = [
+        { productId: 'p1', name: '机械键盘', price: 399, quantity: 2, stock: 50 },
+      ];
+      const after = updateCartQuantity(legacyCart, 'p1', 9999);
+      expect(after[0].quantity).toBe(50);
+    });
+
+    it('updateCartQuantity still uses explicit stock arg over item.stock', () => {
+      const legacyCart = [
+        { productId: 'p1', name: 'x', price: 1, quantity: 1, stock: 50 },
+      ];
+      const after = updateCartQuantity(legacyCart, 'p1', 100, 10);
+      expect(after[0].quantity).toBe(10);
+      expect(after[0].stock).toBe(10);
+    });
+  });
+
   describe('image fallback', () => {
     it('FALLBACK_PRODUCT_IMAGE is a non-empty data URL', () => {
       expect(typeof FALLBACK_PRODUCT_IMAGE).toBe('string');
@@ -553,9 +611,20 @@ describe('orders/storage', () => {
 
   it('saveCart and loadCart round-trip', async () => {
     const { saveCart, loadCart } = await import('@/pages/orders/storage.js');
-    saveCart([{ productId: 'p1', quantity: 2 }], storage);
+    saveCart([{ productId: 'unknown_x_item', name: 'foo', price: 99, quantity: 2 }], storage);
     const loaded = loadCart(storage);
-    expect(loaded).toEqual([{ productId: 'p1', quantity: 2 }]);
+    expect(loaded.length).toBe(1);
+    expect(loaded[0].productId).toBe('unknown_x_item');
+    expect(loaded[0].quantity).toBe(2);
+  });
+
+  it('loadCart migrates legacy items without stock by looking up PRODUCTS', async () => {
+    const { saveCart, loadCart } = await import('@/pages/orders/storage.js');
+    const p1 = PRODUCTS.find((p) => p.id === 'p1');
+    saveCart([{ productId: 'p1', name: '机械键盘', price: 399, quantity: 2 }], storage);
+    const loaded = loadCart(storage);
+    expect(loaded[0].stock).toBe(p1.stock);
+    expect(loaded[0].quantity).toBe(2);
   });
 
   it('loadCart defaults to empty array', async () => {

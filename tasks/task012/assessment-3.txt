@@ -1,0 +1,7 @@
+产物不满意：
+1. 老购物车数据的库存回填方案整体正确，migrateCartItems 和 updateCartQuantity 的 fallback 逻辑配合得很好。但 CSS 新增的断点是 @media (max-width: 420px)，提示词要求的是 375px 宽度验证，420px 虽然覆盖了 375px 但断点值偏大，应该在 375px 或 400px 处设断点才更精确地对齐要求。
+2. updateCartQuantity 里当 stock 不是 number 且 item.stock 也不是 number 时，用 safeQty 自己兜底自己导致库存上限等于请求数量本身，等于没有约束。虽然这个路径只在商品完全未知时才走到，但语义上应该有个更明确的 fallback 值而不是让数量自限。
+
+过程不满意：
+1. 模型在思考过程中反复推翻自己的设计方案，从"在 utils 里 lookup PRODUCTS"改成"在 storage 里做迁移"，又改成"双保险：迁移加 utils fallback"，在几段里说了三四个 Wait/Actually/Better approach。虽然是最终方案是合理的，但规划阶段的反复说明没有在动手前把方案想清楚。
+2. 模型执行了两次 pnpm test -- src/pages/__tests__/orders/utils.test.js，第一次在修改 test 之前、第二次在修改 test 之后，两次运行结果没有变化，属于重复操作。

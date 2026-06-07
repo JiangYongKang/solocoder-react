@@ -514,7 +514,7 @@ describe('simulateExecution', () => {
     expect(result.path).toContainEqual({ type: 'dead-end', nodeId: 't' })
   })
 
-  it('should detect loops gracefully without infinite processing', () => {
+  it('should detect loops and emit loop event', () => {
     const nodes = [
       { id: 's', type: NODE_TYPES.START, x: 0, y: 0 },
       { id: 't', type: NODE_TYPES.TASK, x: 100, y: 0 },
@@ -525,10 +525,50 @@ describe('simulateExecution', () => {
     ]
     const result = simulateExecution(nodes, edges)
     expect(result.error).toBe(null)
+    expect(result.path).toContainEqual({ type: 'loop', nodeId: 's' })
     expect(new Set(result.visitedNodeIds)).toEqual(new Set(['s', 't']))
     expect(new Set(result.visitedEdgeIds)).toEqual(new Set(['e1', 'e2']))
-    expect(result.visitedNodeIds.filter((id) => id === 's').length).toBe(1)
-    expect(result.visitedNodeIds.filter((id) => id === 't').length).toBe(1)
+  })
+
+  it('should not falsely detect loop when parallel branches converge at end node', () => {
+    const nodes = [
+      { id: 's', type: NODE_TYPES.START, x: 0, y: 0 },
+      { id: 'p', type: NODE_TYPES.PARALLEL, x: 100, y: 0 },
+      { id: 't1', type: NODE_TYPES.TASK, x: 200, y: -50 },
+      { id: 't2', type: NODE_TYPES.TASK, x: 200, y: 50 },
+      { id: 'e', type: NODE_TYPES.END, x: 300, y: 0 },
+    ]
+    const edges = [
+      { id: 'e1', source: 's', target: 'p' },
+      { id: 'e2', source: 'p', target: 't1' },
+      { id: 'e3', source: 'p', target: 't2' },
+      { id: 'e4', source: 't1', target: 'e' },
+      { id: 'e5', source: 't2', target: 'e' },
+    ]
+    const result = simulateExecution(nodes, edges)
+    expect(result.error).toBe(null)
+    const loopEvents = result.path.filter((p) => p.type === 'loop')
+    expect(loopEvents).toHaveLength(0)
+    expect(result.visitedNodeIds).toContain('e')
+  })
+
+  it('should detect loop involving non-end nodes only', () => {
+    const nodes = [
+      { id: 's', type: NODE_TYPES.START, x: 0, y: 0 },
+      { id: 'a', type: NODE_TYPES.TASK, x: 100, y: 0 },
+      { id: 'b', type: NODE_TYPES.TASK, x: 200, y: 0 },
+      { id: 'c', type: NODE_TYPES.CONDITION, x: 300, y: 0 },
+      { id: 'e', type: NODE_TYPES.END, x: 400, y: 0 },
+    ]
+    const edges = [
+      { id: 'e1', source: 's', target: 'a' },
+      { id: 'e2', source: 'a', target: 'b' },
+      { id: 'e3', source: 'b', target: 'c' },
+      { id: 'e4', source: 'c', target: 'e' },
+      { id: 'e5', source: 'c', target: 'a' },
+    ]
+    const result = simulateExecution(nodes, edges, () => 0.99)
+    expect(result.path).toContainEqual({ type: 'loop', nodeId: 'a' })
   })
 
   it('should traverse all branches from parallel gateway', () => {

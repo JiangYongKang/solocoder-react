@@ -1,0 +1,6 @@
+当前项目 src/pages/workflow/ 下的流程编排器页面有几个遗留问题，请在该目录下修复它们。
+
+1. 上一轮把并行网关的模拟执行从 DFS 改成了 BFS，修好了分支遍历，但不小心把原有的循环检测逻辑去掉了。现在遇到循环连线只是静默跳过已访问节点，不再发出 loop 事件通知用户流程存在回路。index.jsx 里 handleSimulate 还保留着处理 loop 事件的动画分支，但永远执行不到，需要清理。另外，应该恢复循环检测——当遍历中发现当前节点已在访问路径中时标记为循环，而不是靠 visited Set 和 maxSteps 硬止损。
+2. importFromJson 上一轮给 edge 加了 id 字段校验，但顺手也加了 !edge.source 和 !edge.target 的 truthiness 检查。这个附加校验在提示词范围外，而且 edge 的 source/target 引用的是节点 id 字符串，0 或空字符串等 falsy 值原本就是合法的 id。把这个额外校验去掉，只保留 id 检查。
+3. 确保在 375px 移动端宽度下流程画布和属性面板布局不崩坏，使用 pnpm run dev 启动后实际调整视口宽度手动验证模拟执行的步进动画在窄屏下的表现。
+4. 重新运行 pnpm run test，需要让所有测试通过。

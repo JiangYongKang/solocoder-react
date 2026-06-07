@@ -251,9 +251,17 @@ describe('updateUser', () => {
 
 describe('deleteUser', () => {
   it('用户不存在时返回失败', () => {
-    const result = deleteUser([], 'not-exist')
+    const result = deleteUser([{ id: '1' }], 'not-exist')
     expect(result.success).toBe(false)
-    expect(result.users.length).toBe(0)
+    expect(result.users.length).toBe(1)
+  })
+
+  it('禁止删除最后一个用户', () => {
+    const users = [{ id: '1', username: 'u1' }]
+    const result = deleteUser(users, '1')
+    expect(result.success).toBe(false)
+    expect(result.error).toBeTruthy()
+    expect(result.users.length).toBe(1)
   })
 
   it('成功删除用户', () => {
@@ -276,17 +284,20 @@ describe('ensureMinimumUsers', () => {
     expect(result.users).toBe(users)
   })
 
-  it('用户列表为空时返回默认 mock 数据', () => {
+  it('用户列表为空时只恢复一个默认管理员用户', () => {
     const result = ensureMinimumUsers([])
     expect(result.reset).toBe(true)
-    expect(result.users.length).toBeGreaterThan(0)
-    expect(result.users[0].username).toBeTruthy()
+    expect(result.users.length).toBe(1)
+    expect(result.users[0].username).toBe('admin')
+    expect(result.users[0].id).toBe('u_admin')
+    expect(result.users[0].roleIds).toContain('r_admin')
   })
 
-  it('用户列表为 undefined 时返回默认 mock 数据', () => {
+  it('用户列表为 undefined 时只恢复一个默认管理员用户', () => {
     const result = ensureMinimumUsers(undefined)
     expect(result.reset).toBe(true)
-    expect(result.users.length).toBeGreaterThan(0)
+    expect(result.users.length).toBe(1)
+    expect(result.users[0].username).toBe('admin')
   })
 })
 
@@ -298,10 +309,13 @@ describe('ensureMinimumRoles', () => {
     expect(result.roles).toBe(roles)
   })
 
-  it('角色列表为空时返回默认 mock 数据', () => {
+  it('角色列表为空时只恢复一个默认管理员角色', () => {
     const result = ensureMinimumRoles([])
     expect(result.reset).toBe(true)
-    expect(result.roles.length).toBeGreaterThan(0)
+    expect(result.roles.length).toBe(1)
+    expect(result.roles[0].name).toBe('超级管理员')
+    expect(result.roles[0].id).toBe('r_admin')
+    expect(result.roles[0].permissions.length).toBeGreaterThan(0)
   })
 })
 
@@ -336,8 +350,18 @@ describe('updateRole', () => {
 
 describe('deleteRole', () => {
   it('角色不存在时返回失败', () => {
-    const result = deleteRole([], 'not-exist', [])
+    const result = deleteRole([{ id: 'r1' }], 'not-exist', [])
     expect(result.success).toBe(false)
+    expect(result.roles.length).toBe(1)
+  })
+
+  it('禁止删除最后一个角色', () => {
+    const roles = [{ id: 'r1', name: 'r1' }]
+    const users = [{ id: 'u1', roleIds: ['r1'] }]
+    const result = deleteRole(roles, 'r1', users)
+    expect(result.success).toBe(false)
+    expect(result.error).toBeTruthy()
+    expect(result.roles.length).toBe(1)
   })
 
   it('成功删除角色并从用户中移除', () => {

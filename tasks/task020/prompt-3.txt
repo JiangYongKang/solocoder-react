@@ -1,0 +1,6 @@
+当前项目 src/pages/notifications/ 下的通知中心页面有一个严重的运行时错误需要修复，同时还有一个小问题，请在该目录下处理。
+
+1. notifications.css 里 @media (max-width: 375px) 块中的 .notif-toggle::after 和 .notif-toggle-on::after 的 content 属性里，单引号字符不是标准的 ASCII 引号（U+0027），而是非标准 Unicode 引号，浏览器解析这个 CSS 后传给 React 的 style 计算会抛出 "style prop expects a mapping" 的运行时错误，导致通知卡片点击展开时页面白屏。需要检查 CSS 文件中的特殊字符并修正为标准 ASCII 字符。
+2. Canvas 绘制的 favicon 角标以 18px 粗体在 32×32 画布上渲染未读数，当未读数超过 99 时显示 "99+" 三个字符会超出画布右边界被裁切。需要处理 99+ 场景下的文字适应。
+3. 确保在 375px 移动端宽度下通知列表布局不崩坏，使用 pnpm run dev 启动后实际调整视口宽度手动验证各类通知面板和展开折叠的可用性。
+4. 重新运行 pnpm run test，需要让所有测试通过。

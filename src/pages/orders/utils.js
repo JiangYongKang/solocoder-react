@@ -52,12 +52,31 @@ export function updateCartQuantity(cart, productId, quantity, stock) {
   if (safeQty <= 0) {
     return cart.filter((item) => item.productId !== productId);
   }
-  const maxStock = typeof stock === 'number' ? stock : safeQty;
-  return cart.map((item) =>
-    item.productId === productId
-      ? { ...item, quantity: Math.min(safeQty, maxStock) }
-      : item
-  );
+  return cart.map((item) => {
+    if (item.productId !== productId) return item;
+    const itemStock = typeof stock === 'number' ? stock : (typeof item.stock === 'number' ? item.stock : safeQty);
+    const maxStock = typeof itemStock === 'number' ? itemStock : safeQty;
+    return {
+      ...item,
+      stock: typeof stock === 'number' ? stock : item.stock,
+      quantity: Math.min(safeQty, maxStock),
+    };
+  });
+}
+
+export function migrateCartItems(cart, products) {
+  if (!Array.isArray(cart)) return [];
+  if (!Array.isArray(products)) return cart;
+  const productMap = new Map(products.map((p) => [p.id, p]));
+  let changed = false;
+  const migrated = cart.map((item) => {
+    if (typeof item.stock === 'number') return item;
+    const product = productMap.get(item.productId);
+    if (!product || typeof product.stock !== 'number') return item;
+    changed = true;
+    return { ...item, stock: product.stock };
+  });
+  return changed ? migrated : cart;
 }
 
 export function removeFromCart(cart, productId) {

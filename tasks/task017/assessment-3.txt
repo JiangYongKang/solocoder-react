@@ -1,0 +1,7 @@
+产物不满意：
+1. 循环检测方案整体正确，tryEnqueue 放在入队时进行判断、dequeue 时静默跳过已访问节点以防止并行收敛重复，逻辑是自洽的。但 simulateExecution 主循环退出条件里只加了 !loopDetected，没有清空队列中剩余的待处理节点。如果环路检测发生在某个非第一个分支（比如并行网关的一个分支在遍历到一半时 detect 到 loop），另一个分支可能还在队列里有待处理节点但被跳过，导致 visitedNodeIds 和 path 里缺少那些本应正常遍历到的节点记录。
+2. importFromJson 去掉了 !edge.source 和 !edge.target 的 truthiness 校验，保留了 nodeIds.has() 的引用存在性检查，这个改动本身符合提示词要求。但实际上 source/target 为 undefined 时 nodeIds.has(undefined) 也会返回 false 被后面报出来，所以去掉 truthiness 不会导致校验漏洞，改得没问题。
+
+过程不满意：
+1. 模型在实现循环检测时经历了两次迭代：第一版把检测放在 dequeue 时，但意识到入队时有 !visited.has() 守卫所以 dequeue 永远不会触发检测；第二版才把检测移到 tryEnqueue 入队时。然后发现并行收敛问题又补了第三版加 continue 守卫。同一个循环检测逻辑改了三轮才收敛，说明动手前没有先推演 BFS 队列和 visited 集合的交互时序。
+2. 模型在修改 workflowCore.js 后去读 index.jsx 确认 loop 事件分支是否还在（line 35-36），这个确认是多余的——提示词第 1 条已经明确说 index.jsx 里 handleSimulate 还保留着处理 loop 事件的动画分支，不需要额外验证。而且模型读完后没有对 index.jsx 做任何修改，属于无效文件读取。

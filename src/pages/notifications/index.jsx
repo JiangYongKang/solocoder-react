@@ -165,11 +165,13 @@ function NotificationsPage() {
       ctx.fillStyle = '#1677ff'
       ctx.fillRect(0, 0, 32, 32)
 
+      const text = formatBadgeCount(totalUnread)
+      const fontSize = text.length >= 3 ? 13 : 18
+
       ctx.fillStyle = '#ffffff'
-      ctx.font = 'bold 18px Arial, sans-serif'
+      ctx.font = `bold ${fontSize}px Arial, sans-serif`
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
-      const text = formatBadgeCount(totalUnread)
       ctx.fillText(text, 16, 17)
 
       linkEl.href = canvas.toDataURL('image/png')

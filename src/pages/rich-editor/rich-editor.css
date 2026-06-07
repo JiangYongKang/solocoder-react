@@ -561,3 +561,173 @@
     padding: 20px;
   }
 }
+
+@media (max-width: 400px) {
+  .re-container {
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .re-header {
+    gap: 8px;
+  }
+
+  .re-title {
+    font-size: 18px;
+  }
+
+  .re-back-link {
+    font-size: 12px;
+    padding: 5px 8px;
+  }
+
+  .re-saved-info {
+    font-size: 11px;
+    gap: 4px;
+  }
+
+  .re-saved-text {
+    max-width: 70px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .re-toolbar {
+    padding: 8px;
+    gap: 4px;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .re-toolbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .re-toolbar-group {
+    gap: 2px;
+    padding-right: 4px;
+    margin-right: 2px;
+    flex-shrink: 0;
+  }
+
+  .re-toolbar-group:last-child {
+    padding-right: 8px;
+  }
+
+  .re-toolbar-btn {
+    min-width: 30px;
+    height: 30px;
+    padding: 0 6px;
+    font-size: 12px;
+    border-radius: 6px;
+  }
+
+  .re-pane-header {
+    padding: 8px 10px;
+  }
+
+  .re-pane-title {
+    font-size: 11px;
+  }
+
+  .re-pane-count {
+    font-size: 11px;
+  }
+
+  .re-textarea {
+    padding: 12px;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .re-preview-content {
+    padding: 12px;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .re-preview-content h1 {
+    font-size: 20px;
+    margin-bottom: 12px;
+  }
+
+  .re-preview-content h2 {
+    font-size: 17px;
+    margin: 16px 0 8px;
+  }
+
+  .re-preview-content h3 {
+    font-size: 15px;
+    margin: 12px 0 6px;
+  }
+
+  .re-preview-content pre {
+    padding: 10px;
+    margin: 10px 0;
+  }
+
+  .re-preview-content pre code {
+    font-size: 12px;
+  }
+
+  .re-preview-content ul,
+  .re-preview-content ol {
+    padding-left: 20px;
+  }
+
+  .re-editor-pane,
+  .re-preview-pane {
+    min-height: 260px;
+  }
+
+  .re-dialog {
+    padding: 16px;
+    border-radius: 12px;
+  }
+
+  .re-dialog-title {
+    font-size: 16px;
+    margin-bottom: 16px;
+  }
+
+  .re-dialog-field {
+    margin-bottom: 12px;
+  }
+
+  .re-dialog-label {
+    font-size: 12px;
+    margin-bottom: 4px;
+  }
+
+  .re-dialog-input {
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+
+  .re-radio-group {
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .re-radio {
+    font-size: 13px;
+  }
+
+  .re-dialog-actions {
+    margin-top: 16px;
+  }
+
+  .re-dialog-btn-primary,
+  .re-dialog-btn-secondary {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  .re-dialog-error {
+    padding: 8px 10px;
+    margin-bottom: 12px;
+    font-size: 12px;
+  }
+}

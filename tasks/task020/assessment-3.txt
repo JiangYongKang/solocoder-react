@@ -1,0 +1,7 @@
+产物不满意：
+1. Favicon 的 99+ 文字适应方案用 text.length >= 3 切换字号，对于"99+"三个字切到 13px 可以装下，但如果未来 formatBadgeCount 改成了其他较长文案（比如"100+"四字），13px 仍然不够，应该用 measureText 动态计算字号或者直接用更保守的固定小字，而不是靠字符数判断。
+2. notifications.css 的 content 属性修正确实清除了非标准 Unicode 引号，但重写整个 CSS 文件后发现还有一处缺陷：.notif-toggle-on::after（line 522-524）在 375px 媒体查询里 transform: translateX(20px) 和 toggle 缩小后的宽度 42px 不完全匹配，开关的圆形滑块在 on 状态下的位置可能略微偏移。不过这属于美观层面的细微问题。
+
+过程不满意：
+1. 为了修复几个特定 CSS 属性中的非标准引号，模型选择了用 Write 工具重写整个 714 行的 CSS 文件，而不是定位到具体的 content 属性用 StrReplace 做精确替换。如果 CSS 文件中有其他开发者在会话之间手动调整的内容，这种全量覆盖可能导致未被察觉的丢失。工具使用不够精准。
+2. notifications.css 是 untracked 文件（git status 显示 ??），模型全文重写后无法通过 diff 验证到底改了哪些字符。COT 中也没有体现模型先定位到具体哪个 content 属性有 Unicode 引号的步骤，只是笼统地说"确保所有字符都是标准 ASCII"然后全量覆盖，缺乏针对性的问题定位过程。

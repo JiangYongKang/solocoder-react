@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import './index.css'
 import UserEditPanel from './UserEditPanel'
@@ -64,6 +64,27 @@ export default function PermissionsPage() {
   const [roleModalOpen, setRoleModalOpen] = useState(false)
   const [editingRole, setEditingRole] = useState(null)
   const [roleDeleteConfirm, setRoleDeleteConfirm] = useState(null)
+
+  const [errorMessage, setErrorMessage] = useState('')
+  const errorTimer = useRef(null)
+
+  const showError = useCallback((msg) => {
+    setErrorMessage(msg)
+    if (errorTimer.current) {
+      clearTimeout(errorTimer.current)
+    }
+    errorTimer.current = setTimeout(() => {
+      setErrorMessage('')
+    }, 3000)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (errorTimer.current) {
+        clearTimeout(errorTimer.current)
+      }
+    }
+  }, [])
 
   const perm = usePermission(currentUserId, users, roles)
 
@@ -138,8 +159,10 @@ export default function PermissionsPage() {
       if (targetUserId !== currentUserId) {
         handleCurrentUserChange(targetUserId)
       }
+      setUserDeleteConfirm(null)
+    } else {
+      showError(result.error || '删除用户失败')
     }
-    setUserDeleteConfirm(null)
   }
 
   const handleOpenCreateRole = () => {
@@ -180,8 +203,10 @@ export default function PermissionsPage() {
       const ensuredRoles = ensureMinimumRoles(result.roles)
       handleRolesUpdate(ensuredRoles.roles)
       handleUsersUpdate(result.users)
+      setRoleDeleteConfirm(null)
+    } else {
+      showError(result.error || '删除角色失败')
     }
-    setRoleDeleteConfirm(null)
   }
 
   const renderPagination = (pagination, setPage) => {
@@ -262,6 +287,12 @@ export default function PermissionsPage() {
           <span>
             权限数：{perm.permissions.length}
           </span>
+        </div>
+      )}
+
+      {errorMessage && (
+        <div className="error-toast" role="alert">
+          {errorMessage}
         </div>
       )}
 
@@ -361,8 +392,9 @@ export default function PermissionsPage() {
                         )}
                         {perm.can('user:delete') && (
                           <button
-                            className="btn-link btn-link-danger"
-                            onClick={() => setUserDeleteConfirm(user)}
+                            className={`btn-link btn-link-danger ${users.length <= 1 ? 'disabled' : ''}`}
+                            disabled={users.length <= 1}
+                            onClick={() => users.length > 1 && setUserDeleteConfirm(user)}
                           >
                             删除
                           </button>
@@ -447,8 +479,9 @@ export default function PermissionsPage() {
                         )}
                         {perm.can('role:delete') && (
                           <button
-                            className="btn-link btn-link-danger"
-                            onClick={() => setRoleDeleteConfirm(role)}
+                            className={`btn-link btn-link-danger ${roles.length <= 1 ? 'disabled' : ''}`}
+                            disabled={roles.length <= 1}
+                            onClick={() => roles.length > 1 && setRoleDeleteConfirm(role)}
                           >
                             删除
                           </button>

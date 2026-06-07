@@ -248,10 +248,10 @@ export function importFromJson(jsonData) {
     if (!edge.id || typeof edge.id !== 'string') {
       return { valid: false, error: '连线缺少有效的 id' }
     }
-    if (!edge.source || !nodeIds.has(edge.source)) {
+    if (!nodeIds.has(edge.source)) {
       return { valid: false, error: `连线 ${edge.id} 引用了不存在的源节点: ${edge.source}` }
     }
-    if (!edge.target || !nodeIds.has(edge.target)) {
+    if (!nodeIds.has(edge.target)) {
       return { valid: false, error: `连线 ${edge.id} 引用了不存在的目标节点: ${edge.target}` }
     }
   }
@@ -284,8 +284,22 @@ export function simulateExecution(nodes, edges, randomFn = Math.random) {
   const queue = [startNode.id]
   const maxSteps = (nodes.length + edges.length) * 3
   let steps = 0
+  let loopDetected = false
 
-  while (queue.length > 0 && steps < maxSteps) {
+  const tryEnqueue = (targetId) => {
+    if (visited.has(targetId)) {
+      const targetNode = getNodeById(nodes, targetId)
+      if (targetNode && targetNode.type === NODE_TYPES.END) {
+        return
+      }
+      path.push({ type: 'loop', nodeId: targetId })
+      loopDetected = true
+      return
+    }
+    queue.push(targetId)
+  }
+
+  while (queue.length > 0 && steps < maxSteps && !loopDetected) {
     steps++
     const currentNodeId = queue.shift()
 
@@ -309,14 +323,13 @@ export function simulateExecution(nodes, edges, randomFn = Math.random) {
 
     if (currentNode.type === NODE_TYPES.PARALLEL) {
       for (const edge of outEdges) {
+        if (loopDetected) break
         if (!visitedEdgesSet.has(edge.id)) {
           visitedEdgesSet.add(edge.id)
           visitedEdgeIds.push(edge.id)
           path.push({ type: 'edge', edgeId: edge.id })
         }
-        if (!visited.has(edge.target)) {
-          queue.push(edge.target)
-        }
+        tryEnqueue(edge.target)
       }
     } else if (currentNode.type === NODE_TYPES.CONDITION && outEdges.length > 1) {
       const idx = Math.floor(randomFn() * outEdges.length)
@@ -326,9 +339,7 @@ export function simulateExecution(nodes, edges, randomFn = Math.random) {
         visitedEdgeIds.push(nextEdge.id)
         path.push({ type: 'edge', edgeId: nextEdge.id })
       }
-      if (!visited.has(nextEdge.target)) {
-        queue.push(nextEdge.target)
-      }
+      tryEnqueue(nextEdge.target)
     } else {
       const nextEdge = outEdges[0]
       if (!visitedEdgesSet.has(nextEdge.id)) {
@@ -336,9 +347,7 @@ export function simulateExecution(nodes, edges, randomFn = Math.random) {
         visitedEdgeIds.push(nextEdge.id)
         path.push({ type: 'edge', edgeId: nextEdge.id })
       }
-      if (!visited.has(nextEdge.target)) {
-        queue.push(nextEdge.target)
-      }
+      tryEnqueue(nextEdge.target)
     }
   }
 

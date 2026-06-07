@@ -1,0 +1,6 @@
+当前项目 src/pages/permissions/ 下的权限管理系统页面有一个遗留问题，请在该目录下修复它。
+
+1. 上一轮加了一个兜底逻辑：删除最后一个用户时调用 ensureMinimumMinimumUsers 恢复 Mock 用户。但目前的做法是一次性恢复全部 5 个 Mock 用户到页面和 localStorage，如果管理员之前手动清理过某些默认用户，这些已删掉的用户也会全部复活。恢复粒度太粗了，应该只补一个默认管理员用户，或者改成直接禁止删除最后一个用户。
+2. getCheckState 函数还用的老逻辑来判断节点复选框的打勾和半选状态，但 togglePermission 已经改成只存叶子节点 ID 了。虽然当前权限树只有两层所以碰巧能对上，但 getCheckState 内部仍用 getChildIdsByParent 按直接子节点判断，跟 togglePermission 的新语义在设计上不一致。需要让复选框状态的计算逻辑也同步到用叶子节点来判断。
+3. 确保在 375px 移动端宽度下各面板布局不崩坏，使用 pnpm run dev 启动后实际调整视口宽度手动验证用户列表、权限树弹窗等关键组件。
+4. 重新运行 pnpm run test，需要让所有测试通过。

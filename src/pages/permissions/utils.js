@@ -164,6 +164,9 @@ export function updateUser(users, id, data) {
 }
 
 export function deleteUser(users, id) {
+  if (users.length <= 1) {
+    return { success: false, users, error: '至少保留一个用户' }
+  }
   const exists = users.some((u) => u.id === id)
   if (!exists) {
     return { success: false, users }
@@ -171,20 +174,39 @@ export function deleteUser(users, id) {
   return { success: true, users: users.filter((u) => u.id !== id) }
 }
 
+const DEFAULT_ADMIN_USER = {
+  id: 'u_admin',
+  username: 'admin',
+  email: 'admin@example.com',
+  roleIds: ['r_admin'],
+  createdAt: Date.now(),
+}
+
+const DEFAULT_ADMIN_ROLE = {
+  id: 'r_admin',
+  name: '超级管理员',
+  description: '拥有系统所有权限',
+  permissions: [
+    'user:view', 'user:edit', 'user:delete',
+    'role:view', 'role:edit', 'role:delete',
+    'permission:view', 'permission:assign',
+    'settings:view', 'settings:edit',
+  ],
+  createdAt: Date.now(),
+}
+
 export function ensureMinimumUsers(users) {
   if (users && users.length > 0) {
     return { users, reset: false }
   }
-  const defaults = [...MOCK_USERS]
-  return { users: defaults, reset: true }
+  return { users: [DEFAULT_ADMIN_USER], reset: true }
 }
 
 export function ensureMinimumRoles(roles) {
   if (roles && roles.length > 0) {
     return { roles, reset: false }
   }
-  const defaults = [...MOCK_ROLES]
-  return { roles: defaults, reset: true }
+  return { roles: [DEFAULT_ADMIN_ROLE], reset: true }
 }
 
 export function createRole(roles, data) {
@@ -222,6 +244,9 @@ export function updateRole(roles, id, data) {
 }
 
 export function deleteRole(roles, id, users) {
+  if (roles.length <= 1) {
+    return { success: false, roles, users, error: '至少保留一个角色' }
+  }
   const exists = roles.some((r) => r.id === id)
   if (!exists) {
     return { success: false, roles, users }
@@ -398,15 +423,18 @@ export function togglePermission(checkedIds, targetId, tree = PERMISSION_TREE) {
 
 export function getCheckState(nodeId, checkedIds, tree = PERMISSION_TREE) {
   const checkedSet = new Set(checkedIds)
-  const isParent = isParentNode(nodeId, tree)
+  const leafIds = getLeafIdsUnderNode(nodeId, tree)
 
-  if (!isParent) {
+  if (leafIds.length === 0) {
+    return 'unchecked'
+  }
+
+  if (leafIds.length === 1 && leafIds[0] === nodeId) {
     return checkedSet.has(nodeId) ? 'checked' : 'unchecked'
   }
 
-  const childIds = getChildIdsByParent(nodeId, tree) || []
-  const allChecked = childIds.every((cid) => checkedSet.has(cid))
-  const someChecked = childIds.some((cid) => checkedSet.has(cid))
+  const allChecked = leafIds.every((lid) => checkedSet.has(lid))
+  const someChecked = leafIds.some((lid) => checkedSet.has(lid))
 
   if (allChecked) return 'checked'
   if (someChecked) return 'indeterminate'

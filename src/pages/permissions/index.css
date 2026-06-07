@@ -75,6 +75,24 @@
   color: var(--text-h);
 }
 
+.error-toast {
+  padding: 12px 16px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid #ef4444;
+  color: #ef4444;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  font-size: 14px;
+  font-weight: 500;
+  animation: shakeIn 0.3s ease;
+}
+
+@keyframes shakeIn {
+  0% { transform: translateX(-8px); opacity: 0; }
+  50% { transform: translateX(4px); }
+  100% { transform: translateX(0); opacity: 1; }
+}
+
 .tabs {
   display: flex;
   gap: 0;
@@ -218,6 +236,13 @@
   font-size: 13px;
   border-radius: 4px;
   font-family: inherit;
+}
+
+.btn-link.disabled,
+.btn-link:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 .btn-link-primary {

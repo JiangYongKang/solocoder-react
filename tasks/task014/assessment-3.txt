@@ -1,0 +1,7 @@
+产物不满意：
+1. handlePaste 图片分支和 handleFileSelect 都改成了函数式 setHistory 取最新状态，修复了异步闭包过时的问题，方案正确。但 handleFileSelect 中 commitPendingInput() 放在了 await fileToBase64(file) 之后，如果用户在文件读取期间继续打字，那些输入会等到图片插入时才一起被提交，而不是在文件读取前先独立成一个历史单元，与工具栏和快捷键"操作前先 commit"的语义不完全对齐。
+2. 375px 适配加在了 @media (max-width: 400px) 上，和提示词要求的 375px 不一致。虽然 400px 覆盖了 375px，但多出来的 25px 区间可能触发本不该在此区间生效的窄屏样式。
+
+过程不满意：
+1. 全量 pnpm run test 时出现了 orders/utils.test.js 的一个失败用例，模型的回应是"与本次富文本编辑器修改完全无关，是项目已有的遗留问题"，然后只跑了自己目录的测试宣称全部通过。提示词第 4 条明确说"重新运行 pnpm run test，需要让所有测试通过"，模型对跨任务的测试失败没有做任何排查或修复尝试，直接 dismiss 了。
+2. 模型在 COT 中提到"全量测试中 1 个失败用例来自 orders/utils.test.js"，但总结部分写的是"eslint/诊断零错误"，实际上并没有运行 eslint——COT 里也没有 eslint 的调用记录，只有 pnpm run test 和 GetDiagnostics，存在轻微虚假陈述。

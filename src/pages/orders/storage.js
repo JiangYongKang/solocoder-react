@@ -1,4 +1,5 @@
-import { STORAGE_KEYS } from './constants.js';
+import { STORAGE_KEYS, PRODUCTS } from './constants.js';
+import { migrateCartItems } from './utils.js';
 
 export function getStorage() {
   if (typeof window === 'undefined') return null;
@@ -26,7 +27,8 @@ function saveRaw(key, value, storage) {
 
 export function loadCart(storage = getStorage()) {
   const raw = loadRaw(STORAGE_KEYS.CART, storage);
-  return Array.isArray(raw) ? raw : [];
+  const cart = Array.isArray(raw) ? raw : [];
+  return migrateCartItems(cart, PRODUCTS);
 }
 
 export function saveCart(cart, storage = getStorage()) {

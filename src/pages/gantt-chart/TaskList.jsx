@@ -1,9 +1,10 @@
-import { useState, useRef, useEffect } from 'react';
-import { getVisibleTasks, getChildren, formatDate } from './ganttUtils.js';
+import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
+import { getVisibleTasks, getChildren, formatDate, validateTask } from './ganttUtils.js';
 
-function EditableCell({ value, onSave, type = 'text', placeholder = '' }) {
+function EditableCell({ value, onSave, type = 'text', placeholder = '', field, currentTask }) {
   const [editing, setEditing] = useState(false);
   const [localValue, setLocalValue] = useState(value);
+  const [error, setError] = useState('');
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -21,10 +22,21 @@ function EditableCell({ value, onSave, type = 'text', placeholder = '' }) {
 
   const handleStartEdit = () => {
     setEditing(true);
+    setError('');
   };
 
   const handleCommit = () => {
+    if (currentTask && field) {
+      const testTask = { ...currentTask, [field]: localValue };
+      const result = validateTask(testTask);
+      if (!result.valid && result.errors[field]) {
+        setError(result.errors[field]);
+        return;
+      }
+    }
+
     setEditing(false);
+    setError('');
     if (localValue !== value) {
       onSave(localValue);
     }
@@ -32,6 +44,7 @@ function EditableCell({ value, onSave, type = 'text', placeholder = '' }) {
 
   const handleCancel = () => {
     setEditing(false);
+    setError('');
     setLocalValue(value);
   };
 
@@ -58,52 +71,98 @@ function EditableCell({ value, onSave, type = 'text', placeholder = '' }) {
     );
   }
 
-  if (type === 'date') {
+  const inputStyle = error
+    ? { borderColor: '#ef4444', outline: 'none' }
+    : undefined;
+
+  const inputNode = (() => {
+    if (type === 'date') {
+      return (
+        <input
+          ref={inputRef}
+          type="date"
+          className="gantt-task-input"
+          style={inputStyle}
+          value={localValue || ''}
+          onChange={(e) => setLocalValue(e.target.value)}
+          onBlur={handleCommit}
+          onKeyDown={handleKeyDown}
+        />
+      );
+    }
+
+    if (type === 'number') {
+      return (
+        <input
+          ref={inputRef}
+          type="number"
+          className="gantt-task-input"
+          style={inputStyle}
+          value={localValue ?? 0}
+          min={0}
+          max={100}
+          onChange={(e) => setLocalValue(Number(e.target.value))}
+          onBlur={handleCommit}
+          onKeyDown={handleKeyDown}
+        />
+      );
+    }
+
     return (
       <input
         ref={inputRef}
-        type="date"
+        type="text"
         className="gantt-task-input"
+        style={inputStyle}
         value={localValue || ''}
+        placeholder={placeholder}
         onChange={(e) => setLocalValue(e.target.value)}
         onBlur={handleCommit}
         onKeyDown={handleKeyDown}
       />
     );
-  }
-
-  if (type === 'number') {
-    return (
-      <input
-        ref={inputRef}
-        type="number"
-        className="gantt-task-input"
-        value={localValue ?? 0}
-        min={0}
-        max={100}
-        onChange={(e) => setLocalValue(Number(e.target.value))}
-        onBlur={handleCommit}
-        onKeyDown={handleKeyDown}
-      />
-    );
-  }
+  })();
 
   return (
-    <input
-      ref={inputRef}
-      type="text"
-      className="gantt-task-input"
-      value={localValue || ''}
-      placeholder={placeholder}
-      onChange={(e) => setLocalValue(e.target.value)}
-      onBlur={handleCommit}
-      onKeyDown={handleKeyDown}
-    />
+    <div style={{ position: 'relative', width: '100%' }}>
+      {inputNode}
+      {error && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            fontSize: '11px',
+            color: '#ef4444',
+            marginTop: '2px',
+            whiteSpace: 'nowrap',
+            zIndex: 10,
+            background: 'var(--bg)',
+            padding: '2px 4px',
+            borderRadius: '4px',
+            border: '1px solid #ef4444',
+          }}
+        >
+          {error}
+        </div>
+      )}
+    </div>
   );
 }
 
-export default function TaskList({ state, onToggleExpand, onUpdateTask, selectedTaskId, onSelectTask }) {
+const TaskList = forwardRef(function TaskList(
+  { state, onToggleExpand, onUpdateTask, selectedTaskId, onSelectTask },
+  ref
+) {
   const visibleTasks = getVisibleTasks(state);
+  const scrollRef = useRef(null);
+
+  useImperativeHandle(ref, () => ({
+    getScrollElement: () => scrollRef.current,
+    setScrollTop: (top) => {
+      if (scrollRef.current) scrollRef.current.scrollTop = top;
+    },
+  }));
 
   if (visibleTasks.length === 0) {
     return (
@@ -129,7 +188,7 @@ export default function TaskList({ state, onToggleExpand, onUpdateTask, selected
         <span>进度</span>
         <span>开始 / 结束</span>
       </div>
-      <div className="gantt-task-list">
+      <div className="gantt-task-list" ref={scrollRef}>
         {visibleTasks.map((task) => {
           const hasChildren = getChildren(state, task.id).length > 0;
           const isSelected = task.id === selectedTaskId;
@@ -160,6 +219,8 @@ export default function TaskList({ state, onToggleExpand, onUpdateTask, selected
                 <EditableCell
                   value={task.name}
                   placeholder="任务名称"
+                  field="name"
+                  currentTask={task}
                   onSave={(val) => onUpdateTask(task.id, { name: val })}
                 />
               </div>
@@ -184,6 +245,8 @@ export default function TaskList({ state, onToggleExpand, onUpdateTask, selected
                     value={task.progress}
                     type="number"
                     placeholder="0%"
+                    field="progress"
+                    currentTask={task}
                     onSave={(val) => onUpdateTask(task.id, { progress: val })}
                   />
                 </div>
@@ -194,12 +257,16 @@ export default function TaskList({ state, onToggleExpand, onUpdateTask, selected
                   value={task.startDate}
                   type="date"
                   placeholder="开始日期"
+                  field="startDate"
+                  currentTask={task}
                   onSave={(val) => onUpdateTask(task.id, { startDate: val })}
                 />
                 <EditableCell
                   value={task.endDate}
                   type="date"
                   placeholder="结束日期"
+                  field="endDate"
+                  currentTask={{ ...task }}
                   onSave={(val) => onUpdateTask(task.id, { endDate: val })}
                 />
               </div>
@@ -209,4 +276,6 @@ export default function TaskList({ state, onToggleExpand, onUpdateTask, selected
       </div>
     </div>
   );
-}
+});
+
+export default TaskList;

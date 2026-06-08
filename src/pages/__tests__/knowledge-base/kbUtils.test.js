@@ -404,6 +404,88 @@ describe('分类操作', () => {
       expect(cat1.children).toContain('cat-2')
     })
 
+    it('应该将分类移动到同层另一个分类之前', () => {
+      const initial = createInitialState()
+      const root = initial.categories.find((c) => c.id === 'cat-root')
+      expect(root.children).toEqual(['cat-1', 'cat-2'])
+      const result = moveCategory(initial, 'cat-2', 'cat-1', 'before')
+      const newRoot = result.categories.find((c) => c.id === 'cat-root')
+      expect(newRoot.children).toEqual(['cat-2', 'cat-1'])
+      const cat2 = result.categories.find((c) => c.id === 'cat-2')
+      expect(cat2.parentId).toBe('cat-root')
+    })
+
+    it('应该将分类移动到同层另一个分类之后', () => {
+      const initial = createInitialState()
+      const root = initial.categories.find((c) => c.id === 'cat-root')
+      expect(root.children).toEqual(['cat-1', 'cat-2'])
+      const result = moveCategory(initial, 'cat-1', 'cat-2', 'after')
+      const newRoot = result.categories.find((c) => c.id === 'cat-root')
+      expect(newRoot.children).toEqual(['cat-2', 'cat-1'])
+      const cat1 = result.categories.find((c) => c.id === 'cat-1')
+      expect(cat1.parentId).toBe('cat-root')
+    })
+
+    it('应该将深层分类移动到另一个深层分类之前', () => {
+      const initial = createInitialState()
+      const cat11 = initial.categories.find((c) => c.id === 'cat-1-1')
+      expect(cat11.children).toEqual(['cat-1-1-1'])
+      const withNewChild = createCategory(initial, 'cat-1-1', '新增子分类')
+      const newCatId = withNewChild.categories.find((c) => c.name === '新增子分类').id
+      const newCat11 = withNewChild.categories.find((c) => c.id === 'cat-1-1')
+      expect(newCat11.children).toEqual(['cat-1-1-1', newCatId])
+      const result = moveCategory(withNewChild, newCatId, 'cat-1-1-1', 'before')
+      const finalCat11 = result.categories.find((c) => c.id === 'cat-1-1')
+      expect(finalCat11.children).toEqual([newCatId, 'cat-1-1-1'])
+    })
+
+    it('拖拽到根节点 before 应该转为 inside（根节点无同级）', () => {
+      const initial = createInitialState()
+      const beforeRoot = initial.categories.find((c) => c.id === 'cat-root')
+      const beforeChildren = [...beforeRoot.children]
+      const result = moveCategory(initial, 'cat-2', 'cat-root', 'before')
+      const cat2 = result.categories.find((c) => c.id === 'cat-2')
+      expect(cat2.parentId).toBe('cat-root')
+      const afterRoot = result.categories.find((c) => c.id === 'cat-root')
+      expect(afterRoot.children).toEqual(expect.arrayContaining(beforeChildren))
+      expect(afterRoot.children).toContain('cat-2')
+    })
+
+    it('拖拽到根节点 after 应该转为 inside（根节点无同级）', () => {
+      const initial = createInitialState()
+      const result = moveCategory(initial, 'cat-2', 'cat-root', 'after')
+      const cat2 = result.categories.find((c) => c.id === 'cat-2')
+      expect(cat2.parentId).toBe('cat-root')
+      const afterRoot = result.categories.find((c) => c.id === 'cat-root')
+      expect(afterRoot.children).toContain('cat-2')
+    })
+
+    it('目标节点不在父级 children 中（防御性），before 应该插入到开头', () => {
+      const initial = createInitialState()
+      const tampered = {
+        ...initial,
+        categories: initial.categories.map((c) =>
+          c.id === 'cat-root' ? { ...c, children: ['cat-1'] } : c
+        ),
+      }
+      const result = moveCategory(tampered, 'cat-2', 'cat-1', 'before')
+      const newRoot = result.categories.find((c) => c.id === 'cat-root')
+      expect(newRoot.children[0]).toBe('cat-2')
+    })
+
+    it('目标节点不在父级 children 中（防御性），after 应该插入到末尾', () => {
+      const initial = createInitialState()
+      const tampered = {
+        ...initial,
+        categories: initial.categories.map((c) =>
+          c.id === 'cat-root' ? { ...c, children: ['cat-1'] } : c
+        ),
+      }
+      const result = moveCategory(tampered, 'cat-2', 'cat-1', 'after')
+      const newRoot = result.categories.find((c) => c.id === 'cat-root')
+      expect(newRoot.children[newRoot.children.length - 1]).toBe('cat-2')
+    })
+
     it('不应该将分类移动到自己的后代中', () => {
       const initial = createInitialState()
       const result = moveCategory(initial, 'cat-1', 'cat-1-1', 'inside')
@@ -414,6 +496,26 @@ describe('分类操作', () => {
       const initial = createInitialState()
       const result = moveCategory(initial, 'cat-1', 'cat-1', 'inside')
       expect(result).toEqual(initial)
+    })
+
+    it('移动后应该从原父节点的 children 中移除', () => {
+      const initial = createInitialState()
+      const cat1Before = initial.categories.find((c) => c.id === 'cat-1')
+      expect(cat1Before.children).toContain('cat-1-1')
+      const result = moveCategory(initial, 'cat-1-1', 'cat-2', 'inside')
+      const cat1After = result.categories.find((c) => c.id === 'cat-1')
+      expect(cat1After.children).not.toContain('cat-1-1')
+      const cat2After = result.categories.find((c) => c.id === 'cat-2')
+      expect(cat2After.children).toContain('cat-1-1')
+    })
+
+    it('移动到新父节点内部时应该展开新父节点', () => {
+      const initial = createInitialState()
+      const cat2Before = initial.categories.find((c) => c.id === 'cat-2')
+      expect(cat2Before.isExpanded).toBe(false)
+      const result = moveCategory(initial, 'cat-1-1', 'cat-2', 'inside')
+      const cat2After = result.categories.find((c) => c.id === 'cat-2')
+      expect(cat2After.isExpanded).toBe(true)
     })
   })
 })
@@ -603,12 +705,20 @@ describe('搜索与排序', () => {
       expect(sorted.map((a) => a.id)).toEqual(['a1', 'a3', 'a2'])
     })
 
-    it('应该按标题排序', () => {
+    it('应该按标题升序排序', () => {
       const sorted = sortArticles(testArticles, 'title', 'asc', categories)
-      expect(sorted[0].title <= sorted[1].title).toBe(true)
+      for (let i = 0; i < sorted.length - 1; i++) {
+        expect(sorted[i].title.localeCompare(sorted[i + 1].title, 'zh-CN') <= 0).toBe(true)
+      }
     })
 
-    it('应该按分类路径排序', () => {
+    it('应该按标题倒序排序', () => {
+      const sortedAsc = sortArticles(testArticles, 'title', 'asc', categories)
+      const sortedDesc = sortArticles(testArticles, 'title', 'desc', categories)
+      expect(sortedDesc.map((a) => a.id)).toEqual([...sortedAsc.map((a) => a.id)].reverse())
+    })
+
+    it('应该按分类路径升序排序', () => {
       const sorted = sortArticles(testArticles, 'category', 'asc', categories)
       const ids = sorted.map((a) => a.id)
       const c1Idx = ids.indexOf('a1')
@@ -617,6 +727,15 @@ describe('搜索与排序', () => {
       expect(c2Idx !== -1).toBe(true)
       expect(sorted[c1Idx].categoryId).toBe('c1')
       expect(sorted[c2Idx].categoryId).toBe('c2')
+    })
+
+    it('应该按分类路径倒序排序（与升序首元素分类不同）', () => {
+      const sortedAsc = sortArticles(testArticles, 'category', 'asc', categories)
+      const sortedDesc = sortArticles(testArticles, 'category', 'desc', categories)
+      const ascFirstCat = sortedAsc[0].categoryId
+      const descFirstCat = sortedDesc[0].categoryId
+      expect(ascFirstCat).not.toBe(descFirstCat)
+      expect(sortedDesc[sortedDesc.length - 1].categoryId).toBe(ascFirstCat)
     })
   })
 })

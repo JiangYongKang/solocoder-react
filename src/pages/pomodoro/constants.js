@@ -33,3 +33,4 @@ export const WHITE_NOISE_OPTIONS = [
 
 export const STORAGE_KEY_SETTINGS = 'pomodoro_settings'
 export const STORAGE_KEY_RECORDS = 'pomodoro_records'
+export const STORAGE_KEY_TIMER_STATE = 'pomodoro_timer_state'

@@ -21,10 +21,18 @@ export default function ExamHistory({ onViewDetail }) {
     []
   )
 
+  const gradedMap = useMemo(() => {
+    const map = new Map()
+    history.forEach((record) => {
+      map.set(record.id, gradeExam({ questions: record.questions }, record.answers))
+    })
+    return map
+  }, [history])
+
   const chartData = useMemo(() => {
     const sorted = [...history].sort((a, b) => a.date - b.date)
     return sorted.map((record, idx) => {
-      const graded = gradeExam({ questions: record.questions }, record.answers)
+      const graded = gradedMap.get(record.id) || { totalScore: 0, maxScore: 0 }
       const percentage =
         graded.maxScore > 0
           ? Math.round((graded.totalScore / graded.maxScore) * 100)
@@ -37,7 +45,7 @@ export default function ExamHistory({ onViewDetail }) {
         examName: record.examName,
       }
     })
-  }, [history])
+  }, [history, gradedMap])
 
   const stats = useMemo(() => {
     if (history.length === 0) {
@@ -47,7 +55,7 @@ export default function ExamHistory({ onViewDetail }) {
     let totalMax = 0
     let bestPct = 0
     history.forEach((r) => {
-      const graded = gradeExam({ questions: r.questions }, r.answers)
+      const graded = gradedMap.get(r.id) || { totalScore: 0, maxScore: 0 }
       totalScore += graded.totalScore
       totalMax += graded.maxScore
       const pct = graded.maxScore > 0 ? graded.totalScore / graded.maxScore : 0
@@ -60,16 +68,7 @@ export default function ExamHistory({ onViewDetail }) {
       avgPercentage: avgPct,
       best: Math.round(bestPct * 100),
     }
-  }, [history])
-
-  const getScoreClass = (record) => {
-    const graded = gradeExam({ questions: record.questions }, record.answers)
-    if (graded.maxScore === 0) return ''
-    const pct = graded.totalScore / graded.maxScore
-    if (pct >= 0.8) return 'history-score-high'
-    if (pct >= 0.6) return 'history-score-mid'
-    return 'history-score-low'
-  }
+  }, [history, gradedMap])
 
   return (
     <div>
@@ -154,14 +153,19 @@ export default function ExamHistory({ onViewDetail }) {
             </thead>
             <tbody>
               {history.map((record) => {
-                const graded = gradeExam(
-                  { questions: record.questions },
-                  record.answers
-                )
+                const graded = gradedMap.get(record.id) || {
+                  totalScore: 0,
+                  maxScore: 0,
+                }
+                const pct = graded.maxScore > 0 ? graded.totalScore / graded.maxScore : 0
+                let scoreClass = ''
+                if (pct >= 0.8) scoreClass = 'history-score-high'
+                else if (pct >= 0.6) scoreClass = 'history-score-mid'
+                else if (graded.maxScore > 0) scoreClass = 'history-score-low'
                 return (
                   <tr key={record.id}>
                     <td>{record.examName}</td>
-                    <td className={getScoreClass(record)}>
+                    <td className={scoreClass}>
                       {graded.totalScore} / {graded.maxScore}
                       <span style={{ fontSize: 12, marginLeft: 4, opacity: 0.7 }}>
                         (

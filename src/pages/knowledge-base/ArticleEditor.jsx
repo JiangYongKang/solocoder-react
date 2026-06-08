@@ -14,10 +14,16 @@ export default function ArticleEditor({
   const [activeHeading, setActiveHeading] = useState('')
   const previewRef = useRef(null)
   const saveTimerRef = useRef(null)
+  const pendingChangesRef = useRef({})
 
   useEffect(() => {
     setTitle(article?.title || '')
     setContent(article?.content || '')
+    pendingChangesRef.current = {}
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current)
+      saveTimerRef.current = null
+    }
   }, [article?.id])
 
   useEffect(() => {
@@ -28,22 +34,31 @@ export default function ArticleEditor({
     }
   }, [])
 
+  const scheduleSave = (changes) => {
+    pendingChangesRef.current = { ...pendingChangesRef.current, ...changes }
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current)
+    }
+    saveTimerRef.current = setTimeout(() => {
+      const toSave = pendingChangesRef.current
+      pendingChangesRef.current = {}
+      saveTimerRef.current = null
+      if (Object.keys(toSave).length > 0) {
+        onUpdate(toSave)
+      }
+    }, 300)
+  }
+
   const handleTitleChange = (e) => {
     const newTitle = e.target.value
     setTitle(newTitle)
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
-    saveTimerRef.current = setTimeout(() => {
-      onUpdate({ title: newTitle })
-    }, 300)
+    scheduleSave({ title: newTitle })
   }
 
   const handleContentChange = (e) => {
     const newContent = e.target.value
     setContent(newContent)
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
-    saveTimerRef.current = setTimeout(() => {
-      onUpdate({ content: newContent })
-    }, 300)
+    scheduleSave({ content: newContent })
   }
 
   const previewHtml = useMemo(() => markdownToHtml(content), [content])

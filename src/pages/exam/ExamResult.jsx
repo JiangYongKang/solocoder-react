@@ -18,6 +18,7 @@ export default function ExamResult({ record, onBack, onRetry }) {
   const accuracy = graded.maxScore > 0
     ? Math.round((graded.totalScore / graded.maxScore) * 100)
     : 0
+  const hasTargetDiff = record.targetScore && record.targetScore !== graded.maxScore
 
   return (
     <div>
@@ -28,6 +29,11 @@ export default function ExamResult({ record, onBack, onRetry }) {
           <span style={{ fontSize: 18, fontWeight: 400, opacity: 0.8 }}>
             {' '}/ {graded.maxScore} 分
           </span>
+          {hasTargetDiff && (
+            <span style={{ fontSize: 13, fontWeight: 400, opacity: 0.7, marginLeft: 8 }}>
+              （目标 {record.targetScore} 分）
+            </span>
+          )}
         </div>
         <div className="exam-result-meta">
           <span>正确率 {accuracy}%</span>

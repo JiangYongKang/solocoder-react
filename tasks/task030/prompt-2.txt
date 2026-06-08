@@ -1,0 +1,7 @@
+你实现的番茄钟计时器页面还存在一些问题，需要进行修复：
+
+1. 计时器运行时状态未持久化：当前仅将 settings 和 records 保存到了 localStorage，但计时器的运行时状态（当前阶段、剩余秒数、已完成番茄数、绑定的任务名）没有持久化。用户在计时器运行中刷新页面或关闭标签页后重新打开，所有计时进度全部丢失。需要在计时器运行时同步保存这些状态到 localStorage，初始化时恢复。
+2. addRecord 函数缺少对 records 参数的防御性检查：当 records 为 undefined 或 null 时，展开运算符会抛出 TypeError 导致页面崩溃。需要增加数组类型的防御性检查。
+3. 计时器倒计时归零时的副作用（播放蜂鸣声、发送桌面通知）被放在了 setState 的 updater 回调函数内部执行。在 React 18 严格模式下，state updater 可能被执行两次，导致提示音播放两次或通知发送两次。此外在 state updater 中执行副作用违反 React 数据流规范。需要将副作用移到 useEffect 中监听状态变化来触发。
+4. 测试覆盖不完整：updateDocumentTitle、resetDocumentTitle、requestNotificationPermission、sendNotification、playBeep 共 5 个导出函数完全没有测试覆盖。需要为它们补充测试用例，对依赖浏览器 API 的函数通过 mock 来验证不同场景下的行为。
+5. 修复后重新运行 pnpm run test，确保所有测试通过。确保所有子页面在 375px 和 1440px 宽度下布局不崩坏。

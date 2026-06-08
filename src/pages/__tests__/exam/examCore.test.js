@@ -13,10 +13,12 @@ import {
   deleteQuestion,
   filterQuestions,
   paginateQuestions,
+  shuffleArray,
   generateExam,
   loadExamDraft,
   saveExamDraft,
   clearExamDraft,
+  findActiveExamDraft,
   gradeQuestion,
   gradeExam,
   loadExamHistory,
@@ -328,6 +330,13 @@ describe('paginateQuestions', () => {
 function createMockLocalStorage() {
   const store = new Map()
   return {
+    get length() {
+      return store.size
+    },
+    key: (i) => {
+      const keys = Array.from(store.keys())
+      return keys[i] ?? null
+    },
     getItem: (key) => (store.has(key) ? store.get(key) : null),
     setItem: (key, value) => {
       store.set(key, String(value))
@@ -427,11 +436,75 @@ describe('exam draft localStorage functions', () => {
         removeItem: () => {
           throw new Error('fail')
         },
+        get length() {
+          return 0
+        },
+        key: () => null,
       },
     })
     expect(loadExamDraft('x')).toBe(null)
     expect(saveExamDraft('x', {})).toBe(false)
     expect(clearExamDraft('x')).toBe(false)
+  })
+})
+
+describe('findActiveExamDraft', () => {
+  let mockStorage
+
+  beforeEach(() => {
+    mockStorage = createMockLocalStorage()
+    vi.stubGlobal('window', { localStorage: mockStorage })
+    mockStorage.clear()
+  })
+
+  it('should return null when no drafts exist', () => {
+    expect(findActiveExamDraft()).toBe(null)
+  })
+
+  it('should return active draft with exam data', () => {
+    const exam = { id: 'exam1', name: 'Test Exam', duration: 60, totalScore: 100, questions: [] }
+    saveExamDraft('exam1', { exam, answers: { q1: 'A' }, startedAt: Date.now() })
+    const result = findActiveExamDraft()
+    expect(result).not.toBe(null)
+    expect(result.exam.id).toBe('exam1')
+    expect(result.answers).toEqual({ q1: 'A' })
+    expect(result.examId).toBe('exam1')
+  })
+
+  it('should return the most recently saved draft when multiple exist', () => {
+    const examA = { id: 'examA', name: 'A', duration: 60, totalScore: 10, questions: [] }
+    const examB = { id: 'examB', name: 'B', duration: 60, totalScore: 10, questions: [] }
+    saveExamDraft('examA', { exam: examA, answers: {}, startedAt: Date.now() })
+    saveExamDraft('examB', { exam: examB, answers: {}, startedAt: Date.now() })
+    const result = findActiveExamDraft()
+    expect(result).not.toBe(null)
+    expect(result.examId).toBe('examB')
+  })
+
+  it('should ignore expired drafts (past duration)', () => {
+    const exam = { id: 'exam1', name: 'Expired', duration: 1, totalScore: 10, questions: [] }
+    saveExamDraft('exam1', { exam, answers: {}, startedAt: Date.now() - 2 * 60 * 1000 })
+    expect(findActiveExamDraft()).toBe(null)
+  })
+
+  it('should ignore non-draft keys in storage', () => {
+    mockStorage.setItem('some_other_key', JSON.stringify({ foo: 1 }))
+    expect(findActiveExamDraft()).toBe(null)
+  })
+
+  it('should handle corrupted draft data gracefully', () => {
+    mockStorage.setItem('exam_draft_bad', 'not json')
+    expect(findActiveExamDraft()).toBe(null)
+  })
+
+  it('should handle draft without exam field', () => {
+    mockStorage.setItem('exam_draft_noexam', JSON.stringify({ answers: {}, savedAt: Date.now() }))
+    expect(findActiveExamDraft()).toBe(null)
+  })
+
+  it('should return null when window is undefined', () => {
+    vi.stubGlobal('window', undefined)
+    expect(findActiveExamDraft()).toBe(null)
   })
 })
 
@@ -477,6 +550,40 @@ describe('exam history localStorage functions', () => {
   })
 })
 
+describe('shuffleArray (Fisher-Yates)', () => {
+  it('should return empty array for invalid input', () => {
+    expect(shuffleArray(null)).toEqual([])
+    expect(shuffleArray(undefined)).toEqual([])
+  })
+
+  it('should return empty array for empty input', () => {
+    expect(shuffleArray([])).toEqual([])
+  })
+
+  it('should return same elements (same length and values)', () => {
+    const arr = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    const shuffled = shuffleArray(arr)
+    expect(shuffled).toHaveLength(arr.length)
+    expect(shuffled.sort()).toEqual([...arr].sort())
+  })
+
+  it('should not mutate the original array', () => {
+    const arr = [1, 2, 3, 4, 5]
+    const frozen = [...arr]
+    shuffleArray(arr)
+    expect(arr).toEqual(frozen)
+  })
+
+  it('should produce different orderings over many runs (probabilistic)', () => {
+    const arr = [1, 2, 3, 4, 5, 6]
+    const orderings = new Set()
+    for (let i = 0; i < 50; i += 1) {
+      orderings.add(JSON.stringify(shuffleArray(arr)))
+    }
+    expect(orderings.size).toBeGreaterThan(1)
+  })
+})
+
 describe('generateExam', () => {
   const baseQ = (score, type = QUESTION_TYPES.SINGLE) => ({
     ...createQuestion(type),
@@ -501,9 +608,9 @@ describe('generateExam', () => {
     expect(result.message).toContain('不足')
   })
 
-  it('should generate exam with score approximately matching target', () => {
+  it('should exactly match target score when possible', () => {
     const questions = []
-    for (let i = 0; i < 20; i += 1) {
+    for (let i = 0; i < 30; i += 1) {
       questions.push(baseQ(5))
     }
     for (let i = 0; i < 10; i += 1) {
@@ -513,10 +620,26 @@ describe('generateExam', () => {
     expect(result.ok).toBe(true)
     expect(result.exam.name).toBe('Midterm')
     expect(result.exam.duration).toBe(60)
-    expect(result.exam.questions.length).toBeGreaterThan(0)
+    expect(result.exam.targetScore).toBe(100)
+    expect(result.exam.isExactScore).toBe(true)
     const totalScore = result.exam.questions.reduce((s, q) => s + q.score, 0)
-    expect(totalScore).toBeGreaterThanOrEqual(90)
-    expect(totalScore).toBeLessThanOrEqual(105)
+    expect(totalScore).toBe(100)
+    expect(result.exam.totalScore).toBe(100)
+  })
+
+  it('should never exceed target score', () => {
+    const questions = [baseQ(7), baseQ(7), baseQ(7), baseQ(7)]
+    const result = generateExam(questions, { name: 'Test', totalScore: 15 })
+    expect(result.ok).toBe(true)
+    expect(result.exam.totalScore).toBeLessThanOrEqual(15)
+  })
+
+  it('should mark isExactScore false when exact match not possible', () => {
+    const questions = [baseQ(7), baseQ(7), baseQ(7)]
+    const result = generateExam(questions, { name: 'Test', totalScore: 15 })
+    expect(result.ok).toBe(true)
+    expect(result.exam.targetScore).toBe(15)
+    expect(result.exam.totalScore).toBeLessThanOrEqual(15)
   })
 
   it('should generate exam with default params', () => {
@@ -525,6 +648,16 @@ describe('generateExam', () => {
     expect(result.ok).toBe(true)
     expect(typeof result.exam.name).toBe('string')
     expect(result.exam.id).toBeDefined()
+    expect(result.exam.targetScore).toBe(15)
+  })
+
+  it('should preserve targetScore even when actual differs', () => {
+    const questions = [baseQ(3), baseQ(3), baseQ(3), baseQ(3)]
+    const result = generateExam(questions, { name: 'T', totalScore: 7 })
+    expect(result.ok).toBe(true)
+    expect(result.exam.targetScore).toBe(7)
+    expect(result.exam.totalScore).toBeLessThanOrEqual(7)
+    expect(result.exam.totalScore).toBeGreaterThan(0)
   })
 })
 

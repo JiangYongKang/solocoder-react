@@ -237,15 +237,15 @@ export function sortBookingsByDateTime(bookings) {
   })
 }
 
-export function getDefaultBookings() {
-  const today = formatDate(new Date())
+export function getDefaultBookings(dateStr) {
+  const date = dateStr || formatDate(new Date())
   return [
     {
       id: generateId(),
       bookedBy: '李四',
       title: '产品需求评审',
       roomId: 'A',
-      date: today,
+      date,
       startHour: 9,
       endHour: 11,
       createdAt: new Date().toISOString(),
@@ -255,7 +255,7 @@ export function getDefaultBookings() {
       bookedBy: '王五',
       title: '技术方案讨论',
       roomId: 'B',
-      date: today,
+      date,
       startHour: 14,
       endHour: 16,
       createdAt: new Date().toISOString(),
@@ -263,25 +263,25 @@ export function getDefaultBookings() {
   ]
 }
 
-export function loadBookings(storage = typeof window !== 'undefined' ? window.localStorage : null) {
-  if (!storage) return getDefaultBookings()
+export function loadBookings(storage = typeof window !== 'undefined' ? window.localStorage : null, defaultDate) {
+  if (!storage) return getDefaultBookings(defaultDate)
   try {
     const raw = storage.getItem(STORAGE_KEY)
     if (!raw) {
-      const defaults = getDefaultBookings()
+      const defaults = getDefaultBookings(defaultDate)
       saveBookings(defaults, storage)
       return defaults
     }
     const parsed = JSON.parse(raw)
     if (!Array.isArray(parsed)) {
-      return cleanupExpiredBookings(getDefaultBookings())
+      return cleanupExpiredBookings(getDefaultBookings(defaultDate))
     }
     const validBookings = parsed.filter(
       (b) => b && b.id && b.bookedBy && b.title && b.roomId && b.date && typeof b.startHour === 'number' && typeof b.endHour === 'number'
     )
     return cleanupExpiredBookings(validBookings)
   } catch {
-    return cleanupExpiredBookings(getDefaultBookings())
+    return cleanupExpiredBookings(getDefaultBookings(defaultDate))
   }
 }
 

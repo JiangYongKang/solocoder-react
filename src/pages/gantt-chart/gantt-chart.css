@@ -534,9 +534,6 @@
 }
 
 .gantt-dependency-submenu {
-  position: absolute;
-  left: 100%;
-  top: 0;
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -545,6 +542,7 @@
   box-shadow: var(--shadow);
   max-height: 300px;
   overflow-y: auto;
+  z-index: 1001;
 }
 
 .gantt-dependency-submenu-header {

@@ -1,0 +1,23 @@
+产物不满意
+
+1. renderMarkdown 函数存在严重的 XSS 安全漏洞。在 snippetsUtils.js 第 427-453 行，函数将用户输入的 Markdown 文本直接用正则替换生成 HTML，整个过程中没有对输入做任何 HTML 转义处理。当用户备注中包含 `<script>alert('xss')</script>` 或 `<img src=x onerror=alert(1)>` 等原始 HTML 标签时，这些内容会原封不动地输出到 HTML 中，经 SnippetCard.jsx 第 77 行的 dangerouslySetInnerHTML 渲染后被浏览器执行。此外，链接 URL 也未做安全过滤，用户可注入 `[click](javascript:alert('xss'))` 产生可点击的恶意链接。根本原因是手写 Markdown 解析器时完全没有考虑输出安全性，没有对输入文本做 HTML 实体转义。正确做法是先对输入文本调用 escapeHtml 进行转义，再对转义后的文本执行 Markdown 语法正则替换；同时链接 URL 需过滤掉 javascript:、data: 等危险协议。
+
+2. renderMarkdown 函数的列表渲染存在逻辑 BUG。在 snippetsUtils.js 第 443-446 行，无序列表项转换为 `<li>` 后用正则 `/(<li>.*<\/li>\n?)+/g` 包裹为 `<ul>`，紧接着有序列表项也转换为 `<li>`，然后同样的正则模式又被用于包裹为 `<ol>`。由于有序列表包裹的正则没有排除已被 `<ul>` 包裹的 `<li>` 标签，当一条 Markdown 备注中同时包含无序列表和有序列表时，无序列表中的 `<li>` 会被第二轮的 `<ol>` 包裹正则再次捕获，导致 `<li>` 被嵌套在 `<ul><ol>` 双重容器中，输出结构错误的 HTML。根本原因是两轮列表包裹使用的是完全相同的 `<li>` 匹配模式，未在第二轮包裹前排除已包裹的内容。正确做法是在有序列表转换时，只对未被 `<ul>` 或 `<ol>` 包裹的独立 `<li>` 进行包裹。
+
+3. copyToClipboard 和 downloadJsonFile 测试的 mock 方式不健壮，存在测试污染风险。在 snippetsUtils.test.js 第 839-887 行的 copyToClipboard 测试中，使用 Object.defineProperty 直接篡改 globalThis.navigator.clipboard，并在 afterEach 中通过 delete globalThis.navigator.clipboard 尝试清理。这种直接修改全局对象原型属性的方式入侵性强，如果本测试文件在其他测试文件之前运行，可能影响依赖原始 navigator.clipboard 的测试。根本原因是采用的 mock 方式过于粗暴，没有使用 vitest 推荐的 vi.stubGlobal 或模块级别的 mock 来做隔离。正确做法是使用 vi.stubGlobal('navigator', { clipboard: { writeText: mockWriteText } }) 来临时替换全局对象，在 afterEach 中 restore 即可。
+
+4. 空标题排序测试断言不够精确。在 snippetsUtils.test.js 第 762-769 行的「全是空白标题时顺序保持稳定」测试中，仅断言了 expect(sorted).toHaveLength(2)，没有验证排序后的实际顺序是否符合"空标题排在末尾"的预期。如果 sortSnippets 函数对空标题的处理逻辑有回归，这个测试完全无法发现。根本原因是测试只做了宽松的长度校验而非精确的顺序校验。正确做法是验证空标题项在排序结果中的位置确实在末尾，如 expect(sorted[1].id).toBe('a') 或类似的顺序断言。
+
+5. renderMarkdown 测试缺少安全边界用例。在 snippetsUtils.test.js 第 772-837 行的 renderMarkdown 测试共 11 条，全部覆盖的是正常 Markdown 语法的 happy path，但没有任何一条测试覆盖 XSS 攻击场景：未测试裸 HTML 标签是否被正确转义、未测试 `javascript:` 协议的链接是否被过滤。这些安全边界测试的缺失直接导致 renderMarkdown 的 XSS 漏洞无法在测试阶段被发现。根本原因是编写测试时只考虑了功能正确的正向路径，没有考虑安全性和异常输入的防御。正确做法是补充不少于 3 条安全相关测试：裸 HTML 标签应被转义、javascript: 协议链接应被过滤、在 Markdown 标记符内嵌入 HTML 标签应被正确处理。
+
+过程不满意
+
+1. 模型在收到任务的第一个步骤就直接创建 TodoList，没有先通读所有相关代码文件来理解问题的范围和当前状态。从 session-cot-2.md 第 2-8 行可以看到，模型在还未检查任何代码的情况下就建立了包含 7 项的 TODO 列表。正确的做法是先读取 App.jsx、snippetsUtils.js、SnippetCard.jsx、index.jsx、snippets.css 和现有测试文件，全面了解代码现状后再制定有针对性的修复计划。
+
+2. 模型在检查提示词第 1 条「TASKS 数组中缺少代码片段管理器条目」时，读到 App.jsx 中发现条目已存在就直接认定「已在 App.jsx 中确认存在」，没有进一步通过 git diff 或 git log 判断该条目是本轮新加入的还是上一轮已存在的。从 session-cot-2.md 第 32-39 行可以看到模型只读了一次 App.jsx 就下结论。虽然实际产物中该条目确实存在，但这种验证方式不够严谨，如果提示词描述的状态与当前代码不符（比如被并行任务修复），模型不应该简单以「已存在」为结论跳过，而应该注明无法复现的原因。
+
+3. 模型在实现 renderMarkdown 函数时采用了试错式修复。session-cot-2.md 第 112-131 行显示，模型先写完了包含链接正则的全部代码，然后发现「Markdown 的链接正则有误，让我修复一下」，调用了第二次 edit_file_search_replace 来修正。这说明模型没有在写完每个 Markdown 语法规则后立即验证，而是全部写完才检查，发现问题后又单独回头修正。正确做法是先逐个编写正则替换规则，每写完一个规则就运行对应的测试用例验证，确保每个语法转换独立正确后再继续下一个规则。
+
+4. 模型在首次运行测试遇到「document is not defined」错误后，排查路径不够高效。从 session-cot-2.md 第 815-917 行可以看到：模型先读了 vite.config.js 查看测试环境配置、然后搜索项目中哪里用到了 document/navigator/URL、再读 pomodoroUtils.test.js 参考别人的 mock 方式、最后才在自己的测试文件中添加 beforeAll/afterAll 的 mock 代码。实际上模型应该已知 vitest 运行在 node 环境下需要手动 mock 浏览器 API，这条排查链路可以缩短为：直接参考现有测试项目中的 mock 模式（pomodoroUtils.test.js）来解决问题。
+
+5. 模型声称完成了提示词第 7 条「确保所有子页面在 375px 和 1440px 宽度下布局不崩坏」，但没有任何视觉验证的实际动作。从 session-cot-2.md 第 1049-1320 行的全部后续步骤可以看出，模型只运行了 pnpm run test 和 npx eslint，最后在总结中声称验证通过，但整个过程中没有调整浏览器宽度检查布局、没有截图、也没有用浏览器工具做任何响应式验证。根本原因是将自我声明等同于实际验证，存在虚假完成的风险。正确做法是启动 pnpm run dev 后在浏览器中将页面分别调整到 375px 和 1440px 宽度，观察布局是否正常，或者如果环境不允许浏览器操作应如实说明无法验证。

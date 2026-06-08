@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import TaskList from './TaskList.jsx';
 import Timeline from './Timeline.jsx';
@@ -22,10 +22,45 @@ export default function GanttChartPage() {
   const [zoomLevel, setZoomLevel] = useState(ZOOM_LEVELS.WEEK);
   const [selectedTaskId, setSelectedTaskId] = useState(null);
   const [contextMenu, setContextMenu] = useState(null);
+  const taskListRef = useRef(null);
+  const timelineRef = useRef(null);
+  const isSyncingScroll = useRef(false);
 
   useEffect(() => {
     saveTasks(state);
   }, [state]);
+
+  useEffect(() => {
+    const taskListEl = taskListRef.current?.getScrollElement();
+    const timelineEl = timelineRef.current?.getScrollElement();
+    if (!taskListEl || !timelineEl) return;
+
+    const handleTaskListScroll = () => {
+      if (isSyncingScroll.current) return;
+      isSyncingScroll.current = true;
+      timelineRef.current?.setScrollTop(taskListEl.scrollTop);
+      requestAnimationFrame(() => {
+        isSyncingScroll.current = false;
+      });
+    };
+
+    const handleTimelineScroll = () => {
+      if (isSyncingScroll.current) return;
+      isSyncingScroll.current = true;
+      taskListRef.current?.setScrollTop(timelineEl.scrollTop);
+      requestAnimationFrame(() => {
+        isSyncingScroll.current = false;
+      });
+    };
+
+    taskListEl.addEventListener('scroll', handleTaskListScroll);
+    timelineEl.addEventListener('scroll', handleTimelineScroll);
+
+    return () => {
+      taskListEl.removeEventListener('scroll', handleTaskListScroll);
+      timelineEl.removeEventListener('scroll', handleTimelineScroll);
+    };
+  }, []);
 
   const handleToggleExpand = (taskId) => {
     setState((prev) => toggleExpanded(prev, taskId));
@@ -107,6 +142,7 @@ export default function GanttChartPage() {
 
       <div className="gantt-container">
         <TaskList
+          ref={taskListRef}
           state={state}
           onToggleExpand={handleToggleExpand}
           onUpdateTask={handleUpdateTask}
@@ -114,6 +150,7 @@ export default function GanttChartPage() {
           onSelectTask={setSelectedTaskId}
         />
         <Timeline
+          ref={timelineRef}
           state={state}
           zoomLevel={zoomLevel}
           onUpdateTask={handleUpdateTask}

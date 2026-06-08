@@ -29,6 +29,7 @@ import {
   saveBookings,
   areHoursConsecutive,
   hoursToRange,
+  getDefaultBookings,
 } from '@/pages/meeting-room/meetingRoomUtils.js'
 import {
   STORAGE_KEY,
@@ -37,6 +38,8 @@ import {
   MEETING_ROOMS,
   START_HOUR,
   END_HOUR,
+  VIEW_MODES,
+  VIEW_MODE_LABELS,
 } from '@/pages/meeting-room/constants.js'
 
 function createMockStorage() {
@@ -414,13 +417,27 @@ describe('meetingRoomUtils - booking queries', () => {
 
 describe('meetingRoomUtils - localStorage persistence', () => {
   let storage
+  const FIXED_FUTURE_DATE = '2099-06-15'
   beforeEach(() => {
     storage = createMockStorage()
   })
 
   it('loadBookings should return defaults and persist when storage empty', () => {
-    const bookings = loadBookings(storage)
+    const bookings = loadBookings(storage, FIXED_FUTURE_DATE)
     expect(Array.isArray(bookings)).toBe(true)
+    expect(bookings.length).toBe(2)
+    expect(bookings[0].bookedBy).toBe('李四')
+    expect(bookings[0].title).toBe('产品需求评审')
+    expect(bookings[0].roomId).toBe('A')
+    expect(bookings[0].date).toBe(FIXED_FUTURE_DATE)
+    expect(bookings[0].startHour).toBe(9)
+    expect(bookings[0].endHour).toBe(11)
+    expect(bookings[1].bookedBy).toBe('王五')
+    expect(bookings[1].title).toBe('技术方案讨论')
+    expect(bookings[1].roomId).toBe('B')
+    expect(bookings[1].date).toBe(FIXED_FUTURE_DATE)
+    expect(bookings[1].startHour).toBe(14)
+    expect(bookings[1].endHour).toBe(16)
     expect(storage.getItem(STORAGE_KEY)).toBeTruthy()
   })
 
@@ -434,14 +451,27 @@ describe('meetingRoomUtils - localStorage persistence', () => {
 
   it('loadBookings should return defaults for corrupted JSON', () => {
     storage.setItem(STORAGE_KEY, '{bad json')
-    const bookings = loadBookings(storage)
+    const bookings = loadBookings(storage, FIXED_FUTURE_DATE)
     expect(Array.isArray(bookings)).toBe(true)
+    expect(bookings.length).toBe(2)
+    expect(bookings[0].bookedBy).toBe('李四')
+    expect(bookings[1].bookedBy).toBe('王五')
+    expect(bookings.every((b) => b.date === FIXED_FUTURE_DATE)).toBe(true)
   })
 
   it('loadBookings should return defaults for non-array data', () => {
     storage.setItem(STORAGE_KEY, JSON.stringify({ not: 'array' }))
-    const bookings = loadBookings(storage)
+    const bookings = loadBookings(storage, FIXED_FUTURE_DATE)
     expect(Array.isArray(bookings)).toBe(true)
+    expect(bookings.length).toBe(2)
+    expect(bookings[0].bookedBy).toBe('李四')
+    expect(bookings[0].title).toBe('产品需求评审')
+    expect(bookings[0].roomId).toBe('A')
+    expect(bookings[0].date).toBe(FIXED_FUTURE_DATE)
+    expect(bookings[1].bookedBy).toBe('王五')
+    expect(bookings[1].title).toBe('技术方案讨论')
+    expect(bookings[1].roomId).toBe('B')
+    expect(bookings[1].date).toBe(FIXED_FUTURE_DATE)
   })
 
   it('loadBookings should filter out invalid booking entries', () => {
@@ -454,8 +484,9 @@ describe('meetingRoomUtils - localStorage persistence', () => {
       ])
     )
     const bookings = loadBookings(storage)
-    expect(bookings.length).toBeGreaterThanOrEqual(1)
-    expect(bookings.some((b) => b.id === '1')).toBe(true)
+    expect(bookings.length).toBe(1)
+    expect(bookings[0].id).toBe('1')
+    expect(bookings[0].bookedBy).toBe('test')
   })
 
   it('should not throw when storage is unavailable', () => {
@@ -517,5 +548,249 @@ describe('meetingRoomUtils - constants integrity', () => {
     expect(END_HOUR).toBeGreaterThan(START_HOUR)
     expect(START_HOUR).toBeGreaterThanOrEqual(0)
     expect(END_HOUR).toBeLessThanOrEqual(24)
+  })
+
+  it('VIEW_MODES should have three view modes', () => {
+    expect(Object.keys(VIEW_MODES).length).toBe(3)
+    expect(VIEW_MODES.GRID).toBe('grid')
+    expect(VIEW_MODES.MY_BOOKINGS).toBe('my_bookings')
+    expect(VIEW_MODES.ALL_BOOKINGS).toBe('all_bookings')
+  })
+
+  it('VIEW_MODE_LABELS should have labels for all modes', () => {
+    Object.values(VIEW_MODES).forEach((mode) => {
+      expect(VIEW_MODE_LABELS[mode]).toBeTruthy()
+      expect(typeof VIEW_MODE_LABELS[mode]).toBe('string')
+    })
+  })
+
+  it('MEETING_ROOMS should have capacity information', () => {
+    MEETING_ROOMS.forEach((room) => {
+      expect(room.id).toBeTruthy()
+      expect(room.name).toBeTruthy()
+      expect(typeof room.capacity).toBe('number')
+      expect(room.capacity).toBeGreaterThan(0)
+    })
+  })
+})
+
+describe('meetingRoomUtils - getDefaultBookings', () => {
+  it('should return two default bookings', () => {
+    const defaults = getDefaultBookings('2099-01-01')
+    expect(Array.isArray(defaults)).toBe(true)
+    expect(defaults.length).toBe(2)
+  })
+
+  it('should use the provided date', () => {
+    const date = '2099-06-15'
+    const defaults = getDefaultBookings(date)
+    expect(defaults.every((b) => b.date === date)).toBe(true)
+  })
+
+  it('should fall back to current date when no date provided', () => {
+    const defaults = getDefaultBookings()
+    const today = formatDate(new Date())
+    expect(defaults.every((b) => b.date === today)).toBe(true)
+  })
+
+  it('should have valid booking structure', () => {
+    const defaults = getDefaultBookings('2099-01-01')
+    defaults.forEach((b) => {
+      expect(b.id).toBeTruthy()
+      expect(b.bookedBy).toBeTruthy()
+      expect(b.title).toBeTruthy()
+      expect(b.roomId).toBeTruthy()
+      expect(b.date).toBeTruthy()
+      expect(typeof b.startHour).toBe('number')
+      expect(typeof b.endHour).toBe('number')
+      expect(b.createdAt).toBeTruthy()
+    })
+  })
+
+  it('should generate unique ids for each call', () => {
+    const a = getDefaultBookings('2099-01-01')
+    const b = getDefaultBookings('2099-01-01')
+    expect(a[0].id).not.toBe(b[0].id)
+    expect(a[1].id).not.toBe(b[1].id)
+  })
+})
+
+describe('meetingRoomUtils - additional validation edge cases', () => {
+  it('should reject booking with only whitespace bookedBy', () => {
+    const result = validateBooking(makeBooking({ bookedBy: '   ' }))
+    expect(result.valid).toBe(false)
+    expect(result.errors.bookedBy).toBeTruthy()
+  })
+
+  it('should reject booking with only whitespace title', () => {
+    const result = validateBooking(makeBooking({ title: '   ' }))
+    expect(result.valid).toBe(false)
+    expect(result.errors.title).toBeTruthy()
+  })
+
+  it('should reject booking with startHour equal to END_HOUR', () => {
+    const result = validateBooking(makeBooking({ startHour: END_HOUR, endHour: END_HOUR + 1 }))
+    expect(result.valid).toBe(false)
+    expect(result.errors.startHour).toBeTruthy()
+  })
+
+  it('should accept booking with endHour equal to END_HOUR', () => {
+    const result = validateBooking(makeBooking({ startHour: END_HOUR - 1, endHour: END_HOUR }))
+    expect(result.valid).toBe(true)
+  })
+
+  it('should reject booking with endHour equal to START_HOUR', () => {
+    const result = validateBooking(makeBooking({ startHour: START_HOUR - 1, endHour: START_HOUR }))
+    expect(result.valid).toBe(false)
+  })
+
+  it('should reject null booking', () => {
+    const result = validateBooking(null)
+    expect(result.valid).toBe(false)
+    expect(result.errors.booking).toBeTruthy()
+  })
+
+  it('should reject booking with missing date', () => {
+    const b = makeBooking()
+    delete b.date
+    const result = validateBooking(b)
+    expect(result.valid).toBe(false)
+    expect(result.errors.date).toBeTruthy()
+  })
+
+  it('should trim bookedBy and title in createBooking', () => {
+    const result = createBooking([], makeBooking({
+      id: undefined,
+      bookedBy: '  张三  ',
+      title: '  测试会议  ',
+      date: '2099-01-01',
+    }))
+    expect(result.success).toBe(true)
+    expect(result.bookings[0].bookedBy).toBe('张三')
+    expect(result.bookings[0].title).toBe('测试会议')
+  })
+
+  it('should trim bookedBy and title in updateBooking', () => {
+    const existing = [makeBooking({ id: 'b1', date: '2099-01-01' })]
+    const result = updateBooking(existing, 'b1', {
+      bookedBy: '  李四  ',
+      title: '  更新的会议  ',
+    })
+    expect(result.success).toBe(true)
+    expect(result.bookings[0].bookedBy).toBe('李四')
+    expect(result.bookings[0].title).toBe('更新的会议')
+  })
+})
+
+describe('meetingRoomUtils - additional overlap edge cases', () => {
+  it('bookingsOverlap should return false for exact boundary touch (end == start)', () => {
+    const a = makeBooking({ startHour: 9, endHour: 10 })
+    const b = makeBooking({ startHour: 10, endHour: 11 })
+    expect(bookingsOverlap(a, b)).toBe(false)
+  })
+
+  it('bookingsOverlap should return true for full containment', () => {
+    const a = makeBooking({ startHour: 9, endHour: 15 })
+    const b = makeBooking({ startHour: 10, endHour: 12 })
+    expect(bookingsOverlap(a, b)).toBe(true)
+    expect(bookingsOverlap(b, a)).toBe(true)
+  })
+
+  it('bookingsOverlap should return true for exact same time', () => {
+    const a = makeBooking({ startHour: 9, endHour: 10 })
+    const b = makeBooking({ startHour: 9, endHour: 10 })
+    expect(bookingsOverlap(a, b)).toBe(true)
+  })
+
+  it('hasConflict should return false when excluding self', () => {
+    const existing = [makeBooking({ id: 'b1', startHour: 9, endHour: 10 })]
+    expect(hasConflict(existing, existing[0], 'b1')).toBe(false)
+  })
+})
+
+describe('meetingRoomUtils - additional CRUD edge cases', () => {
+  it('createBooking should not add booking on validation failure', () => {
+    const original = [makeBooking({ id: 'exist', date: '2099-01-01' })]
+    const result = createBooking(original, makeBooking({ id: undefined, title: '' }))
+    expect(result.success).toBe(false)
+    expect(result.bookings).toBeUndefined()
+  })
+
+  it('updateBooking should not modify other fields when not specified', () => {
+    const original = makeBooking({
+      id: 'b1',
+      bookedBy: '张三',
+      title: '原标题',
+      roomId: 'A',
+      date: '2099-01-01',
+      startHour: 9,
+      endHour: 10,
+    })
+    const result = updateBooking([original], 'b1', { title: '新标题' })
+    expect(result.success).toBe(true)
+    expect(result.bookings[0].bookedBy).toBe('张三')
+    expect(result.bookings[0].roomId).toBe('A')
+    expect(result.bookings[0].startHour).toBe(9)
+    expect(result.bookings[0].endHour).toBe(10)
+  })
+
+  it('sortBookingsByDateTime should not mutate original array', () => {
+    const unsorted = [
+      makeBooking({ id: '2', date: '2025-01-15', startHour: 14 }),
+      makeBooking({ id: '1', date: '2025-01-15', startHour: 9 }),
+    ]
+    const originalIds = unsorted.map((b) => b.id)
+    sortBookingsByDateTime(unsorted)
+    expect(unsorted.map((b) => b.id)).toEqual(originalIds)
+  })
+})
+
+describe('meetingRoomUtils - additional expired booking tests', () => {
+  it('isBookingExpired should return false exactly at end time', () => {
+    const booking = makeBooking({ date: '2025-01-15', startHour: 9, endHour: 10 })
+    const exactlyAtEnd = buildDateTime('2025-01-15', 10)
+    expect(isBookingExpired(booking, exactlyAtEnd)).toBe(false)
+  })
+
+  it('isBookingExpired should return true just after end time', () => {
+    const booking = makeBooking({ date: '2025-01-15', startHour: 9, endHour: 10 })
+    const justAfter = new Date(buildDateTime('2025-01-15', 10).getTime() + 1)
+    expect(isBookingExpired(booking, justAfter)).toBe(true)
+  })
+
+  it('cleanupExpiredBookings should return empty array for all expired', () => {
+    const bookings = [
+      makeBooking({ date: '2020-01-01', startHour: 9, endHour: 10 }),
+      makeBooking({ date: '2019-06-15', startHour: 14, endHour: 16 }),
+    ]
+    const result = cleanupExpiredBookings(bookings, new Date(2025, 0, 15))
+    expect(result).toEqual([])
+  })
+
+  it('cleanupExpiredBookings should not mutate original array', () => {
+    const bookings = [makeBooking({ date: '2020-01-01', startHour: 9, endHour: 10 })]
+    cleanupExpiredBookings(bookings, new Date(2025, 0, 15))
+    expect(bookings.length).toBe(1)
+  })
+})
+
+describe('meetingRoomUtils - additional query tests', () => {
+  it('getBookingsForRoomAndDate should return empty array when no matches', () => {
+    const result = getBookingsForRoomAndDate([], 'A', '2099-01-01')
+    expect(result).toEqual([])
+  })
+
+  it('filterBookingsByUser should return empty array when no matches', () => {
+    const bookings = [makeBooking({ bookedBy: '张三' })]
+    const result = filterBookingsByUser(bookings, '不存在的用户')
+    expect(result).toEqual([])
+  })
+
+  it('isSlotBooked should return false for empty bookings', () => {
+    expect(isSlotBooked([], 'A', '2099-01-01', 9)).toBe(false)
+  })
+
+  it('getBookingForSlot should return undefined for empty bookings', () => {
+    expect(getBookingForSlot([], 'A', '2099-01-01', 9)).toBeFalsy()
   })
 })

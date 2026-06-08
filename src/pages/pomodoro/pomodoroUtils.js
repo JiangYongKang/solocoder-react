@@ -3,6 +3,7 @@ import {
   DEFAULT_SETTINGS,
   STORAGE_KEY_SETTINGS,
   STORAGE_KEY_RECORDS,
+  STORAGE_KEY_TIMER_STATE,
 } from './constants'
 
 export function formatTime(totalSeconds) {
@@ -166,7 +167,12 @@ export function saveRecords(records) {
 }
 
 export function addRecord(records, newRecord) {
-  if (!newRecord || !newRecord.id) return records
+  if (!newRecord || !newRecord.id) {
+    return Array.isArray(records) ? records : []
+  }
+  if (!Array.isArray(records)) {
+    return [newRecord]
+  }
   return [newRecord, ...records]
 }
 
@@ -286,6 +292,59 @@ export function playBeep() {
     gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5)
     oscillator.start(ctx.currentTime)
     oscillator.stop(ctx.currentTime + 0.5)
+    return true
+  } catch {
+    return false
+  }
+}
+
+export function saveTimerState(state) {
+  try {
+    const data = {
+      currentPhase: state.currentPhase,
+      remainingSeconds: Number(state.remainingSeconds) || 0,
+      totalSeconds: Number(state.totalSeconds) || 0,
+      completedWorkPomodoros: Number(state.completedWorkPomodoros) || 0,
+      currentTask: state.currentTask || '',
+      savedAt: Date.now(),
+    }
+    localStorage.setItem(STORAGE_KEY_TIMER_STATE, JSON.stringify(data))
+    return true
+  } catch {
+    return false
+  }
+}
+
+export function loadTimerState(settings) {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_TIMER_STATE)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return null
+
+    const validPhases = [PHASES.WORK, PHASES.SHORT_BREAK, PHASES.LONG_BREAK]
+    if (!validPhases.includes(parsed.currentPhase)) return null
+
+    const s = settings || DEFAULT_SETTINGS
+    const expectedDuration = getPhaseDuration(parsed.currentPhase, s)
+    const remaining = Math.max(0, Math.min(Number(parsed.remainingSeconds) || 0, expectedDuration))
+    const total = Math.max(remaining, Math.min(Number(parsed.totalSeconds) || expectedDuration, expectedDuration))
+
+    return {
+      currentPhase: parsed.currentPhase,
+      remainingSeconds: remaining,
+      totalSeconds: total,
+      completedWorkPomodoros: Math.max(0, Number(parsed.completedWorkPomodoros) || 0),
+      currentTask: typeof parsed.currentTask === 'string' ? parsed.currentTask : '',
+    }
+  } catch {
+    return null
+  }
+}
+
+export function clearTimerState() {
+  try {
+    localStorage.removeItem(STORAGE_KEY_TIMER_STATE)
     return true
   } catch {
     return false

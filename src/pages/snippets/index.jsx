@@ -120,7 +120,6 @@ function SnippetsPage() {
   const [viewMode, setViewMode] = useState('card')
   const [modalVisible, setModalVisible] = useState(false)
   const [editingSnippet, setEditingSnippet] = useState(null)
-  const [copiedId, setCopiedId] = useState(null)
   const [toast, setToast] = useState(null)
   const [confirmDialog, setConfirmDialog] = useState({ visible: false, title: '', message: '', onConfirm: null })
   const [importDialogVisible, setImportDialogVisible] = useState(false)
@@ -131,7 +130,7 @@ function SnippetsPage() {
 
   const showToast = useCallback((message, type = 'success') => {
     setToast({ message, type })
-    setTimeout(() => setToast(null), 2000)
+    setTimeout(() => setToast(null), 1500)
   }, [])
 
   const allLanguages = useMemo(() => getAllLanguages(snippets), [snippets])
@@ -180,12 +179,8 @@ function SnippetsPage() {
     setSnippets((prev) => toggleFavorite(prev, id))
   }, [])
 
-  const handleCopy = useCallback((id) => {
-    setCopiedId(id)
+  const handleCopy = useCallback(() => {
     showToast('已复制')
-    setTimeout(() => {
-      setCopiedId((prev) => (prev === id ? null : prev))
-    }, 1500)
   }, [showToast])
 
   const handleDelete = useCallback((id) => {
@@ -341,12 +336,6 @@ function SnippetsPage() {
           </div>
         )}
       </div>
-
-      {copiedId && (
-        <div className="sn-tooltip" data-copied="true">
-          已复制
-        </div>
-      )}
 
       <SnippetModal
         key={`${modalVisible}-${editingSnippet?.id || 'new'}`}

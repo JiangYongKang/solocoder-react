@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import {
   DEFAULT_ROWS,
   DEFAULT_COLS,
@@ -34,6 +34,9 @@ import {
   insertCol,
   deleteCol,
   applyStyleToSelection,
+  shiftFormulaReferences,
+  saveToLocalStorage,
+  loadFromLocalStorage,
 } from '../../spreadsheet/spreadsheetUtils'
 
 describe('常量定义', () => {
@@ -829,5 +832,194 @@ describe('样式应用', () => {
     expect(result.B1.style.bold).toBe(true)
     expect(result.A2.style.bold).toBe(true)
     expect(result.B2.style.bold).toBe(true)
+  })
+})
+
+describe('公式引用更新', () => {
+  it('shiftFormulaReferences - 插入行时更新引用（后面的行 +1）', () => {
+    expect(shiftFormulaReferences('=A3+B5', 'insert-row', 2)).toBe('=A4+B6')
+    expect(shiftFormulaReferences('=A1+B2', 'insert-row', 5)).toBe('=A1+B2')
+    expect(shiftFormulaReferences('=A1+B2', 'insert-row', 0)).toBe('=A2+B3')
+  })
+
+  it('shiftFormulaReferences - 删除行时更新引用', () => {
+    expect(shiftFormulaReferences('=A4+B5', 'delete-row', 2)).toBe('=A3+B4')
+    expect(shiftFormulaReferences('=A1+B5', 'delete-row', 2)).toBe('=A1+B4')
+    expect(shiftFormulaReferences('=A1+B2', 'delete-row', 5)).toBe('=A1+B2')
+  })
+
+  it('shiftFormulaReferences - 删除引用所在行时返回 #REF!', () => {
+    expect(shiftFormulaReferences('=A3+B5', 'delete-row', 2)).toBe('=#REF!+B4')
+    expect(shiftFormulaReferences('=A3+B5', 'delete-row', 4)).toBe('=A3+#REF!')
+    expect(shiftFormulaReferences('=A4+B5', 'delete-row', 2)).not.toContain('#REF!')
+  })
+
+  it('shiftFormulaReferences - 插入列时更新引用', () => {
+    expect(shiftFormulaReferences('=A3+C5', 'insert-col', 1)).toBe('=A3+D5')
+    expect(shiftFormulaReferences('=A3+B5', 'insert-col', 5)).toBe('=A3+B5')
+    expect(shiftFormulaReferences('=A3+B5', 'insert-col', 0)).toBe('=B3+C5')
+  })
+
+  it('shiftFormulaReferences - 删除列时更新引用', () => {
+    expect(shiftFormulaReferences('=D3+E5', 'delete-col', 1)).toBe('=C3+D5')
+    expect(shiftFormulaReferences('=A3+E5', 'delete-col', 2)).toBe('=A3+D5')
+    expect(shiftFormulaReferences('=A3+B5', 'delete-col', 5)).toBe('=A3+B5')
+  })
+
+  it('shiftFormulaReferences - 删除引用所在列时返回 #REF!', () => {
+    expect(shiftFormulaReferences('=A3+C5', 'delete-col', 2)).toBe('=A3+#REF!')
+    expect(shiftFormulaReferences('=C3+E5', 'delete-col', 4)).toBe('=C3+#REF!')
+  })
+
+  it('shiftFormulaReferences - 范围引用更新', () => {
+    expect(shiftFormulaReferences('=SUM(A1:B3)', 'insert-row', 2)).toBe('=SUM(A1:B4)')
+    expect(shiftFormulaReferences('=SUM(A1:B3)', 'insert-col', 1)).toBe('=SUM(A1:C3)')
+  })
+
+  it('shiftFormulaReferences - 非公式直接返回原值', () => {
+    expect(shiftFormulaReferences('hello', 'insert-row', 0)).toBe('hello')
+    expect(shiftFormulaReferences('123', 'delete-row', 0)).toBe('123')
+  })
+
+  it('shiftFormulaReferences - 复杂公式', () => {
+    expect(shiftFormulaReferences('=SUM(A1:A5)+B2*2-C4', 'insert-row', 3)).toBe('=SUM(A1:A6)+B2*2-C5')
+  })
+})
+
+describe('行列操作 - 公式引用更新', () => {
+  it('insertRow - 应该同步更新公式中的行引用', () => {
+    const state = {
+      ...createInitialState(),
+      cells: {
+        A1: { raw: '10', display: '10' },
+        A2: { raw: '20', display: '20' },
+        B2: { raw: '=A1+A2', display: '30' },
+      },
+      rows: 3,
+      cols: 2,
+    }
+    const result = insertRow(state, 0)
+    expect(result.rows).toBe(4)
+    expect(result.cells.B3.raw).toBe('=A2+A3')
+  })
+
+  it('deleteRow - 应该同步更新公式中的行引用', () => {
+    const state = {
+      ...createInitialState(),
+      cells: {
+        A1: { raw: '10', display: '10' },
+        A2: { raw: '20', display: '20' },
+        A3: { raw: '30', display: '30' },
+        B3: { raw: '=A1+A2+A3', display: '60' },
+      },
+      rows: 4,
+      cols: 2,
+    }
+    const result = deleteRow(state, 0)
+    expect(result.rows).toBe(3)
+    expect(result.cells.B2.raw).toBe('=#REF!+A1+A2')
+  })
+
+  it('insertCol - 应该同步更新公式中的列引用', () => {
+    const state = {
+      ...createInitialState(),
+      cells: {
+        A1: { raw: '10', display: '10' },
+        B1: { raw: '20', display: '20' },
+        C1: { raw: '=A1+B1', display: '30' },
+      },
+      rows: 2,
+      cols: 3,
+    }
+    const result = insertCol(state, 0)
+    expect(result.cols).toBe(4)
+    expect(result.cells.D1.raw).toBe('=B1+C1')
+  })
+
+  it('deleteCol - 应该同步更新公式中的列引用', () => {
+    const state = {
+      ...createInitialState(),
+      cells: {
+        A1: { raw: '10', display: '10' },
+        B1: { raw: '20', display: '20' },
+        C1: { raw: '30', display: '30' },
+        D1: { raw: '=A1+B1+C1', display: '60' },
+      },
+      rows: 2,
+      cols: 4,
+    }
+    const result = deleteCol(state, 0)
+    expect(result.cols).toBe(3)
+    expect(result.cells.C1.raw).toBe('=#REF!+A1+B1')
+  })
+
+  it('insertRow - 更新后公式应能正确计算', () => {
+    const state = {
+      ...createInitialState(),
+      cells: {
+        A1: { raw: '10', display: '10' },
+        A2: { raw: '20', display: '20' },
+        A3: { raw: '=A1+A2', display: '30' },
+      },
+      rows: 4,
+      cols: 1,
+    }
+    const result = insertRow(state, 0)
+    expect(result.cells.A4.raw).toBe('=A2+A3')
+    expect(result.cells.A4.display).toBe('30')
+  })
+})
+
+describe('localStorage 持久化', () => {
+  const mockStorage = {}
+
+  beforeEach(() => {
+    globalThis.localStorage = {
+      setItem: (key, value) => { mockStorage[key] = value },
+      getItem: (key) => mockStorage[key] ?? null,
+      removeItem: (key) => { delete mockStorage[key] },
+      clear: () => { Object.keys(mockStorage).forEach(k => delete mockStorage[k]) },
+      length: 0,
+      key: () => null,
+    }
+  })
+
+  afterEach(() => {
+    delete mockStorage[STORAGE_KEY]
+    delete globalThis.localStorage
+  })
+
+  it('saveToLocalStorage - 应该保存状态到 localStorage', () => {
+    const state = createInitialState()
+    state.cells.A1 = { raw: '10', display: '10', style: {} }
+    saveToLocalStorage(state)
+    const saved = JSON.parse(mockStorage[STORAGE_KEY])
+    expect(saved.cells.A1.raw).toBe('10')
+    expect(saved.rows).toBe(state.rows)
+    expect(saved.cols).toBe(state.cols)
+  })
+
+  it('loadFromLocalStorage - 应该从 localStorage 加载状态', () => {
+    const state = createInitialState()
+    state.cells.B2 = { raw: 'hello', display: 'hello', style: { bold: true } }
+    saveToLocalStorage(state)
+    const loaded = loadFromLocalStorage()
+    expect(loaded.cells.B2.raw).toBe('hello')
+    expect(loaded.cells.B2.style.bold).toBe(true)
+  })
+
+  it('loadFromLocalStorage - 没有数据时返回 null', () => {
+    delete mockStorage[STORAGE_KEY]
+    expect(loadFromLocalStorage()).toBeNull()
+  })
+
+  it('loadFromLocalStorage - 无效 JSON 返回 null', () => {
+    mockStorage[STORAGE_KEY] = 'invalid json'
+    expect(loadFromLocalStorage()).toBeNull()
+  })
+
+  it('loadFromLocalStorage - 结构不完整返回 null', () => {
+    mockStorage[STORAGE_KEY] = JSON.stringify({ foo: 'bar' })
+    expect(loadFromLocalStorage()).toBeNull()
   })
 })

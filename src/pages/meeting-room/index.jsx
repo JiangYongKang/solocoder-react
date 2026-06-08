@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import BookingForm from './BookingForm.jsx'
 import BookingList from './BookingList.jsx'
@@ -50,6 +50,7 @@ export default function MeetingRoomPage() {
   const [isDragging, setIsDragging] = useState(false)
   const dragRoomRef = useRef(null)
   const dragStartHourRef = useRef(null)
+  const handleMouseUpRef = useRef(null)
 
   useEffect(() => {
     saveBookings(bookings)
@@ -112,7 +113,7 @@ export default function MeetingRoomPage() {
     setSelectedSlots(newSet)
   }
 
-  const handleMouseUp = () => {
+  const handleMouseUp = useCallback(() => {
     if (!isDragging) return
     setIsDragging(false)
     if (selectedSlots.size > 0 && dragRoomRef.current != null) {
@@ -137,12 +138,17 @@ export default function MeetingRoomPage() {
     }
     dragRoomRef.current = null
     dragStartHourRef.current = null
-  }
+  }, [isDragging, selectedSlots, selectedDate, areHoursConsecutive, hoursToRange])
 
   useEffect(() => {
-    window.addEventListener('mouseup', handleMouseUp)
-    return () => window.removeEventListener('mouseup', handleMouseUp)
-  })
+    handleMouseUpRef.current = handleMouseUp
+  }, [handleMouseUp])
+
+  useEffect(() => {
+    const listener = () => handleMouseUpRef.current?.()
+    window.addEventListener('mouseup', listener)
+    return () => window.removeEventListener('mouseup', listener)
+  }, [])
 
   const handleSlotClick = (booking) => {
     if (booking) {

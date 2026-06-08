@@ -381,24 +381,9 @@ export function getConnectionPath(fromPos, toPos) {
     : toPos.x
   const toCenterY = toPos.y + toPos.height / 2
 
-  const dx = Math.abs(toCenterX - fromCenterX)
-  const controlOffset = Math.max(dx * 0.5, 40)
+  const midX = (fromCenterX + toCenterX) / 2
 
-  let cp1x, cp1y, cp2x, cp2y
-
-  if (toPos.direction === 'right' || (fromPos.direction === 'center' && toCenterX >= fromCenterX)) {
-    cp1x = fromCenterX + controlOffset
-    cp1y = fromCenterY
-    cp2x = toCenterX - controlOffset
-    cp2y = toCenterY
-  } else {
-    cp1x = fromCenterX - controlOffset
-    cp1y = fromCenterY
-    cp2x = toCenterX + controlOffset
-    cp2y = toCenterY
-  }
-
-  return `M ${fromCenterX} ${fromCenterY} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${toCenterX} ${toCenterY}`
+  return `M ${fromCenterX} ${fromCenterY} L ${midX} ${fromCenterY} L ${midX} ${toCenterY} L ${toCenterX} ${toCenterY}`
 }
 
 export function loadFromStorage(storage = typeof window !== 'undefined' ? window.localStorage : null) {

@@ -123,6 +123,16 @@ describe('validateReview', () => {
     const errors = validateReview({ rating: 5, content: '很好', images })
     expect(errors.images).toBeFalsy()
   })
+
+  it('字符串形式的评分也能正确验证', () => {
+    expect(validateReview({ rating: '5', content: '好' }).rating).toBeFalsy()
+    expect(validateReview({ rating: '1', content: '好' }).rating).toBeFalsy()
+  })
+
+  it('非数字字符串评分验证不通过', () => {
+    expect(validateReview({ rating: 'abc', content: '好' }).rating).toBeTruthy()
+    expect(validateReview({ rating: NaN, content: '好' }).rating).toBeTruthy()
+  })
 })
 
 describe('createReview', () => {
@@ -160,6 +170,22 @@ describe('createReview', () => {
     const result = createReview([], { rating: 5, content: '很好' })
     expect(result.review.username).toBe('我')
     expect(result.review.userId).toBe(CURRENT_USER)
+  })
+
+  it('rating 传入字符串时自动转为数字', () => {
+    const result = createReview([], { rating: '5', content: '很好' })
+    expect(result.success).toBe(true)
+    expect(typeof result.review.rating).toBe('number')
+    expect(result.review.rating).toBe(5)
+  })
+
+  it('rating 字符串数字和数字混用也能正确转换', () => {
+    const r1 = createReview([], { rating: '4', content: '测试' }).review
+    const r2 = createReview([r1], { rating: 3, content: '测试2' }).review
+    expect(r1.rating).toBe(4)
+    expect(typeof r1.rating).toBe('number')
+    expect(r2.rating).toBe(3)
+    expect(typeof r2.rating).toBe('number')
   })
 })
 
@@ -201,6 +227,17 @@ describe('calculateRatingStats', () => {
     const stats = calculateRatingStats(reviews)
     expect(stats.percentages[5]).toBe(100)
     expect(stats.percentages[4]).toBe(0)
+  })
+
+  it('字符串类型 rating 经 createReview 转换后计算平均分正确', () => {
+    const r1 = createReview([], { rating: '5', content: 'a' }).review
+    const r2 = createReview([r1], { rating: '3', content: 'b' }).review
+    const r3 = createReview([r1, r2], { rating: '4', content: 'c' }).review
+    const stats = calculateRatingStats([r1, r2, r3])
+    expect(stats.total).toBe(3)
+    expect(typeof stats.average).toBe('number')
+    expect(stats.average).toBe(4)
+    expect(Number.isNaN(stats.average)).toBe(false)
   })
 })
 
@@ -383,27 +420,35 @@ describe('vote functions', () => {
 
 describe('addFollowUp', () => {
   const reviews = [
-    { id: 'r1', followUps: [] },
+    { id: 'r1', userId: 'owner_user', followUps: [] },
+    { id: 'r2', userId: 'another_user', followUps: [] },
   ]
 
   it('内容为空时失败', () => {
-    const result = addFollowUp(reviews, 'r1', '')
+    const result = addFollowUp(reviews, 'r1', 'owner_user', '')
     expect(result.success).toBe(false)
     expect(result.error).toBeTruthy()
   })
 
   it('内容超过500字符时失败', () => {
-    const result = addFollowUp(reviews, 'r1', 'a'.repeat(501))
+    const result = addFollowUp(reviews, 'r1', 'owner_user', 'a'.repeat(501))
     expect(result.success).toBe(false)
   })
 
   it('评价不存在时失败', () => {
-    const result = addFollowUp(reviews, 'not-exist', '追评内容')
+    const result = addFollowUp(reviews, 'not-exist', 'owner_user', '追评内容')
     expect(result.success).toBe(false)
   })
 
-  it('成功添加追评', () => {
-    const result = addFollowUp(reviews, 'r1', '这是追评内容')
+  it('非评价发布者无法追评（权限校验）', () => {
+    const result = addFollowUp(reviews, 'r1', 'other_user', '我想追评')
+    expect(result.success).toBe(false)
+    expect(result.error).toContain('只有评价发布者')
+    expect(reviews[0].followUps.length).toBe(0)
+  })
+
+  it('只有评价发布者本人可以追评', () => {
+    const result = addFollowUp(reviews, 'r1', 'owner_user', '这是追评内容')
     expect(result.success).toBe(true)
     expect(result.reviews[0].followUps.length).toBe(1)
     expect(result.reviews[0].followUps[0].content).toBe('这是追评内容')
@@ -411,9 +456,15 @@ describe('addFollowUp', () => {
     expect(result.followUp).toBeTruthy()
   })
 
+  it('其他用户不能在别人的评价下追评', () => {
+    const result = addFollowUp(reviews, 'r2', 'owner_user', '试图在别人评价下追评')
+    expect(result.success).toBe(false)
+    expect(result.error).toContain('只有评价发布者')
+  })
+
   it('支持多条追评', () => {
-    let result = addFollowUp(reviews, 'r1', '第一条追评')
-    result = addFollowUp(result.reviews, 'r1', '第二条追评')
+    let result = addFollowUp(reviews, 'r1', 'owner_user', '第一条追评')
+    result = addFollowUp(result.reviews, 'r1', 'owner_user', '第二条追评')
     expect(result.reviews[0].followUps.length).toBe(2)
   })
 })

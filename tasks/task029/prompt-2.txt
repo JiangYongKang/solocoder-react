@@ -1,0 +1,7 @@
+你实现的商品评价评分系统页面还存在一些问题，需要进行修复：
+
+1. addFollowUp 函数缺少追评权限校验：需求要求只有评价发布者才能追评，但纯 JS 工具函数 addFollowUp 只校验了 content 和评价存在性，没有校验 review.userId 是否为当前用户。虽然 UI 层通过按钮显隐做了控制，但工具函数作为业务逻辑核心应包含权限校验，防止调用方绕过 UI 限制。
+2. createReview 函数对 rating 字段没有做类型转换：如果传入字符串类型的 rating（如 { rating: '5' }），rating 会保留为字符串，导致 calculateRatingStats 中 sum += r.rating 产生字符串拼接而非数值加法，平均分计算错误。需要对 rating 做防御性类型转换。
+3. index.jsx 中使用 queueMicrotask 延迟 localStorage 写入存在数据丢失风险：如果用户在提交评价后立即关闭浏览器或刷新页面，微任务可能未被触发导致数据未保存。需要改为同步保存。
+4. 修复后需要为该页面补充纯 JS 函数的单元测试，只测和页面渲染无关的逻辑。测试代码放在 src/pages/__tests__/product-review/ 下。
+5. 重新运行 pnpm run test，确保所有测试通过。确保所有子页面在 375px 和 1440px 宽度下布局不崩坏。

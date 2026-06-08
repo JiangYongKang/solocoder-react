@@ -2,8 +2,10 @@ import { useState, useEffect, useRef } from 'react';
 
 export default function ContextMenu({ x, y, task, allTasks, onAddDependency, onRemoveDependency, onAddSubtask, onDeleteTask, onClose }) {
   const [showDependencyMenu, setShowDependencyMenu] = useState(false);
+  const [submenuPosition, setSubmenuPosition] = useState({ x: 0, y: 0 });
   const menuRef = useRef(null);
   const submenuRef = useRef(null);
+  const addDependencyItemRef = useRef(null);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -36,12 +38,24 @@ export default function ContextMenu({ x, y, task, allTasks, onAddDependency, onR
 
   const currentDependencies = allTasks.filter((t) => task.dependencies.includes(t.id));
 
+  const handleDependencyItemEnter = () => {
+    setShowDependencyMenu(true);
+    if (addDependencyItemRef.current && menuRef.current) {
+      const itemRect = addDependencyItemRef.current.getBoundingClientRect();
+      const menuRect = menuRef.current.getBoundingClientRect();
+      setSubmenuPosition({
+        x: menuRect.right + 4,
+        y: itemRect.top,
+      });
+    }
+  };
+
   return (
     <>
       <div
         ref={menuRef}
         className="gantt-context-menu"
-        style={{ left: x, top: y }}
+        style={{ left: x, top: y, position: 'fixed' }}
       >
         <div
           className="gantt-context-menu-item"
@@ -78,8 +92,9 @@ export default function ContextMenu({ x, y, task, allTasks, onAddDependency, onR
           <>
             <div className="gantt-context-menu-separator" />
             <div
+              ref={addDependencyItemRef}
               className="gantt-context-menu-item"
-              onMouseEnter={() => setShowDependencyMenu(true)}
+              onMouseEnter={handleDependencyItemEnter}
               onMouseLeave={() => setShowDependencyMenu(false)}
             >
               添加依赖 →
@@ -104,7 +119,11 @@ export default function ContextMenu({ x, y, task, allTasks, onAddDependency, onR
         <div
           ref={submenuRef}
           className="gantt-dependency-submenu"
-          style={{ left: x + 180, top: y + 60 + (currentDependencies.length > 0 ? currentDependencies.length * 32 + 40 : 0) }}
+          style={{
+            position: 'fixed',
+            left: submenuPosition.x,
+            top: submenuPosition.y,
+          }}
           onMouseEnter={() => setShowDependencyMenu(true)}
           onMouseLeave={() => setShowDependencyMenu(false)}
         >

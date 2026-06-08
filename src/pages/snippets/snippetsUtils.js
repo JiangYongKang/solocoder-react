@@ -399,24 +399,57 @@ export function sortSnippets(snippets, sortBy = 'createdAt', sortOrder = 'desc')
       return a.favorite ? -1 : 1
     }
 
-    let va
-    let vb
     switch (sortBy) {
-      case 'title':
-        va = a.title || ''
-        vb = b.title || ''
+      case 'title': {
+        const va = (a.title || '').trim()
+        const vb = (b.title || '').trim()
+        const aEmpty = va.length === 0
+        const bEmpty = vb.length === 0
+        if (aEmpty && bEmpty) return 0
+        if (aEmpty) return 1
+        if (bEmpty) return -1
         if (va < vb) return -1 * multiplier
         if (va > vb) return 1 * multiplier
         return 0
+      }
       case 'createdAt':
-      default:
-        va = a.createdAt || 0
-        vb = b.createdAt || 0
+      default: {
+        const va = a.createdAt || 0
+        const vb = b.createdAt || 0
         return (va - vb) * multiplier
+      }
     }
   })
 
   return sorted
+}
+
+export function renderMarkdown(md) {
+  if (!md) return ''
+  let html = md
+
+  html = html.replace(/^######\s+(.+?)$/gm, '<h6>$1</h6>')
+  html = html.replace(/^#####\s+(.+?)$/gm, '<h5>$1</h5>')
+  html = html.replace(/^####\s+(.+?)$/gm, '<h4>$1</h4>')
+  html = html.replace(/^###\s+(.+?)$/gm, '<h3>$1</h3>')
+  html = html.replace(/^##\s+(.+?)$/gm, '<h2>$1</h2>')
+  html = html.replace(/^#\s+(.+?)$/gm, '<h1>$1</h1>')
+
+  html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>')
+  html = html.replace(/`([^`]+)`/g, '<code>$1</code>')
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
+  html = html.replace(/^-\s+(.+?)$/gm, '<li>$1</li>')
+  html = html.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>')
+  html = html.replace(/^\d+\.\s+(.+?)$/gm, '<li>$1</li>')
+  html = html.replace(/(<li>.*<\/li>\n?)+/g, '<ol>$&</ol>')
+
+  html = html.replace(/^>\s+(.+?)$/gm, '<blockquote>$1</blockquote>')
+  html = html.replace(/^---+$/gm, '<hr />')
+  html = html.replace(/\n/g, '<br />')
+
+  return html
 }
 
 export function snippetsToJson(snippets) {

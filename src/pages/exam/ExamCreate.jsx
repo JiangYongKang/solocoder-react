@@ -119,7 +119,21 @@ export default function ExamCreate({ onStartExam }) {
             <div className="exam-preview-meta">
               <span>时长：{currentExam.duration} 分钟</span>
               <span>题数：{currentExam.questions.length} 道</span>
-              <span>总分：{currentExam.totalScore} 分</span>
+              <span>
+                目标总分：{currentExam.targetScore} 分 · 实际总分：
+                <strong
+                  style={{
+                    color: currentExam.isExactScore ? '#059669' : '#d97706',
+                  }}
+                >
+                  {currentExam.totalScore} 分
+                </strong>
+                {!currentExam.isExactScore && (
+                  <span style={{ fontSize: 12, opacity: 0.7, marginLeft: 4 }}>
+                    （题库题目分值组合限制）
+                  </span>
+                )}
+              </span>
             </div>
           </div>
 

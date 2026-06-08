@@ -11,6 +11,7 @@ import {
   screenToWorld,
   findNodeById,
   isDescendant,
+  clampZoom,
 } from './mindMapCore.js'
 
 function MindMapCanvas({
@@ -21,6 +22,7 @@ function MindMapCanvas({
   onToggleCollapse,
   onEditNode,
   onMoveNode,
+  onNodeContextMenu,
   pan,
   zoom,
   onPanChange,
@@ -118,7 +120,7 @@ function MindMapCanvas({
     const mouseY = e.clientY - rect.top
 
     const delta = -e.deltaY * 0.001
-    const newZoom = Math.max(0.3, Math.min(2.0, zoom + delta))
+    const newZoom = clampZoom(zoom + delta)
 
     const worldBefore = screenToWorld(mouseX, mouseY, pan.x, pan.y, zoom)
     const newPanX = mouseX - worldBefore.x * newZoom
@@ -302,7 +304,11 @@ function MindMapCanvas({
           onDoubleClick={(e) => handleNodeDoubleClick(e, node)}
           onContextMenu={(e) => {
             e.preventDefault()
+            e.stopPropagation()
             onSelectNode(node.id)
+            if (onNodeContextMenu) {
+              onNodeContextMenu(node.id, e.clientX, e.clientY)
+            }
           }}
         >
           <rect

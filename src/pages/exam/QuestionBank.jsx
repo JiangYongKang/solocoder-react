@@ -449,18 +449,18 @@ export default function QuestionBank() {
         <div className="exam-pagination">
           <button
             className="exam-btn exam-btn-secondary"
-            disabled={page <= 1}
-            onClick={() => setPage((p) => p - 1)}
+            disabled={safePage <= 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
           >
             上一页
           </button>
           <span className="exam-pagination-info">
-            第 {page} / {paginated.totalPages} 页，共 {paginated.total} 题
+            第 {safePage} / {paginated.totalPages} 页，共 {paginated.total} 题
           </span>
           <button
             className="exam-btn exam-btn-secondary"
-            disabled={page >= paginated.totalPages}
-            onClick={() => setPage((p) => p + 1)}
+            disabled={safePage >= paginated.totalPages}
+            onClick={() => setPage((p) => Math.min(paginated.totalPages, p + 1))}
           >
             下一页
           </button>

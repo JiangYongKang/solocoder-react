@@ -93,6 +93,7 @@ export default function ExamTake({ exam, initialAnswers, initialStartedAt, onFin
       examId: currentExam.id,
       examName: currentExam.name,
       totalScore: currentExam.totalScore,
+      targetScore: currentExam.targetScore || currentExam.totalScore,
       answers: currentAnswers,
       questions: currentExam.questions,
       duration: currentExam.duration,
@@ -174,7 +175,11 @@ export default function ExamTake({ exam, initialAnswers, initialStartedAt, onFin
         <div>
           <h2 style={{ margin: 0, fontSize: 18, color: '#1f2328' }}>{exam.name}</h2>
           <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>
-            总分 {exam.totalScore} 分 · 共 {exam.questions.length} 题
+            满分 {exam.totalScore} 分
+            {exam.targetScore && exam.targetScore !== exam.totalScore && (
+              <span style={{ marginLeft: 6 }}>（目标 {exam.targetScore} 分）</span>
+            )}
+            {' · '}共 {exam.questions.length} 题
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>

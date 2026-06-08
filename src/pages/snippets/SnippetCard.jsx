@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { LANGUAGE_LABELS, highlightCode, highlightSearchTerm, formatDate, copyToClipboard } from './snippetsUtils'
+import { LANGUAGE_LABELS, highlightCode, highlightSearchTerm, formatDate, copyToClipboard, renderMarkdown } from './snippetsUtils'
 
 function SnippetCard({ snippet, viewMode, searchTerm, onToggleFavorite, onCopy, onEdit, onDelete }) {
   const previewHtml = useMemo(() => {
@@ -10,6 +10,10 @@ function SnippetCard({ snippet, viewMode, searchTerm, onToggleFavorite, onCopy, 
   const titleHtml = useMemo(() => {
     return highlightSearchTerm(snippet.title || '', searchTerm)
   }, [snippet.title, searchTerm])
+
+  const notesHtml = useMemo(() => {
+    return renderMarkdown(snippet.notes || '')
+  }, [snippet.notes])
 
   const handleCopy = async (e) => {
     e.stopPropagation()
@@ -39,22 +43,10 @@ function SnippetCard({ snippet, viewMode, searchTerm, onToggleFavorite, onCopy, 
   if (viewMode === 'list') {
     return (
       <div className="sn-card sn-card--list" onClick={() => onEdit?.(snippet)}>
-        <button
-          className={`sn-favorite-btn ${snippet.favorite ? 'is-active' : ''}`}
-          onClick={handleFavorite}
-          aria-label={snippet.favorite ? '取消收藏' : '收藏'}
-        >
-          {snippet.favorite ? '★' : '☆'}
-        </button>
         <div className="sn-card-list-title" dangerouslySetInnerHTML={{ __html: titleHtml }} />
         <span className={`sn-lang-tag sn-lang-${snippet.language}`}>
           {LANGUAGE_LABELS[snippet.language] || snippet.language}
         </span>
-        <span className="sn-card-date">{formatDate(snippet.createdAt)}</span>
-        <div className="sn-card-actions">
-          <button className="sn-btn sn-btn-sm" onClick={handleCopy}>复制</button>
-          <button className="sn-btn sn-btn-sm sn-btn-danger" onClick={handleDelete}>删除</button>
-        </div>
       </div>
     )
   }
@@ -82,7 +74,7 @@ function SnippetCard({ snippet, viewMode, searchTerm, onToggleFavorite, onCopy, 
         dangerouslySetInnerHTML={{ __html: previewHtml || '<span class="sn-empty">暂无代码</span>' }}
       />
       {snippet.notes && (
-        <p className="sn-card-notes">{snippet.notes}</p>
+        <div className="sn-card-notes" dangerouslySetInnerHTML={{ __html: notesHtml }} />
       )}
       <div className="sn-card-actions">
         <button className="sn-btn sn-btn-sm" onClick={handleCopy}>复制代码</button>

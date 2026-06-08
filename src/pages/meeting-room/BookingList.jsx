@@ -1,5 +1,5 @@
-import { MEETING_ROOMS } from './constants.js'
-import { formatTimeRange, sortBookingsByDateTime } from './meetingRoomUtils.js'
+import { MEETING_ROOMS, VIEW_MODES } from './constants.js'
+import { formatTimeRange, sortBookingsByDateTime, filterBookingsByUser } from './meetingRoomUtils.js'
 
 function getRoomName(roomId) {
   const room = MEETING_ROOMS.find((r) => r.id === roomId)
@@ -7,8 +7,8 @@ function getRoomName(roomId) {
 }
 
 export default function BookingList({ bookings, viewMode, currentUser, onEdit, onDelete }) {
-  const displayBookings = viewMode === 'my_bookings'
-    ? bookings.filter((b) => b.bookedBy === currentUser)
+  const displayBookings = viewMode === VIEW_MODES.MY_BOOKINGS
+    ? filterBookingsByUser(bookings, currentUser)
     : bookings
 
   const sorted = sortBookingsByDateTime(displayBookings)
@@ -18,7 +18,7 @@ export default function BookingList({ bookings, viewMode, currentUser, onEdit, o
       <div className="mr-empty-state">
         <div className="mr-empty-icon">📭</div>
         <div className="mr-empty-text">
-          {viewMode === 'my_bookings' ? '您还没有任何预约记录' : '暂无任何预约记录'}
+          {viewMode === VIEW_MODES.MY_BOOKINGS ? '您还没有任何预约记录' : '暂无任何预约记录'}
         </div>
       </div>
     )

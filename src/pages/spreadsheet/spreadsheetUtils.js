@@ -702,6 +702,78 @@ export const pasteClipboardData = (cells, clipboardData, targetRow, targetCol, m
   return computeAllFormulas(newCells, maxRows, maxCols)
 }
 
+export const shiftFormulaReferences = (formula, operationType, index) => {
+  if (!isFormula(formula)) return formula
+  const tokens = tokenize(formula)
+
+  const shiftCell = (refStr) => {
+    const ref = parseCellRef(refStr)
+    if (!ref) return refStr
+    let { row, col } = ref
+    let deleted = false
+
+    switch (operationType) {
+      case 'insert-row':
+        if (row >= index) row += 1
+        break
+      case 'delete-row':
+        if (row === index) deleted = true
+        else if (row > index) row -= 1
+        break
+      case 'insert-col':
+        if (col >= index) col += 1
+        break
+      case 'delete-col':
+        if (col === index) deleted = true
+        else if (col > index) col -= 1
+        break
+      default:
+        return refStr
+    }
+
+    if (deleted) return '#REF!'
+    return cellRefToIndex(row, col)
+  }
+
+  const shiftRange = (rangeStr) => {
+    const parts = rangeStr.split(':')
+    const shiftedStart = shiftCell(parts[0])
+    const shiftedEnd = shiftCell(parts[1])
+    if (shiftedStart === '#REF!' || shiftedEnd === '#REF!') return '#REF!'
+    return `${shiftedStart}:${shiftedEnd}`
+  }
+
+  const resultTokens = tokens.map(token => {
+    if (token.type === 'cell') {
+      return { ...token, value: shiftCell(token.value) }
+    } else if (token.type === 'range') {
+      return { ...token, value: shiftRange(token.value) }
+    }
+    return token
+  })
+
+  let result = '='
+  for (let i = 0; i < resultTokens.length; i++) {
+    const token = resultTokens[i]
+
+    if (token.type === 'number') {
+      result += String(token.value)
+    } else if (token.type === 'string') {
+      result += `"${token.value}"`
+    } else if (token.type === 'cell' || token.type === 'range') {
+      result += token.value
+    } else if (token.type === 'func') {
+      result += token.value
+    } else if (token.type === 'ident') {
+      result += token.value
+    } else if (token.type === 'op') {
+      result += token.value
+    }
+  }
+
+  return result
+}
+
 export const createInitialState = () => {
   const colWidths = {}
   const rowHeights = {}
@@ -720,14 +792,49 @@ export const createInitialState = () => {
   }
 }
 
+export const saveToLocalStorage = (state) => {
+  if (typeof localStorage === 'undefined') return
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+  } catch {
+    // ignore
+  }
+}
+
+export const loadFromLocalStorage = () => {
+  if (typeof localStorage === 'undefined') return null
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (parsed && typeof parsed === 'object' && 'cells' in parsed && 'rows' in parsed && 'cols' in parsed) {
+      return parsed
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
 export const insertRow = (state, index) => {
-  const newCells = {}
+  const updatedCells = {}
   for (const key of Object.keys(state.cells)) {
+    const cell = state.cells[key]
+    if (cell && isFormula(cell.raw)) {
+      const shiftedRaw = shiftFormulaReferences(cell.raw, 'insert-row', index)
+      updatedCells[key] = { ...cell, raw: shiftedRaw }
+    } else {
+      updatedCells[key] = cell
+    }
+  }
+
+  const newCells = {}
+  for (const key of Object.keys(updatedCells)) {
     const ref = parseCellRef(key)
     if (!ref) continue
     const newRow = ref.row >= index ? ref.row + 1 : ref.row
     const newKey = cellRefToIndex(newRow, ref.col)
-    newCells[newKey] = state.cells[key]
+    newCells[newKey] = updatedCells[key]
   }
 
   const newRowHeights = {}
@@ -752,14 +859,25 @@ export const insertRow = (state, index) => {
 export const deleteRow = (state, index) => {
   if (state.rows <= 1) return state
 
-  const newCells = {}
+  const updatedCells = {}
   for (const key of Object.keys(state.cells)) {
+    const cell = state.cells[key]
+    if (cell && isFormula(cell.raw)) {
+      const shiftedRaw = shiftFormulaReferences(cell.raw, 'delete-row', index)
+      updatedCells[key] = { ...cell, raw: shiftedRaw }
+    } else {
+      updatedCells[key] = cell
+    }
+  }
+
+  const newCells = {}
+  for (const key of Object.keys(updatedCells)) {
     const ref = parseCellRef(key)
     if (!ref) continue
     if (ref.row === index) continue
     const newRow = ref.row > index ? ref.row - 1 : ref.row
     const newKey = cellRefToIndex(newRow, ref.col)
-    newCells[newKey] = state.cells[key]
+    newCells[newKey] = updatedCells[key]
   }
 
   const newRowHeights = {}
@@ -780,13 +898,24 @@ export const deleteRow = (state, index) => {
 }
 
 export const insertCol = (state, index) => {
-  const newCells = {}
+  const updatedCells = {}
   for (const key of Object.keys(state.cells)) {
+    const cell = state.cells[key]
+    if (cell && isFormula(cell.raw)) {
+      const shiftedRaw = shiftFormulaReferences(cell.raw, 'insert-col', index)
+      updatedCells[key] = { ...cell, raw: shiftedRaw }
+    } else {
+      updatedCells[key] = cell
+    }
+  }
+
+  const newCells = {}
+  for (const key of Object.keys(updatedCells)) {
     const ref = parseCellRef(key)
     if (!ref) continue
     const newCol = ref.col >= index ? ref.col + 1 : ref.col
     const newKey = cellRefToIndex(ref.row, newCol)
-    newCells[newKey] = state.cells[key]
+    newCells[newKey] = updatedCells[key]
   }
 
   const newColWidths = {}
@@ -811,14 +940,25 @@ export const insertCol = (state, index) => {
 export const deleteCol = (state, index) => {
   if (state.cols <= 1) return state
 
-  const newCells = {}
+  const updatedCells = {}
   for (const key of Object.keys(state.cells)) {
+    const cell = state.cells[key]
+    if (cell && isFormula(cell.raw)) {
+      const shiftedRaw = shiftFormulaReferences(cell.raw, 'delete-col', index)
+      updatedCells[key] = { ...cell, raw: shiftedRaw }
+    } else {
+      updatedCells[key] = cell
+    }
+  }
+
+  const newCells = {}
+  for (const key of Object.keys(updatedCells)) {
     const ref = parseCellRef(key)
     if (!ref) continue
     if (ref.col === index) continue
     const newCol = ref.col > index ? ref.col - 1 : ref.col
     const newKey = cellRefToIndex(ref.row, newCol)
-    newCells[newKey] = state.cells[key]
+    newCells[newKey] = updatedCells[key]
   }
 
   const newColWidths = {}

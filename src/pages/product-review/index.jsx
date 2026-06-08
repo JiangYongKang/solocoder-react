@@ -113,13 +113,13 @@ export default function ProductReviewPage() {
   const [lightboxIndex, setLightboxIndex] = useState(null)
 
   const handleReviewsUpdate = (next) => {
+    saveReviews(next)
     setReviews(next)
-    queueMicrotask(() => saveReviews(next))
   }
 
   const handleVotesUpdate = (next) => {
+    saveVotes(next)
     setVotes(next)
-    queueMicrotask(() => saveVotes(next))
   }
 
   const handleFilterChange = (value) => {
@@ -218,7 +218,7 @@ export default function ProductReviewPage() {
 
   const handleSubmitFollowUp = (reviewId) => {
     const text = followContents[reviewId] || ''
-    const result = addFollowUp(reviews, reviewId, text)
+    const result = addFollowUp(reviews, reviewId, CURRENT_USER, text)
     if (result.success) {
       handleReviewsUpdate(result.reviews)
       setFollowContents((prev) => ({

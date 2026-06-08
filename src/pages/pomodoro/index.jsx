@@ -27,6 +27,9 @@ import {
   sendNotification,
   playBeep,
   getDateKey,
+  saveTimerState,
+  loadTimerState,
+  clearTimerState,
 } from './pomodoroUtils'
 import StatsChart from './StatsChart'
 import WhiteNoiseSelector from './WhiteNoiseSelector'
@@ -37,14 +40,28 @@ const PomodoroPage = () => {
   const [settings, setSettings] = useState(() => loadSettings())
   const [records, setRecords] = useState(() => loadRecords())
 
-  const [currentPhase, setCurrentPhase] = useState(PHASES.WORK)
-  const [completedWorkPomodoros, setCompletedWorkPomodoros] = useState(0)
-  const [totalSeconds, setTotalSeconds] = useState(() => getPhaseDuration(PHASES.WORK, loadSettings()))
-  const [remainingSeconds, setRemainingSeconds] = useState(() => getPhaseDuration(PHASES.WORK, loadSettings()))
+  const initialTimerState = useMemo(() => loadTimerState(loadSettings()), [])
+
+  const [currentPhase, setCurrentPhase] = useState(() =>
+    initialTimerState ? initialTimerState.currentPhase : PHASES.WORK
+  )
+  const [completedWorkPomodoros, setCompletedWorkPomodoros] = useState(() =>
+    initialTimerState ? initialTimerState.completedWorkPomodoros : 0
+  )
+  const [totalSeconds, setTotalSeconds] = useState(() =>
+    initialTimerState ? initialTimerState.totalSeconds : getPhaseDuration(PHASES.WORK, loadSettings())
+  )
+  const [remainingSeconds, setRemainingSeconds] = useState(() =>
+    initialTimerState ? initialTimerState.remainingSeconds : getPhaseDuration(PHASES.WORK, loadSettings())
+  )
   const [isRunning, setIsRunning] = useState(false)
 
-  const [taskName, setTaskName] = useState('')
-  const [currentTask, setCurrentTask] = useState('')
+  const [taskName, setTaskName] = useState(() =>
+    initialTimerState ? initialTimerState.currentTask : ''
+  )
+  const [currentTask, setCurrentTask] = useState(() =>
+    initialTimerState ? initialTimerState.currentTask : ''
+  )
 
   const [whiteNoise, setWhiteNoise] = useState('silent')
 
@@ -66,6 +83,7 @@ const PomodoroPage = () => {
   const taskRef = useRef(currentTask)
   const settingsRef = useRef(settings)
   const workCountRef = useRef(completedWorkPomodoros)
+  const phaseCompletedRef = useRef(false)
 
   useEffect(() => {
     phaseRef.current = currentPhase
@@ -86,6 +104,16 @@ const PomodoroPage = () => {
   useEffect(() => {
     saveRecords(records)
   }, [records])
+
+  useEffect(() => {
+    saveTimerState({
+      currentPhase,
+      remainingSeconds,
+      totalSeconds,
+      completedWorkPomodoros,
+      currentTask,
+    })
+  }, [currentPhase, remainingSeconds, totalSeconds, completedWorkPomodoros, currentTask])
 
   useEffect(() => {
     return () => {
@@ -132,16 +160,27 @@ const PomodoroPage = () => {
     const nextDuration = getPhaseDuration(next.phase, settingsRef.current)
     setTotalSeconds(nextDuration)
     setRemainingSeconds(nextDuration)
+    phaseCompletedRef.current = false
   }, [])
 
   useEffect(() => {
+    if (remainingSeconds === 0 && !phaseCompletedRef.current) {
+      phaseCompletedRef.current = true
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+        intervalRef.current = null
+      }
+      setIsRunning(false)
+      handlePhaseComplete()
+    }
+  }, [remainingSeconds, handlePhaseComplete])
+
+  useEffect(() => {
     if (isRunning) {
+      phaseCompletedRef.current = false
       intervalRef.current = setInterval(() => {
         setRemainingSeconds((prev) => {
           if (prev <= 1) {
-            clearInterval(intervalRef.current)
-            setIsRunning(false)
-            handlePhaseComplete()
             return 0
           }
           return prev - 1
@@ -159,7 +198,7 @@ const PomodoroPage = () => {
         clearInterval(intervalRef.current)
       }
     }
-  }, [isRunning, handlePhaseComplete])
+  }, [isRunning])
 
   const handleStart = async () => {
     if (!notificationRequested) {
@@ -169,6 +208,7 @@ const PomodoroPage = () => {
     if (!isRunning && remainingSeconds === totalSeconds) {
       setCurrentTask(taskName)
     }
+    phaseCompletedRef.current = false
     setIsRunning(true)
   }
 
@@ -179,10 +219,12 @@ const PomodoroPage = () => {
   const handleStop = () => {
     setIsRunning(false)
     setRemainingSeconds(totalSeconds)
+    phaseCompletedRef.current = false
   }
 
   const handlePhaseChange = (phase) => {
     if (isRunning) return
+    phaseCompletedRef.current = false
     setCurrentPhase(phase)
     const duration = getPhaseDuration(phase, settings)
     setTotalSeconds(duration)

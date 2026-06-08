@@ -333,14 +333,6 @@ export const getChangeTypeLabel = (type) => {
   }
 }
 
-export const escapeHtml = (str) => {
-  if (typeof str !== 'string') return ''
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-}
-
 export const readFileAsText = (file) => {
   return new Promise((resolve, reject) => {
     if (!file || !(file instanceof Blob)) {

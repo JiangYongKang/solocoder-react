@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach, vi } from 'vitest'
+import { describe, it, expect, afterEach, vi, beforeEach } from 'vitest'
 import {
   DIFF_TYPE,
   splitLines,
@@ -9,9 +9,9 @@ import {
   buildSideBySideDiff,
   extractChangeBlocks,
   getChangeTypeLabel,
-  escapeHtml,
   isSupportedFileType,
   readClipboardText,
+  readFileAsText,
   getDiffStats,
 } from '../../text-diff/diffUtils'
 
@@ -110,6 +110,35 @@ describe('computeLineDiff', () => {
     const diff = computeLineDiff(['a'], ['b'])
     expect(diff[0]).toHaveProperty('oldIndex')
     expect(diff[0]).toHaveProperty('newIndex')
+  })
+
+  it('支持字符串输入（自动按行分割）', () => {
+    const diff = computeLineDiff('a\nb', 'a\nc')
+    expect(diff.length).toBe(3)
+    expect(diff[0].type).toBe(DIFF_TYPE.EQUAL)
+    expect(diff[0].oldLine).toBe('a')
+    expect(diff[1].type).toBe(DIFF_TYPE.REMOVED)
+    expect(diff[1].oldLine).toBe('b')
+    expect(diff[2].type).toBe(DIFF_TYPE.ADDED)
+    expect(diff[2].newLine).toBe('c')
+  })
+
+  it('字符串输入时应正确识别新增行', () => {
+    const diff = computeLineDiff('hello', 'hello\nworld')
+    const types = diff.map((d) => d.type)
+    expect(types).toEqual([DIFF_TYPE.EQUAL, DIFF_TYPE.ADDED])
+    expect(diff[1].newLine).toBe('world')
+  })
+
+  it('字符串输入时应正确识别删除行', () => {
+    const diff = computeLineDiff('foo\nbar', 'foo')
+    const types = diff.map((d) => d.type)
+    expect(types).toEqual([DIFF_TYPE.EQUAL, DIFF_TYPE.REMOVED])
+    expect(diff[1].oldLine).toBe('bar')
+  })
+
+  it('字符串输入空字符串应返回空数组', () => {
+    expect(computeLineDiff('', '')).toEqual([])
   })
 })
 
@@ -315,21 +344,6 @@ describe('getChangeTypeLabel', () => {
   })
 })
 
-describe('escapeHtml', () => {
-  it('应该正确转义 HTML 特殊字符', () => {
-    expect(escapeHtml('<div>')).toBe('&lt;div&gt;')
-    expect(escapeHtml('&')).toBe('&amp;')
-    expect(escapeHtml('>')).toBe('&gt;')
-  })
-
-  it('非字符串输入应该返回空字符串', () => {
-    expect(escapeHtml(null)).toBe('')
-    expect(escapeHtml(undefined)).toBe('')
-    expect(escapeHtml(123)).toBe('')
-    expect(escapeHtml({})).toBe('')
-  })
-})
-
 describe('isSupportedFileType', () => {
   it('应该接受 .txt 文件', () => {
     expect(isSupportedFileType({ name: 'test.txt' })).toBe(true)
@@ -352,6 +366,100 @@ describe('isSupportedFileType', () => {
     expect(isSupportedFileType({ name: 'script.js' })).toBe(false)
     expect(isSupportedFileType(null)).toBe(false)
     expect(isSupportedFileType(undefined)).toBe(false)
+  })
+})
+
+describe('readFileAsText', () => {
+  let originalFileReader
+
+  beforeEach(() => {
+    originalFileReader = globalThis.FileReader
+  })
+
+  afterEach(() => {
+    if (originalFileReader) {
+      globalThis.FileReader = originalFileReader
+    } else {
+      delete globalThis.FileReader
+    }
+  })
+
+  it('应该成功读取文件内容', async () => {
+    class MockFileReader {
+      constructor() {
+        this.readyState = 0
+        this.result = ''
+        this.error = null
+        this.onload = null
+        this.onerror = null
+      }
+      readAsText() {
+        this.result = 'mock file content'
+        if (this.onload) {
+          this.onload({ target: this })
+        }
+      }
+    }
+    globalThis.FileReader = MockFileReader
+
+    const mockFile = new Blob(['hello world'], { type: 'text/plain' })
+    const content = await readFileAsText(mockFile)
+    expect(content).toBe('mock file content')
+  })
+
+  it('文件读取失败时应该 reject', async () => {
+    class MockFileReader {
+      constructor() {
+        this.readyState = 0
+        this.result = ''
+        this.error = null
+        this.onload = null
+        this.onerror = null
+      }
+      readAsText() {
+        this.error = new Error('read error')
+        if (this.onerror) {
+          this.onerror({ target: this })
+        }
+      }
+    }
+    globalThis.FileReader = MockFileReader
+
+    const mockFile = new Blob(['hello'], { type: 'text/plain' })
+    await expect(readFileAsText(mockFile)).rejects.toThrow('read error')
+  })
+
+  it('传入 null 或 undefined 应该 reject', async () => {
+    await expect(readFileAsText(null)).rejects.toThrow('Invalid file')
+    await expect(readFileAsText(undefined)).rejects.toThrow('Invalid file')
+  })
+
+  it('传入非 Blob 对象应该 reject', async () => {
+    await expect(readFileAsText({})).rejects.toThrow('Invalid file')
+    await expect(readFileAsText('not a blob')).rejects.toThrow('Invalid file')
+  })
+
+  it('文件内容为空字符串时应该正常返回', async () => {
+    class MockFileReader {
+      constructor() {
+        this.readyState = 0
+        this.result = ''
+        this.error = null
+        this.onload = null
+        this.onerror = null
+      }
+      readAsText() {
+        this.result = ''
+        if (this.onload) {
+          this.onload({ target: this })
+        }
+      }
+    }
+    globalThis.FileReader = MockFileReader
+
+    const mockFile = new Blob([''], { type: 'text/plain' })
+    const content = await readFileAsText(mockFile)
+    expect(content).toBe('')
   })
 })
 

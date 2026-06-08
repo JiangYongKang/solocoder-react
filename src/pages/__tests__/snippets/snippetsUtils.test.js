@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi, beforeAll, afterAll } from 'vitest'
 import {
   LANGUAGES,
   LANGUAGE_LABELS,
@@ -20,6 +20,9 @@ import {
   jsonToSnippets,
   mergeSnippets,
   formatDate,
+  renderMarkdown,
+  copyToClipboard,
+  downloadJsonFile,
 } from '@/pages/snippets/snippetsUtils'
 
 function createMockLocalStorage() {
@@ -36,7 +39,68 @@ function createMockLocalStorage() {
   }
 }
 
+function createMockDocument() {
+  let bodyChildren = []
+  return {
+    createElement: (tag) => {
+      const el = {
+        tagName: tag.toUpperCase(),
+        href: '',
+        download: '',
+        click: vi.fn(),
+      }
+      return el
+    },
+    body: {
+      appendChild: (el) => {
+        bodyChildren.push(el)
+      },
+      removeChild: (el) => {
+        bodyChildren = bodyChildren.filter((c) => c !== el)
+      },
+      get children() {
+        return bodyChildren
+      },
+    },
+  }
+}
+
+function createMockURL() {
+  return {
+    createObjectURL: vi.fn().mockReturnValue('blob:mock-url'),
+    revokeObjectURL: vi.fn(),
+  }
+}
+
 const originalLocalStorage = globalThis.localStorage
+let originalDocument
+let originalURL
+
+beforeAll(() => {
+  originalDocument = globalThis.document
+  originalURL = globalThis.URL
+  if (!globalThis.document) {
+    globalThis.document = createMockDocument()
+  }
+  if (!globalThis.URL) {
+    globalThis.URL = createMockURL()
+  } else if (!globalThis.URL.createObjectURL) {
+    globalThis.URL = { ...globalThis.URL, ...createMockURL() }
+  }
+})
+
+afterAll(() => {
+  if (originalDocument !== undefined) {
+    globalThis.document = originalDocument
+  } else {
+    delete globalThis.document
+  }
+  if (originalURL !== undefined) {
+    globalThis.URL = originalURL
+  } else {
+    delete globalThis.URL
+  }
+})
 
 beforeEach(() => {
   globalThis.localStorage = createMockLocalStorage()
@@ -667,5 +731,231 @@ describe('formatDate', () => {
   it('无效时间戳返回 -', () => {
     expect(formatDate('invalid')).toBe('-')
     expect(formatDate(0)).not.toBe('-')
+  })
+})
+
+describe('sortSnippets - 空标题排序', () => {
+  it('空标题在升序时排在末尾', () => {
+    const items = [
+      { id: 'a', title: 'Banana', favorite: false },
+      { id: 'b', title: '', favorite: false },
+      { id: 'c', title: 'Apple', favorite: false },
+    ]
+    const sorted = sortSnippets(items, 'title', 'asc')
+    const ids = sorted.map((s) => s.id)
+    expect(ids.indexOf('c')).toBeLessThan(ids.indexOf('a'))
+    expect(ids.indexOf('a')).toBeLessThan(ids.indexOf('b'))
+  })
+
+  it('空标题在降序时排在末尾', () => {
+    const items = [
+      { id: 'a', title: 'Banana', favorite: false },
+      { id: 'b', title: '', favorite: false },
+      { id: 'c', title: 'Apple', favorite: false },
+    ]
+    const sorted = sortSnippets(items, 'title', 'desc')
+    const ids = sorted.map((s) => s.id)
+    expect(ids.indexOf('a')).toBeLessThan(ids.indexOf('c'))
+    expect(ids.indexOf('c')).toBeLessThan(ids.indexOf('b'))
+  })
+
+  it('全是空白标题时顺序保持稳定', () => {
+    const items = [
+      { id: 'a', title: '   ', favorite: false, createdAt: 2 },
+      { id: 'b', title: '', favorite: false, createdAt: 1 },
+    ]
+    const sorted = sortSnippets(items, 'title', 'asc')
+    expect(sorted).toHaveLength(2)
+  })
+})
+
+describe('renderMarkdown', () => {
+  it('空字符串返回空字符串', () => {
+    expect(renderMarkdown('')).toBe('')
+    expect(renderMarkdown(null)).toBe('')
+    expect(renderMarkdown(undefined)).toBe('')
+  })
+
+  it('转换标题语法', () => {
+    expect(renderMarkdown('# H1')).toContain('<h1>')
+    expect(renderMarkdown('## H2')).toContain('<h2>')
+    expect(renderMarkdown('### H3')).toContain('<h3>')
+    expect(renderMarkdown('#### H4')).toContain('<h4>')
+    expect(renderMarkdown('##### H5')).toContain('<h5>')
+    expect(renderMarkdown('###### H6')).toContain('<h6>')
+  })
+
+  it('转换粗体和斜体', () => {
+    expect(renderMarkdown('**bold**')).toContain('<strong>bold</strong>')
+    expect(renderMarkdown('*italic*')).toContain('<em>italic</em>')
+    expect(renderMarkdown('***both***')).toContain('<strong><em>both</em></strong>')
+  })
+
+  it('转换行内代码', () => {
+    expect(renderMarkdown('`code`')).toContain('<code>code</code>')
+  })
+
+  it('转换链接', () => {
+    expect(renderMarkdown('[link](https://example.com)')).toContain(
+      '<a href="https://example.com">link</a>'
+    )
+  })
+
+  it('转换无序列表', () => {
+    const md = '- item1\n- item2\n- item3'
+    const result = renderMarkdown(md)
+    expect(result).toContain('<ul>')
+    expect(result.match(/<li>/g)?.length).toBe(3)
+  })
+
+  it('转换有序列表', () => {
+    const md = '1. first\n2. second'
+    const result = renderMarkdown(md)
+    expect(result).toContain('<ol>')
+    expect(result.match(/<li>/g)?.length).toBe(2)
+  })
+
+  it('转换引用', () => {
+    expect(renderMarkdown('> quote')).toContain('<blockquote>')
+  })
+
+  it('转换分隔线', () => {
+    expect(renderMarkdown('---')).toContain('<hr />')
+  })
+
+  it('转换换行', () => {
+    expect(renderMarkdown('line1\nline2')).toContain('<br />')
+  })
+
+  it('支持复合 Markdown', () => {
+    const md = '# Title\n\n**bold** text with `code`'
+    const result = renderMarkdown(md)
+    expect(result).toContain('<h1>Title</h1>')
+    expect(result).toContain('<strong>bold</strong>')
+    expect(result).toContain('<code>code</code>')
+  })
+})
+
+describe('copyToClipboard', () => {
+  const originalClipboard = globalThis.navigator?.clipboard
+
+  beforeEach(() => {
+    const mockWriteText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(globalThis.navigator, 'clipboard', {
+      value: { writeText: mockWriteText },
+      writable: true,
+      configurable: true,
+    })
+  })
+
+  afterEach(() => {
+    if (originalClipboard) {
+      Object.defineProperty(globalThis.navigator, 'clipboard', {
+        value: originalClipboard,
+        writable: true,
+        configurable: true,
+      })
+    } else {
+      delete globalThis.navigator.clipboard
+    }
+    vi.restoreAllMocks()
+  })
+
+  it('调用 navigator.clipboard.writeText 并返回 Promise', async () => {
+    const result = copyToClipboard('hello world')
+    expect(result).toBeInstanceOf(Promise)
+    await result
+    expect(globalThis.navigator.clipboard.writeText).toHaveBeenCalledWith('hello world')
+  })
+
+  it('传递空字符串时也正常调用', async () => {
+    await copyToClipboard('')
+    expect(globalThis.navigator.clipboard.writeText).toHaveBeenCalledWith('')
+  })
+
+  it('传递特殊字符时正常调用', async () => {
+    const text = '<script>alert("xss")</script>\nnewline\t\ttab'
+    await copyToClipboard(text)
+    expect(globalThis.navigator.clipboard.writeText).toHaveBeenCalledWith(text)
+  })
+
+  it('当 clipboard.writeText 失败时 Promise reject', async () => {
+    const mockError = new Error('Clipboard access denied')
+    globalThis.navigator.clipboard.writeText.mockRejectedValue(mockError)
+    await expect(copyToClipboard('test')).rejects.toThrow('Clipboard access denied')
+  })
+})
+
+describe('downloadJsonFile', () => {
+  let mockCreateObjectURL
+  let mockRevokeObjectURL
+  let mockCreateElement
+  let mockAppendChild
+  let mockRemoveChild
+  let mockClick
+
+  beforeEach(() => {
+    mockCreateObjectURL = vi.fn().mockReturnValue('blob:mock-url')
+    mockRevokeObjectURL = vi.fn()
+    globalThis.URL.createObjectURL = mockCreateObjectURL
+    globalThis.URL.revokeObjectURL = mockRevokeObjectURL
+
+    mockClick = vi.fn()
+    const mockAnchor = {
+      href: '',
+      download: '',
+      click: mockClick,
+    }
+    mockCreateElement = vi.fn().mockReturnValue(mockAnchor)
+    mockAppendChild = vi.fn()
+    mockRemoveChild = vi.fn()
+
+    document.createElement = mockCreateElement
+    document.body.appendChild = mockAppendChild
+    document.body.removeChild = mockRemoveChild
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('创建 Blob 并触发下载', () => {
+    downloadJsonFile('{"key":"value"}', 'test.json')
+
+    expect(mockCreateObjectURL).toHaveBeenCalled()
+    const blobArg = mockCreateObjectURL.mock.calls[0][0]
+    expect(blobArg).toBeInstanceOf(Blob)
+    expect(blobArg.type).toBe('application/json')
+
+    expect(mockCreateElement).toHaveBeenCalledWith('a')
+    expect(mockAppendChild).toHaveBeenCalled()
+    expect(mockClick).toHaveBeenCalled()
+    expect(mockRemoveChild).toHaveBeenCalled()
+    expect(mockRevokeObjectURL).toHaveBeenCalledWith('blob:mock-url')
+  })
+
+  it('设置正确的 href 和 download 属性', () => {
+    let anchor
+    mockCreateElement.mockImplementation((tag) => {
+      const el = {
+        href: '',
+        download: '',
+        click: vi.fn(),
+      }
+      if (tag === 'a') anchor = el
+      return el
+    })
+
+    downloadJsonFile('[]', 'snippets.json')
+
+    expect(anchor.href).toBe('blob:mock-url')
+    expect(anchor.download).toBe('snippets.json')
+  })
+
+  it('支持复杂 JSON 内容', () => {
+    const complexJson = JSON.stringify({ items: [1, 2, 3], meta: { nested: true } }, null, 2)
+    downloadJsonFile(complexJson, 'export.json')
+    expect(mockCreateObjectURL).toHaveBeenCalledTimes(1)
+    expect(mockClick).toHaveBeenCalledTimes(1)
   })
 })

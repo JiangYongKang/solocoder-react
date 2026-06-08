@@ -514,20 +514,64 @@ describe('screenToWorld / worldToScreen', () => {
 })
 
 describe('getConnectionPath', () => {
-  it('should return a valid SVG path string', () => {
+  it('should return a valid SVG path string with polyline (L segments)', () => {
     const fromPos = { x: 0, y: 0, width: 100, height: 40, direction: 'center' }
     const toPos = { x: 200, y: 0, width: 100, height: 40, direction: 'right' }
     const path = getConnectionPath(fromPos, toPos)
     expect(typeof path).toBe('string')
     expect(path.startsWith('M ')).toBe(true)
-    expect(path.includes('C ')).toBe(true)
+    expect(path.includes('L ')).toBe(true)
+    expect(path.includes('C ')).toBe(false)
   })
 
-  it('should handle left direction', () => {
+  it('should handle left direction (polyline)', () => {
     const fromPos = { x: 200, y: 0, width: 100, height: 40, direction: 'center' }
     const toPos = { x: 0, y: 0, width: 100, height: 40, direction: 'left' }
     const path = getConnectionPath(fromPos, toPos)
     expect(path.startsWith('M ')).toBe(true)
+    expect(path.includes('L ')).toBe(true)
+  })
+
+  it('should produce orthogonal polyline with correct anchor points (right child)', () => {
+    const fromPos = { x: 0, y: 0, width: 100, height: 40, direction: 'right' }
+    const toPos = { x: 200, y: 100, width: 100, height: 40, direction: 'right' }
+    const path = getConnectionPath(fromPos, toPos)
+    const parts = path.split(/[ML]\s+/).filter(Boolean).map((s) => s.trim())
+    expect(parts).toHaveLength(4)
+    const start = parts[0].split(' ').map(Number)
+    expect(start[0]).toBe(100)
+    expect(start[1]).toBe(20)
+    const end = parts[3].split(' ').map(Number)
+    expect(end[0]).toBe(200)
+    expect(end[1]).toBe(120)
+  })
+
+  it('should produce orthogonal polyline with correct anchor points (left child)', () => {
+    const fromPos = { x: 300, y: 0, width: 100, height: 40, direction: 'center' }
+    const toPos = { x: 0, y: 100, width: 100, height: 40, direction: 'left' }
+    const path = getConnectionPath(fromPos, toPos)
+    const parts = path.split(/[ML]\s+/).filter(Boolean).map((s) => s.trim())
+    expect(parts).toHaveLength(4)
+    const start = parts[0].split(' ').map(Number)
+    expect(start[0]).toBe(350)
+    expect(start[1]).toBe(20)
+    const end = parts[3].split(' ').map(Number)
+    expect(end[0]).toBe(100)
+    expect(end[1]).toBe(120)
+  })
+
+  it('should produce horizontal-first then vertical polyline shape', () => {
+    const fromPos = { x: 0, y: 0, width: 100, height: 40, direction: 'right' }
+    const toPos = { x: 300, y: 200, width: 100, height: 40, direction: 'right' }
+    const path = getConnectionPath(fromPos, toPos)
+    const parts = path.split(/[ML]\s+/).filter(Boolean).map((s) => s.trim())
+    const p0 = parts[0].split(' ').map(Number)
+    const p1 = parts[1].split(' ').map(Number)
+    const p2 = parts[2].split(' ').map(Number)
+    const p3 = parts[3].split(' ').map(Number)
+    expect(p1[1]).toBe(p0[1])
+    expect(p1[0]).toBe(p2[0])
+    expect(p2[1]).toBe(p3[1])
   })
 })
 

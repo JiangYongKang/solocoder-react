@@ -53,7 +53,8 @@ export function saveVotes(votes) {
 
 export function validateReview(data) {
   const errors = {}
-  if (!data.rating || data.rating < 1 || data.rating > 5) {
+  const ratingNum = Number(data.rating)
+  if (!ratingNum || ratingNum < 1 || ratingNum > 5 || Number.isNaN(ratingNum)) {
     errors.rating = '请选择 1-5 星评分'
   }
   if (!data.content || data.content.trim().length === 0) {
@@ -72,11 +73,12 @@ export function createReview(reviews, data) {
   if (Object.keys(errors).length > 0) {
     return { success: false, errors }
   }
+  const ratingNum = Number(data.rating)
   const newReview = {
     id: generateId('r'),
     userId: CURRENT_USER,
     username: data.username || '我',
-    rating: data.rating,
+    rating: ratingNum,
     content: data.content.trim(),
     images: data.images || [],
     createdAt: Date.now(),
@@ -190,7 +192,7 @@ export function castVote(reviews, votes, userId, reviewId, voteType) {
   return { success: true, reviews: updatedReviews, votes: updatedVotes }
 }
 
-export function addFollowUp(reviews, reviewId, content) {
+export function addFollowUp(reviews, reviewId, userId, content) {
   if (!content || content.trim().length === 0) {
     return { success: false, error: '追评内容不能为空', reviews }
   }
@@ -200,6 +202,9 @@ export function addFollowUp(reviews, reviewId, content) {
   const reviewIndex = reviews.findIndex((r) => r.id === reviewId)
   if (reviewIndex === -1) {
     return { success: false, error: '评价不存在', reviews }
+  }
+  if (reviews[reviewIndex].userId !== userId) {
+    return { success: false, error: '只有评价发布者才能追加评论', reviews }
   }
   const updatedReviews = [...reviews]
   const review = { ...updatedReviews[reviewIndex] }

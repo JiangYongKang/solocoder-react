@@ -5,7 +5,7 @@ import ExamCreate from './ExamCreate'
 import ExamTake from './ExamTake'
 import ExamResult from './ExamResult'
 import ExamHistory from './ExamHistory'
-import { loadExamHistory } from './examCore'
+import { loadExamHistory, findActiveExamDraft } from './examCore'
 import './exam.css'
 
 const VIEWS = {
@@ -26,7 +26,7 @@ export default function ExamPage() {
   const navigate = useNavigate()
   const initial = useMemo(() => {
     if (typeof window === 'undefined') {
-      return { view: VIEWS.BANK, record: null }
+      return { view: VIEWS.BANK, record: null, exam: null, answers: {}, startedAt: null }
     }
     const params = new URLSearchParams(window.location.search)
     const recordId = params.get('record')
@@ -34,16 +34,26 @@ export default function ExamPage() {
       const history = loadExamHistory()
       const r = history.find((x) => x.id === recordId)
       if (r) {
-        return { view: VIEWS.RESULT, record: r }
+        return { view: VIEWS.RESULT, record: r, exam: null, answers: {}, startedAt: null }
       }
     }
-    return { view: VIEWS.BANK, record: null }
+    const draft = findActiveExamDraft()
+    if (draft && draft.exam) {
+      return {
+        view: VIEWS.TAKE,
+        record: null,
+        exam: draft.exam,
+        answers: draft.answers || {},
+        startedAt: draft.startedAt,
+      }
+    }
+    return { view: VIEWS.BANK, record: null, exam: null, answers: {}, startedAt: null }
   }, [])
   const [view, setView] = useState(initial.view)
-  const [currentExam, setCurrentExam] = useState(null)
+  const [currentExam, setCurrentExam] = useState(initial.exam)
   const [currentRecord, setCurrentRecord] = useState(initial.record)
-  const [takeAnswers, setTakeAnswers] = useState({})
-  const [takeStartedAt, setTakeStartedAt] = useState(null)
+  const [takeAnswers, setTakeAnswers] = useState(initial.answers)
+  const [takeStartedAt, setTakeStartedAt] = useState(initial.startedAt)
 
   const handleStartExam = (exam) => {
     setCurrentExam(exam)

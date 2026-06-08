@@ -253,6 +253,8 @@ export const moveCategory = (data, sourceId, targetId, position = 'inside') => {
   if (isDescendantCategory(data.categories, sourceId, targetId)) return data
   if (targetId !== 'cat-root' && !findCategoryById(data.categories, targetId)) return data
 
+  const effectivePosition = targetId === 'cat-root' ? 'inside' : position
+
   let categories = [...data.categories.map((c) => ({ ...c }))]
 
   const sourceIndex = categories.findIndex((c) => c.id === sourceId)
@@ -260,7 +262,9 @@ export const moveCategory = (data, sourceId, targetId, position = 'inside') => {
   const source = categories[sourceIndex]
   const oldParentId = source.parentId
 
-  const newParentId = position === 'inside' ? targetId : (findCategoryById(categories, targetId)?.parentId || 'cat-root')
+  const newParentId = effectivePosition === 'inside'
+    ? targetId
+    : (findCategoryById(categories, targetId)?.parentId || 'cat-root')
   source.parentId = newParentId
 
   if (oldParentId) {
@@ -273,12 +277,12 @@ export const moveCategory = (data, sourceId, targetId, position = 'inside') => {
     }
   }
 
-  if (position === 'inside') {
+  if (effectivePosition === 'inside') {
     const newParentIndex = categories.findIndex((c) => c.id === newParentId)
     if (newParentIndex !== -1) {
       categories[newParentIndex] = {
         ...categories[newParentIndex],
-        children: [...categories[newParentIndex].children, sourceId],
+        children: [...categories[newParentIndex].children.filter((id) => id !== sourceId), sourceId],
         isExpanded: true,
       }
     }
@@ -287,10 +291,18 @@ export const moveCategory = (data, sourceId, targetId, position = 'inside') => {
     if (parentIndex !== -1) {
       const siblings = categories[parentIndex].children.filter((id) => id !== sourceId)
       const targetIdx = siblings.indexOf(targetId)
-      if (position === 'before') {
-        siblings.splice(Math.max(0, targetIdx), 0, sourceId)
+      if (targetIdx === -1) {
+        if (effectivePosition === 'before') {
+          siblings.unshift(sourceId)
+        } else {
+          siblings.push(sourceId)
+        }
       } else {
-        siblings.splice(targetIdx + 1, 0, sourceId)
+        if (effectivePosition === 'before') {
+          siblings.splice(targetIdx, 0, sourceId)
+        } else {
+          siblings.splice(targetIdx + 1, 0, sourceId)
+        }
       }
       categories[parentIndex] = {
         ...categories[parentIndex],

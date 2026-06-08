@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useMemo } from 'react';
+import { useRef, useState, useEffect, useMemo, forwardRef, useImperativeHandle } from 'react';
 import {
   ZOOM_LEVELS,
   DAY_WIDTH,
@@ -22,20 +22,33 @@ import {
   addDays,
   getTask,
   getDependencyPath,
+  dateToPx,
 } from './ganttUtils.js';
 
-export default function Timeline({
-  state,
-  zoomLevel,
-  onUpdateTask,
-  selectedTaskId,
-  onSelectTask,
-  onContextMenu,
-}) {
+const Timeline = forwardRef(function Timeline(
+  {
+    state,
+    zoomLevel,
+    onUpdateTask,
+    selectedTaskId,
+    onSelectTask,
+    onContextMenu,
+  },
+  ref
+) {
   const containerRef = useRef(null);
+  const scrollRef = useRef(null);
   const [dragging, setDragging] = useState(null);
   const [dragTooltip, setDragTooltip] = useState(null);
+  const [editingProgressId, setEditingProgressId] = useState(null);
   const dayWidth = DAY_WIDTH[zoomLevel];
+
+  useImperativeHandle(ref, () => ({
+    getScrollElement: () => scrollRef.current,
+    setScrollTop: (top) => {
+      if (scrollRef.current) scrollRef.current.scrollTop = top;
+    },
+  }));
 
   const range = useMemo(() => getDateRange(state), [state]);
   const days = useMemo(() => getTimelineDays(range), [range]);
@@ -54,9 +67,18 @@ export default function Timeline({
     e.stopPropagation();
     onSelectTask(task.id);
 
+    if (mode === 'progress') return;
+
     const startX = e.clientX;
     const originalStart = parseDate(task.startDate);
     const originalEnd = parseDate(task.endDate);
+    const originalDuration = diffDays(originalStart, originalEnd) + 1;
+    const scrollLeft = scrollRef.current?.scrollLeft || 0;
+    const containerRect = scrollRef.current?.getBoundingClientRect();
+    const offsetX = containerRect ? containerRect.left : 0;
+    const relativeStartX = startX - offsetX + scrollLeft;
+    const grabDate = pxToDate(relativeStartX, range.start, zoomLevel);
+    const grabOffsetDays = diffDays(originalStart, grabDate);
 
     setDragging({
       taskId: task.id,
@@ -64,30 +86,70 @@ export default function Timeline({
       startX,
       originalStart,
       originalEnd,
+      originalDuration,
+      scrollLeft,
+      offsetX,
+      grabOffsetDays,
       currentX: startX,
     });
+  };
+
+  const handleProgressMouseDown = (e, task) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onSelectTask(task.id);
+
+    const barEl = e.currentTarget.closest('.gantt-task-bar');
+    if (!barEl) return;
+
+    const barRect = barEl.getBoundingClientRect();
+
+    const handleProgressMove = (ev) => {
+      const relativeX = ev.clientX - barRect.left;
+      const newProgress = Math.max(0, Math.min(100, Math.round((relativeX / barRect.width) * 100)));
+      onUpdateTask(task.id, { progress: newProgress });
+    };
+
+    const handleProgressUp = () => {
+      document.removeEventListener('mousemove', handleProgressMove);
+      document.removeEventListener('mouseup', handleProgressUp);
+    };
+
+    document.addEventListener('mousemove', handleProgressMove);
+    document.addEventListener('mouseup', handleProgressUp);
   };
 
   useEffect(() => {
     if (!dragging) return;
 
-    const handleMouseMove = (e) => {
-      const deltaPx = e.clientX - dragging.startX;
-      const deltaDays = Math.round(deltaPx / dayWidth);
+    const computeNewDates = (clientX) => {
+      const relativeX = clientX - dragging.offsetX + dragging.scrollLeft;
+      const dateAtMouse = pxToDate(relativeX, range.start, zoomLevel);
+      const snapDate = (d) => {
+        d.setHours(0, 0, 0, 0);
+        return d;
+      };
 
       let newStart = new Date(dragging.originalStart);
       let newEnd = new Date(dragging.originalEnd);
 
       if (dragging.mode === 'move') {
-        newStart = addDays(dragging.originalStart, deltaDays);
-        newEnd = addDays(dragging.originalEnd, deltaDays);
+        const snappedMouseDate = snapDate(new Date(dateAtMouse));
+        newStart = addDays(snappedMouseDate, -dragging.grabOffsetDays);
+        newEnd = addDays(newStart, dragging.originalDuration - 1);
       } else if (dragging.mode === 'resize-left') {
-        newStart = addDays(dragging.originalStart, deltaDays);
+        newStart = snapDate(new Date(dateAtMouse));
         if (newStart > newEnd) newStart = new Date(newEnd);
       } else if (dragging.mode === 'resize-right') {
-        newEnd = addDays(dragging.originalEnd, deltaDays);
+        newEnd = snapDate(new Date(dateAtMouse));
         if (newEnd < newStart) newEnd = new Date(newStart);
       }
+
+      return { newStart, newEnd };
+    };
+
+    const handleMouseMove = (e) => {
+      const { newStart, newEnd } = computeNewDates(e.clientX);
 
       setDragging((prev) => ({ ...prev, currentX: e.clientX }));
       setDragTooltip({
@@ -99,22 +161,7 @@ export default function Timeline({
     };
 
     const handleMouseUp = (e) => {
-      const deltaPx = e.clientX - dragging.startX;
-      const deltaDays = Math.round(deltaPx / dayWidth);
-
-      let newStart = new Date(dragging.originalStart);
-      let newEnd = new Date(dragging.originalEnd);
-
-      if (dragging.mode === 'move') {
-        newStart = addDays(dragging.originalStart, deltaDays);
-        newEnd = addDays(dragging.originalEnd, deltaDays);
-      } else if (dragging.mode === 'resize-left') {
-        newStart = addDays(dragging.originalStart, deltaDays);
-        if (newStart > newEnd) newStart = new Date(newEnd);
-      } else if (dragging.mode === 'resize-right') {
-        newEnd = addDays(dragging.originalEnd, deltaDays);
-        if (newEnd < newStart) newEnd = new Date(newStart);
-      }
+      const { newStart, newEnd } = computeNewDates(e.clientX);
 
       onUpdateTask(dragging.taskId, {
         startDate: formatDate(newStart),
@@ -132,7 +179,7 @@ export default function Timeline({
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [dragging, dayWidth, onUpdateTask]);
+  }, [dragging, range.start, zoomLevel, onUpdateTask]);
 
   const isDraggingTask = (taskId) => dragging?.taskId === taskId;
 
@@ -243,7 +290,7 @@ export default function Timeline({
       ))}
       <div
         className="gantt-today-line"
-        style={{ left: Math.max(0, diffDays(range.start, today)) * dayWidth + dayWidth / 2 }}
+        style={{ left: Math.max(0, dateToPx(today, range.start, zoomLevel)) + dayWidth / 2 }}
       />
     </div>
   );
@@ -258,6 +305,7 @@ export default function Timeline({
       const pos = calculateBarPosition(task, range.start, zoomLevel);
       const isDragging = isDraggingTask(task.id);
       const isSelected = task.id === selectedTaskId;
+      const progressWidth = Math.max(0, Math.min(100, task.progress || 0));
 
       return (
         <div
@@ -287,9 +335,28 @@ export default function Timeline({
           >
             <div
               className="gantt-task-bar-progress"
-              style={{ width: `${Math.max(0, Math.min(100, task.progress || 0))}%` }}
+              style={{ width: `${progressWidth}%`, cursor: 'ew-resize' }}
+              onMouseDown={(e) => handleProgressMouseDown(e, task)}
+              title={`${task.progress || 0}% - 拖拽调整进度`}
             />
-            <span className="gantt-task-bar-label">{task.name}</span>
+            <div
+              style={{
+                position: 'absolute',
+                left: `${progressWidth}%`,
+                top: 0,
+                bottom: 0,
+                width: 4,
+                transform: 'translateX(-50%)',
+                cursor: 'ew-resize',
+                zIndex: 5,
+                background: progressWidth > 0 ? 'var(--accent)' : 'transparent',
+                borderRadius: 2,
+              }}
+              onMouseDown={(e) => handleProgressMouseDown(e, task)}
+            />
+            <span className="gantt-task-bar-label">
+              {task.name} ({task.progress || 0}%)
+            </span>
             <div
               className="gantt-task-bar-handle gantt-task-bar-handle-left"
               onMouseDown={(e) => handleMouseDown(e, task, 'resize-left')}
@@ -349,7 +416,7 @@ export default function Timeline({
   };
 
   return (
-    <div className="gantt-right-panel" ref={containerRef}>
+    <div className="gantt-right-panel" ref={scrollRef}>
       {renderHeader()}
       <div
         style={{
@@ -373,4 +440,6 @@ export default function Timeline({
       )}
     </div>
   );
-}
+});
+
+export default Timeline;

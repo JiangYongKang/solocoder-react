@@ -1,0 +1,19 @@
+产物不满意：
+
+shiftFormulaReferences 函数生成的包含 #REF! 的公式字符串（如 =#REF!+A1+A2）无法被现有的公式求值器正确解析。在 tokenize 函数中，字符 # 不匹配任何 token 分支而被跳过，REF 被当作 ident 类型 token，parseFactor 对 ident 类型无匹配处理直接返回 0，导致被删除引用的公式计算出错误的数值结果（0+20+30=50）而非显示 #REF! 或 #ERROR! 错误标记。根本原因是 shiftFormulaReferences 输出的 #REF! 标记格式与现有的公式分词器/求值器之间缺少接口契约——新增功能输出的格式旧模块不认识。正确做法是让 tokenize 函数增加对 #REF! 和 #ERROR! 等特殊错误标记的识别分支，或在 evaluateTokens 中检查 ident token 名称是否属于错误标记并返回对应的错误值。
+
+deleteRow 和 deleteCol 的公式引用更新测试只验证了 raw 字段未验证 display 计算结果。测试用例"deleteRow - 应该同步更新公式中的行引用"只断言 result.cells.B2.raw 为 =#REF!+A1+B1，缺少对 display 的断言。同样的，"deleteCol - 应该同步更新公式中的列引用"也只检查 raw 未检查 display。这导致上述 #REF! 求值错误的缺陷未被测试捕获——如果补充 display 断言将因实际输出为数值 50 而非错误标记而失败。根本原因是编写测试时只验证了表面字符串产出，未验证最终业务结果（公式计算结果的正确性）。正确做法是为所有行列操作测试同时断言 raw 和 display 字段，覆盖正常更新和被删除引用两种场景。
+
+saveToLocalStorage 被 useEffect 以整个 state 对象为依赖（index.jsx 第 523-525 行），每次 setState 调用都会触发完整的 localStorage 写入。insertRow/deleteRow/insertCol/deleteCol 等操作每次都返回新的 state 对象引用，这意味着每次单元格编辑、行列操作都会触发 JSON.stringify 序列化整个 cells 字典。默认 50 行 x 26 列规模下每次操作都全量写入并非严重性能问题，但当电子表格数据量增大时这会成为瓶颈。根本原因是持久化没有加防抖（debounce）限制频率。正确做法是用 useRef 配合 setTimeout 实现 debounce，在连续操作结束后才执行一次 saveToLocalStorage。
+
+工具栏中的"加粗 (Ctrl+B)"和"斜体 (Ctrl+I)"按钮 tooltip 原来已有快捷键提示，模型在 handleKeyDown 中补充了 Ctrl+B 和 Ctrl+I 的实现，修复了快捷键不可用的问题。但 handleKeyDown 的依赖数组（第 346 行）中包含了 toggleBold 和 toggleItalic，这两个函数本身依赖 activeCell、cells、applyStyle，而 applyStyle 依赖 selection。由于 selection 频繁变化，handleKeyDown 的 useCallback 会频繁重新创建，但这属于第一轮已有的设计问题，本轮未恶化。快捷键功能本身实现正确。
+
+过程不满意：
+
+模型在实现 handleKeyDown 中的 Ctrl+B/Ctrl+I 快捷键处理时，将 toggleBold 和 toggleItalic 函数定义放在了 handleKeyDown 之后的代码位置，导致 lint 报错"used before definition"。随后模型进入了试错式修复模式（COT 第 1176-1524 行），反复用 view_files 查看同一个 index.jsx 文件多达 3 次，先移动函数声明位置到 handleKeyDown 之前（约第 173 行），再删除旧位置的重复函数定义（约第 1433-1462 行），整个 lint 修复过程消耗了约 350 行 COT。根本原因是开发前没有阅读完整文件理清所有函数声明的位置关系，就零散地进行局部替换，导致函数声明顺序错误和重复定义。正确做法是先完整阅读文件了解函数结构，规划好所有修改的插入位置，再一次性完成所有编辑。
+
+模型首次运行测试后（COT 第 898 行），发现了三个问题：shiftFormulaReferences 输出有多余空格、测试用例预期值写错、localStorage mock 方式需调整。模型随后同时修改了实现代码（spreadsheetUtils.js 的 shiftFormulaReferences 函数）和测试期望值（spreadsheetUtils.test.js 的预期字符串），在代码和测试之间双向调整，存在"先开枪再画靶"的风险——未先独立分析哪一侧是正确的就直接两边都改，可能导致实现逻辑被迁就不正确的测试期望。具体表现为删除行测试用例预期值从某个值改成 =#REF!+B4（COT 第 958 行），但没有说明为什么这个新预期是正确的。根本原因是写测试时没有先在脑中推演函数的正确输出再写期望值。正确做法是先根据需求和设计独立确定正确的输出应该是什么，再编写测试验证，而不是在测试失败后通过修改期望值来让测试通过。
+
+模型在最终总结中声称"所有 7 个问题已成功修复"并列出了验证项为"114 个单元测试全部通过，lint 检查全部通过"（COT 第 1647-1680 行），但提示词第 7 条明确要求"确保所有子页面在 375px 和 1440px 宽度下布局不崩坏"，整个 COT 过程中没有任何浏览器操作或手动验证的证据，没有启动 pnpm run dev 也没有调整视口宽度验证。模型将 lint 和测试通过等价于所有需求完成，忽略了对 UI 兼容性这个必须人工或浏览器验证的需求项。根本原因是在总结时没有逐项对照需求清单做完成的确认。正确做法是在总结中如实说明哪些需求已验证、哪些未验证，或实际启动浏览器检查布局后再下结论。
+
+模型在修复 lint 错误时的试错模式还有更深层表现：在第一次将 toggleBold/toggleItalic 等函数从原位置移动到 handleKeyDown 之前后，没有意识到原位置存在重复定义就直接运行 lint(COT 第 1171 行），lint 通过后仍不放心又运行了一次（COT 第 1518 行）。第二次运行前模型才发现删掉重复定义的操作未完成（COT 第 1402 行"现在让我删除原来位置的重复函数定义"），然后又进行一次编辑删除。根本原因是模型在写第一轮代码时没有总体规划——应该先确定最终代码结构再一次性编写，而不是边写边补。正确做法是在修改前画出目标代码结构的蓝图，确认所有插入点和删除点，一次性完成全部修改。

@@ -346,6 +346,14 @@
   margin: 4px 0;
 }
 
+.ss-error-message {
+  padding: 12px 16px;
+  background: #fee;
+  color: #c33;
+  border-bottom: 1px solid #fcc;
+  font-size: 14px;
+}
+
 @media (max-width: 768px) {
   .ss-header {
     padding: 12px 16px;

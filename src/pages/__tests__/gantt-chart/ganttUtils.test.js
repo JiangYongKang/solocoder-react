@@ -32,6 +32,7 @@ import {
   dateToPx,
   getDependencyPath,
   getTaskRowIndex,
+  getDefaultTasks,
 } from '@/pages/gantt-chart/ganttUtils.js';
 import { STORAGE_KEY, ZOOM_LEVELS, DAY_WIDTH } from '@/pages/gantt-chart/constants.js';
 
@@ -535,5 +536,278 @@ describe('ganttUtils - Position calculations', () => {
     const t3 = getTask(state, 't3');
     const path = getDependencyPath(t1, t3, state, rangeStart, ZOOM_LEVELS.DAY);
     expect(path).toBeNull();
+  });
+});
+
+describe('ganttUtils - Default tasks hierarchy', () => {
+  it('getDefaultTasks should return non-empty task list', () => {
+    const data = getDefaultTasks();
+    expect(Array.isArray(data.tasks)).toBe(true);
+    expect(data.tasks.length).toBeGreaterThan(0);
+  });
+
+  it('getDefaultTasks should have tasks with parentId set (hierarchy exists)', () => {
+    const data = getDefaultTasks();
+    const tasksWithParent = data.tasks.filter((t) => t.parentId !== null);
+    expect(tasksWithParent.length).toBeGreaterThan(0);
+  });
+
+  it('getDefaultTasks root tasks should have parentId null', () => {
+    const data = getDefaultTasks();
+    const rootTasks = data.tasks.filter((t) => t.parentId === null);
+    expect(rootTasks.length).toBeGreaterThan(0);
+    rootTasks.forEach((t) => {
+      expect(t.parentId).toBeNull();
+    });
+  });
+
+  it('getDefaultTasks parent references should be valid (no dangling parentId)', () => {
+    const data = getDefaultTasks();
+    const allIds = new Set(data.tasks.map((t) => t.id));
+    for (const task of data.tasks) {
+      if (task.parentId !== null) {
+        expect(allIds.has(task.parentId)).toBe(true);
+      }
+    }
+  });
+
+  it('getDefaultTasks should produce visible children when parent is expanded', () => {
+    const data = getDefaultTasks();
+    const visible = getVisibleTasks(data);
+    const depths = new Set(visible.map((t) => t.depth));
+    expect(depths.has(0)).toBe(true);
+    expect(depths.has(1)).toBe(true);
+  });
+
+  it('getDefaultTasks should have valid task data (all pass validateTask)', () => {
+    const data = getDefaultTasks();
+    for (const task of data.tasks) {
+      const result = validateTask(task);
+      expect(result.valid).toBe(true);
+    }
+  });
+
+  it('getDefaultTasks dependencies should reference existing tasks', () => {
+    const data = getDefaultTasks();
+    const allIds = new Set(data.tasks.map((t) => t.id));
+    for (const task of data.tasks) {
+      for (const depId of task.dependencies) {
+        expect(allIds.has(depId)).toBe(true);
+      }
+    }
+  });
+});
+
+describe('ganttUtils - dateToPx / pxToDate roundtrip', () => {
+  const rangeStart = new Date(2025, 0, 1);
+
+  it('dateToPx followed by pxToDate returns same day (day view)', () => {
+    const target = new Date(2025, 0, 15);
+    const px = dateToPx(target, rangeStart, ZOOM_LEVELS.DAY);
+    const roundTrip = pxToDate(px, rangeStart, ZOOM_LEVELS.DAY);
+    expect(isSameDay(target, roundTrip)).toBe(true);
+  });
+
+  it('dateToPx followed by pxToDate returns same day (week view)', () => {
+    const target = new Date(2025, 0, 15);
+    const px = dateToPx(target, rangeStart, ZOOM_LEVELS.WEEK);
+    const roundTrip = pxToDate(px, rangeStart, ZOOM_LEVELS.WEEK);
+    expect(isSameDay(target, roundTrip)).toBe(true);
+  });
+
+  it('dateToPx followed by pxToDate returns same day (month view)', () => {
+    const target = new Date(2025, 0, 15);
+    const px = dateToPx(target, rangeStart, ZOOM_LEVELS.MONTH);
+    const roundTrip = pxToDate(px, rangeStart, ZOOM_LEVELS.MONTH);
+    expect(isSameDay(target, roundTrip)).toBe(true);
+  });
+
+  it('dateToPx for same day as rangeStart should be 0', () => {
+    expect(dateToPx(rangeStart, rangeStart, ZOOM_LEVELS.DAY)).toBe(0);
+  });
+
+  it('pxToDate for 0 pixels should be rangeStart', () => {
+    const result = pxToDate(0, rangeStart, ZOOM_LEVELS.DAY);
+    expect(isSameDay(result, rangeStart)).toBe(true);
+  });
+
+  it('dateToPx returns consistent value with DAY_WIDTH constant', () => {
+    const target = addDays(rangeStart, 10);
+    const px = dateToPx(target, rangeStart, ZOOM_LEVELS.DAY);
+    expect(px).toBe(10 * DAY_WIDTH[ZOOM_LEVELS.DAY]);
+  });
+
+  it('calculateBarPosition uses dateToPx internally', () => {
+    const task = {
+      startDate: formatDate(addDays(rangeStart, 2)),
+      endDate: formatDate(addDays(rangeStart, 7)),
+    };
+    const pos = calculateBarPosition(task, rangeStart, ZOOM_LEVELS.DAY);
+    const dayWidth = DAY_WIDTH[ZOOM_LEVELS.DAY];
+    expect(pos.left).toBe(2 * dayWidth);
+    expect(pos.width).toBe(6 * dayWidth);
+  });
+});
+
+describe('ganttUtils - Multi-level hierarchy', () => {
+  function createDeepHierarchyState() {
+    return {
+      tasks: [
+        { id: 'l1', name: 'Level 1', assignee: 'A', progress: 0, startDate: '2025-01-01', endDate: '2025-01-31', parentId: null, dependencies: [], expanded: true },
+        { id: 'l2a', name: 'Level 2a', assignee: 'A', progress: 0, startDate: '2025-01-01', endDate: '2025-01-15', parentId: 'l1', dependencies: [], expanded: true },
+        { id: 'l2b', name: 'Level 2b', assignee: 'A', progress: 0, startDate: '2025-01-16', endDate: '2025-01-31', parentId: 'l1', dependencies: [], expanded: true },
+        { id: 'l3a', name: 'Level 3a', assignee: 'A', progress: 0, startDate: '2025-01-01', endDate: '2025-01-07', parentId: 'l2a', dependencies: [], expanded: false },
+        { id: 'l3b', name: 'Level 3b', assignee: 'A', progress: 0, startDate: '2025-01-08', endDate: '2025-01-15', parentId: 'l2a', dependencies: [], expanded: false },
+        { id: 'l4a', name: 'Level 4', assignee: 'A', progress: 0, startDate: '2025-01-01', endDate: '2025-01-03', parentId: 'l3a', dependencies: [], expanded: false },
+      ],
+    };
+  }
+
+  it('getVisibleTasks should respect multi-level expansion', () => {
+    const state = createDeepHierarchyState();
+    const visible = getVisibleTasks(state);
+    const ids = visible.map((t) => t.id);
+    expect(ids).toEqual(['l1', 'l2a', 'l3a', 'l3b', 'l2b']);
+  });
+
+  it('getVisibleTasks assigns correct depth at each level', () => {
+    const state = createDeepHierarchyState();
+    const visible = getVisibleTasks(state);
+    const byId = Object.fromEntries(visible.map((t) => [t.id, t]));
+    expect(byId['l1'].depth).toBe(0);
+    expect(byId['l2a'].depth).toBe(1);
+    expect(byId['l2b'].depth).toBe(1);
+    expect(byId['l3a'].depth).toBe(2);
+    expect(byId['l3b'].depth).toBe(2);
+  });
+
+  it('collapsing level 2 hides level 3 tasks', () => {
+    const state = createDeepHierarchyState();
+    const collapsed = toggleExpanded(state, 'l2a');
+    const visible = getVisibleTasks(collapsed);
+    const ids = visible.map((t) => t.id);
+    expect(ids).toEqual(['l1', 'l2a', 'l2b']);
+    expect(ids).not.toContain('l3a');
+    expect(ids).not.toContain('l3b');
+  });
+
+  it('deleteTask at level 1 removes all descendants', () => {
+    const state = createDeepHierarchyState();
+    const result = deleteTask(state, 'l1');
+    expect(result.tasks.length).toBe(0);
+  });
+
+  it('deleteTask at level 2 removes only its subtree', () => {
+    const state = createDeepHierarchyState();
+    const result = deleteTask(state, 'l2a');
+    const ids = result.tasks.map((t) => t.id);
+    expect(ids).toEqual(['l1', 'l2b']);
+  });
+
+  it('getChildren returns only direct children', () => {
+    const state = createDeepHierarchyState();
+    const l1Children = getChildren(state, 'l1');
+    expect(l1Children.map((t) => t.id).sort()).toEqual(['l2a', 'l2b'].sort());
+    const l2aChildren = getChildren(state, 'l2a');
+    expect(l2aChildren.map((t) => t.id).sort()).toEqual(['l3a', 'l3b'].sort());
+  });
+
+  it('addTask with nested parentId works', () => {
+    const state = createDeepHierarchyState();
+    const result = addTask(state, { name: 'new child' }, 'l3b');
+    const newTask = result.tasks.find((t) => t.name === 'new child');
+    expect(newTask.parentId).toBe('l3b');
+  });
+
+  it('getTaskRowIndex handles deep hierarchy correctly', () => {
+    const state = createDeepHierarchyState();
+    const visible = getVisibleTasks(state);
+    visible.forEach((t, idx) => {
+      expect(getTaskRowIndex(state, t.id)).toBe(idx);
+    });
+  });
+});
+
+describe('ganttUtils - validateTask field-level validation', () => {
+  it('validateTask returns specific error for name field', () => {
+    const result = validateTask({ name: '   ' });
+    expect(result.valid).toBe(false);
+    expect(result.errors.name).toBeTruthy();
+  });
+
+  it('validateTask returns specific error for progress field', () => {
+    const result = validateTask({ name: 'OK', progress: 101 });
+    expect(result.valid).toBe(false);
+    expect(result.errors.progress).toBeTruthy();
+  });
+
+  it('validateTask returns specific error for invalid startDate', () => {
+    const result = validateTask({ name: 'OK', startDate: 'not-a-date' });
+    expect(result.valid).toBe(false);
+    expect(result.errors.startDate).toBeTruthy();
+  });
+
+  it('validateTask returns specific error for invalid endDate', () => {
+    const result = validateTask({ name: 'OK', endDate: 'not-a-date' });
+    expect(result.valid).toBe(false);
+    expect(result.errors.endDate).toBeTruthy();
+  });
+
+  it('validateTask returns multiple errors when multiple fields invalid', () => {
+    const result = validateTask({
+      name: '',
+      progress: 150,
+      startDate: 'bad',
+    });
+    expect(result.valid).toBe(false);
+    expect(Object.keys(result.errors).length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('validateTask partial updates: valid name only still valid', () => {
+    const partial = { name: 'Valid Name' };
+    const result = validateTask(partial);
+    expect(result.valid).toBe(true);
+  });
+
+  it('validateTask partial updates: progress update validates progress', () => {
+    const partial = { name: 'OK', progress: -5 };
+    const result = validateTask(partial);
+    expect(result.valid).toBe(false);
+    expect(result.errors.progress).toBeTruthy();
+  });
+
+  it('validateTask accepts progress exactly at boundaries', () => {
+    expect(validateTask({ name: 'OK', progress: 0 }).valid).toBe(true);
+    expect(validateTask({ name: 'OK', progress: 100 }).valid).toBe(true);
+  });
+});
+
+describe('ganttUtils - Zoom level position calculations', () => {
+  const rangeStart = new Date(2025, 0, 1);
+  const task = { startDate: '2025-01-05', endDate: '2025-01-12' };
+
+  it('calculateBarPosition produces smaller widths in month view', () => {
+    const dayPos = calculateBarPosition(task, rangeStart, ZOOM_LEVELS.DAY);
+    const monthPos = calculateBarPosition(task, rangeStart, ZOOM_LEVELS.MONTH);
+    expect(monthPos.width).toBeLessThan(dayPos.width);
+  });
+
+  it('calculateBarPosition scales linearly with DAY_WIDTH', () => {
+    const dayPos = calculateBarPosition(task, rangeStart, ZOOM_LEVELS.DAY);
+    const weekPos = calculateBarPosition(task, rangeStart, ZOOM_LEVELS.WEEK);
+    const dayWidth = DAY_WIDTH[ZOOM_LEVELS.DAY];
+    const weekWidth = DAY_WIDTH[ZOOM_LEVELS.WEEK];
+    const ratio = weekWidth / dayWidth;
+    expect(Math.abs(weekPos.width - dayPos.width * ratio)).toBeLessThan(1);
+  });
+
+  it('getDependencyPath x-coordinates scale with zoom', () => {
+    const state = createSimpleState();
+    const t1 = getTask(state, 't1');
+    const t2 = getTask(state, 't2');
+    const dayPath = getDependencyPath(t1, t2, state, rangeStart, ZOOM_LEVELS.DAY);
+    const weekPath = getDependencyPath(t1, t2, state, rangeStart, ZOOM_LEVELS.WEEK);
+    expect(dayPath.x1).toBeGreaterThan(weekPath.x1);
+    expect(dayPath.x2).toBeGreaterThan(weekPath.x2);
   });
 });

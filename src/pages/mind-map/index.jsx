@@ -219,15 +219,13 @@ function MindMapPage() {
     img.src = url
   }, [tree])
 
-  const handleContextMenu = useCallback((e) => {
-    e.preventDefault()
-    if (selectedId) {
-      setContextMenu({
-        x: e.clientX,
-        y: e.clientY,
-      })
-    }
-  }, [selectedId])
+  const handleNodeContextMenu = useCallback((nodeId, clientX, clientY) => {
+    setSelectedId(nodeId)
+    setContextMenu({
+      x: clientX,
+      y: clientY,
+    })
+  }, [])
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -295,7 +293,7 @@ function MindMapPage() {
   )
 
   return (
-    <div className="mind-map-page" onContextMenu={handleContextMenu}>
+    <div className="mind-map-page">
       <div className="mind-map-header">
         <div className="mind-map-header-left">
           <Link to="/" className="mind-back-link">← 返回首页</Link>
@@ -367,6 +365,7 @@ function MindMapPage() {
           onToggleCollapse={handleToggleCollapse}
           onEditNode={handleEditNode}
           onMoveNode={handleMoveNode}
+          onNodeContextMenu={handleNodeContextMenu}
           pan={pan}
           zoom={zoom}
           onPanChange={setPan}

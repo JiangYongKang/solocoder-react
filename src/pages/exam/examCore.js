@@ -149,32 +149,60 @@ export function paginateQuestions(questions, page = 1, pageSize = 10) {
   return { items, total, totalPages, page: safePage, pageSize }
 }
 
-export function generateExam(questions, { name = '', duration = 60, totalScore = 100 } = {}) {
-  if (!Array.isArray(questions) || questions.length === 0) {
-    return { ok: false, message: '题库为空，请先添加题目' }
+export function shuffleArray(arr) {
+  if (!Array.isArray(arr)) return []
+  const result = [...arr]
+  for (let i = result.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1))
+    const tmp = result[i]
+    result[i] = result[j]
+    result[j] = tmp
   }
-  const totalBankScore = questions.reduce((sum, q) => sum + (Number(q.score) || 0), 0)
-  if (totalBankScore < totalScore) {
-    return {
-      ok: false,
-      message: `题库总分（${totalBankScore}）不足，无法组出总分 ${totalScore} 的试卷`,
-    }
-  }
+  return result
+}
 
-  const shuffled = [...questions].sort(() => Math.random() - 0.5)
+function greedyPick(questions, targetScore) {
+  const shuffled = shuffleArray(questions)
   const selected = []
   let accumulated = 0
-
   for (const q of shuffled) {
-    if (accumulated >= totalScore) break
+    if (accumulated >= targetScore) break
     const qScore = Number(q.score) || 0
-    if (accumulated + qScore <= totalScore + 5) {
+    if (accumulated + qScore <= targetScore) {
       selected.push(q)
       accumulated += qScore
     }
   }
+  return { selected, accumulated }
+}
 
-  if (selected.length === 0) {
+export function generateExam(questions, { name = '', duration = 60, totalScore = 100 } = {}) {
+  if (!Array.isArray(questions) || questions.length === 0) {
+    return { ok: false, message: '题库为空，请先添加题目' }
+  }
+  const targetScore = Number(totalScore) || 100
+  const totalBankScore = questions.reduce((sum, q) => sum + (Number(q.score) || 0), 0)
+  if (totalBankScore < targetScore) {
+    return {
+      ok: false,
+      message: `题库总分（${totalBankScore}）不足，无法组出总分 ${targetScore} 的试卷`,
+    }
+  }
+
+  const MAX_ATTEMPTS = 100
+  let best = null
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
+    const pick = greedyPick(questions, targetScore)
+    if (pick.accumulated === targetScore) {
+      best = pick
+      break
+    }
+    if (!best || Math.abs(pick.accumulated - targetScore) < Math.abs(best.accumulated - targetScore)) {
+      best = pick
+    }
+  }
+
+  if (!best || best.selected.length === 0) {
     return { ok: false, message: '未能选出合适的题目，请调整总分或检查题库' }
   }
 
@@ -182,9 +210,10 @@ export function generateExam(questions, { name = '', duration = 60, totalScore =
     id: generateId('exam'),
     name: name || `考试_${new Date().toLocaleDateString()}`,
     duration: Number(duration) || 60,
-    totalScore: accumulated,
-    targetScore: Number(totalScore) || 100,
-    questions: selected,
+    totalScore: best.accumulated,
+    targetScore,
+    questions: best.selected,
+    isExactScore: best.accumulated === targetScore,
     createdAt: Date.now(),
   }
 
@@ -222,6 +251,36 @@ export function clearExamDraft(examId) {
     return true
   } catch {
     return false
+  }
+}
+
+export function findActiveExamDraft() {
+  if (typeof window === 'undefined' || !window.localStorage) return null
+  try {
+    const prefixLen = EXAM_DRAFT_STORAGE_PREFIX.length
+    let latest = null
+    for (let i = 0; i < window.localStorage.length; i += 1) {
+      const key = window.localStorage.key(i)
+      if (key && key.startsWith(EXAM_DRAFT_STORAGE_PREFIX)) {
+        const raw = window.localStorage.getItem(key)
+        if (!raw) continue
+        const parsed = JSON.parse(raw)
+        if (!parsed || !parsed.exam) continue
+        const durationMs = (Number(parsed.exam.duration) || 0) * 60 * 1000
+        const startedAt = Number(parsed.startedAt) || 0
+        if (durationMs > 0 && startedAt > 0 && Date.now() - startedAt >= durationMs) {
+          window.localStorage.removeItem(key)
+          continue
+        }
+        if (!latest || (parsed.savedAt || 0) >= (latest.savedAt || 0)) {
+          latest = parsed
+          latest.examId = key.slice(prefixLen)
+        }
+      }
+    }
+    return latest
+  } catch {
+    return null
   }
 }
 

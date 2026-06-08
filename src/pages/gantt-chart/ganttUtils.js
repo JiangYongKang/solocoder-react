@@ -87,10 +87,20 @@ export function getDefaultTasks() {
   const t10 = formatDate(addDays(today, 10));
   const t14 = formatDate(addDays(today, 14));
 
+  const id1 = generateId();
+  const id2 = generateId();
+  const id3 = generateId();
+  const id4 = generateId();
+  const id5 = generateId();
+  const id6 = generateId();
+  const id7 = generateId();
+  const id8 = generateId();
+  const id9 = generateId();
+
   return {
     tasks: [
       {
-        id: generateId(),
+        id: id1,
         name: '项目启动与规划',
         assignee: '张三',
         progress: 100,
@@ -101,91 +111,91 @@ export function getDefaultTasks() {
         expanded: true,
       },
       {
-        id: generateId(),
+        id: id2,
         name: '需求调研',
         assignee: '李四',
         progress: 100,
         startDate: t1,
         endDate: t3,
-        parentId: null,
+        parentId: id1,
         dependencies: [],
         expanded: false,
       },
       {
-        id: generateId(),
+        id: id3,
         name: '技术方案设计',
         assignee: '王五',
         progress: 60,
         startDate: t3,
         endDate: t7,
         parentId: null,
-        dependencies: [],
+        dependencies: [id1],
         expanded: true,
       },
       {
-        id: generateId(),
+        id: id4,
         name: '前端架构设计',
         assignee: '赵六',
         progress: 80,
         startDate: t3,
         endDate: t5,
-        parentId: null,
+        parentId: id3,
         dependencies: [],
         expanded: false,
       },
       {
-        id: generateId(),
+        id: id5,
         name: '后端架构设计',
         assignee: '孙七',
         progress: 40,
         startDate: t5,
         endDate: t7,
-        parentId: null,
-        dependencies: [],
+        parentId: id3,
+        dependencies: [id4],
         expanded: false,
       },
       {
-        id: generateId(),
+        id: id6,
         name: '开发与测试',
         assignee: '周八',
         progress: 20,
         startDate: t7,
         endDate: t14,
         parentId: null,
-        dependencies: [],
+        dependencies: [id3],
         expanded: true,
       },
       {
-        id: generateId(),
+        id: id7,
         name: '前端开发',
         assignee: '赵六',
         progress: 30,
         startDate: t7,
         endDate: t10,
-        parentId: null,
-        dependencies: [],
+        parentId: id6,
+        dependencies: [id4],
         expanded: false,
       },
       {
-        id: generateId(),
+        id: id8,
         name: '后端开发',
         assignee: '孙七',
         progress: 15,
         startDate: t7,
         endDate: t10,
-        parentId: null,
-        dependencies: [],
+        parentId: id6,
+        dependencies: [id5],
         expanded: false,
       },
       {
-        id: generateId(),
+        id: id9,
         name: '集成测试',
         assignee: '李四',
         progress: 0,
         startDate: t10,
         endDate: t14,
-        parentId: null,
-        dependencies: [],
+        parentId: id6,
+        dependencies: [id7, id8],
         expanded: false,
       },
     ],

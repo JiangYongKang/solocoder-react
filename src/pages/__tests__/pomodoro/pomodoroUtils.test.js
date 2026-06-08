@@ -1,9 +1,10 @@
-import { describe, it, expect, beforeEach, beforeAll, afterAll } from 'vitest'
+import { describe, it, expect, beforeEach, beforeAll, afterAll, vi } from 'vitest'
 import {
   PHASES,
   DEFAULT_SETTINGS,
   STORAGE_KEY_SETTINGS,
   STORAGE_KEY_RECORDS,
+  STORAGE_KEY_TIMER_STATE,
 } from '../../pomodoro/constants'
 import {
   formatTime,
@@ -22,6 +23,14 @@ import {
   getLastNDays,
   buildDailyStats,
   calculateSummary,
+  updateDocumentTitle,
+  resetDocumentTitle,
+  requestNotificationPermission,
+  sendNotification,
+  playBeep,
+  saveTimerState,
+  loadTimerState,
+  clearTimerState,
 } from '../../pomodoro/pomodoroUtils'
 
 const createMockLocalStorage = () => {
@@ -41,14 +50,35 @@ const createMockLocalStorage = () => {
 }
 
 let originalLocalStorage
+let originalDocument
+let originalNotification
+let originalAudioContext
+let originalWebkitAudioContext
 
 beforeAll(() => {
   originalLocalStorage = globalThis.localStorage
   globalThis.localStorage = createMockLocalStorage()
+  originalDocument = globalThis.document
 })
 
 afterAll(() => {
   globalThis.localStorage = originalLocalStorage
+  globalThis.document = originalDocument
+  if (originalNotification !== undefined) {
+    globalThis.Notification = originalNotification
+  } else {
+    delete globalThis.Notification
+  }
+  if (originalAudioContext !== undefined) {
+    globalThis.AudioContext = originalAudioContext
+  } else {
+    delete globalThis.AudioContext
+  }
+  if (originalWebkitAudioContext !== undefined) {
+    globalThis.webkitAudioContext = originalWebkitAudioContext
+  } else {
+    delete globalThis.webkitAudioContext
+  }
 })
 
 describe('formatTime', () => {
@@ -343,6 +373,30 @@ describe('addRecord', () => {
     const result = addRecord(existing, null)
     expect(result).toBe(existing)
   })
+
+  it('records 为 undefined 时返回空数组', () => {
+    const result = addRecord(undefined, { id: 'new' })
+    expect(Array.isArray(result)).toBe(true)
+    expect(result.length).toBe(1)
+    expect(result[0].id).toBe('new')
+  })
+
+  it('records 为 null 时返回空数组', () => {
+    const result = addRecord(null, { id: 'new' })
+    expect(Array.isArray(result)).toBe(true)
+    expect(result.length).toBe(1)
+  })
+
+  it('records 为非数组时返回只包含新记录的数组', () => {
+    const result = addRecord('not-array', { id: 'new' })
+    expect(Array.isArray(result)).toBe(true)
+    expect(result).toEqual([{ id: 'new' }])
+  })
+
+  it('records 无效且新记录也无效时返回空数组', () => {
+    expect(addRecord(undefined, null)).toEqual([])
+    expect(addRecord(null, undefined)).toEqual([])
+  })
 })
 
 describe('getDateKey', () => {
@@ -448,5 +502,319 @@ describe('calculateSummary', () => {
     expect(summary.totalHours).toBe(0)
     expect(summary.remainingMinutes).toBe(0)
     expect(summary.dailyAvg).toBe(0)
+  })
+})
+
+describe('updateDocumentTitle', () => {
+  it('document 不存在时不报错', () => {
+    const origDoc = globalThis.document
+    delete globalThis.document
+    expect(() => updateDocumentTitle(1500, '工作中')).not.toThrow()
+    globalThis.document = origDoc
+  })
+
+  it('剩余秒数大于0时更新标题', () => {
+    globalThis.document = { title: '' }
+    updateDocumentTitle(1500, '工作中')
+    expect(globalThis.document.title).toBe('25:00 - 工作中')
+  })
+
+  it('剩余秒数为0时显示默认标题', () => {
+    globalThis.document = { title: '' }
+    updateDocumentTitle(0, '工作中')
+    expect(globalThis.document.title).toBe('番茄钟计时器')
+  })
+})
+
+describe('resetDocumentTitle', () => {
+  it('document 不存在时不报错', () => {
+    const origDoc = globalThis.document
+    delete globalThis.document
+    expect(() => resetDocumentTitle()).not.toThrow()
+    globalThis.document = origDoc
+  })
+
+  it('重置标题为默认值', () => {
+    globalThis.document = { title: '25:00 - 工作中' }
+    resetDocumentTitle()
+    expect(globalThis.document.title).toBe('番茄钟计时器')
+  })
+})
+
+describe('requestNotificationPermission', () => {
+  it('Notification 不存在时返回 unsupported', async () => {
+    const origNotif = globalThis.Notification
+    delete globalThis.Notification
+    const result = await requestNotificationPermission()
+    expect(result).toBe('unsupported')
+    globalThis.Notification = origNotif
+  })
+
+  it('权限已授权时返回 granted', async () => {
+    globalThis.Notification = { permission: 'granted' }
+    const result = await requestNotificationPermission()
+    expect(result).toBe('granted')
+  })
+
+  it('权限已拒绝时返回 denied', async () => {
+    globalThis.Notification = { permission: 'denied' }
+    const result = await requestNotificationPermission()
+    expect(result).toBe('denied')
+  })
+
+  it('用户授权时返回 granted', async () => {
+    globalThis.Notification = {
+      permission: 'default',
+      requestPermission: vi.fn().mockResolvedValue('granted'),
+    }
+    const result = await requestNotificationPermission()
+    expect(result).toBe('granted')
+    expect(globalThis.Notification.requestPermission).toHaveBeenCalled()
+  })
+
+  it('用户拒绝时返回 denied', async () => {
+    globalThis.Notification = {
+      permission: 'default',
+      requestPermission: vi.fn().mockResolvedValue('denied'),
+    }
+    const result = await requestNotificationPermission()
+    expect(result).toBe('denied')
+  })
+
+  it('requestPermission 抛错时返回 denied', async () => {
+    globalThis.Notification = {
+      permission: 'default',
+      requestPermission: vi.fn().mockRejectedValue(new Error('denied')),
+    }
+    const result = await requestNotificationPermission()
+    expect(result).toBe('denied')
+  })
+})
+
+describe('sendNotification', () => {
+  it('Notification 不存在时返回 false', () => {
+    const origNotif = globalThis.Notification
+    delete globalThis.Notification
+    expect(sendNotification('test', 'body')).toBe(false)
+    globalThis.Notification = origNotif
+  })
+
+  it('权限未授权时返回 false', () => {
+    globalThis.Notification = { permission: 'denied' }
+    expect(sendNotification('test', 'body')).toBe(false)
+  })
+
+  it('权限已授权时成功发送通知', () => {
+    const mockNotification = vi.fn()
+    globalThis.Notification = {
+      permission: 'granted',
+    }
+    globalThis.Notification = mockNotification
+    globalThis.Notification.permission = 'granted'
+
+    const result = sendNotification('测试标题', '测试内容')
+    expect(result).toBe(true)
+  })
+
+  it('构造 Notification 抛错时返回 false', () => {
+    globalThis.Notification = function () {
+      throw new Error('error')
+    }
+    globalThis.Notification.permission = 'granted'
+    const result = sendNotification('test', 'body')
+    expect(result).toBe(false)
+  })
+})
+
+describe('playBeep', () => {
+  it('AudioContext 和 webkitAudioContext 都不存在时返回 false', () => {
+    const origAC = globalThis.AudioContext
+    const origWAC = globalThis.webkitAudioContext
+    delete globalThis.AudioContext
+    delete globalThis.webkitAudioContext
+    expect(playBeep()).toBe(false)
+    globalThis.AudioContext = origAC
+    globalThis.webkitAudioContext = origWAC
+  })
+
+  it('AudioContext 存在时成功播放', () => {
+    const mockGain = {
+      gain: { setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() },
+      connect: vi.fn(),
+    }
+    const mockOscillator = {
+      connect: vi.fn(),
+      frequency: { value: 0 },
+      start: vi.fn(),
+      stop: vi.fn(),
+    }
+    const mockCtx = {
+      createOscillator: vi.fn().mockReturnValue(mockOscillator),
+      createGain: vi.fn().mockReturnValue(mockGain),
+      destination: {},
+      currentTime: 0,
+    }
+    function MockAudioContext() {
+      return mockCtx
+    }
+    const spy = vi.fn(MockAudioContext)
+
+    globalThis.AudioContext = spy
+    delete globalThis.webkitAudioContext
+
+    const result = playBeep()
+    expect(result).toBe(true)
+    expect(spy).toHaveBeenCalled()
+    expect(mockCtx.createOscillator).toHaveBeenCalled()
+    expect(mockCtx.createGain).toHaveBeenCalled()
+    expect(mockOscillator.frequency.value).toBe(880)
+    expect(mockOscillator.start).toHaveBeenCalled()
+    expect(mockOscillator.stop).toHaveBeenCalled()
+  })
+
+  it('AudioContext 抛错时返回 false', () => {
+    globalThis.AudioContext = function () {
+      throw new Error('error')
+    }
+    const result = playBeep()
+    expect(result).toBe(false)
+  })
+})
+
+describe('timer state localStorage operations', () => {
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  it('saveTimerState 保存到 localStorage', () => {
+    const state = {
+      currentPhase: PHASES.WORK,
+      remainingSeconds: 1000,
+      totalSeconds: 1500,
+      completedWorkPomodoros: 2,
+      currentTask: '测试任务',
+    }
+    const result = saveTimerState(state)
+    expect(result).toBe(true)
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY_TIMER_STATE))
+    expect(saved.currentPhase).toBe(PHASES.WORK)
+    expect(saved.remainingSeconds).toBe(1000)
+    expect(saved.totalSeconds).toBe(1500)
+    expect(saved.completedWorkPomodoros).toBe(2)
+    expect(saved.currentTask).toBe('测试任务')
+    expect(typeof saved.savedAt).toBe('number')
+  })
+
+  it('saveTimerState 出错时返回 false', () => {
+    const origSetItem = localStorage.setItem
+    localStorage.setItem = vi.fn().mockImplementation(() => {
+      throw new Error('quota exceeded')
+    })
+    const result = saveTimerState({ currentPhase: PHASES.WORK, remainingSeconds: 0, totalSeconds: 0, completedWorkPomodoros: 0, currentTask: '' })
+    expect(result).toBe(false)
+    localStorage.setItem = origSetItem
+  })
+
+  it('loadTimerState 从 localStorage 读取并验证', () => {
+    const saved = {
+      currentPhase: PHASES.WORK,
+      remainingSeconds: 1000,
+      totalSeconds: 1500,
+      completedWorkPomodoros: 2,
+      currentTask: '测试任务',
+      savedAt: Date.now(),
+    }
+    localStorage.setItem(STORAGE_KEY_TIMER_STATE, JSON.stringify(saved))
+    const result = loadTimerState(DEFAULT_SETTINGS)
+    expect(result).not.toBeNull()
+    expect(result.currentPhase).toBe(PHASES.WORK)
+    expect(result.remainingSeconds).toBe(1000)
+    expect(result.totalSeconds).toBe(1500)
+    expect(result.completedWorkPomodoros).toBe(2)
+    expect(result.currentTask).toBe('测试任务')
+  })
+
+  it('loadTimerState localStorage 为空时返回 null', () => {
+    expect(loadTimerState(DEFAULT_SETTINGS)).toBeNull()
+  })
+
+  it('loadTimerState 数据损坏时返回 null', () => {
+    localStorage.setItem(STORAGE_KEY_TIMER_STATE, 'invalid json')
+    expect(loadTimerState(DEFAULT_SETTINGS)).toBeNull()
+  })
+
+  it('loadTimerState 阶段无效时返回 null', () => {
+    localStorage.setItem(STORAGE_KEY_TIMER_STATE, JSON.stringify({ currentPhase: 'invalid' }))
+    expect(loadTimerState(DEFAULT_SETTINGS)).toBeNull()
+  })
+
+  it('loadTimerState 限制 remainingSeconds 不超过阶段时长', () => {
+    const saved = {
+      currentPhase: PHASES.WORK,
+      remainingSeconds: 9999,
+      totalSeconds: 9999,
+      completedWorkPomodoros: 0,
+      currentTask: '',
+    }
+    localStorage.setItem(STORAGE_KEY_TIMER_STATE, JSON.stringify(saved))
+    const result = loadTimerState(DEFAULT_SETTINGS)
+    expect(result.remainingSeconds).toBe(25 * 60)
+    expect(result.totalSeconds).toBe(25 * 60)
+  })
+
+  it('loadTimerState 负数的 remainingSeconds 被限制为 0', () => {
+    const saved = {
+      currentPhase: PHASES.WORK,
+      remainingSeconds: -100,
+      totalSeconds: 1500,
+      completedWorkPomodoros: 0,
+      currentTask: '',
+    }
+    localStorage.setItem(STORAGE_KEY_TIMER_STATE, JSON.stringify(saved))
+    const result = loadTimerState(DEFAULT_SETTINGS)
+    expect(result.remainingSeconds).toBe(0)
+  })
+
+  it('loadTimerState 处理 completedWorkPomodoros 无效值', () => {
+    const saved = {
+      currentPhase: PHASES.WORK,
+      remainingSeconds: 100,
+      totalSeconds: 1500,
+      completedWorkPomodoros: 'invalid',
+      currentTask: '',
+    }
+    localStorage.setItem(STORAGE_KEY_TIMER_STATE, JSON.stringify(saved))
+    const result = loadTimerState(DEFAULT_SETTINGS)
+    expect(result.completedWorkPomodoros).toBe(0)
+  })
+
+  it('loadTimerState currentTask 非字符串时返回空字符串', () => {
+    const saved = {
+      currentPhase: PHASES.WORK,
+      remainingSeconds: 100,
+      totalSeconds: 1500,
+      completedWorkPomodoros: 0,
+      currentTask: 123,
+    }
+    localStorage.setItem(STORAGE_KEY_TIMER_STATE, JSON.stringify(saved))
+    const result = loadTimerState(DEFAULT_SETTINGS)
+    expect(result.currentTask).toBe('')
+  })
+
+  it('clearTimerState 清除存储的状态', () => {
+    localStorage.setItem(STORAGE_KEY_TIMER_STATE, JSON.stringify({ foo: 'bar' }))
+    const result = clearTimerState()
+    expect(result).toBe(true)
+    expect(localStorage.getItem(STORAGE_KEY_TIMER_STATE)).toBeNull()
+  })
+
+  it('clearTimerState 出错时返回 false', () => {
+    const origRemoveItem = localStorage.removeItem
+    localStorage.removeItem = vi.fn().mockImplementation(() => {
+      throw new Error('error')
+    })
+    const result = clearTimerState()
+    expect(result).toBe(false)
+    localStorage.removeItem = origRemoveItem
   })
 })

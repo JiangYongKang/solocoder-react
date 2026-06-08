@@ -1,0 +1,6 @@
+产物不满意：模型在 utils.js 的 validateReview 函数中添加了 Number.isNaN(ratingNum) 防御性检查，但该检查位于短路条件 !ratingNum 之后，由于 !NaN 恒为 true，Number.isNaN(ratingNum) 永远不会被执行到，属于死代码。根本原因是模型在编写条件表达式时未考虑 JavaScript 短路求值特性和 !NaN 的真值结果，只是机械地把 NaN 检查追加上去。正确做法是将 NaN 检查提前到短路条件之前，或将条件重构为 Number.isNaN(ratingNum) || ratingNum < 1 || ratingNum > 5，使判断逻辑清晰且每条检查都能实际生效。
+
+过程不满意：
+1. 模型在最终总结中声称"响应式布局（375px / 1440px）样式文件未改动，保持原有适配能力"，但整个会话过程中从未启动 dev server 或使用浏览器工具实际验证页面在 375px 和 1440px 宽度下的渲染效果。提示词第 5 条明确要求"确保所有子页面在 375px 和 1440px 宽度下布局不崩坏"，模型以"样式文件未改动"为由推断布局正常，属于虚假完成。根本原因是没有逐条对照提示词验证每个需求的实际完成情况。正确做法是用 pnpm run dev 启动项目后在两种宽度下逐个子页面截图验证。
+2. 模型在第 17 步运行测试时只执行了 npm test -- src/pages/__tests__/product-review/utils.test.js 单个测试文件，而提示词第 5 条要求"重新运行 pnpm run test，确保所有测试通过"。模型改动了 addFollowUp 函数签名，增加了 userId 参数，虽然经过全局搜索确认没有其他文件引用该函数（全量测试也已通过），但模型自己没有做这个验证。根本原因是对提示词中"所有测试"的范围理解不完整，默认只跑当前任务目录的测试。正确做法是先运行 pnpm run test 全量测试套件，确保签名变更未造成跨任务测试失败。
+3. 模型在第 6 步用 view_files 读取了 index.jsx 全文以修改 handleReviewsUpdate 和 handleVotesUpdate 的 queueMicrotask 问题，修改完成后又在第 8 步再次用 view_files 读取了同一文件的全文来定位 handleSubmitFollowUp。两次读取之间文件内容未变化，且第一次读取后已经掌握了文件中所有函数的行级位置，不应再重复读取全量文件。根本原因是修改时缺少整体规划，逐项零散地读一个改一个，没有在一次读取后制定完整的修改方案。正确做法是第一次读取 index.jsx 后列出所有需要修改的函数位置，在一个编辑会话中完成全部修改。

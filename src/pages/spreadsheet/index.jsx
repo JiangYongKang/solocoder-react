@@ -24,6 +24,8 @@ import {
   insertCol,
   deleteCol,
   applyStyleToSelection,
+  saveToLocalStorage,
+  loadFromLocalStorage,
 } from './spreadsheetUtils'
 
 const ALIGN_OPTIONS = [
@@ -33,7 +35,10 @@ const ALIGN_OPTIONS = [
 ]
 
 const SpreadsheetPage = () => {
-  const [state, setState] = useState(() => createInitialState())
+  const [state, setState] = useState(() => {
+    const saved = loadFromLocalStorage()
+    return saved || createInitialState()
+  })
   const [selection, setSelection] = useState({
     start: { row: 0, col: 0 },
     end: { row: 0, col: 0 },
@@ -41,9 +46,11 @@ const SpreadsheetPage = () => {
   const [editing, setEditing] = useState(null)
   const [editValue, setEditValue] = useState('')
   const [contextMenu, setContextMenu] = useState(null)
+  const [errorMessage, setErrorMessage] = useState('')
   const fileInputRef = useRef(null)
   const containerRef = useRef(null)
   const editInputRef = useRef(null)
+  const globalListenersRef = useRef([])
 
   const { cells, rows, cols, colWidths, rowHeights } = state
 
@@ -166,6 +173,37 @@ const SpreadsheetPage = () => {
     setEditing(null)
   }, [])
 
+  const applyStyle = useCallback((styleUpdate) => {
+    setState(prev => ({
+      ...prev,
+      cells: applyStyleToSelection(prev.cells, selection, styleUpdate),
+    }))
+  }, [selection])
+
+  const toggleBold = useCallback(() => {
+    if (!activeCell) return
+    const currentStyle = getCellStyle(cells, activeCell.row, activeCell.col)
+    applyStyle({ bold: !currentStyle.bold })
+  }, [activeCell, cells, applyStyle])
+
+  const toggleItalic = useCallback(() => {
+    if (!activeCell) return
+    const currentStyle = getCellStyle(cells, activeCell.row, activeCell.col)
+    applyStyle({ italic: !currentStyle.italic })
+  }, [activeCell, cells, applyStyle])
+
+  const handleBgColorChange = useCallback((e) => {
+    applyStyle({ bgColor: e.target.value })
+  }, [applyStyle])
+
+  const handleFgColorChange = useCallback((e) => {
+    applyStyle({ color: e.target.value })
+  }, [applyStyle])
+
+  const setAlign = useCallback((align) => {
+    applyStyle({ align })
+  }, [applyStyle])
+
   const handleKeyDown = useCallback((e) => {
     if (editing) {
       if (e.key === 'Enter' && !e.shiftKey) {
@@ -268,6 +306,18 @@ const SpreadsheetPage = () => {
       return
     }
 
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+      e.preventDefault()
+      toggleBold()
+      return
+    }
+
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'i') {
+      e.preventDefault()
+      toggleItalic()
+      return
+    }
+
     if (e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault()
       const range = getSelectionRange()
@@ -293,7 +343,7 @@ const SpreadsheetPage = () => {
       setEditing({ row, col, key })
       setEditValue(e.key)
     }
-  }, [editing, commitEdit, cancelEdit, activeCell, rows, cols, startEditing, cells, selection, getSelectionRange])
+  }, [editing, commitEdit, cancelEdit, activeCell, rows, cols, startEditing, cells, selection, getSelectionRange, toggleBold, toggleItalic])
 
   const handleMouseDown = useCallback((row, col, e) => {
     if (e.button !== 0) return
@@ -319,10 +369,15 @@ const SpreadsheetPage = () => {
     const handleMouseUp = () => {
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
+      globalListenersRef.current = globalListenersRef.current.filter(
+        l => l.handler !== handleMouseMove && l.handler !== handleMouseUp
+      )
     }
 
     document.addEventListener('mousemove', handleMouseMove)
     document.addEventListener('mouseup', handleMouseUp)
+    globalListenersRef.current.push({ event: 'mousemove', handler: handleMouseMove })
+    globalListenersRef.current.push({ event: 'mouseup', handler: handleMouseUp })
   }, [])
 
   const handleContextMenu = useCallback((e, type, index) => {
@@ -375,10 +430,15 @@ const SpreadsheetPage = () => {
     const handleMouseUp = () => {
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
+      globalListenersRef.current = globalListenersRef.current.filter(
+        l => l.handler !== handleMouseMove && l.handler !== handleMouseUp
+      )
     }
 
     document.addEventListener('mousemove', handleMouseMove)
     document.addEventListener('mouseup', handleMouseUp)
+    globalListenersRef.current.push({ event: 'mousemove', handler: handleMouseMove })
+    globalListenersRef.current.push({ event: 'mouseup', handler: handleMouseUp })
   }, [colWidths])
 
   const handleRowResizeStart = useCallback((rowIndex, e) => {
@@ -399,42 +459,16 @@ const SpreadsheetPage = () => {
     const handleMouseUp = () => {
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
+      globalListenersRef.current = globalListenersRef.current.filter(
+        l => l.handler !== handleMouseMove && l.handler !== handleMouseUp
+      )
     }
 
     document.addEventListener('mousemove', handleMouseMove)
     document.addEventListener('mouseup', handleMouseUp)
+    globalListenersRef.current.push({ event: 'mousemove', handler: handleMouseMove })
+    globalListenersRef.current.push({ event: 'mouseup', handler: handleMouseUp })
   }, [rowHeights])
-
-  const applyStyle = useCallback((styleUpdate) => {
-    setState(prev => ({
-      ...prev,
-      cells: applyStyleToSelection(prev.cells, selection, styleUpdate),
-    }))
-  }, [selection])
-
-  const toggleBold = useCallback(() => {
-    if (!activeCell) return
-    const currentStyle = getCellStyle(cells, activeCell.row, activeCell.col)
-    applyStyle({ bold: !currentStyle.bold })
-  }, [activeCell, cells, applyStyle])
-
-  const toggleItalic = useCallback(() => {
-    if (!activeCell) return
-    const currentStyle = getCellStyle(cells, activeCell.row, activeCell.col)
-    applyStyle({ italic: !currentStyle.italic })
-  }, [activeCell, cells, applyStyle])
-
-  const handleBgColorChange = useCallback((e) => {
-    applyStyle({ bgColor: e.target.value })
-  }, [applyStyle])
-
-  const handleFgColorChange = useCallback((e) => {
-    applyStyle({ color: e.target.value })
-  }, [applyStyle])
-
-  const setAlign = useCallback((align) => {
-    applyStyle({ align })
-  }, [applyStyle])
 
   const handleExportCSV = useCallback(() => {
     exportCSV(cells, rows, cols)
@@ -471,8 +505,10 @@ const SpreadsheetPage = () => {
           rowHeights: newRowHeights,
         }
       })
+      setErrorMessage('')
     } catch {
-      // ignore
+      setErrorMessage('CSV 导入失败，请检查文件格式是否正确')
+      setTimeout(() => setErrorMessage(''), 3000)
     } finally {
       e.target.value = ''
     }
@@ -482,6 +518,19 @@ const SpreadsheetPage = () => {
     const handleClickOutside = () => setContextMenu(null)
     document.addEventListener('click', handleClickOutside)
     return () => document.removeEventListener('click', handleClickOutside)
+  }, [])
+
+  useEffect(() => {
+    saveToLocalStorage(state)
+  }, [state])
+
+  useEffect(() => {
+    return () => {
+      for (const listener of globalListenersRef.current) {
+        document.removeEventListener(listener.event, listener.handler)
+      }
+      globalListenersRef.current = []
+    }
   }, [])
 
   useEffect(() => {
@@ -697,6 +746,12 @@ const SpreadsheetPage = () => {
           </button>
         </div>
       </div>
+
+      {errorMessage && (
+        <div className="ss-error-message">
+          {errorMessage}
+        </div>
+      )}
 
       <div className="ss-container">
         <div className="ss-grid-wrapper" style={{ width: totalWidth, height: totalHeight }}>

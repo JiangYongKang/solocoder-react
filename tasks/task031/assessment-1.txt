@@ -1,0 +1,9 @@
+产物不满意：
+1. src/App.jsx 第145行使用了 `<ApiDebuggerPage />` 组件，但文件顶部 import 区域（第1-40行）中没有 `import ApiDebuggerPage from '@/pages/api-debugger/index.jsx'` 的导入语句，导致页面导航到 /api-debugger 路由时会抛出 ReferenceError，页面完全空白无法使用。根本原因是模型在修改 App.jsx 添加路由和任务卡片时只加了路由声明和 TASKS 数组条目，遗漏了对应的 import 语句。正确做法是在 App.jsx 顶部 import 区域添加导入语句，确保路由、卡片、导入三者完整。
+2. src/pages/api-debugger/index.jsx 第850-856行定义了 escapeHtmlForDisplay 函数，与 src/pages/api-debugger/apiDebuggerUtils.js 第337-342行的 escapeHtml 函数功能完全一致，存在代码重复。同时 index.jsx 第809-811行在非JSON响应体分支中直接使用了 escapeHtmlForDisplay，而JSON分支通过 highlightJson 内部调用的是 utils 中的 escapeHtml，两处使用了不同的函数但未复用一个实现。根本原因是模型在组件文件中直接写入了本应只在工具函数文件中存在的 HTML 转义逻辑，没有做好代码职责分离。正确做法是删除 index.jsx 中的 escapeHtmlForDisplay，从 apiDebuggerUtils.js 中导出 escapeHtml 并在组件中直接使用。
+
+过程不满意：
+1. 模型在接收到提示词的第一步就创建了 TodoList，随后又修订了一次，但没有先在接收提示词后分析需求范围和技术要点。根本原因是违反了"不能刚收到任务时就直接创建 TodoList，应先分析问题再规划"的规范。正确做法是先完整理解7条需求再拆解计划。
+2. 模型在修改 App.jsx 添加路由和任务卡片的过程中，多次查看该文件（至少3次），也成功添加了 /api-debugger 路由和任务卡片条目，但始终没有添加对应的 import 语句，最终产物 App.jsx 因缺少导入而无法编译通过。根本原因是模型修改文件时只关注了路由和任务卡片两处需要改动的位置，没有系统性地检查"一个页面接入需要同时完成 import、路由声明、任务卡片"这三个联动修改点。正确做法是修改 App.jsx 时应先列出所有需要改动的位置，一次性完成所有修改。
+3. 模型在执行 pnpm build 失败后，将构建失败原因完全归因为 src/pages/qrcode/tables.js 的已有语法错误，声称"与我们的代码无关"，但没有进一步排查 App.jsx 中缺少 import 是否也导致构建错误。根本原因是模型在排查构建失败时只关注了其他文件报出的错误，没有检查自己的代码是否存在编译问题。正确做法是构建失败后应分别检查报错列表中的每一项，确认哪些与自己有关、哪些是已有问题。
+4. 模型在开发过程中只运行了单元测试和 ESLint，但在编写完成后的验证阶段没有启动 pnpm run dev 来实际在浏览器中验证页面能否从首页点击进入并正常加载。如果启动了 dev server 并尝试访问该页面，浏览器控制台会立即报告 ApiDebuggerPage is not defined 的错误。根本原因是模型将测试通过和 lint 通过等同于"功能可用"，忽视了需要运行时验证的基本开发流程。正确做法是在开发完成后手动启动项目进行端到端的功能验证。

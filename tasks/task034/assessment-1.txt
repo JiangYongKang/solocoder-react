@@ -1,0 +1,11 @@
+产物不满意：
+1. 提示词第2条要求"播放列表支持清空和全部添加到队列的操作"，index.jsx 中只实现了清空按钮 handleClearPlaylist（第386行），完全没有"全部添加到队列"的功能入口和实现代码。根本原因是模型在收到提示词后立即创建 TodoList 开始编码，未对6条需求逐条拆解确认，导致遗漏此功能点。正确做法是先逐条分析需求，确认每个功能点都有对应的实现计划。
+2. 双击视频画面切换全屏与单击播放/暂停存在事件冲突：index.jsx 第492-495行在同一个 media-player-wrapper div 上同时绑定了 onClick={handleMediaClick}（togglePlay）和 onDoubleClick={handleVideoDoubleClick}（toggleFullscreen）。浏览器在双击时先触发两个 click 事件再触发 dblclick 事件，导致用户双击全屏时播放状态被反复切换，交互体验混乱。根本原因是对 DOM 事件冒泡顺序和单击/双击冲突缺乏认识。正确做法是在双击事件中阻止单击行为（例如用 setTimeout 延迟执行单击逻辑，在双击时取消延迟）。
+3. 断点续播的 localStorage 保存频率过高：index.jsx 第93-100行的 useEffect 依赖 [currentMedia, currentTime]，播放过程中 currentTime 随 timeupdate 事件约每250ms更新一次，导致 localStorage.setItem 被极高频调用。同时第102-112行还有一个每5秒触发的 setInterval 定时保存，形成双重冗余。高频写入 localStorage 可能造成页面卡顿和浏览器存储配额问题。根本原因是对 currentTime 更新频率和 localStorage 写入成本缺乏评估。正确做法是仅用定时保存（如每5秒）+ 页面卸载时保存，去掉高频的 useEffect 触发保存。
+4. 全屏模式下控制栏隐藏后仍可交互：media-player.css 第488-502行中 .media-player-controls.fullscreen-hidden 仅设置了 opacity: 0，未设置 pointer-events: none，导致控制栏在视觉隐藏后仍能被用户误触点击。根本原因是对 CSS 隐藏控件时需同时禁用交互的完整方案考虑不周。正确做法是隐藏时添加 pointer-events: none，显示时恢复 pointer-events: auto。
+5. 进度条拖拽中频繁进行 DOM 查询：index.jsx 第398-399行的 updateProgressFromMouseEvent 函数在每次 mousemove 事件（拖拽时每帧触发多次）中都调用 e.currentTarget.querySelector('.progress-bar-track') 查询 DOM。根本原因是对拖拽性能优化缺乏关注。正确做法是用 useRef 直接引用进度条 track 的 DOM 节点，避免在事件处理中进行 querySelector 查询。
+
+过程不满意：
+1. 模型在思考过程第74行探索完项目结构后立即创建 TodoList 开始编码，未先对提示词6条需求做逐条分析和拆解。这直接导致遗漏了第2条中的"全部添加到队列"功能。根本原因是任务规划前缺少对需求的系统性拆解步骤。正确做法是先逐条阅读提示词需求，逐条确认实现方案，再创建 TodoList。
+2. 模型在修改 App.jsx 注册路由时（cot第195-288行），先后三次 edit_file_search_replace 操作后发现"文件有一些其他内容了"需要重新读取修复，说明对目标文件的当前状态把握不精确。根本原因是修改文件前未先完整读取目标文件确认上下文，采用了边改边发现问题再补的试错模式。正确做法是修改前先完整读取目标文件，整理出所有需要改动的位置后一次性完成。
+3. 模型全程只运行了 npm test 验证工具函数（106条通过），未执行 pnpm run dev 启动项目进行页面实际渲染验证。双击全屏与单击的冲突、全屏控制栏隐藏后仍可点击等问题因此未被发现。根本原因是过度依赖自动化测试而忽略了手动验证页面交互行为这一关键步骤。正确做法是测试通过后启动 dev server，在浏览器中实际验证页面渲染和交互功能。

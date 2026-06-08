@@ -5,32 +5,39 @@ import AuthPage from '@/pages/auth/index.jsx'
 import CalendarPage from '@/pages/calendar/index.jsx'
 import ChatPage from '@/pages/chat/index.jsx'
 import Dashboard from '@/pages/dashboard/Dashboard.jsx'
+import ExamPage from '@/pages/exam/index.jsx'
 import FileManager from '@/pages/file-manager/FileManager.jsx'
+import FinancePage from '@/pages/finance/index.jsx'
 import FormBuilder from '@/pages/form-builder/FormBuilder.jsx'
+import GanttChartPage from '@/pages/gantt-chart/index.jsx'
 import InfiniteListPage from '@/pages/infinite-list/index.jsx'
 import KanbanPage from '@/pages/kanban/KanbanPage.jsx'
+import KnowledgeBasePage from '@/pages/knowledge-base/index.jsx'
+import MapAreaPage from '@/pages/map-area/index.jsx'
+import MediaGallery from '@/pages/media-gallery/index.jsx'
+import MediaPlayerPage from '@/pages/media-player/index.jsx'
+import MeetingRoomPage from '@/pages/meeting-room/index.jsx'
+import MindMapPage from '@/pages/mind-map/index.jsx'
+import NotificationsPage from '@/pages/notifications/index.jsx'
 import OrdersPage from '@/pages/orders/index.jsx'
+import PermissionsPage from '@/pages/permissions/index.jsx'
+import PomodoroPage from '@/pages/pomodoro/index.jsx'
+import ProductReviewPage from '@/pages/product-review/index.jsx'
 import ProductsPage from '@/pages/products/index.jsx'
+import RegexTesterPage from '@/pages/regex-tester/index.jsx'
+import RichEditorPage from '@/pages/rich-editor/index.jsx'
+import SnippetsPage from '@/pages/snippets/index.jsx'
+import SpreadsheetPage from '@/pages/spreadsheet/index.jsx'
+import SurveyPage from '@/pages/survey/index.jsx'
+import TextDiffPage from '@/pages/text-diff/index.jsx'
 import ThemeEditorPage from '@/pages/theme-editor/index.jsx'
 import Wizard from '@/pages/wizard/Wizard.jsx'
-import SurveyPage from '@/pages/survey/index.jsx'
-import MediaGallery from '@/pages/media-gallery/index.jsx'
-import NotificationsPage from '@/pages/notifications/index.jsx'
-import PermissionsPage from '@/pages/permissions/index.jsx'
 import WorkflowPage from '@/pages/workflow/index.jsx'
-import FinancePage from '@/pages/finance/index.jsx'
-import MapAreaPage from '@/pages/map-area/index.jsx'
-import RichEditorPage from '@/pages/rich-editor/index.jsx'
-import ExamPage from '@/pages/exam/index.jsx'
-import TextDiffPage from '@/pages/text-diff/index.jsx'
-import SpreadsheetPage from '@/pages/spreadsheet/index.jsx'
-import GanttChartPage from '@/pages/gantt-chart/index.jsx'
-import MeetingRoomPage from '@/pages/meeting-room/index.jsx'
-import PomodoroPage from '@/pages/pomodoro/index.jsx'
-import SnippetsPage from '@/pages/snippets/index.jsx'
-import ProductReviewPage from '@/pages/product-review/index.jsx'
-import KnowledgeBasePage from '@/pages/knowledge-base/index.jsx'
-import MindMapPage from '@/pages/mind-map/index.jsx'
+import DBDesignerPage from '@/pages/db-designer/index.jsx'
+import CouponPage from '@/pages/coupon/index.jsx'
+import FitnessTrackerPage from '@/pages/fitness-tracker/index.jsx'
+import GitBrowserPage from '@/pages/git-browser/index.jsx'
+import QRCodePage from '@/pages/qrcode/index.jsx'
 
 const TASKS = [
     { id: 1, title: '用户认证系统', route: 'auth', description: '登录、注册、找回密码、修改密码完整的认证流程，基于 localStorage 存储。' },
@@ -63,6 +70,13 @@ const TASKS = [
     { id: 28, title: '代码片段管理器', route: 'snippets', description: '代码片段收藏管理工具，支持语法高亮、标签分类、搜索过滤、快速复制、导入导出，基于 localStorage 持久化。' },
     { id: 29, title: '思维导图', route: 'mind-map', description: '可视化思维导图编辑器，支持节点增删改、拖拽布局、父子层级展开收起、导出图片/JSON，数据本地持久化。' },
     { id: 30, title: '知识库系统', route: 'knowledge-base', description: '多级分类树形目录 + Markdown 文章编辑，支持全文搜索高亮、TOC 目录大纲、收藏夹、最近浏览，数据本地持久化。' },
+    { id: 31, title: '音视频播放器', route: 'media-player', description: '浏览器内的媒体播放器，支持音视频播放、播放列表管理、LRC歌词同步滚动、断点续播，基于 localStorage 持久化。' },
+    { id: 32, title: 'API 调试工具', route: 'api-debugger', description: '类似 Postman 的前端 API 调试工具，支持 HTTP 请求构造、发送、响应查看，历史记录和环境变量管理。' },
+    { id: 33, title: '正则测试器', route: 'regex-tester', description: '正则表达式在线测试工具，实时匹配高亮、捕获组解析、替换预览、常用正则速查、历史记录持久化。' },
+    { id: 34, title: '健身运动追踪', route: 'fitness-tracker', description: '记录和追踪日常运动，汇总统计数据，设定健身目标，趋势图表可视化，基于 localStorage 持久化。' },
+    { id: 35, title: 'Git 仓库浏览器', route: 'git-browser', description: '模拟 Git 仓库可视化管理工具，文件树、Diff 对比、提交历史时间线、分支切换、Stage/Unstage 暂存面板。' },
+    { id: 36, title: '数据库表设计器', route: 'db-designer', description: '可视化数据库表结构设计工具，支持表/字段拖拽编辑、外键关系连线、自动布局、DDL导出、JSON导入导出。' },
+    { id: 37, title: '二维码工具', route: 'qrcode', description: '二维码生成和解析工具，支持自定义尺寸、颜色、Logo 嵌入、PNG 下载、图片解析、历史记录，基于 localStorage 持久化。' },
 ]
 
 function HomePage() {
@@ -127,6 +141,14 @@ function App() {
             <Route path="/gantt-chart" element={<GanttChartPage />} />
             <Route path="/snippets" element={<SnippetsPage />} />
             <Route path="/mind-map" element={<MindMapPage />} />
+            <Route path="/media-player" element={<MediaPlayerPage />} />
+            <Route path="/api-debugger" element={<ApiDebuggerPage />} />
+            <Route path="/regex-tester" element={<RegexTesterPage />} />
+            <Route path="/db-designer" element={<DBDesignerPage />} />
+            <Route path="/coupon" element={<CouponPage />} />
+            <Route path="/fitness-tracker" element={<FitnessTrackerPage />} />
+            <Route path="/qrcode" element={<QRCodePage />} />
+            <Route path="/git-browser" element={<GitBrowserPage />} />
         </Routes>
     )
 }

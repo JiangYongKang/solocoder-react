@@ -1,0 +1,12 @@
+产物不满意：
+1. qrcodeDecoder.js 的 decodeData 函数将 QR 码版本硬编码为 const version = 1，以此计算字符计数指示符的位宽。Byte 模式下版本 1-9 使用 8 位计数，而版本 10-40 应使用 16 位计数。由于 decodeQRImage 调用 decodeData 时未传入已解析出的版本号，当解析版本 10 及以上的 QR 码时，字符计数会少读 8 位，导致后续字节解码偏移、输出乱码。根本原因是解码管道中版本信息未从 decodeQRImage 传递给 decodeData。正确做法是为 decodeData 增加 version 参数，并在调用处传入已解析出的版本值。
+2. qrcodeDecoder.js 的 applyMask 函数重新内联定义了 8 个遮罩模式函数，与 constants.js 中已导入的 MASK_PATTERNS 常量完全重复。如果需要修改遮罩算法，必须同步改动两处代码，违反了 DRY 原则。根本原因是编写解码器时没有复用已导入的常量。正确做法是直接使用 MASK_PATTERNS 替代内联数组。
+3. qrcodeEncoder.js 和 qrcodeDecoder.js 各有一个名为 applyMask 的导出函数，但签名完全不同：编码器版本为 applyMask(matrix, size, maskIndex, version)，解码器版本为 applyMask(grid, maskIndex, version)。同名函数在相邻文件中具有不同语义和不同参数顺序，极易导致导入错误。根本原因是命名时未考虑两个文件的导出符号冲突。正确做法是给两个函数分别使用不同的名称（如 applyMaskToMatrix 和 unmaskGrid）。
+4. qrcodeDecoder.test.js 中 decodeData 的测试用例覆盖了 Numeric 模式 "12345" 和 Byte 模式 "Hi"，但缺少 Alphanumeric 模式的测试用例，未覆盖所有三种编码模式。同时所有测试只覆盖了低版本（版本1-3）的场景，对可能触发 decodeData 中硬编码版本 bug 的高版本场景无覆盖。根本原因是测试设计时仅考虑了常见短文本输入。正确做法是为三种编码模式分别编写生成-解码往返测试，并至少包含一个足够长的文本以触发版本 10 以上的 QR 码。
+
+过程不满意：
+1. 模型在项目根目录创建了至少 7 个一次性调试文件（debug-qr.mjs、debug-version.mjs、debug-bits.mjs、debug-reserved.mjs、debug-nulls.mjs、debug-hi.mjs、debug-encode.mjs），其中 debug-qr.mjs 被覆写和修改了至少 5 次。每次调试都是新建一个独立的 .mjs 文件导入业务模块并打印中间变量值，然后观察输出、推测问题、再修改调试脚本重跑。模型没有使用任何结构化调试方法，而是反复创建和丢弃临时文件。根本原因是缺乏系统化调试策略。正确做法是先构造一个端到端的编码-解码闭环测试脚本，一次性定位是编码输出有误还是解码读取有误，再沿着数据流逐步收敛问题范围。
+2. tables.js 文件首次写入时存在多处数组语法错误，将 ]], [[ 误用为数组分隔符而非正确的 ], [，导致首次测试运行因解析错误失败。这表明 VERSION_INFORMATION 数据表很可能是从外部资料直接复制粘贴或手动输入，未经过语法校验。根本原因是写入后没有对数据文件做基本验证。正确做法是在写入 tables.js 后至少执行一次 node -c tables.js 做语法检查。
+3. 在修改 applyMask 函数签名为解码器版本增加 version 参数时，模型只更新了 qrcodeDecoder.js 内部的调用处，没有检查测试文件中的调用方，导致测试中 applyMask(grid, maskIndex) 调用因缺少第三个参数而失败。根本原因是修改导出函数签名前没有全局搜索所有调用点。正确做法是先用 Grep 搜索 applyMask 的全部引用，枚举所有需要同步修改的位置后再执行变更。
+4. 解码测试经历了至少 4 轮独立失败周期，每轮失败后模型创建了不同主题的调试脚本，但始终没有从根因层面验证编码器与解码器的数据读写路径是否镜像一致。直到最后模型才发现矩阵中存在未填充的 null 值，才着手添加 fillSeparatorsAndRemainder 来统一处理剩余区域。整个过程消耗了大量迭代回合。根本原因是调试时聚焦于逐个症状而非先验证编码管道和解码管道在数据区域定义上的对偶性。正确做法是先在注释或文档中对比 placeData 的写入逻辑和 readDataCodewords 的读取逻辑，确认两者的列遍历方向、保留区域判断条件完全对应。
+5. 模型在总结中声称"诊断检查：无 lint/type 错误"，但实际代码中 qrcodeDecoder.js 导入了 MASK_PATTERNS 却从未使用——applyMask 函数内重新内联定义了遮罩数组。这是一个未使用导入的 lint 警告，说明模型在完成开发后未对代码做充分的静态检查。根本原因是总结时依赖印象而非实际验证。正确做法是运行一次 lint 检查确认无警告后再做出声明。

@@ -1,0 +1,8 @@
+产物不满意：
+1. App.jsx 中缺少 WhiteboardPage 的导入、路由和 TASKS 条目。提示词第一句明确描述该页面是"首页任务卡片'协作白板'点击后的二级页面"，但当前 App.jsx 的 TASKS 数组中 id:33 条目对应的是"正则测试器"而非"协作白板"，import 列表、Routes 配置中也没有 WhiteboardPage 的任何引用。即使模型在 COT 第200-232行对 App.jsx 执行了 3 次 edit_file_search_replace，但最终产物的 App.jsx 文件中无任何白板集成代码，意味着其他任务实现覆盖了此次修改或编辑本身未生效。根本原因是模型完成所有文件后未重新读取 App.jsx 做最终验证就声称集成完成。正确做法是在总结前重新打开 App.jsx 检查 import、路由和 TASKS 条目是否都正确写入。
+2. 文本输入框在非100%缩放比例下字体大小未适配。index.jsx 第430行设置 textInputRef 的 fontSize 为 existingText.fontSize，第450行设置为 fontSize，均未乘以当前 zoom 系数。当 zoom=200% 时，canvas 通过 ctx.scale(zoom,zoom) 将文本渲染为 fontSize*2 的大小，而 DOM input 元素仍按 fontSize*1 显示，导致输入框文字与画布上已渲染文字大小不一致。根本原因是 DOM input 不参与 canvas 的坐标变换但代码未做缩放补偿。正确做法是设置 fontSize 时乘以 zoom，如 fontSize * zoompx。
+3. 矩形和圆形的 shape 创建函数未包含填充属性，drawShape 中对矩形和圆形只调用了 ctx.stroke() 没有调用 ctx.fill()，导致 ctx.fillStyle 被设置但从未生效。提示词要求"形状内部用半透明或透明填充"，当前以无 fill（完全透明）方式满足"透明填充"，虽非严重缺陷，但 fillStyle 冗余设置属于产物不干净。根本原因是绘制逻辑中遗漏了 fill() 调用，fillStyle 赋值无实际效用。正确做法是要么移除无用的 fillStyle 设置，要么实现真正的半透明填充选项。
+
+过程不满意：
+1. 在 COT 第200-232行，模型对 App.jsx 执行了 3 次 edit_file_search_replace 操作来注册路由和任务卡片，三个操作均返回 status:success 但 changes 字段为 undefined。随后在总结（第557行）中声称"已在 App.jsx 注册路由 /whiteboard 和任务卡片'协作白板'"，然而实际检查 App.jsx 文件发现无任何白板相关代码。这是典型的虚假完成行为——模型基于工具调用返回的 success 状态就认定操作已生效，未通过重新读取文件进行二次验证。根本原因是模型缺乏对关键文件做最终验证的环节意识。正确做法是在总结前重新打开 App.jsx 读取内容，确认 import、Route、TASKS 条目确实写入后再做完成声明。
+2. 在 COT 第323行，模型首次运行测试发现 getShapesBounds 函数未正确处理负尺寸矩形后，采用了修复方式：先 search_by_regex 定位函数位置，再通过 edit_file_search_replace 直接替换代码。这个修复流程本身没有问题，但模型在修复完成后没有重新审视整个 getShapesBounds 函数是否还有其他场景遗漏。实际上该函数对 TEXT 类型使用了 shape.fontSize 来估算文本宽度，但未使用 normalizeRectangle 或类似规范化逻辑来统一处理坐标（而 RECTANGLE 和 CIRCLE 类型都调用了 normalize），代码风格不一致。根本原因是修复时只针对报错做了点对点修补，未做周边代码的一致性检查。正确做法是在修复函数级 bug 后对整段代码做一次扫描，确保同类逻辑使用了统一的处理模式。

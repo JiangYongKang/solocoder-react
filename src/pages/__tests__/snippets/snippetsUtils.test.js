@@ -759,13 +759,33 @@ describe('sortSnippets - 空标题排序', () => {
     expect(ids.indexOf('c')).toBeLessThan(ids.indexOf('b'))
   })
 
-  it('全是空白标题时顺序保持稳定', () => {
+  it('全是空白标题时顺序保持稳定，空标题排在末尾', () => {
     const items = [
       { id: 'a', title: '   ', favorite: false, createdAt: 2 },
-      { id: 'b', title: '', favorite: false, createdAt: 1 },
+      { id: 'b', title: 'Normal', favorite: false, createdAt: 1 },
+      { id: 'c', title: '', favorite: false, createdAt: 3 },
+      { id: 'd', title: 'Apple', favorite: false, createdAt: 4 },
     ]
     const sorted = sortSnippets(items, 'title', 'asc')
-    expect(sorted).toHaveLength(2)
+    const ids = sorted.map((s) => s.id)
+    expect(ids.indexOf('d')).toBeLessThan(ids.indexOf('b'))
+    expect(ids.indexOf('b')).toBeLessThan(ids.indexOf('a'))
+    expect(ids.indexOf('a')).toBeLessThan(ids.indexOf('c'))
+    expect(sorted).toHaveLength(4)
+  })
+
+  it('混合空标题和非空标题，空标题始终排末尾（降序）', () => {
+    const items = [
+      { id: 'a', title: 'Banana', favorite: false },
+      { id: 'b', title: '   ', favorite: false },
+      { id: 'c', title: 'Apple', favorite: false },
+      { id: 'd', title: '', favorite: false },
+    ]
+    const sorted = sortSnippets(items, 'title', 'desc')
+    const ids = sorted.map((s) => s.id)
+    expect(ids.indexOf('a')).toBeLessThan(ids.indexOf('c'))
+    expect(ids.indexOf('c')).toBeLessThan(ids.indexOf('b'))
+    expect(ids.indexOf('b')).toBeLessThan(ids.indexOf('d'))
   })
 })
 
@@ -796,15 +816,17 @@ describe('renderMarkdown', () => {
   })
 
   it('转换链接', () => {
-    expect(renderMarkdown('[link](https://example.com)')).toContain(
-      '<a href="https://example.com">link</a>'
-    )
+    const result = renderMarkdown('[link](https://example.com)')
+    expect(result).toContain('<a href="https://example.com"')
+    expect(result).toContain('rel="noopener noreferrer"')
+    expect(result).toContain('>link</a>')
   })
 
   it('转换无序列表', () => {
     const md = '- item1\n- item2\n- item3'
     const result = renderMarkdown(md)
     expect(result).toContain('<ul>')
+    expect(result).not.toContain('<ol>')
     expect(result.match(/<li>/g)?.length).toBe(3)
   })
 
@@ -812,7 +834,18 @@ describe('renderMarkdown', () => {
     const md = '1. first\n2. second'
     const result = renderMarkdown(md)
     expect(result).toContain('<ol>')
+    expect(result).not.toContain('<ul>')
     expect(result.match(/<li>/g)?.length).toBe(2)
+  })
+
+  it('混合无序列表和有序列表互不干扰', () => {
+    const md = '- unordered1\n- unordered2\n1. ordered1\n2. ordered2\n- more-unordered'
+    const result = renderMarkdown(md)
+    const ulCount = (result.match(/<ul>/g) || []).length
+    const olCount = (result.match(/<ol>/g) || []).length
+    expect(ulCount).toBe(2)
+    expect(olCount).toBe(1)
+    expect(result).not.toMatch(/<ol>[\s\S]*?<ul>[\s\S]*?<\/ul>[\s\S]*?<\/ol>/)
   })
 
   it('转换引用', () => {
@@ -833,6 +866,95 @@ describe('renderMarkdown', () => {
     expect(result).toContain('<h1>Title</h1>')
     expect(result).toContain('<strong>bold</strong>')
     expect(result).toContain('<code>code</code>')
+  })
+
+  it('HTML 转义 - script 标签被转义', () => {
+    const md = '<script>alert("xss")</script>'
+    const result = renderMarkdown(md)
+    expect(result).not.toContain('<script>')
+    expect(result).toContain('&lt;script&gt;')
+  })
+
+  it('HTML 转义 - img onerror 事件被转义', () => {
+    const md = '<img src="x" onerror="alert(1)" />'
+    const result = renderMarkdown(md)
+    expect(result).not.toContain('<img')
+    expect(result).toContain('&lt;img')
+    expect(result).not.toContain('onerror="alert(1)"')
+  })
+
+  it('HTML 转义 - 任意 HTML 标签被转义', () => {
+    const md = '<div onclick="steal()">text</div>'
+    const result = renderMarkdown(md)
+    expect(result).not.toContain('<div')
+    expect(result).toContain('&lt;div')
+    expect(result).not.toContain('onclick="steal()"')
+  })
+
+  it('链接协议过滤 - javascript: 协议被拒绝', () => {
+    const md = '[click](javascript:alert(1))'
+    const result = renderMarkdown(md)
+    expect(result).toContain('href="#"')
+    expect(result).not.toContain('javascript:')
+  })
+
+  it('链接协议过滤 - data: 协议被拒绝', () => {
+    const md = '[click](data:text/html,<script>alert(1)</script>)'
+    const result = renderMarkdown(md)
+    expect(result).toContain('href="#"')
+    expect(result).not.toContain('data:')
+  })
+
+  it('链接协议过滤 - vbscript: 协议被拒绝', () => {
+    const md = '[click](vbscript:msgbox(1))'
+    const result = renderMarkdown(md)
+    expect(result).toContain('href="#"')
+    expect(result).not.toContain('vbscript:')
+  })
+
+  it('链接协议过滤 - http 和 https 允许', () => {
+    const httpResult = renderMarkdown('[a](http://example.com)')
+    expect(httpResult).toContain('href="http://example.com"')
+    const httpsResult = renderMarkdown('[a](https://example.com)')
+    expect(httpsResult).toContain('href="https://example.com"')
+  })
+
+  it('链接协议过滤 - mailto 和 tel 允许', () => {
+    const mailtoResult = renderMarkdown('[email](mailto:test@example.com)')
+    expect(mailtoResult).toContain('href="mailto:test@example.com"')
+    const telResult = renderMarkdown('[call](tel:+1234567890)')
+    expect(telResult).toContain('href="tel:+1234567890"')
+  })
+
+  it('链接协议过滤 - 相对路径和锚点允许', () => {
+    const relativeResult = renderMarkdown('[a](./path/to/file)')
+    expect(relativeResult).toContain('href="./path/to/file"')
+    const anchorResult = renderMarkdown('[a](#section)')
+    expect(anchorResult).toContain('href="#section"')
+  })
+
+  it('XSS - 链接文本中的 HTML 也被转义', () => {
+    const md = '[<img src=x onerror=alert(1)>](https://example.com)'
+    const result = renderMarkdown(md)
+    expect(result).not.toContain('<img')
+    expect(result).toContain('&lt;img')
+    expect(result).toContain('&gt;')
+  })
+
+  it('XSS - 代码块中的 HTML 被转义', () => {
+    const md = '`<script>alert(1)</script>`'
+    const result = renderMarkdown(md)
+    expect(result).toContain('<code>')
+    expect(result).not.toContain('<script>')
+    expect(result).toContain('&lt;script&gt;')
+  })
+
+  it('XSS - 标题中的 HTML 被转义', () => {
+    const md = '# <svg onload=alert(1)>'
+    const result = renderMarkdown(md)
+    expect(result).toContain('<h1>')
+    expect(result).not.toContain('<svg')
+    expect(result).toContain('&lt;svg')
   })
 })
 

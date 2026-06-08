@@ -439,25 +439,58 @@ describe('分类操作', () => {
       expect(finalCat11.children).toEqual([newCatId, 'cat-1-1-1'])
     })
 
-    it('拖拽到根节点 before 应该转为 inside（根节点无同级）', () => {
+    it('拖拽到根节点 before 应该插入到 children 开头（index 0）', () => {
       const initial = createInitialState()
-      const beforeRoot = initial.categories.find((c) => c.id === 'cat-root')
-      const beforeChildren = [...beforeRoot.children]
+      const rootBefore = initial.categories.find((c) => c.id === 'cat-root')
+      expect(rootBefore.children).toEqual(['cat-1', 'cat-2'])
       const result = moveCategory(initial, 'cat-2', 'cat-root', 'before')
-      const cat2 = result.categories.find((c) => c.id === 'cat-2')
-      expect(cat2.parentId).toBe('cat-root')
-      const afterRoot = result.categories.find((c) => c.id === 'cat-root')
-      expect(afterRoot.children).toEqual(expect.arrayContaining(beforeChildren))
-      expect(afterRoot.children).toContain('cat-2')
+      const rootAfter = result.categories.find((c) => c.id === 'cat-root')
+      expect(rootAfter.children[0]).toBe('cat-2')
+      expect(rootAfter.children).toEqual(['cat-2', 'cat-1'])
+      expect(rootAfter.isExpanded).toBe(true)
     })
 
-    it('拖拽到根节点 after 应该转为 inside（根节点无同级）', () => {
+    it('拖拽到根节点 after 应该追加到 children 末尾（last index）', () => {
       const initial = createInitialState()
-      const result = moveCategory(initial, 'cat-2', 'cat-root', 'after')
-      const cat2 = result.categories.find((c) => c.id === 'cat-2')
-      expect(cat2.parentId).toBe('cat-root')
-      const afterRoot = result.categories.find((c) => c.id === 'cat-root')
-      expect(afterRoot.children).toContain('cat-2')
+      const rootBefore = initial.categories.find((c) => c.id === 'cat-root')
+      expect(rootBefore.children).toEqual(['cat-1', 'cat-2'])
+      const result = moveCategory(initial, 'cat-1', 'cat-root', 'after')
+      const rootAfter = result.categories.find((c) => c.id === 'cat-root')
+      expect(rootAfter.children[rootAfter.children.length - 1]).toBe('cat-1')
+      expect(rootAfter.children).toEqual(['cat-2', 'cat-1'])
+      expect(rootAfter.isExpanded).toBe(true)
+    })
+
+    it('拖拽深层分类到根节点 before 应该移到 children 首位', () => {
+      const initial = createInitialState()
+      const result = moveCategory(initial, 'cat-1-1-1', 'cat-root', 'before')
+      const rootAfter = result.categories.find((c) => c.id === 'cat-root')
+      expect(rootAfter.children[0]).toBe('cat-1-1-1')
+      expect(rootAfter.children.slice(1)).toEqual(expect.arrayContaining(['cat-1', 'cat-2']))
+      const movedCat = result.categories.find((c) => c.id === 'cat-1-1-1')
+      expect(movedCat.parentId).toBe('cat-root')
+      const cat11 = result.categories.find((c) => c.id === 'cat-1-1')
+      expect(cat11.children).not.toContain('cat-1-1-1')
+    })
+
+    it('拖拽深层分类到根节点 after 应该追加到 children 末尾', () => {
+      const initial = createInitialState()
+      const result = moveCategory(initial, 'cat-1-1-1', 'cat-root', 'after')
+      const rootAfter = result.categories.find((c) => c.id === 'cat-root')
+      expect(rootAfter.children[rootAfter.children.length - 1]).toBe('cat-1-1-1')
+      const movedCat = result.categories.find((c) => c.id === 'cat-1-1-1')
+      expect(movedCat.parentId).toBe('cat-root')
+    })
+
+    it('拖拽到根节点 inside 应该追加到 children 末尾并展开', () => {
+      const initial = createInitialState()
+      initial.categories.find((c) => c.id === 'cat-root').isExpanded = false
+      const result = moveCategory(initial, 'cat-1-1', 'cat-root', 'inside')
+      const rootAfter = result.categories.find((c) => c.id === 'cat-root')
+      expect(rootAfter.children[rootAfter.children.length - 1]).toBe('cat-1-1')
+      expect(rootAfter.isExpanded).toBe(true)
+      const movedCat = result.categories.find((c) => c.id === 'cat-1-1')
+      expect(movedCat.parentId).toBe('cat-root')
     })
 
     it('目标节点不在父级 children 中（防御性），before 应该插入到开头', () => {

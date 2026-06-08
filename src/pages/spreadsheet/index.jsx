@@ -520,8 +520,19 @@ const SpreadsheetPage = () => {
     return () => document.removeEventListener('click', handleClickOutside)
   }, [])
 
+  const saveTimerRef = useRef(null)
   useEffect(() => {
-    saveToLocalStorage(state)
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current)
+    }
+    saveTimerRef.current = setTimeout(() => {
+      saveToLocalStorage(state)
+    }, 300)
+    return () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current)
+      }
+    }
   }, [state])
 
   useEffect(() => {

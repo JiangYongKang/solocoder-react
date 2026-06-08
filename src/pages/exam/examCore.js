@@ -189,7 +189,10 @@ export function generateExam(questions, { name = '', duration = 60, totalScore =
     }
   }
 
-  const MAX_ATTEMPTS = 100
+  // 重试次数与题库规模正相关：题库越大，潜在组合越多，需要更多尝试才能找到精确匹配
+  // 基础 50 次，每 10 道题额外增加 10 次，上限 500 次避免极端情况耗时过长
+  const MAX_ATTEMPTS = Math.min(500, 50 + Math.floor(questions.length / 10) * 10)
+
   let best = null
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
     const pick = greedyPick(questions, targetScore)
@@ -254,34 +257,63 @@ export function clearExamDraft(examId) {
   }
 }
 
-export function findActiveExamDraft() {
-  if (typeof window === 'undefined' || !window.localStorage) return null
-  try {
-    const prefixLen = EXAM_DRAFT_STORAGE_PREFIX.length
-    let latest = null
-    for (let i = 0; i < window.localStorage.length; i += 1) {
-      const key = window.localStorage.key(i)
-      if (key && key.startsWith(EXAM_DRAFT_STORAGE_PREFIX)) {
-        const raw = window.localStorage.getItem(key)
-        if (!raw) continue
+export function isDraftExpired(draft, now = Date.now()) {
+  if (!draft || !draft.exam) return true
+  const durationMs = (Number(draft.exam.duration) || 0) * 60 * 1000
+  const startedAt = Number(draft.startedAt) || 0
+  if (durationMs <= 0 || startedAt <= 0) return false
+  return now - startedAt >= durationMs
+}
+
+function getAllExamDrafts() {
+  if (typeof window === 'undefined' || !window.localStorage) return []
+  const prefixLen = EXAM_DRAFT_STORAGE_PREFIX.length
+  const drafts = []
+  for (let i = 0; i < window.localStorage.length; i += 1) {
+    const key = window.localStorage.key(i)
+    if (key && key.startsWith(EXAM_DRAFT_STORAGE_PREFIX)) {
+      const raw = window.localStorage.getItem(key)
+      if (!raw) continue
+      try {
         const parsed = JSON.parse(raw)
-        if (!parsed || !parsed.exam) continue
-        const durationMs = (Number(parsed.exam.duration) || 0) * 60 * 1000
-        const startedAt = Number(parsed.startedAt) || 0
-        if (durationMs > 0 && startedAt > 0 && Date.now() - startedAt >= durationMs) {
-          window.localStorage.removeItem(key)
-          continue
+        if (parsed && parsed.exam) {
+          drafts.push({
+            examId: key.slice(prefixLen),
+            draft: parsed,
+          })
         }
-        if (!latest || (parsed.savedAt || 0) >= (latest.savedAt || 0)) {
-          latest = parsed
-          latest.examId = key.slice(prefixLen)
-        }
+      } catch {
+        // ignore corrupted entry
       }
     }
-    return latest
-  } catch {
-    return null
   }
+  return drafts
+}
+
+export function cleanupExpiredExamDrafts() {
+  if (typeof window === 'undefined' || !window.localStorage) return 0
+  let removed = 0
+  const drafts = getAllExamDrafts()
+  for (const { examId, draft } of drafts) {
+    if (isDraftExpired(draft)) {
+      window.localStorage.removeItem(EXAM_DRAFT_STORAGE_PREFIX + examId)
+      removed += 1
+    }
+  }
+  return removed
+}
+
+export function findActiveExamDraft() {
+  const drafts = getAllExamDrafts()
+  let latest = null
+  for (const { examId, draft } of drafts) {
+    if (isDraftExpired(draft)) continue
+    if (!latest || (draft.savedAt || 0) >= (latest.draft.savedAt || 0)) {
+      latest = { examId, draft }
+    }
+  }
+  if (!latest) return null
+  return { ...latest.draft, examId: latest.examId }
 }
 
 function arraysEqualAsSets(a, b) {

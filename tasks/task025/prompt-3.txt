@@ -1,0 +1,5 @@
+你实现的会议室预约系统页面在第二轮修复后还存在一些问题，需要进行修复：
+
+1. useEffect 缺少依赖数组的修复方案过于复杂：第二轮引入了 useCallback + useRef + 中间层 useEffect 三层间接方案，但 useCallback 依赖了 selectedSlots（拖拽期间每次鼠标移动都会创建新 Set），导致 handleMouseUp 在拖拽过程中频繁重建，useCallback 的优化意图实际上失效。此外 handleMouseUpRef.current 的赋值放在了 useEffect 中而非 render 阶段同步执行，在快速拖拽场景下存在短暂闭包过期窗口。需要简化为更直接可靠的方案。
+2. App.jsx 中出现了与会议室预约系统无关的修改：第二轮修复中模型越界添加了 MindMapPage 等无关路由和任务卡片。请在本次修复开始前，将这些无关变更从 App.jsx 中还原。
+3. 修复后重新运行 pnpm run test，确保所有测试（不仅仅是会议室模块）全部通过。确保所有子页面在 375px 和 1440px 宽度下布局不崩坏，需要启动 dev server 实际验证。

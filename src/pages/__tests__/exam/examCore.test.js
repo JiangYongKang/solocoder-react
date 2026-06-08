@@ -18,6 +18,8 @@ import {
   loadExamDraft,
   saveExamDraft,
   clearExamDraft,
+  isDraftExpired,
+  cleanupExpiredExamDrafts,
   findActiveExamDraft,
   gradeQuestion,
   gradeExam,
@@ -448,6 +450,62 @@ describe('exam draft localStorage functions', () => {
   })
 })
 
+describe('isDraftExpired', () => {
+  const makeDraft = (durationMin, startedAgoMs) => ({
+    exam: { id: 'x', name: 'X', duration: durationMin, totalScore: 10, questions: [] },
+    startedAt: Date.now() - startedAgoMs,
+    savedAt: Date.now(),
+    answers: {},
+  })
+
+  it('should return true for null/undefined draft', () => {
+    expect(isDraftExpired(null)).toBe(true)
+    expect(isDraftExpired(undefined)).toBe(true)
+  })
+
+  it('should return true for draft without exam', () => {
+    expect(isDraftExpired({ answers: {} })).toBe(true)
+  })
+
+  it('should return false when duration is 0 (no time limit)', () => {
+    const d = makeDraft(0, 1000 * 60 * 60)
+    expect(isDraftExpired(d)).toBe(false)
+  })
+
+  it('should return false when startedAt is 0', () => {
+    const d = { ...makeDraft(60, 0), startedAt: 0 }
+    expect(isDraftExpired(d)).toBe(false)
+  })
+
+  it('should return false when not yet expired', () => {
+    const d = makeDraft(60, 30 * 60 * 1000)
+    expect(isDraftExpired(d)).toBe(false)
+  })
+
+  it('should return true when exactly at duration boundary', () => {
+    const now = Date.now()
+    const d = makeDraft(10, 10 * 60 * 1000)
+    expect(isDraftExpired(d, now)).toBe(true)
+  })
+
+  it('should return true when fully expired', () => {
+    const d = makeDraft(1, 2 * 60 * 1000)
+    expect(isDraftExpired(d)).toBe(true)
+  })
+
+  it('should accept custom now timestamp', () => {
+    const d = {
+      exam: { id: 'x', name: 'X', duration: 10, totalScore: 10, questions: [] },
+      startedAt: 1000000,
+      savedAt: 1000000,
+      answers: {},
+    }
+    expect(isDraftExpired(d, 1000000 + 9 * 60 * 1000)).toBe(false)
+    expect(isDraftExpired(d, 1000000 + 10 * 60 * 1000)).toBe(true)
+    expect(isDraftExpired(d, 1000000 + 11 * 60 * 1000)).toBe(true)
+  })
+})
+
 describe('findActiveExamDraft', () => {
   let mockStorage
 
@@ -461,9 +519,11 @@ describe('findActiveExamDraft', () => {
     expect(findActiveExamDraft()).toBe(null)
   })
 
-  it('should return active draft with exam data', () => {
+  it('should return active draft with examId attached (without mutating stored data)', () => {
     const exam = { id: 'exam1', name: 'Test Exam', duration: 60, totalScore: 100, questions: [] }
     saveExamDraft('exam1', { exam, answers: { q1: 'A' }, startedAt: Date.now() })
+    const rawStored = JSON.parse(mockStorage.getItem('exam_draft_exam1'))
+    expect(rawStored.examId).toBeUndefined()
     const result = findActiveExamDraft()
     expect(result).not.toBe(null)
     expect(result.exam.id).toBe('exam1')
@@ -481,10 +541,11 @@ describe('findActiveExamDraft', () => {
     expect(result.examId).toBe('examB')
   })
 
-  it('should ignore expired drafts (past duration)', () => {
+  it('should skip (not return) expired drafts but NOT remove them', () => {
     const exam = { id: 'exam1', name: 'Expired', duration: 1, totalScore: 10, questions: [] }
     saveExamDraft('exam1', { exam, answers: {}, startedAt: Date.now() - 2 * 60 * 1000 })
     expect(findActiveExamDraft()).toBe(null)
+    expect(mockStorage.getItem('exam_draft_exam1')).not.toBe(null)
   })
 
   it('should ignore non-draft keys in storage', () => {
@@ -505,6 +566,43 @@ describe('findActiveExamDraft', () => {
   it('should return null when window is undefined', () => {
     vi.stubGlobal('window', undefined)
     expect(findActiveExamDraft()).toBe(null)
+  })
+})
+
+describe('cleanupExpiredExamDrafts', () => {
+  let mockStorage
+
+  beforeEach(() => {
+    mockStorage = createMockLocalStorage()
+    vi.stubGlobal('window', { localStorage: mockStorage })
+    mockStorage.clear()
+  })
+
+  it('should return 0 when no drafts exist', () => {
+    expect(cleanupExpiredExamDrafts()).toBe(0)
+  })
+
+  it('should remove expired drafts and return removed count', () => {
+    const expired = { id: 'e1', name: 'E', duration: 1, totalScore: 10, questions: [] }
+    const active = { id: 'a1', name: 'A', duration: 60, totalScore: 10, questions: [] }
+    saveExamDraft('e1', { exam: expired, answers: {}, startedAt: Date.now() - 2 * 60 * 1000 })
+    saveExamDraft('a1', { exam: active, answers: {}, startedAt: Date.now() })
+    const removed = cleanupExpiredExamDrafts()
+    expect(removed).toBe(1)
+    expect(mockStorage.getItem('exam_draft_e1')).toBe(null)
+    expect(mockStorage.getItem('exam_draft_a1')).not.toBe(null)
+  })
+
+  it('should not remove active drafts', () => {
+    const active = { id: 'a1', name: 'A', duration: 60, totalScore: 10, questions: [] }
+    saveExamDraft('a1', { exam: active, answers: {}, startedAt: Date.now() })
+    expect(cleanupExpiredExamDrafts()).toBe(0)
+    expect(mockStorage.getItem('exam_draft_a1')).not.toBe(null)
+  })
+
+  it('should return 0 when window is undefined', () => {
+    vi.stubGlobal('window', undefined)
+    expect(cleanupExpiredExamDrafts()).toBe(0)
   })
 })
 

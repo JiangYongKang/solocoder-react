@@ -462,6 +462,7 @@ export function validateTask(task) {
     const s = parseDate(task.startDate);
     const e = parseDate(task.endDate);
     if (s && e && s > e) {
+      errors.startDate = '开始日期不能晚于结束日期';
       errors.endDate = '结束日期不能早于开始日期';
     }
   }
@@ -476,12 +477,12 @@ export function calculateBarPosition(task, rangeStart, zoomLevel) {
 
   if (!start || !end) return { left: 0, width: 0 };
 
-  const leftDays = diffDays(rangeStart, start);
-  const durationDays = Math.max(1, diffDays(start, end) + 1);
+  const left = dateToPx(start, rangeStart, zoomLevel);
+  const rightPx = dateToPx(addDays(end, 1), rangeStart, zoomLevel);
 
   return {
-    left: leftDays * dayWidth,
-    width: durationDays * dayWidth,
+    left,
+    width: Math.max(dayWidth, rightPx - left),
   };
 }
 

@@ -1,0 +1,7 @@
+你实现的电子表格页面在第二轮修复后还存在一些问题，需要进行修复：
+
+1. 公式引用在删除行列后计算结果错误：shiftFormulaReferences 函数在引用被删除时生成了 #REF! 标记（如 =#REF!+A1+B1），但 tokenize 分词器和 evaluateTokens 求值器不认识 #REF! 格式，会将 REF 当作普通标识符解析为数值 0，导致被删除引用的公式显示错误的计算结果（如 50）而非错误提示。需要让公式求值器能识别并正确处理 #REF! 标记。
+2. 行列操作后公式引用更新的测试只验证了 raw 字段未验证 display 计算结果，导致上述求值错误被掩盖。需要在 deleteRow 和 deleteCol 的测试中同时断言 raw 和 display 字段，覆盖正常更新和被删除引用两种场景。
+3. saveToLocalStorage 在 useEffect 中以整个 state 对象为依赖，每次单元格编辑、行列操作都触发全量 JSON.stringify 写入 localStorage。需要对持久化写入加上防抖，避免高频操作时的性能浪费。
+4. App.jsx 中出现了与电子表格无关的修改：第二轮修复中模型越界添加了 MindMapPage 等无关路由和任务卡片。请在本次修复开始前，将这些无关变更从 App.jsx 中还原。
+5. 修复后重新运行 pnpm run test，确保所有测试通过。确保所有子页面在 375px 和 1440px 宽度下布局不崩坏，需要启动 dev server 实际验证。

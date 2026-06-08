@@ -38,9 +38,10 @@ const Timeline = forwardRef(function Timeline(
 ) {
   const containerRef = useRef(null);
   const scrollRef = useRef(null);
-  const [dragging, setDragging] = useState(null);
+  const [draggingTaskId, setDraggingTaskId] = useState(null);
   const [dragTooltip, setDragTooltip] = useState(null);
   const [editingProgressId, setEditingProgressId] = useState(null);
+  const draggingRef = useRef(null);
   const dayWidth = DAY_WIDTH[zoomLevel];
 
   useImperativeHandle(ref, () => ({
@@ -80,7 +81,7 @@ const Timeline = forwardRef(function Timeline(
     const grabDate = pxToDate(relativeStartX, range.start, zoomLevel);
     const grabOffsetDays = diffDays(originalStart, grabDate);
 
-    setDragging({
+    draggingRef.current = {
       taskId: task.id,
       mode,
       startX,
@@ -90,8 +91,8 @@ const Timeline = forwardRef(function Timeline(
       scrollLeft,
       offsetX,
       grabOffsetDays,
-      currentX: startX,
-    });
+    };
+    setDraggingTaskId(task.id);
   };
 
   const handleProgressMouseDown = (e, task) => {
@@ -120,27 +121,30 @@ const Timeline = forwardRef(function Timeline(
   };
 
   useEffect(() => {
-    if (!dragging) return;
+    if (draggingTaskId === null) return;
 
     const computeNewDates = (clientX) => {
-      const relativeX = clientX - dragging.offsetX + dragging.scrollLeft;
+      const drag = draggingRef.current;
+      if (!drag) return null;
+
+      const relativeX = clientX - drag.offsetX + drag.scrollLeft;
       const dateAtMouse = pxToDate(relativeX, range.start, zoomLevel);
       const snapDate = (d) => {
         d.setHours(0, 0, 0, 0);
         return d;
       };
 
-      let newStart = new Date(dragging.originalStart);
-      let newEnd = new Date(dragging.originalEnd);
+      let newStart = new Date(drag.originalStart);
+      let newEnd = new Date(drag.originalEnd);
 
-      if (dragging.mode === 'move') {
+      if (drag.mode === 'move') {
         const snappedMouseDate = snapDate(new Date(dateAtMouse));
-        newStart = addDays(snappedMouseDate, -dragging.grabOffsetDays);
-        newEnd = addDays(newStart, dragging.originalDuration - 1);
-      } else if (dragging.mode === 'resize-left') {
+        newStart = addDays(snappedMouseDate, -drag.grabOffsetDays);
+        newEnd = addDays(newStart, drag.originalDuration - 1);
+      } else if (drag.mode === 'resize-left') {
         newStart = snapDate(new Date(dateAtMouse));
         if (newStart > newEnd) newStart = new Date(newEnd);
-      } else if (dragging.mode === 'resize-right') {
+      } else if (drag.mode === 'resize-right') {
         newEnd = snapDate(new Date(dateAtMouse));
         if (newEnd < newStart) newEnd = new Date(newStart);
       }
@@ -149,9 +153,10 @@ const Timeline = forwardRef(function Timeline(
     };
 
     const handleMouseMove = (e) => {
-      const { newStart, newEnd } = computeNewDates(e.clientX);
+      const result = computeNewDates(e.clientX);
+      if (!result) return;
+      const { newStart, newEnd } = result;
 
-      setDragging((prev) => ({ ...prev, currentX: e.clientX }));
       setDragTooltip({
         x: e.clientX,
         y: e.clientY - 40,
@@ -161,14 +166,18 @@ const Timeline = forwardRef(function Timeline(
     };
 
     const handleMouseUp = (e) => {
-      const { newStart, newEnd } = computeNewDates(e.clientX);
+      const drag = draggingRef.current;
+      const result = computeNewDates(e.clientX);
+      if (drag && result) {
+        const { newStart, newEnd } = result;
+        onUpdateTask(drag.taskId, {
+          startDate: formatDate(newStart),
+          endDate: formatDate(newEnd),
+        });
+      }
 
-      onUpdateTask(dragging.taskId, {
-        startDate: formatDate(newStart),
-        endDate: formatDate(newEnd),
-      });
-
-      setDragging(null);
+      draggingRef.current = null;
+      setDraggingTaskId(null);
       setDragTooltip(null);
     };
 
@@ -179,9 +188,9 @@ const Timeline = forwardRef(function Timeline(
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [dragging, range.start, zoomLevel, onUpdateTask]);
+  }, [draggingTaskId, range.start, zoomLevel, onUpdateTask]);
 
-  const isDraggingTask = (taskId) => dragging?.taskId === taskId;
+  const isDraggingTask = (taskId) => draggingTaskId === taskId;
 
   const renderHeader = () => {
     let primaryLabels = [];

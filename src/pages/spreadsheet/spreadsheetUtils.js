@@ -96,6 +96,8 @@ export const isFormula = (value) => {
   return typeof value === 'string' && value.startsWith('=')
 }
 
+const isErrorValue = (v) => typeof v === 'string' && (v === '#REF!' || v === '#ERROR!' || v === '#DIV/0!')
+
 const tokenize = (formula) => {
   const tokens = []
   let i = 0
@@ -106,6 +108,12 @@ const tokenize = (formula) => {
 
     if (/\s/.test(ch)) {
       i++
+      continue
+    }
+
+    if (ch === '#' && s.slice(i, i + 5) === '#REF!') {
+      tokens.push({ type: 'ref_error', value: '#REF!' })
+      i += 5
       continue
     }
 
@@ -198,8 +206,12 @@ const executeFunction = (name, args, cells) => {
   for (const arg of args) {
     if (arg.type === 'range') {
       const rangeVals = getRangeValues(cells, arg.value)
-      for (const v of rangeVals) values.push(v)
+      for (const v of rangeVals) {
+        if (isErrorValue(v)) return v
+        values.push(v)
+      }
     } else {
+      if (isErrorValue(arg.evaluated)) return arg.evaluated
       values.push(arg.evaluated)
     }
   }
@@ -242,10 +254,12 @@ const evaluateTokens = (tokens, cells) => {
 
   const parseExpression = () => {
     let left = parseTerm()
+    if (isErrorValue(left)) return left
     while (pos < tokens.length && (tokens[pos].value === '+' || tokens[pos].value === '-')) {
       const op = tokens[pos].value
       pos++
       const right = parseTerm()
+      if (isErrorValue(right)) return right
       left = op === '+' ? toNumber(left) + toNumber(right) : toNumber(left) - toNumber(right)
     }
     return left
@@ -253,10 +267,12 @@ const evaluateTokens = (tokens, cells) => {
 
   const parseTerm = () => {
     let left = parseFactor()
+    if (isErrorValue(left)) return left
     while (pos < tokens.length && (tokens[pos].value === '*' || tokens[pos].value === '/')) {
       const op = tokens[pos].value
       pos++
       const right = parseFactor()
+      if (isErrorValue(right)) return right
       left = op === '*' ? toNumber(left) * toNumber(right) : toNumber(right) === 0 ? '#DIV/0!' : toNumber(left) / toNumber(right)
     }
     return left
@@ -266,6 +282,11 @@ const evaluateTokens = (tokens, cells) => {
     if (pos >= tokens.length) return 0
 
     const token = tokens[pos]
+
+    if (token.type === 'ref_error') {
+      pos++
+      return '#REF!'
+    }
 
     if (token.type === 'number') {
       pos++
@@ -283,7 +304,10 @@ const evaluateTokens = (tokens, cells) => {
       if (!ref) return '#REF!'
       const raw = getCellRawValue(cells, ref.row, ref.col)
       if (isFormula(raw)) {
-        return getCellDisplayValue(cells, ref.row, ref.col)
+        const display = getCellDisplayValue(cells, ref.row, ref.col)
+        if (isErrorValue(display)) return display
+        const num = parseFloat(String(display))
+        return isNaN(num) ? (display || 0) : num
       }
       const num = parseFloat(raw)
       return isNaN(num) ? (raw || 0) : num
@@ -292,6 +316,9 @@ const evaluateTokens = (tokens, cells) => {
     if (token.type === 'range') {
       pos++
       const vals = getRangeValues(cells, token.value)
+      for (const v of vals) {
+        if (isErrorValue(v)) return v
+      }
       let sum = 0
       for (const v of vals) sum += toNumber(v)
       return sum
@@ -334,12 +361,16 @@ const evaluateTokens = (tokens, cells) => {
 
     if (token.type === 'op' && token.value === '-') {
       pos++
-      return -toNumber(parseFactor())
+      const val = parseFactor()
+      if (isErrorValue(val)) return val
+      return -toNumber(val)
     }
 
     if (token.type === 'op' && token.value === '+') {
       pos++
-      return toNumber(parseFactor())
+      const val = parseFactor()
+      if (isErrorValue(val)) return val
+      return toNumber(val)
     }
 
     pos++

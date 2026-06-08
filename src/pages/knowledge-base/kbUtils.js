@@ -253,8 +253,6 @@ export const moveCategory = (data, sourceId, targetId, position = 'inside') => {
   if (isDescendantCategory(data.categories, sourceId, targetId)) return data
   if (targetId !== 'cat-root' && !findCategoryById(data.categories, targetId)) return data
 
-  const effectivePosition = targetId === 'cat-root' ? 'inside' : position
-
   let categories = [...data.categories.map((c) => ({ ...c }))]
 
   const sourceIndex = categories.findIndex((c) => c.id === sourceId)
@@ -262,7 +260,9 @@ export const moveCategory = (data, sourceId, targetId, position = 'inside') => {
   const source = categories[sourceIndex]
   const oldParentId = source.parentId
 
-  const newParentId = effectivePosition === 'inside'
+  const isRootTarget = targetId === 'cat-root'
+  const effectivePosition = position
+  const newParentId = isRootTarget || effectivePosition === 'inside'
     ? targetId
     : (findCategoryById(categories, targetId)?.parentId || 'cat-root')
   source.parentId = newParentId
@@ -277,7 +277,22 @@ export const moveCategory = (data, sourceId, targetId, position = 'inside') => {
     }
   }
 
-  if (effectivePosition === 'inside') {
+  if (isRootTarget) {
+    const newParentIndex = categories.findIndex((c) => c.id === newParentId)
+    if (newParentIndex !== -1) {
+      const siblings = categories[newParentIndex].children.filter((id) => id !== sourceId)
+      if (effectivePosition === 'before') {
+        siblings.unshift(sourceId)
+      } else {
+        siblings.push(sourceId)
+      }
+      categories[newParentIndex] = {
+        ...categories[newParentIndex],
+        children: siblings,
+        isExpanded: true,
+      }
+    }
+  } else if (effectivePosition === 'inside') {
     const newParentIndex = categories.findIndex((c) => c.id === newParentId)
     if (newParentIndex !== -1) {
       categories[newParentIndex] = {

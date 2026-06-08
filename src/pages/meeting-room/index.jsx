@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import BookingForm from './BookingForm.jsx'
 import BookingList from './BookingList.jsx'
@@ -50,7 +50,14 @@ export default function MeetingRoomPage() {
   const [isDragging, setIsDragging] = useState(false)
   const dragRoomRef = useRef(null)
   const dragStartHourRef = useRef(null)
+  const selectedSlotsRef = useRef(new Set())
+  const isDraggingRef = useRef(false)
+  const selectedDateRef = useRef(selectedDate)
   const handleMouseUpRef = useRef(null)
+
+  selectedSlotsRef.current = selectedSlots
+  isDraggingRef.current = isDragging
+  selectedDateRef.current = selectedDate
 
   useEffect(() => {
     saveBookings(bookings)
@@ -113,12 +120,15 @@ export default function MeetingRoomPage() {
     setSelectedSlots(newSet)
   }
 
-  const handleMouseUp = useCallback(() => {
-    if (!isDragging) return
+  const handleMouseUp = () => {
+    if (!isDraggingRef.current) return
     setIsDragging(false)
-    if (selectedSlots.size > 0 && dragRoomRef.current != null) {
+    const slots = selectedSlotsRef.current
+    const roomId = dragRoomRef.current
+    const date = selectedDateRef.current
+    if (slots.size > 0 && roomId != null) {
       const hours = []
-      selectedSlots.forEach((key) => {
+      slots.forEach((key) => {
         const [, hStr] = key.split('-')
         hours.push(Number(hStr))
       })
@@ -126,8 +136,8 @@ export default function MeetingRoomPage() {
         const range = hoursToRange(hours)
         if (range) {
           setFormDefaults({
-            roomId: dragRoomRef.current,
-            date: selectedDate,
+            roomId,
+            date,
             startHour: range.startHour,
             endHour: range.endHour,
           })
@@ -138,11 +148,9 @@ export default function MeetingRoomPage() {
     }
     dragRoomRef.current = null
     dragStartHourRef.current = null
-  }, [isDragging, selectedSlots, selectedDate, areHoursConsecutive, hoursToRange])
+  }
 
-  useEffect(() => {
-    handleMouseUpRef.current = handleMouseUp
-  }, [handleMouseUp])
+  handleMouseUpRef.current = handleMouseUp
 
   useEffect(() => {
     const listener = () => handleMouseUpRef.current?.()

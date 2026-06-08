@@ -388,6 +388,24 @@ describe('公式计算', () => {
   it('evaluateFormula - 无效公式返回 #ERROR!', () => {
     expect(evaluateFormula('=UNKNOWN()', {})).toBe('#ERROR!')
   })
+
+  it('evaluateFormula - #REF! 错误值传播', () => {
+    expect(evaluateFormula('=#REF!+10', {})).toBe('#REF!')
+    expect(evaluateFormula('=10+#REF!', {})).toBe('#REF!')
+    expect(evaluateFormula('=10*#REF!', {})).toBe('#REF!')
+    expect(evaluateFormula('=#REF!/2', {})).toBe('#REF!')
+    expect(evaluateFormula('=-#REF!', {})).toBe('#REF!')
+    expect(evaluateFormula('=+#REF!', {})).toBe('#REF!')
+    expect(evaluateFormula('=(#REF!)+5', {})).toBe('#REF!')
+  })
+
+  it('evaluateFormula - #REF! 函数参数传播', () => {
+    expect(evaluateFormula('=SUM(#REF!,10,20)', {})).toBe('#REF!')
+    expect(evaluateFormula('=AVG(#REF!:B5)', {})).toBe('#REF!')
+    expect(evaluateFormula('=MAX(10,#REF!)', {})).toBe('#REF!')
+    expect(evaluateFormula('=MIN(#REF!,5)', {})).toBe('#REF!')
+    expect(evaluateFormula('=COUNT(#REF!)', {})).toBe('#REF!')
+  })
 })
 
 describe('公式依赖检测', () => {
@@ -887,7 +905,7 @@ describe('公式引用更新', () => {
 })
 
 describe('行列操作 - 公式引用更新', () => {
-  it('insertRow - 应该同步更新公式中的行引用', () => {
+  it('insertRow - 应该同步更新公式中的行引用（raw + display）', () => {
     const state = {
       ...createInitialState(),
       cells: {
@@ -901,9 +919,29 @@ describe('行列操作 - 公式引用更新', () => {
     const result = insertRow(state, 0)
     expect(result.rows).toBe(4)
     expect(result.cells.B3.raw).toBe('=A2+A3')
+    expect(result.cells.B3.display).toBe('30')
   })
 
-  it('deleteRow - 应该同步更新公式中的行引用', () => {
+  it('deleteRow - 正常更新引用（不包含被删行）应正确计算', () => {
+    const state = {
+      ...createInitialState(),
+      cells: {
+        A1: { raw: '10', display: '10' },
+        A2: { raw: '20', display: '20' },
+        A3: { raw: '30', display: '30' },
+        A4: { raw: '40', display: '40' },
+        B4: { raw: '=A2+A3+A4', display: '90' },
+      },
+      rows: 5,
+      cols: 2,
+    }
+    const result = deleteRow(state, 0)
+    expect(result.rows).toBe(4)
+    expect(result.cells.B3.raw).toBe('=A1+A2+A3')
+    expect(result.cells.B3.display).toBe('90')
+  })
+
+  it('deleteRow - 引用被删除行时 raw 含 #REF! 且 display 显示 #REF!', () => {
     const state = {
       ...createInitialState(),
       cells: {
@@ -918,9 +956,10 @@ describe('行列操作 - 公式引用更新', () => {
     const result = deleteRow(state, 0)
     expect(result.rows).toBe(3)
     expect(result.cells.B2.raw).toBe('=#REF!+A1+A2')
+    expect(result.cells.B2.display).toBe('#REF!')
   })
 
-  it('insertCol - 应该同步更新公式中的列引用', () => {
+  it('insertCol - 应该同步更新公式中的列引用（raw + display）', () => {
     const state = {
       ...createInitialState(),
       cells: {
@@ -934,9 +973,29 @@ describe('行列操作 - 公式引用更新', () => {
     const result = insertCol(state, 0)
     expect(result.cols).toBe(4)
     expect(result.cells.D1.raw).toBe('=B1+C1')
+    expect(result.cells.D1.display).toBe('30')
   })
 
-  it('deleteCol - 应该同步更新公式中的列引用', () => {
+  it('deleteCol - 正常更新引用应正确计算', () => {
+    const state = {
+      ...createInitialState(),
+      cells: {
+        A1: { raw: '10', display: '10' },
+        B1: { raw: '20', display: '20' },
+        C1: { raw: '30', display: '30' },
+        D1: { raw: '40', display: '40' },
+        E1: { raw: '=B1+C1+D1', display: '90' },
+      },
+      rows: 2,
+      cols: 5,
+    }
+    const result = deleteCol(state, 0)
+    expect(result.cols).toBe(4)
+    expect(result.cells.D1.raw).toBe('=A1+B1+C1')
+    expect(result.cells.D1.display).toBe('90')
+  })
+
+  it('deleteCol - 引用被删除列时 raw 含 #REF! 且 display 显示 #REF!', () => {
     const state = {
       ...createInitialState(),
       cells: {
@@ -951,6 +1010,7 @@ describe('行列操作 - 公式引用更新', () => {
     const result = deleteCol(state, 0)
     expect(result.cols).toBe(3)
     expect(result.cells.C1.raw).toBe('=#REF!+A1+B1')
+    expect(result.cells.C1.display).toBe('#REF!')
   })
 
   it('insertRow - 更新后公式应能正确计算', () => {

@@ -424,32 +424,186 @@ export function sortSnippets(snippets, sortBy = 'createdAt', sortOrder = 'desc')
   return sorted
 }
 
+const MD_TOKEN_START = '\u0002MDT'
+const MD_TOKEN_END = 'TDM\u0003'
+const MD_TOKEN_REGEX = new RegExp(`${MD_TOKEN_START}(\\d+)${MD_TOKEN_END}`, 'g')
+
+function mdEscapeHtml(text) {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function isSafeUrl(url) {
+  if (!url) return false
+  const trimmed = url.trim()
+  if (!trimmed) return false
+  const lower = trimmed.toLowerCase()
+  if (lower.startsWith('http://') || lower.startsWith('https://')) return true
+  if (lower.startsWith('mailto:')) return true
+  if (lower.startsWith('tel:')) return true
+  if (lower.startsWith('/') || lower.startsWith('./') || lower.startsWith('../')) return true
+  if (/^#[a-zA-Z0-9_-]*$/.test(trimmed)) return true
+  return false
+}
+
+function sanitizeUrl(url) {
+  if (isSafeUrl(url)) return mdEscapeHtml(url)
+  return '#'
+}
+
+function mdProtectInline(text, tokens) {
+  let result = text
+
+  result = result.replace(/`([^`]+)`/g, (_, code) => {
+    const idx = tokens.length
+    tokens.push(`<code>${code}</code>`)
+    return `${MD_TOKEN_START}${idx}${MD_TOKEN_END}`
+  })
+
+  result = result.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, linkText, linkUrl) => {
+    const idx = tokens.length
+    const safeUrl = sanitizeUrl(linkUrl)
+    tokens.push(`<a href="${safeUrl}" rel="noopener noreferrer">${linkText}</a>`)
+    return `${MD_TOKEN_START}${idx}${MD_TOKEN_END}`
+  })
+
+  result = result.replace(/\*\*\*([^*]+)\*\*\*/g, (_, content) => {
+    const idx = tokens.length
+    tokens.push(`<strong><em>${content}</em></strong>`)
+    return `${MD_TOKEN_START}${idx}${MD_TOKEN_END}`
+  })
+
+  result = result.replace(/\*\*([^*]+)\*\*/g, (_, content) => {
+    const idx = tokens.length
+    tokens.push(`<strong>${content}</strong>`)
+    return `${MD_TOKEN_START}${idx}${MD_TOKEN_END}`
+  })
+
+  result = result.replace(/\*([^*]+)\*/g, (_, content) => {
+    const idx = tokens.length
+    tokens.push(`<em>${content}</em>`)
+    return `${MD_TOKEN_START}${idx}${MD_TOKEN_END}`
+  })
+
+  return result
+}
+
+function mdRestoreInline(text, tokens) {
+  return text.replace(MD_TOKEN_REGEX, (_, idx) => tokens[Number(idx)] || '')
+}
+
 export function renderMarkdown(md) {
   if (!md) return ''
-  let html = md
 
-  html = html.replace(/^######\s+(.+?)$/gm, '<h6>$1</h6>')
-  html = html.replace(/^#####\s+(.+?)$/gm, '<h5>$1</h5>')
-  html = html.replace(/^####\s+(.+?)$/gm, '<h4>$1</h4>')
-  html = html.replace(/^###\s+(.+?)$/gm, '<h3>$1</h3>')
-  html = html.replace(/^##\s+(.+?)$/gm, '<h2>$1</h2>')
-  html = html.replace(/^#\s+(.+?)$/gm, '<h1>$1</h1>')
+  const lines = md.split('\n')
+  const tokens = []
+  const resultLines = []
+  let i = 0
 
-  html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
-  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>')
-  html = html.replace(/`([^`]+)`/g, '<code>$1</code>')
-  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
-  html = html.replace(/^-\s+(.+?)$/gm, '<li>$1</li>')
-  html = html.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>')
-  html = html.replace(/^\d+\.\s+(.+?)$/gm, '<li>$1</li>')
-  html = html.replace(/(<li>.*<\/li>\n?)+/g, '<ol>$&</ol>')
+  while (i < lines.length) {
+    const rawLine = lines[i]
+    const escapedLine = mdEscapeHtml(rawLine)
 
-  html = html.replace(/^>\s+(.+?)$/gm, '<blockquote>$1</blockquote>')
-  html = html.replace(/^---+$/gm, '<hr />')
-  html = html.replace(/\n/g, '<br />')
+    if (/^######\s+(.+?)$/.test(rawLine)) {
+      const rawContent = rawLine.replace(/^######\s+(.+?)$/, '$1')
+      const escapedContent = mdEscapeHtml(rawContent)
+      const protectedContent = mdProtectInline(escapedContent, tokens)
+      resultLines.push(`<h6>${mdRestoreInline(protectedContent, tokens)}</h6>`)
+      i++
+      continue
+    }
+    if (/^#####\s+(.+?)$/.test(rawLine)) {
+      const rawContent = rawLine.replace(/^#####\s+(.+?)$/, '$1')
+      const escapedContent = mdEscapeHtml(rawContent)
+      const protectedContent = mdProtectInline(escapedContent, tokens)
+      resultLines.push(`<h5>${mdRestoreInline(protectedContent, tokens)}</h5>`)
+      i++
+      continue
+    }
+    if (/^####\s+(.+?)$/.test(rawLine)) {
+      const rawContent = rawLine.replace(/^####\s+(.+?)$/, '$1')
+      const escapedContent = mdEscapeHtml(rawContent)
+      const protectedContent = mdProtectInline(escapedContent, tokens)
+      resultLines.push(`<h4>${mdRestoreInline(protectedContent, tokens)}</h4>`)
+      i++
+      continue
+    }
+    if (/^###\s+(.+?)$/.test(rawLine)) {
+      const rawContent = rawLine.replace(/^###\s+(.+?)$/, '$1')
+      const escapedContent = mdEscapeHtml(rawContent)
+      const protectedContent = mdProtectInline(escapedContent, tokens)
+      resultLines.push(`<h3>${mdRestoreInline(protectedContent, tokens)}</h3>`)
+      i++
+      continue
+    }
+    if (/^##\s+(.+?)$/.test(rawLine)) {
+      const rawContent = rawLine.replace(/^##\s+(.+?)$/, '$1')
+      const escapedContent = mdEscapeHtml(rawContent)
+      const protectedContent = mdProtectInline(escapedContent, tokens)
+      resultLines.push(`<h2>${mdRestoreInline(protectedContent, tokens)}</h2>`)
+      i++
+      continue
+    }
+    if (/^#\s+(.+?)$/.test(rawLine)) {
+      const rawContent = rawLine.replace(/^#\s+(.+?)$/, '$1')
+      const escapedContent = mdEscapeHtml(rawContent)
+      const protectedContent = mdProtectInline(escapedContent, tokens)
+      resultLines.push(`<h1>${mdRestoreInline(protectedContent, tokens)}</h1>`)
+      i++
+      continue
+    }
 
-  return html
+    if (/^---+$/.test(rawLine.trim())) {
+      resultLines.push('<hr />')
+      i++
+      continue
+    }
+
+    if (/^>\s+(.+?)$/.test(rawLine)) {
+      const rawContent = rawLine.replace(/^>\s+(.+?)$/, '$1')
+      const escapedContent = mdEscapeHtml(rawContent)
+      const protectedContent = mdProtectInline(escapedContent, tokens)
+      resultLines.push(`<blockquote>${mdRestoreInline(protectedContent, tokens)}</blockquote>`)
+      i++
+      continue
+    }
+
+    if (/^-\s+(.+?)$/.test(rawLine)) {
+      const ulItems = []
+      while (i < lines.length && /^-\s+(.+?)$/.test(lines[i])) {
+        const rawContent = lines[i].replace(/^-\s+(.+?)$/, '$1')
+        const escapedContent = mdEscapeHtml(rawContent)
+        const protectedContent = mdProtectInline(escapedContent, tokens)
+        ulItems.push(`<li>${mdRestoreInline(protectedContent, tokens)}</li>`)
+        i++
+      }
+      resultLines.push(`<ul>${ulItems.join('')}</ul>`)
+      continue
+    }
+
+    if (/^\d+\.\s+(.+?)$/.test(rawLine)) {
+      const olItems = []
+      while (i < lines.length && /^\d+\.\s+(.+?)$/.test(lines[i])) {
+        const rawContent = lines[i].replace(/^\d+\.\s+(.+?)$/, '$1')
+        const escapedContent = mdEscapeHtml(rawContent)
+        const protectedContent = mdProtectInline(escapedContent, tokens)
+        olItems.push(`<li>${mdRestoreInline(protectedContent, tokens)}</li>`)
+        i++
+      }
+      resultLines.push(`<ol>${olItems.join('')}</ol>`)
+      continue
+    }
+
+    const protectedLine = mdProtectInline(escapedLine, tokens)
+    resultLines.push(mdRestoreInline(protectedLine, tokens))
+    i++
+  }
+
+  return resultLines.join('<br />')
 }
 
 export function snippetsToJson(snippets) {

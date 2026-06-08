@@ -780,6 +780,29 @@ describe('ganttUtils - validateTask field-level validation', () => {
     expect(validateTask({ name: 'OK', progress: 0 }).valid).toBe(true);
     expect(validateTask({ name: 'OK', progress: 100 }).valid).toBe(true);
   });
+
+  it('validateTask marks BOTH startDate and endDate when start > end', () => {
+    const result = validateTask({
+      name: 'OK',
+      startDate: '2025-02-01',
+      endDate: '2025-01-01',
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors.startDate).toBeTruthy();
+    expect(result.errors.endDate).toBeTruthy();
+  });
+
+  it('validateTask marks startDate error when editing startDate past endDate', () => {
+    const baseTask = {
+      name: 'OK',
+      startDate: '2025-01-01',
+      endDate: '2025-01-15',
+    };
+    const edited = { ...baseTask, startDate: '2025-02-01' };
+    const result = validateTask(edited);
+    expect(result.valid).toBe(false);
+    expect(result.errors.startDate).toBeTruthy();
+  });
 });
 
 describe('ganttUtils - Zoom level position calculations', () => {

@@ -1,11 +1,15 @@
-import { useState, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import QuestionBank from './QuestionBank'
 import ExamCreate from './ExamCreate'
 import ExamTake from './ExamTake'
 import ExamResult from './ExamResult'
 import ExamHistory from './ExamHistory'
-import { loadExamHistory, findActiveExamDraft } from './examCore'
+import {
+  loadExamHistory,
+  findActiveExamDraft,
+  cleanupExpiredExamDrafts,
+} from './examCore'
 import './exam.css'
 
 const VIEWS = {
@@ -22,38 +26,45 @@ const TABS = [
   { key: VIEWS.HISTORY, label: '成绩记录' },
 ]
 
+function getInitialFromUrl() {
+  if (typeof window === 'undefined') {
+    return { view: VIEWS.BANK, record: null, exam: null, answers: {}, startedAt: null }
+  }
+  const params = new URLSearchParams(window.location.search)
+  const recordId = params.get('record')
+  if (recordId) {
+    const history = loadExamHistory()
+    const r = history.find((x) => x.id === recordId)
+    if (r) {
+      return { view: VIEWS.RESULT, record: r, exam: null, answers: {}, startedAt: null }
+    }
+  }
+  const draft = findActiveExamDraft()
+  if (draft && draft.exam) {
+    return {
+      view: VIEWS.TAKE,
+      record: null,
+      exam: draft.exam,
+      answers: draft.answers || {},
+      startedAt: draft.startedAt,
+    }
+  }
+  return { view: VIEWS.BANK, record: null, exam: null, answers: {}, startedAt: null }
+}
+
 export default function ExamPage() {
   const navigate = useNavigate()
-  const initial = useMemo(() => {
-    if (typeof window === 'undefined') {
-      return { view: VIEWS.BANK, record: null, exam: null, answers: {}, startedAt: null }
-    }
-    const params = new URLSearchParams(window.location.search)
-    const recordId = params.get('record')
-    if (recordId) {
-      const history = loadExamHistory()
-      const r = history.find((x) => x.id === recordId)
-      if (r) {
-        return { view: VIEWS.RESULT, record: r, exam: null, answers: {}, startedAt: null }
-      }
-    }
-    const draft = findActiveExamDraft()
-    if (draft && draft.exam) {
-      return {
-        view: VIEWS.TAKE,
-        record: null,
-        exam: draft.exam,
-        answers: draft.answers || {},
-        startedAt: draft.startedAt,
-      }
-    }
-    return { view: VIEWS.BANK, record: null, exam: null, answers: {}, startedAt: null }
-  }, [])
+  const initial = getInitialFromUrl()
+
   const [view, setView] = useState(initial.view)
   const [currentExam, setCurrentExam] = useState(initial.exam)
   const [currentRecord, setCurrentRecord] = useState(initial.record)
   const [takeAnswers, setTakeAnswers] = useState(initial.answers)
   const [takeStartedAt, setTakeStartedAt] = useState(initial.startedAt)
+
+  useEffect(() => {
+    cleanupExpiredExamDrafts()
+  }, [])
 
   const handleStartExam = (exam) => {
     setCurrentExam(exam)

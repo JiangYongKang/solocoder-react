@@ -1,0 +1,7 @@
+你实现的甘特图页面在第二轮修复后还存在一些问题，需要进行修复：
+
+1. 行内编辑校验功能存在字段错误键不匹配的 BUG：EditableCell 的 handleCommit 在校验失败时只检查 result.errors[field]（当前编辑字段的错误键），但 validateTask 函数在校验日期顺序时（startDate 晚于 endDate）仅将错误记录在 errors.endDate 键上。当用户编辑 startDate 字段并输入一个晚于 endDate 的日期时，validateTask 返回 errors.endDate 而非 errors.startDate，导致条件 !result.valid && result.errors[field] 不成立，校验被静默跳过，用户可以在无错误提示的情况下提交不合法的日期顺序。需要修复字段错误键的对齐问题。
+2. calculateBarPosition 函数内部仍然手动使用 diffDays × dayWidth 计算位置，而没有复用已导入的 dateToPx 工具函数，存在逻辑冗余。需要让 calculateBarPosition 使用 dateToPx 替代手写计算。
+3. Timeline.jsx 的拖拽实现中，mousemove 每帧都通过 setState 更新 currentX 到 React state，而 useEffect 依赖数组包含 dragging 对象，导致每帧都执行一次事件监听器的拆卸和重新绑定。需要减少拖拽期间不必要的 effect 重建。
+4. App.jsx 中出现了与甘特图无关的修改：第二轮修复中模型越界添加了 MindMapPage 等无关路由和任务卡片。请在本次修复开始前，将这些无关变更从 App.jsx 中还原。
+5. 修复后重新运行 pnpm run test，确保所有测试通过。确保所有子页面在 375px 和 1440px 宽度下布局不崩坏，需要启动 dev server 实际验证。

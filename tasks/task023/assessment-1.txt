@@ -1,0 +1,23 @@
+产物不满意：
+
+1. 模型在修改 App.jsx 注册路由的步骤中，尝试了两次 edit_file_search_replace 均失败后，第三次 view_files 读到 App.jsx 时错误地声称"App.jsx 中已经注册好了 MindMapPage 的导入、任务卡片和路由"，实际上 App.jsx 中没有任何 MindMapPage 的 import、TASKS 卡片条目和 Route 配置。导致思维导图页面无法从首页通过点击卡片跳转访问，提示词第 8 条"在 src/App.jsx 中注册该页面的路由，确保从首页点击卡片能正确跳转"完全没有完成。根本原因是模型在文件编辑失败后产生了幻觉，未实际核查 App.jsx 中是否存在目标代码。正确做法是逐行检查 App.jsx 的 imports、TASKS 数组和 Routes 部分，确认缺失后手动添加对应的 import、卡片和路由条目。
+
+2. 模型在 index.jsx 中实现 handleContextMenu 函数时，只判断了 selectedId 是否存在，没有判断右键事件的目标元素是否为画布上的节点，导致在已选中任意节点的状态下，右键点击页面工具栏、标题栏或空白区域时也会弹出节点操作菜单。业务影响是用户在做非节点操作（如点击导出按钮）时误触右键会看到与当前交互无关的弹窗。根本原因是将上下文菜单的触发逻辑绑定在整个页面 div 上而不是限定在画布节点区域。正确做法是让 contextmenu 事件只在画布节点元素上触发，或在页面级 handler 中增加对事件目标是否为 mind-node-group 元素的判断。
+
+3. 模型在 index.jsx 的 handleAddChild 和 handleAddSibling 函数中，将 setSelectedId(newNodeId) 和 setEditingId(newNodeId) 放在了 setTree 的 updater 回调函数内部。在 React 中，在 setState 的 updater 回调里调用另一个 setState 是反模式，虽然 React 的自动批处理会在大多数情况下掩盖问题，但这种写法不符合 React 最佳实践，代码可读性和可维护性差。正确做法是将这些状态更新放在 setTree 的回调外部，让 React 正常批处理即可。
+
+4. 模型在 mindMapCore.js 的 findParentNode 函数中，for 循环体内的条件判断 if (found !== null || (found === null && child.id === nodeId)) 的第二部分 (found === null && child.id === nodeId) 是死代码，永远不会为真。因为当 child.id === nodeId 时，递归调用 findParentNode(child, nodeId, root) 一定会返回 root（非 null），即 found 不为 null。虽然不影响功能正确性，但说明模型写这段逻辑时没有充分推演递归调用链，代码产物不干净。正确做法是简化为 if (found !== null) return found。
+
+5. 模型在 MindMapCanvas.jsx 的 handleWheel 函数中，缩放边界值写死为 Math.max(0.3, Math.min(2.0, ...))，而不是使用从 constants.js 导入的 MIN_ZOOM（0.3）和 MAX_ZOOM（2.0）常量。如果将来需求变更需要调整缩放范围，只修改 constants.js 中的常量值并不会反映到 handleWheel 的实际行为中，存在维护风险。正确做法是在 handleWheel 中引用 MIN_ZOOM 和 MAX_ZOOM 常量。
+
+6. 模型实现的节点间连线使用了三次贝塞尔曲线（SVG C 路径命令），而提示词第 1 条明确要求"节点之间用直线或折线连接"。虽然贝塞尔曲线在视觉效果上更好，但产物偏离了需求规格。正确做法是按照需求文档使用 Line（直线）或 Polyline（折线）实现连线。
+
+过程不满意：
+
+1. 模型在收到任务提示词后，第一步就使用 todo_write 创建了 12 项任务的 TodoList，没有先仔细分析提示词的各项要求。标注规范明确要求"不能在刚收到任务时就直接创建 TodoList，应先分析问题再规划"。这导致后续任务规划缺少针对性，最终遗漏了 App.jsx 路由注册这一关键任务项。
+
+2. 模型在 App.jsx 路由注册环节的行为存在严重问题：先尝试了两次 edit_file_search_replace 均失败，第二次失败后第三次 view_files 读到 App.jsx 内容后，模型在思考过程中直接声称"App.jsx 中已经注册好了 MindMapPage 的导入、任务卡片和路由"，而实际上 App.jsx 中完全不存在这些内容。这是典型的幻觉行为，模型读取了文件但没有正确解析文件内容，导致将不存在的代码误认为已存在。模型的这一步幻觉直接导致产物缺失了路由注册，页面无法从首页跳转访问（提示词第 8 条未完成）。根本原因是模型在编辑操作失败后缺乏审慎验证的态度，仅凭印象就下结论。正确做法是每次读取文件后核实文件内容，对照提示词逐一确认所需修改是否到位。
+
+3. 模型在首次运行测试时，addSiblingNode 的根节点测试用例失败（返回 null），模型的修复方式是直接修改测试用例让 assert 接受 null 返回值，而不是先评估函数行为是否正确。虽然根节点的 addSiblingNode 返回 null 在此场景下可接受（UI 层已降级为 addChildNode），但这种"测试失败就改测试"而非"分析失败原因后决定改代码还是改测试"的习惯是有问题的。正确做法是先确认函数预期行为，再决定是调整测试还是修正函数实现。
+
+4. 模型启动 pnpm dev 后声称"开发服务器成功启动"和"可以预览"，但没有在浏览器中实际验证以下关键路径：从首页点击任务卡片能否跳转到思维导图页面、各个快捷键是否生效、PNG 导出功能是否正常工作。模型的"完成声明"缺乏实际的页面级验证，属于幻觉式完成。正确做法是在启动 dev server 后至少用浏览器工具访问页面并执行一次核心操作序列，确认功能可用后再汇报完成。

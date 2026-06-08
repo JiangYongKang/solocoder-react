@@ -1,0 +1,488 @@
+.mind-map-page {
+  width: 100%;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+.mind-map-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 32px;
+  gap: 24px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.mind-map-header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.mind-back-link {
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 14px;
+  padding: 6px 12px;
+  border: 1px solid var(--accent-border);
+  border-radius: 6px;
+  background: var(--accent-bg);
+  transition: all 0.2s;
+}
+
+.mind-back-link:hover {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.mind-map-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--text-h);
+  margin: 0;
+}
+
+.mind-map-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 32px;
+  gap: 16px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.mind-toolbar-left,
+.mind-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.mind-btn {
+  padding: 8px 14px;
+  background: var(--code-bg);
+  color: var(--text-h);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mind-btn:hover {
+  border-color: var(--accent-border);
+  background: var(--accent-bg);
+}
+
+.mind-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.mind-btn-primary {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.mind-btn-primary:hover {
+  background: var(--accent);
+  opacity: 0.9;
+}
+
+.mind-canvas-wrapper {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  min-height: 500px;
+  background:
+    linear-gradient(rgba(100, 116, 139, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(100, 116, 139, 0.08) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+.mind-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: grab;
+  user-select: none;
+}
+
+.mind-svg.dragging {
+  cursor: grabbing;
+}
+
+.mind-connection {
+  fill: none;
+  stroke: #94a3b8;
+  stroke-width: 2;
+  stroke-opacity: 0.6;
+}
+
+.mind-node-group {
+  cursor: pointer;
+}
+
+.mind-node-group.dragging {
+  opacity: 0.7;
+  cursor: grabbing;
+}
+
+.mind-node-rect {
+  rx: 8;
+  ry: 8;
+  stroke-width: 2;
+  transition: stroke 0.15s, filter 0.15s;
+}
+
+.mind-node-group.selected .mind-node-rect {
+  stroke: #6366f1 !important;
+  filter: drop-shadow(0 0 6px rgba(99, 102, 241, 0.4));
+}
+
+.mind-node-group:hover .mind-node-rect {
+  filter: brightness(1.05);
+}
+
+.mind-node-text {
+  fill: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+  user-select: none;
+}
+
+.mind-node-icon {
+  font-size: 16px;
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+  user-select: none;
+}
+
+.mind-collapse-btn {
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+
+.mind-collapse-btn:hover {
+  transform: scale(1.15);
+}
+
+.mind-collapse-rect {
+  fill: #fff;
+  stroke: #cbd5e1;
+  stroke-width: 1.5;
+  rx: 10;
+  ry: 10;
+}
+
+.mind-collapse-text {
+  fill: #475569;
+  font-size: 14px;
+  font-weight: 600;
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+}
+
+.mind-edit-input {
+  position: fixed;
+  background: var(--bg);
+  color: var(--text-h);
+  border: 2px solid var(--accent);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 14px;
+  outline: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  font-family: inherit;
+}
+
+.mind-context-menu {
+  position: fixed;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  z-index: 2000;
+  padding: 8px;
+  min-width: 220px;
+}
+
+.mind-context-section {
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.mind-context-section:last-child {
+  border-bottom: none;
+}
+
+.mind-context-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+  letter-spacing: 0.5px;
+}
+
+.mind-color-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.mind-color-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: transform 0.15s, border-color 0.15s;
+}
+
+.mind-color-swatch:hover {
+  transform: scale(1.1);
+}
+
+.mind-color-swatch.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-bg);
+}
+
+.mind-icon-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.mind-icon-swatch {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 2px solid transparent;
+  background: var(--code-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  transition: transform 0.15s, border-color 0.15s;
+}
+
+.mind-icon-swatch:hover {
+  transform: scale(1.1);
+  border-color: var(--accent-border);
+  background: var(--accent-bg);
+}
+
+.mind-icon-swatch.selected {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+
+.mind-icon-swatch.clear {
+  font-size: 12px;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.mind-context-action {
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-h);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mind-context-action:hover {
+  background: var(--accent-bg);
+}
+
+.mind-context-action.danger {
+  color: #ef4444;
+}
+
+.mind-context-action.danger:hover {
+  background: #fee2e2;
+}
+
+.mind-context-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mind-hint {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  background: rgba(30, 41, 59, 0.9);
+  color: #e2e8f0;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.6;
+  pointer-events: none;
+  max-width: 320px;
+}
+
+.mind-hint kbd {
+  background: #475569;
+  color: #fff;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 11px;
+  margin: 0 2px;
+}
+
+.mind-zoom-controls {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 4px;
+  box-shadow: var(--shadow);
+}
+
+.mind-zoom-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  background: var(--code-bg);
+  color: var(--text-h);
+  border: none;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+
+.mind-zoom-btn:hover {
+  background: var(--accent-bg);
+}
+
+.mind-zoom-info {
+  padding: 0 10px;
+  font-size: 13px;
+  font-family: var(--mono);
+  color: var(--text);
+  min-width: 52px;
+  text-align: center;
+}
+
+.mind-drop-indicator {
+  fill: rgba(99, 102, 241, 0.15);
+  stroke: #6366f1;
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+  rx: 8;
+  ry: 8;
+  pointer-events: none;
+}
+
+.mind-hidden-file-input {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .mind-map-header {
+    padding: 12px 16px;
+    gap: 12px;
+  }
+
+  .mind-map-title {
+    font-size: 20px;
+  }
+
+  .mind-back-link {
+    padding: 5px 10px;
+    font-size: 13px;
+  }
+
+  .mind-map-toolbar {
+    padding: 10px 16px;
+    gap: 10px;
+  }
+
+  .mind-canvas-wrapper {
+    min-height: 400px;
+  }
+
+  .mind-hint {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .mind-map-header {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+
+  .mind-map-header-left {
+    gap: 8px;
+  }
+
+  .mind-map-title {
+    font-size: 17px;
+  }
+
+  .mind-back-link {
+    padding: 4px 8px;
+    font-size: 12px;
+  }
+
+  .mind-map-toolbar {
+    padding: 8px 12px;
+    gap: 6px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+
+  .mind-map-toolbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .mind-btn {
+    padding: 6px 10px;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+
+  .mind-canvas-wrapper {
+    min-height: 360px;
+  }
+}

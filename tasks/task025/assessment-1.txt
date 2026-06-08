@@ -1,0 +1,10 @@
+产物不满意：
+1. index.jsx 第 142-145 行的 useEffect 钩子缺少依赖数组，导致 window 的 mouseup 事件监听器在每次组件渲染时都被移除并重新注册。虽然因为使用了 ref 追踪拖拽状态，功能上没有直接报错，但持续重复绑定/解绑事件监听器造成了不必要的性能开销。根本原因是模型对 React Hook 的使用规范不够熟悉，忽略了 useEffect 的依赖数组参数。正确做法是添加空依赖数组 []，让事件监听器只在组件挂载时注册一次、卸载时清理一次。
+2. BookingList.jsx 第 10 行和第 21 行硬编码了字符串 'my_bookings' 用于视图模式判断和空状态文案选择，而未引用 constants.js 中已定义的 VIEW_MODES.MY_BOOKINGS 常量。这导致如果常量值发生变化，BookingList 组件会静默失效，违背了使用常量的目的。根本原因是组件编写时没有保持对同一包内常量的引用一致性。正确做法是从 constants.js 导入 VIEW_MODES，并使用 VIEW_MODES.MY_BOOKINGS 替代硬编码字符串。
+3. meetingRoomUtils.test.js 第 441-445 行，loadBookings 的 "non-array data" 测试用例只断言返回值是数组，没有验证数组的具体内容。loadBookings 在检测到非数组数据时会调用 getDefaultBookings() 生成默认预约，再经 cleanupExpiredBookings 清理过期预约。由于 getDefaultBookings 使用当天日期，而 cleanupExpiredBookings 的过滤结果依赖测试运行时的实际时间，导致该测试在不同时间运行会得到不同数量的预约记录，测试断言过于宽松且缺乏确定性。根本原因是编写测试时未考虑到时间依赖对默认数据生成的影响。正确做法是在该测试中也验证返回数组内预约内容的关键字段（如 roomId、bookedBy 等），或使用固定日期构造默认数据避免时间依赖。
+
+过程不满意：
+1. 在第 1 步，模型刚收到任务提示词后立即创建了 TodoWrite，创建 TodoList 之前没有先分析项目结构、阅读已有页面的代码风格或评估任务复杂度。标注规范明确要求"不能在刚收到任务时就直接创建 TodoList，应先分析问题再规划"。虽然模型在创建 TodoList 之后也进行了代码探索，但先规划后分析的顺序错误反映出对任务理解的不充分前置化。根本原因是缺乏"先理解后规划"的工作习惯。正确做法是先通读几个已有页面的代码风格和项目结构，对任务范围有清晰认知后再制定 TodoList。
+2. 在首次编写测试时，模型在 meetingRoomUtils.test.js 中使用了 vitest 不支持的 toBeNullish() 断言方法，导致初始运行有 6 个测试失败。该 API 是 Jest 特有的，vitest 不提供此方法。根本原因是模型对 vitest 和 Jest 的 API 差异缺乏了解，编写测试时未确认当前测试框架支持的断言语义。正确做法是在编写测试前查阅 vitest 的 expect API 文档，或在编写后第一时间运行测试确认兼容性。
+3. 在首次编写 makeBooking 测试辅助函数时，模型使用了 JavaScript || 运算符来处理 overrides 参数的默认值（例如 overrides.bookedBy || '张三'），导致空字符串等 falsy 值被错误地替换为默认值。这说明模型在编写测试工具函数时对 JavaScript 类型转换的边界情况敏感度不足。根本原因是没有考虑到空字符串是合法的输入值。正确做法是使用 !== undefined 判断（或 ?? 运算符），确保只有真正未传入的字段才使用默认值。
+4. 在修改 App.jsx 注册路由时，模型不仅添加了提示词要求的会议室预约系统路由和任务卡片，还一并添加了 exam、pomodoro、product-review、knowledge-base、text-diff、spreadsheet、gantt-chart、snippets 共 8 个与当前任务无关的页面路由和卡片。提示词第 7 条明确要求"在 src/App.jsx 中注册该页面的路由"，仅指当前任务的页面路由，模型擅自扩大修改范围属于越权操作。根本原因是模型没有严格遵循提示词的任务范围边界，自行添加了超出需求的代码变更。正确做法是只注册当前任务所需的 meeting-room 路由和卡片。

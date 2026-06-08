@@ -21,6 +21,15 @@ import WorkflowPage from '@/pages/workflow/index.jsx'
 import FinancePage from '@/pages/finance/index.jsx'
 import MapAreaPage from '@/pages/map-area/index.jsx'
 import RichEditorPage from '@/pages/rich-editor/index.jsx'
+import ExamPage from '@/pages/exam/index.jsx'
+import TextDiffPage from '@/pages/text-diff/index.jsx'
+import SpreadsheetPage from '@/pages/spreadsheet/index.jsx'
+import GanttChartPage from '@/pages/gantt-chart/index.jsx'
+import MeetingRoomPage from '@/pages/meeting-room/index.jsx'
+import PomodoroPage from '@/pages/pomodoro/index.jsx'
+import SnippetsPage from '@/pages/snippets/index.jsx'
+import ProductReviewPage from '@/pages/product-review/index.jsx'
+import KnowledgeBasePage from '@/pages/knowledge-base/index.jsx'
 
 const TASKS = [
     { id: 1, title: '用户认证系统', route: 'auth', description: '登录、注册、找回密码、修改密码完整的认证流程，基于 localStorage 存储。' },
@@ -43,6 +52,13 @@ const TASKS = [
     { id: 18, title: '个人财务管理', route: 'finance', description: '完整的个人财务管理，支持记账、预算管理、统计图表、月度收支分析，基于 localStorage 持久化。' },
     { id: 19, title: '交互式地图', route: 'map-area', description: '自绘 SVG 地图画布，支持拖拽平移、滚轮缩放、标记点增删改查、自动聚合与路线规划。' },
     { id: 20, title: '富文本编辑器', route: 'rich-editor', description: 'Markdown 富文本编辑器，支持左右分栏实时预览、工具栏格式化、撤销重做、图片与链接插入、自动保存与文件导出。' },
+    { id: 21, title: '在线考试系统', route: 'exam', description: '题库管理、随机组卷、限时作答、自动判分和成绩趋势分析的完整在线考试系统，基于 localStorage 持久化。' },
+    { id: 22, title: '会议室预约系统', route: 'meeting-room', description: '内部会议室预定系统，按时间段预约、冲突检测、预约管理、到期自动释放，基于 localStorage 持久化。' },
+    { id: 23, title: '番茄钟计时器', route: 'pomodoro', description: '专注工作计时器，番茄工作法管理时间，支持自定义时长、白噪音、桌面通知、统计图表，基于 localStorage 持久化。' },
+    { id: 24, title: '商品评价评分系统', route: 'product-review', description: '商品评价完整评分互动体系，支持星级评分、图片上传、投票互动、追评时间线、商家回复、评分统计，基于 localStorage 持久化。' },
+    { id: 25, title: '轻量级电子表格', route: 'spreadsheet', description: '浏览器中运行的网格型电子表格，支持单元格编辑、公式计算(SUM/AVG/MAX/MIN/COUNT)、行列操作、样式设置、复制粘贴、CSV导入导出。' },
+    { id: 26, title: '甘特图', route: 'gantt-chart', description: '项目管理甘特图，任务层级分解、拖拽调整时间、依赖关系连线、日/周/月视图缩放、进度可视化，数据本地持久化。' },
+    { id: 27, title: '知识库系统', route: 'knowledge-base', description: '多级分类树形目录 + Markdown 文章编辑，支持全文搜索高亮、TOC 目录大纲、收藏夹、最近浏览，数据本地持久化。' },
 ]
 
 function HomePage() {
@@ -97,6 +113,15 @@ function App() {
             <Route path="/finance" element={<FinancePage />} />
             <Route path="/map-area" element={<MapAreaPage />} />
             <Route path="/rich-editor" element={<RichEditorPage />} />
+            <Route path="/exam" element={<ExamPage />} />
+            <Route path="/pomodoro" element={<PomodoroPage />} />
+            <Route path="/meeting-room" element={<MeetingRoomPage />} />
+            <Route path="/product-review" element={<ProductReviewPage />} />
+            <Route path="/knowledge-base" element={<KnowledgeBasePage />} />
+            <Route path="/text-diff" element={<TextDiffPage />} />
+            <Route path="/spreadsheet" element={<SpreadsheetPage />} />
+            <Route path="/gantt-chart" element={<GanttChartPage />} />
+            <Route path="/snippets" element={<SnippetsPage />} />
         </Routes>
     )
 }

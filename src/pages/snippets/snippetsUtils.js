@@ -460,32 +460,32 @@ function mdProtectInline(text, tokens) {
 
   result = result.replace(/`([^`]+)`/g, (_, code) => {
     const idx = tokens.length
-    tokens.push(`<code>${code}</code>`)
+    tokens.push(`<code>${mdEscapeHtml(code)}</code>`)
     return `${MD_TOKEN_START}${idx}${MD_TOKEN_END}`
   })
 
   result = result.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, linkText, linkUrl) => {
     const idx = tokens.length
     const safeUrl = sanitizeUrl(linkUrl)
-    tokens.push(`<a href="${safeUrl}" rel="noopener noreferrer">${linkText}</a>`)
+    tokens.push(`<a href="${safeUrl}" rel="noopener noreferrer">${mdEscapeHtml(linkText)}</a>`)
     return `${MD_TOKEN_START}${idx}${MD_TOKEN_END}`
   })
 
   result = result.replace(/\*\*\*([^*]+)\*\*\*/g, (_, content) => {
     const idx = tokens.length
-    tokens.push(`<strong><em>${content}</em></strong>`)
+    tokens.push(`<strong><em>${mdEscapeHtml(content)}</em></strong>`)
     return `${MD_TOKEN_START}${idx}${MD_TOKEN_END}`
   })
 
   result = result.replace(/\*\*([^*]+)\*\*/g, (_, content) => {
     const idx = tokens.length
-    tokens.push(`<strong>${content}</strong>`)
+    tokens.push(`<strong>${mdEscapeHtml(content)}</strong>`)
     return `${MD_TOKEN_START}${idx}${MD_TOKEN_END}`
   })
 
   result = result.replace(/\*([^*]+)\*/g, (_, content) => {
     const idx = tokens.length
-    tokens.push(`<em>${content}</em>`)
+    tokens.push(`<em>${mdEscapeHtml(content)}</em>`)
     return `${MD_TOKEN_START}${idx}${MD_TOKEN_END}`
   })
 
@@ -504,55 +504,48 @@ export function renderMarkdown(md) {
   const resultLines = []
   let i = 0
 
+  const processContent = (rawContent) => {
+    const protectedContent = mdProtectInline(rawContent, tokens)
+    const escapedContent = mdEscapeHtml(protectedContent)
+    return mdRestoreInline(escapedContent, tokens)
+  }
+
   while (i < lines.length) {
     const rawLine = lines[i]
-    const escapedLine = mdEscapeHtml(rawLine)
 
     if (/^######\s+(.+?)$/.test(rawLine)) {
       const rawContent = rawLine.replace(/^######\s+(.+?)$/, '$1')
-      const escapedContent = mdEscapeHtml(rawContent)
-      const protectedContent = mdProtectInline(escapedContent, tokens)
-      resultLines.push(`<h6>${mdRestoreInline(protectedContent, tokens)}</h6>`)
+      resultLines.push(`<h6>${processContent(rawContent)}</h6>`)
       i++
       continue
     }
     if (/^#####\s+(.+?)$/.test(rawLine)) {
       const rawContent = rawLine.replace(/^#####\s+(.+?)$/, '$1')
-      const escapedContent = mdEscapeHtml(rawContent)
-      const protectedContent = mdProtectInline(escapedContent, tokens)
-      resultLines.push(`<h5>${mdRestoreInline(protectedContent, tokens)}</h5>`)
+      resultLines.push(`<h5>${processContent(rawContent)}</h5>`)
       i++
       continue
     }
     if (/^####\s+(.+?)$/.test(rawLine)) {
       const rawContent = rawLine.replace(/^####\s+(.+?)$/, '$1')
-      const escapedContent = mdEscapeHtml(rawContent)
-      const protectedContent = mdProtectInline(escapedContent, tokens)
-      resultLines.push(`<h4>${mdRestoreInline(protectedContent, tokens)}</h4>`)
+      resultLines.push(`<h4>${processContent(rawContent)}</h4>`)
       i++
       continue
     }
     if (/^###\s+(.+?)$/.test(rawLine)) {
       const rawContent = rawLine.replace(/^###\s+(.+?)$/, '$1')
-      const escapedContent = mdEscapeHtml(rawContent)
-      const protectedContent = mdProtectInline(escapedContent, tokens)
-      resultLines.push(`<h3>${mdRestoreInline(protectedContent, tokens)}</h3>`)
+      resultLines.push(`<h3>${processContent(rawContent)}</h3>`)
       i++
       continue
     }
     if (/^##\s+(.+?)$/.test(rawLine)) {
       const rawContent = rawLine.replace(/^##\s+(.+?)$/, '$1')
-      const escapedContent = mdEscapeHtml(rawContent)
-      const protectedContent = mdProtectInline(escapedContent, tokens)
-      resultLines.push(`<h2>${mdRestoreInline(protectedContent, tokens)}</h2>`)
+      resultLines.push(`<h2>${processContent(rawContent)}</h2>`)
       i++
       continue
     }
     if (/^#\s+(.+?)$/.test(rawLine)) {
       const rawContent = rawLine.replace(/^#\s+(.+?)$/, '$1')
-      const escapedContent = mdEscapeHtml(rawContent)
-      const protectedContent = mdProtectInline(escapedContent, tokens)
-      resultLines.push(`<h1>${mdRestoreInline(protectedContent, tokens)}</h1>`)
+      resultLines.push(`<h1>${processContent(rawContent)}</h1>`)
       i++
       continue
     }
@@ -565,9 +558,7 @@ export function renderMarkdown(md) {
 
     if (/^>\s+(.+?)$/.test(rawLine)) {
       const rawContent = rawLine.replace(/^>\s+(.+?)$/, '$1')
-      const escapedContent = mdEscapeHtml(rawContent)
-      const protectedContent = mdProtectInline(escapedContent, tokens)
-      resultLines.push(`<blockquote>${mdRestoreInline(protectedContent, tokens)}</blockquote>`)
+      resultLines.push(`<blockquote>${processContent(rawContent)}</blockquote>`)
       i++
       continue
     }
@@ -576,9 +567,7 @@ export function renderMarkdown(md) {
       const ulItems = []
       while (i < lines.length && /^-\s+(.+?)$/.test(lines[i])) {
         const rawContent = lines[i].replace(/^-\s+(.+?)$/, '$1')
-        const escapedContent = mdEscapeHtml(rawContent)
-        const protectedContent = mdProtectInline(escapedContent, tokens)
-        ulItems.push(`<li>${mdRestoreInline(protectedContent, tokens)}</li>`)
+        ulItems.push(`<li>${processContent(rawContent)}</li>`)
         i++
       }
       resultLines.push(`<ul>${ulItems.join('')}</ul>`)
@@ -589,17 +578,14 @@ export function renderMarkdown(md) {
       const olItems = []
       while (i < lines.length && /^\d+\.\s+(.+?)$/.test(lines[i])) {
         const rawContent = lines[i].replace(/^\d+\.\s+(.+?)$/, '$1')
-        const escapedContent = mdEscapeHtml(rawContent)
-        const protectedContent = mdProtectInline(escapedContent, tokens)
-        olItems.push(`<li>${mdRestoreInline(protectedContent, tokens)}</li>`)
+        olItems.push(`<li>${processContent(rawContent)}</li>`)
         i++
       }
       resultLines.push(`<ol>${olItems.join('')}</ol>`)
       continue
     }
 
-    const protectedLine = mdProtectInline(escapedLine, tokens)
-    resultLines.push(mdRestoreInline(protectedLine, tokens))
+    resultLines.push(processContent(rawLine))
     i++
   }
 

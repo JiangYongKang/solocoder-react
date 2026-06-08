@@ -933,6 +933,28 @@ describe('renderMarkdown', () => {
     expect(anchorResult).toContain('href="#section"')
   })
 
+  it('URL 无二次转义 - URL 中特殊字符只被转义一次', () => {
+    const md = '[link](https://example.com?q=<x>&y="z")'
+    const result = renderMarkdown(md)
+    expect(result).toContain('href="https://example.com?q=&lt;x&gt;&amp;y=&quot;z&quot;"')
+    expect(result).not.toContain('&amp;lt;')
+    expect(result).not.toContain('&amp;amp;')
+  })
+
+  it('URL 无二次转义 - URL 在列表项中也只转义一次', () => {
+    const md = '- [link](https://example.com?a=<b>)'
+    const result = renderMarkdown(md)
+    expect(result).toContain('href="https://example.com?a=&lt;b&gt;"')
+    expect(result).not.toContain('&amp;lt;')
+  })
+
+  it('URL 无二次转义 - URL 在标题中也只转义一次', () => {
+    const md = '# Title [link](https://example.com?c=<d>)'
+    const result = renderMarkdown(md)
+    expect(result).toContain('href="https://example.com?c=&lt;d&gt;"')
+    expect(result).not.toContain('&amp;lt;')
+  })
+
   it('XSS - 链接文本中的 HTML 也被转义', () => {
     const md = '[<img src=x onerror=alert(1)>](https://example.com)'
     const result = renderMarkdown(md)

@@ -2,6 +2,7 @@ export const STORAGE_KEY_PLAYLIST = 'media_player_playlist'
 export const STORAGE_KEY_PLAYBACK_STATE = 'media_player_playback_state'
 export const STORAGE_KEY_LYRICS = 'media_player_lyrics'
 export const STORAGE_KEY_SETTINGS = 'media_player_settings'
+export const STORAGE_KEY_QUEUE = 'media_player_queue'
 
 export const PLAYBACK_SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2]
 
@@ -10,6 +11,11 @@ export const DEFAULT_MEDIA_TYPE = 'audio'
 export const MEDIA_TYPES = {
   AUDIO: 'audio',
   VIDEO: 'video',
+}
+
+export const MEDIA_SOURCES = {
+  DEFAULT: 'default',
+  USER: 'user',
 }
 
 export const DEFAULT_SETTINGS = {
@@ -24,12 +30,14 @@ export const DEFAULT_PLAYLIST = [
     title: '示例音频 - SoundHelix Song 1',
     url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
     type: 'audio',
+    source: 'default',
   },
   {
     id: 'default_2',
     title: '示例视频 - Big Buck Bunny',
     url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
     type: 'video',
+    source: 'default',
   },
 ]
 

@@ -319,6 +319,34 @@
   color: var(--accent);
 }
 
+.playlist-action-btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.playlist-action-btn.primary:hover {
+  opacity: 0.85;
+  background: var(--accent);
+  color: #fff;
+}
+
+.playlist-action-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.playlist-action-btn:disabled:hover {
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.playlist-action-btn.primary:disabled:hover {
+  background: var(--accent);
+  color: #fff;
+  opacity: 0.4;
+}
+
 .playlist-action-btn.danger:hover {
   border-color: #dc2626;
   color: #dc2626;

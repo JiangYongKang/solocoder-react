@@ -244,6 +244,137 @@ const normalizeFileEntry = (entry) => {
   return entry
 }
 
+const JS_KEYWORDS = new Set([
+  'const', 'let', 'var', 'function', 'return', 'if', 'else', 'for', 'while',
+  'do', 'switch', 'case', 'break', 'continue', 'new', 'class', 'extends',
+  'super', 'this', 'import', 'export', 'from', 'default', 'try', 'catch',
+  'finally', 'throw', 'typeof', 'instanceof', 'in', 'of', 'void', 'delete',
+  'true', 'false', 'null', 'undefined', 'async', 'await', 'yield', 'static',
+])
+
+const isSafeLineForReplacement = (line) => {
+  if (!line || typeof line !== 'string') return false
+  const trimmed = line.trim()
+  if (!trimmed) return false
+  if (trimmed.startsWith('//')) return false
+  if (trimmed.startsWith('/*') || trimmed.startsWith('*')) return false
+  if (/^(import|export)\s/.test(trimmed)) return false
+  if (/^require\s*\(/.test(trimmed)) return false
+  if (trimmed.startsWith('console.')) return false
+  return true
+}
+
+const isSafeLineForDeletion = (line) => {
+  if (!line || typeof line !== 'string') return false
+  const trimmed = line.trim()
+  if (!trimmed) return false
+  if (trimmed.includes('//')) return false
+  if (trimmed.includes('/*') || trimmed.includes('*/')) return false
+  if (trimmed.startsWith('import ') || trimmed.startsWith('export ')) return false
+  if (trimmed.startsWith('function ') || trimmed.startsWith('class ')) return false
+  if (trimmed.startsWith('return ')) return false
+  if (trimmed.startsWith('console.')) return false
+  if (/['"`]/.test(trimmed)) return false
+  return true
+}
+
+const replaceIdentifierInCode = (line, transformFn) => {
+  let inSingleQuote = false
+  let inDoubleQuote = false
+  let inBacktick = false
+  let inLineComment = false
+  let result = ''
+  let buffer = ''
+
+  const flushBuffer = () => {
+    if (buffer) {
+      if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(buffer) && !JS_KEYWORDS.has(buffer)) {
+        result += transformFn(buffer)
+      } else {
+        result += buffer
+      }
+      buffer = ''
+    }
+  }
+
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i]
+    const next = line[i + 1]
+
+    if (inLineComment) {
+      result += ch
+      continue
+    }
+
+    if (ch === '/' && next === '/' && !inSingleQuote && !inDoubleQuote && !inBacktick) {
+      flushBuffer()
+      inLineComment = true
+      result += ch
+      continue
+    }
+
+    if (ch === "'" && !inDoubleQuote && !inBacktick) {
+      flushBuffer()
+      inSingleQuote = !inSingleQuote
+      result += ch
+      continue
+    }
+    if (ch === '"' && !inSingleQuote && !inBacktick) {
+      flushBuffer()
+      inDoubleQuote = !inDoubleQuote
+      result += ch
+      continue
+    }
+    if (ch === '`' && !inSingleQuote && !inDoubleQuote) {
+      flushBuffer()
+      inBacktick = !inBacktick
+      result += ch
+      continue
+    }
+
+    if (inSingleQuote || inDoubleQuote || inBacktick) {
+      result += ch
+      continue
+    }
+
+    if (/[A-Za-z0-9_]/.test(ch)) {
+      buffer += ch
+    } else {
+      flushBuffer()
+      result += ch
+    }
+  }
+
+  flushBuffer()
+  return result
+}
+
+const buildNaturalCodeLine = (rand, indent) => {
+  const indentStr = indent || '  '
+  const naturalLines = [
+    `${indentStr}const normalizedInput = input?.toString().trim() ?? ''`,
+    `${indentStr}const isValid = Array.isArray(items) && items.length > 0`,
+    `${indentStr}if (!data || Object.keys(data).length === 0) {`,
+    `${indentStr}  return []`,
+    `${indentStr}}`,
+    `${indentStr}const result = await fetchData({ limit: 100, offset: 0 })`,
+    `${indentStr}const filtered = list.filter((item) => item && item.active)`,
+    `${indentStr}const mapped = results.map((r) => ({ id: r.id, name: r.name }))`,
+    `${indentStr}const count = records.reduce((acc) => acc + 1, 0)`,
+    `${indentStr}const value = cache.get(key) ?? computeValue(key)`,
+    `${indentStr}try {`,
+    `${indentStr}  await validatePayload(payload)`,
+    `${indentStr}} catch (err) {`,
+    `${indentStr}  return fallback`,
+    `${indentStr}}`,
+    `${indentStr}return response.status === 200 ? response.data : []`,
+    `${indentStr}const config = { ...defaults, ...userOptions }`,
+    `${indentStr}const hasPermission = roles.includes(currentRole)`,
+    `${indentStr}const sorted = [...data].sort((a, b) => a.index - b.index)`,
+  ]
+  return naturalLines[Math.floor(rand() * naturalLines.length)]
+}
+
 const applyLineTransformations = (lines, rand, options = {}) => {
   const { mode = 'original' } = options
   const result = [...lines]
@@ -251,61 +382,92 @@ const applyLineTransformations = (lines, rand, options = {}) => {
 
   if (lineCount === 0) return result
 
-  const numReplacements = Math.min(
+  const safeIndices = []
+  for (let i = 0; i < lineCount; i++) {
+    if (isSafeLineForReplacement(result[i])) {
+      safeIndices.push(i)
+    }
+  }
+
+  const maxReplacements = Math.min(
     Math.max(1, Math.floor(lineCount * 0.15) + 1),
     Math.floor(lineCount / 2),
     3
   )
+  const numReplacements = Math.min(maxReplacements, safeIndices.length)
 
-  for (let i = 0; i < numReplacements; i++) {
-    const idx = Math.floor(rand() * lineCount)
-    if (typeof result[idx] === 'string' && result[idx].length > 5) {
-      if (mode === 'original') {
-        result[idx] = result[idx].replace(/[A-Za-z_][A-Za-z0-9_]*/, (match) => {
-          if (match.length >= 3 && /^[A-Z]/.test(match)) {
-            return 'Old' + match.slice(1)
-          }
-          if (match.length >= 3) {
-            return 'old' + match.charAt(0).toUpperCase() + match.slice(1)
-          }
-          return match + '_old'
-        })
-      } else {
-        result[idx] = result[idx].replace(/[A-Za-z_][A-Za-z0-9_]*/, (match) => {
-          if (match.length >= 3 && /^[A-Z]/.test(match)) {
-            return 'New' + match.slice(1)
-          }
-          if (match.length >= 3) {
-            return 'new' + match.charAt(0).toUpperCase() + match.slice(1)
-          }
-          return match + '_v2'
-        })
+  const transformFn = (ident) => {
+    if (mode === 'original') {
+      if (ident.length >= 3 && /^[A-Z]/.test(ident)) {
+        return 'Old' + ident.slice(1)
       }
+      if (ident.length >= 3) {
+        return 'old' + ident.charAt(0).toUpperCase() + ident.slice(1)
+      }
+      return ident + '_old'
+    } else {
+      if (ident.length >= 3 && /^[A-Z]/.test(ident)) {
+        return 'New' + ident.slice(1)
+      }
+      if (ident.length >= 3) {
+        return 'new' + ident.charAt(0).toUpperCase() + ident.slice(1)
+      }
+      return ident + '_v2'
     }
   }
 
+  const usedIndices = new Set()
+  for (let i = 0; i < numReplacements; i++) {
+    let idx = -1
+    let attempts = 0
+    while (idx === -1 && attempts < 10) {
+      const candidate = safeIndices[Math.floor(rand() * safeIndices.length)]
+      if (!usedIndices.has(candidate)) {
+        idx = candidate
+      }
+      attempts++
+    }
+    if (idx === -1) break
+    usedIndices.add(idx)
+    result[idx] = replaceIdentifierInCode(result[idx], transformFn)
+  }
+
   if (mode === 'original' && lineCount > 4) {
-    const numDeletions = Math.min(2, Math.floor(lineCount / 6) + 1)
-    for (let i = 0; i < numDeletions; i++) {
-      const delIdx = Math.floor(rand() * result.length)
-      if (delIdx >= 0 && delIdx < result.length) {
-        result.splice(delIdx, 1)
+    const deletableIndices = []
+    for (let i = 0; i < result.length; i++) {
+      if (isSafeLineForDeletion(result[i])) {
+        deletableIndices.push(i)
       }
     }
+    const numDeletions = Math.min(2, Math.floor(lineCount / 6) + 1, deletableIndices.length)
+    const usedDel = new Set()
+    for (let i = 0; i < numDeletions; i++) {
+      let candidateIdx = -1
+      let attempts = 0
+      while (candidateIdx === -1 && attempts < 10) {
+        const di = deletableIndices[Math.floor(rand() * deletableIndices.length)]
+        if (!usedDel.has(di)) candidateIdx = di
+        attempts++
+      }
+      if (candidateIdx >= 0) {
+        usedDel.add(candidateIdx)
+      }
+    }
+    const sortedDel = Array.from(usedDel).sort((a, b) => b - a)
+    sortedDel.forEach((idx) => {
+      if (idx >= 0 && idx < result.length) {
+        result.splice(idx, 1)
+      }
+    })
   }
 
   if (mode === 'modified' && lineCount > 3) {
     const numInsertions = Math.min(2, Math.floor(lineCount / 8) + 1)
     for (let i = 0; i < numInsertions; i++) {
       const insIdx = Math.floor(rand() * (result.length + 1))
-      const placeholderLines = [
-        '  // TODO: handle edge case',
-        '  const processed = input.trim()',
-        '  return result ?? defaultValue',
-        '  /* istanbul ignore next */',
-        '  logger.debug("step completed")',
-      ]
-      result.splice(insIdx, 0, placeholderLines[Math.floor(rand() * placeholderLines.length)])
+      const indentMatch = result[Math.min(insIdx, result.length - 1)]?.match(/^(\s*)/)
+      const indent = indentMatch ? indentMatch[1] : '  '
+      result.splice(insIdx, 0, buildNaturalCodeLine(rand, indent))
     }
   }
 

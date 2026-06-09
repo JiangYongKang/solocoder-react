@@ -1,0 +1,5 @@
+你实现的 Git 仓库浏览器页面在上轮修复中引入了新的问题，需要继续修复：
+
+1. applyLineTransformations 函数的 modified 模式中仍然插入了 "// TODO: handle edge case"、"/* istanbul ignore next */"、"logger.debug("step completed")" 等硬编码的占位注释行。上一轮要求"改用代码风格更合理的内容变换逻辑"，但这些注释与代码语义无关，不符合真实代码变更的风格。插入的内容应用自然的代码行（如变量声明、函数调用、条件判断等），而非与逻辑无关的注释。
+2. applyLineTransformations 中标识符替换的正则匹配过于粗暴，会匹配到字符串字面量和 import 路径等非标识符位置的单词，导致生成的内容出现语义错误（例如 import './Header' 被错误替换为 import './oldHeader'）。
+3. 修复后重新运行 pnpm run test，需要让所有测试通过。

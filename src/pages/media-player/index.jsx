@@ -27,6 +27,11 @@ import {
   generateDefaultPlaylistItems,
   findBufferedEnd,
   clampPercent,
+  loadQueue,
+  saveQueue,
+  appendToQueue,
+  hasQueueableUserItems,
+  filterUserMediaItems,
 } from './mediaPlayerUtils'
 
 const CLICK_DELAY = 250
@@ -35,17 +40,21 @@ const MediaPlayerPage = () => {
   const navigate = useNavigate()
 
   const [playlist, setPlaylist] = useState(() => loadPlaylist())
+  const [queue, setQueue] = useState(() => {
+    const savedQueue = loadQueue()
+    return savedQueue.length > 0 ? savedQueue : loadPlaylist()
+  })
   const [settings, setSettings] = useState(() => loadSettings())
   const [playbackState, setPlaybackState] = useState(() => loadPlaybackState())
   const [lrcText, setLrcText] = useState(() => loadLyrics() || SAMPLE_LRC)
 
   const initialIndex = useMemo(() => {
     if (playbackState && playbackState.currentMediaId) {
-      const idx = findMediaIndexById(playlist, playbackState.currentMediaId)
+      const idx = findMediaIndexById(queue, playbackState.currentMediaId)
       return idx >= 0 ? idx : 0
     }
     return 0
-  }, [playbackState, playlist])
+  }, [playbackState, queue])
 
   const [currentIndex, setCurrentIndex] = useState(initialIndex)
   const [isPlaying, setIsPlaying] = useState(false)
@@ -95,12 +104,21 @@ const MediaPlayerPage = () => {
     [parsedLyrics, currentTime]
   )
 
-  const currentMedia = playlist[currentIndex] || null
+  const currentMedia = queue[currentIndex] || null
   const isVideo = currentMedia?.type === MEDIA_TYPES.VIDEO
+  const currentMediaId = currentMedia?.id
+  const canAddAllToQueue = useMemo(
+    () => hasQueueableUserItems(playlist, queue),
+    [playlist, queue]
+  )
 
   useEffect(() => {
     savePlaylist(playlist)
   }, [playlist])
+
+  useEffect(() => {
+    saveQueue(queue)
+  }, [queue])
 
   useEffect(() => {
     saveSettings(settings)
@@ -222,7 +240,7 @@ const MediaPlayerPage = () => {
   }
 
   const handleEnded = () => {
-    const nextIdx = getNextMediaIndex(playlist, currentIndex)
+    const nextIdx = getNextMediaIndex(queue, currentIndex)
     if (nextIdx >= 0) {
       setCurrentIndex(nextIdx)
       setCurrentTime(0)
@@ -297,7 +315,7 @@ const MediaPlayerPage = () => {
   }
 
   const handleNext = () => {
-    const nextIdx = getNextMediaIndex(playlist, currentIndex)
+    const nextIdx = getNextMediaIndex(queue, currentIndex)
     if (nextIdx >= 0) {
       setCurrentIndex(nextIdx)
       setCurrentTime(0)
@@ -311,7 +329,7 @@ const MediaPlayerPage = () => {
   }
 
   const handlePrev = () => {
-    const prevIdx = getPrevMediaIndex(playlist, currentIndex)
+    const prevIdx = getPrevMediaIndex(queue, currentIndex)
     if (prevIdx >= 0) {
       setCurrentIndex(prevIdx)
       setCurrentTime(0)
@@ -357,31 +375,40 @@ const MediaPlayerPage = () => {
     setAddMediaErrors({})
   }
 
-  const handleAddAllDefaults = () => {
-    const defaults = generateDefaultPlaylistItems()
-    setPlaylist((prev) => mergePlaylistItems(prev, defaults))
+  const handleAddAllToQueue = () => {
+    const userItems = filterUserMediaItems(playlist)
+    setQueue((prev) => appendToQueue(prev, userItems))
   }
 
   const handleDeleteMedia = (id) => {
-    const idx = playlist.findIndex((item) => item.id === id)
-    if (idx < 0) return
+    const playlistIdx = playlist.findIndex((item) => item.id === id)
+    if (playlistIdx < 0) return
     setPlaylist((prev) => prev.filter((item) => item.id !== id))
-    if (idx === currentIndex) {
-      setIsPlaying(false)
-      if (playlist.length > 1) {
-        setCurrentIndex(idx === playlist.length - 1 ? idx - 1 : idx)
+    const queueIdx = queue.findIndex((item) => item.id === id)
+    if (queueIdx >= 0) {
+      setQueue((prev) => prev.filter((item) => item.id !== id))
+      if (queueIdx === currentIndex) {
+        setIsPlaying(false)
+        if (queue.length > 1) {
+          setCurrentIndex(queueIdx === queue.length - 1 ? queueIdx - 1 : queueIdx)
+        }
+        setCurrentTime(0)
+      } else if (queueIdx < currentIndex) {
+        setCurrentIndex((prev) => prev - 1)
       }
-      setCurrentTime(0)
-    } else if (idx < currentIndex) {
-      setCurrentIndex((prev) => prev - 1)
     }
   }
 
-  const handlePlaylistItemClick = (idx) => {
-    if (idx === currentIndex) {
+  const handlePlaylistItemClick = (item) => {
+    let targetQueueIndex = queue.findIndex((q) => q.id === item.id)
+    if (targetQueueIndex < 0) {
+      setQueue((prev) => [...prev, item])
+      targetQueueIndex = queue.length
+    }
+    if (targetQueueIndex === currentIndex) {
       togglePlay()
     } else {
-      setCurrentIndex(idx)
+      setCurrentIndex(targetQueueIndex)
       setCurrentTime(0)
       setTimeout(() => {
         if (mediaRef.current) {
@@ -419,9 +446,17 @@ const MediaPlayerPage = () => {
 
   const handleClearPlaylist = () => {
     setPlaylist([])
+    setQueue([])
     setCurrentIndex(0)
     setCurrentTime(0)
     setIsPlaying(false)
+  }
+
+  const handleAddDefaultSamples = () => {
+    const defaults = generateDefaultPlaylistItems()
+    const merged = mergePlaylistItems(playlist, defaults)
+    setPlaylist(merged)
+    setQueue((prev) => appendToQueue(prev, defaults))
   }
 
   const getPositionFromMouseEvent = useCallback((clientX) => {
@@ -627,10 +662,22 @@ const MediaPlayerPage = () => {
             <div className="playlist-actions">
               <button
                 className="playlist-action-btn"
-                onClick={handleAddAllDefaults}
-                title="批量添加示例媒体到播放列表"
+                onClick={handleAddDefaultSamples}
+                title="添加示例媒体到播放列表和队列"
               >
-                添加示例媒体
+                + 添加示例
+              </button>
+              <button
+                className="playlist-action-btn primary"
+                onClick={handleAddAllToQueue}
+                disabled={!canAddAllToQueue}
+                title={
+                  canAddAllToQueue
+                    ? '将播放列表中所有用户添加的媒体加入播放队列'
+                    : '没有可添加的用户媒体'
+                }
+              >
+                全部加入队列
               </button>
               <button
                 className="playlist-action-btn danger"
@@ -679,11 +726,11 @@ const MediaPlayerPage = () => {
               playlist.map((item, idx) => (
                 <div
                   key={item.id}
-                  className={`playlist-item ${currentIndex === idx ? 'playing' : ''} ${
+                  className={`playlist-item ${currentMediaId === item.id ? 'playing' : ''} ${
                     draggedItemId === item.id ? 'dragging' : ''
                   } ${dragOverItemId === item.id ? 'drag-over' : ''}`}
                   draggable={renamingId !== item.id}
-                  onClick={() => renamingId !== item.id && handlePlaylistItemClick(idx)}
+                  onClick={() => renamingId !== item.id && handlePlaylistItemClick(item)}
                   onDoubleClick={(e) => {
                     e.stopPropagation()
                     handleRenameStart(item)

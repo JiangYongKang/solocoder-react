@@ -4,10 +4,12 @@ import {
   STORAGE_KEY_PLAYBACK_STATE,
   STORAGE_KEY_LYRICS,
   STORAGE_KEY_SETTINGS,
+  STORAGE_KEY_QUEUE,
   DEFAULT_SETTINGS,
   DEFAULT_PLAYLIST,
   PLAYBACK_SPEEDS,
   MEDIA_TYPES,
+  MEDIA_SOURCES,
 } from '../../media-player/constants'
 import {
   formatTime,
@@ -42,6 +44,15 @@ import {
   createMediaItemsBatch,
   findBufferedEnd,
   clampPercent,
+  isDefaultMedia,
+  isUserMedia,
+  filterUserMediaItems,
+  filterDefaultMediaItems,
+  saveQueue,
+  loadQueue,
+  appendToQueue,
+  getQueueableUserItems,
+  hasQueueableUserItems,
 } from '../../media-player/mediaPlayerUtils'
 
 const createMockLocalStorage = () => {
@@ -1209,5 +1220,265 @@ describe('findBufferedEnd', () => {
       end: () => Infinity,
     }
     expect(findBufferedEnd(mockBuffered, 100)).toBe(0)
+  })
+})
+
+describe('isDefaultMedia', () => {
+  it('判断默认示例媒体返回 true', () => {
+    expect(isDefaultMedia({ id: '1', source: MEDIA_SOURCES.DEFAULT })).toBe(true)
+  })
+
+  it('判断用户媒体返回 false', () => {
+    expect(isDefaultMedia({ id: '1', source: MEDIA_SOURCES.USER })).toBe(false)
+    expect(isDefaultMedia({ id: '1' })).toBe(false)
+    expect(isDefaultMedia({ id: '1', source: 'other' })).toBe(false)
+  })
+
+  it('处理无效输入返回 false', () => {
+    expect(isDefaultMedia(null)).toBe(false)
+    expect(isDefaultMedia(undefined)).toBe(false)
+    expect(isDefaultMedia({})).toBe(false)
+    expect(isDefaultMedia('string')).toBe(false)
+  })
+})
+
+describe('isUserMedia', () => {
+  it('判断用户媒体返回 true', () => {
+    expect(isUserMedia({ id: '1', source: MEDIA_SOURCES.USER })).toBe(true)
+    expect(isUserMedia({ id: '1' })).toBe(true)
+    expect(isUserMedia({ id: '1', source: 'other' })).toBe(true)
+  })
+
+  it('判断默认示例媒体返回 false', () => {
+    expect(isUserMedia({ id: '1', source: MEDIA_SOURCES.DEFAULT })).toBe(false)
+  })
+
+  it('处理无效输入返回 false', () => {
+    expect(isUserMedia(null)).toBe(false)
+    expect(isUserMedia(undefined)).toBe(false)
+    expect(isUserMedia({})).toBe(false)
+  })
+})
+
+describe('filterUserMediaItems', () => {
+  it('过滤出用户添加的媒体', () => {
+    const playlist = [
+      { id: '1', source: MEDIA_SOURCES.DEFAULT, title: '默认1' },
+      { id: '2', source: MEDIA_SOURCES.USER, title: '用户1' },
+      { id: '3', title: '用户2' },
+      { id: '4', source: MEDIA_SOURCES.DEFAULT, title: '默认2' },
+    ]
+    const result = filterUserMediaItems(playlist)
+    expect(result).toHaveLength(2)
+    expect(result[0].id).toBe('2')
+    expect(result[1].id).toBe('3')
+  })
+
+  it('空数组返回空数组', () => {
+    expect(filterUserMediaItems([])).toEqual([])
+  })
+
+  it('非数组输入返回空数组', () => {
+    expect(filterUserMediaItems(null)).toEqual([])
+    expect(filterUserMediaItems(undefined)).toEqual([])
+    expect(filterUserMediaItems('string')).toEqual([])
+  })
+})
+
+describe('filterDefaultMediaItems', () => {
+  it('过滤出默认示例媒体', () => {
+    const playlist = [
+      { id: '1', source: MEDIA_SOURCES.DEFAULT, title: '默认1' },
+      { id: '2', source: MEDIA_SOURCES.USER, title: '用户1' },
+      { id: '3', title: '用户2' },
+      { id: '4', source: MEDIA_SOURCES.DEFAULT, title: '默认2' },
+    ]
+    const result = filterDefaultMediaItems(playlist)
+    expect(result).toHaveLength(2)
+    expect(result[0].id).toBe('1')
+    expect(result[1].id).toBe('4')
+  })
+
+  it('空数组返回空数组', () => {
+    expect(filterDefaultMediaItems([])).toEqual([])
+  })
+
+  it('非数组输入返回空数组', () => {
+    expect(filterDefaultMediaItems(null)).toEqual([])
+  })
+})
+
+describe('saveQueue / loadQueue', () => {
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  it('保存并加载播放队列', () => {
+    const queue = [
+      { id: '1', title: '歌曲1', url: 'http://a.com/1.mp3', type: 'audio' },
+      { id: '2', title: '歌曲2', url: 'http://a.com/2.mp3', type: 'audio' },
+    ]
+    saveQueue(queue)
+    const loaded = loadQueue()
+    expect(loaded).toEqual(queue)
+    expect(localStorage.getItem(STORAGE_KEY_QUEUE)).toBe(JSON.stringify(queue))
+  })
+
+  it('saveQueue 成功返回 true', () => {
+    expect(saveQueue([])).toBe(true)
+  })
+
+  it('loadQueue 无数据时返回空数组', () => {
+    expect(loadQueue()).toEqual([])
+  })
+
+  it('loadQueue 无效数据返回空数组', () => {
+    localStorage.setItem(STORAGE_KEY_QUEUE, 'invalid json')
+    expect(loadQueue()).toEqual([])
+    localStorage.setItem(STORAGE_KEY_QUEUE, JSON.stringify('not array'))
+    expect(loadQueue()).toEqual([])
+  })
+
+  it('loadQueue 过滤无效项', () => {
+    const raw = [
+      { id: '1', title: '有效', url: 'http://a.com/1.mp3', type: 'audio' },
+      null,
+      { id: '2' },
+      { title: '缺id', url: 'http://a.com/2.mp3' },
+    ]
+    localStorage.setItem(STORAGE_KEY_QUEUE, JSON.stringify(raw))
+    const result = loadQueue()
+    expect(result).toHaveLength(1)
+    expect(result[0].id).toBe('1')
+  })
+
+  it('saveQueue 非数组输入保存为空数组', () => {
+    saveQueue(null)
+    expect(loadQueue()).toEqual([])
+    saveQueue('string')
+    expect(loadQueue()).toEqual([])
+  })
+})
+
+describe('appendToQueue', () => {
+  it('追加新项到队列', () => {
+    const existing = [
+      { id: '1', title: '已有' },
+    ]
+    const newItems = [
+      { id: '2', title: '新增1' },
+      { id: '3', title: '新增2' },
+    ]
+    const result = appendToQueue(existing, newItems)
+    expect(result).toHaveLength(3)
+    expect(result[0].id).toBe('1')
+    expect(result[1].id).toBe('2')
+    expect(result[2].id).toBe('3')
+  })
+
+  it('自动去重（按 id）', () => {
+    const existing = [
+      { id: '1', title: '已有' },
+      { id: '2', title: '已有2' },
+    ]
+    const newItems = [
+      { id: '2', title: '重复' },
+      { id: '3', title: '新增' },
+    ]
+    const result = appendToQueue(existing, newItems)
+    expect(result).toHaveLength(3)
+    expect(result.map((i) => i.id)).toEqual(['1', '2', '3'])
+    expect(result[1].title).toBe('已有2')
+  })
+
+  it('空队列追加', () => {
+    const result = appendToQueue([], [{ id: '1' }])
+    expect(result).toHaveLength(1)
+  })
+
+  it('无效输入处理', () => {
+    expect(appendToQueue(null, null)).toEqual([])
+    expect(appendToQueue([{ id: '1' }], null)).toHaveLength(1)
+    expect(appendToQueue(null, [{ id: '1' }])[0].id).toBe('1')
+  })
+
+  it('过滤无效项', () => {
+    const result = appendToQueue([{ id: '1' }], [null, undefined, {}, 'string', { id: '2' }])
+    expect(result).toHaveLength(2)
+    expect(result.map((i) => i.id)).toEqual(['1', '2'])
+  })
+})
+
+describe('getQueueableUserItems', () => {
+  it('获取可加入队列的用户媒体', () => {
+    const playlist = [
+      { id: '1', source: MEDIA_SOURCES.DEFAULT, title: '默认' },
+      { id: '2', source: MEDIA_SOURCES.USER, title: '用户1' },
+      { id: '3', source: MEDIA_SOURCES.USER, title: '用户2' },
+    ]
+    const queue = [{ id: '2' }]
+    const result = getQueueableUserItems(playlist, queue)
+    expect(result).toHaveLength(1)
+    expect(result[0].id).toBe('3')
+  })
+
+  it('所有用户媒体都在队列中返回空', () => {
+    const playlist = [
+      { id: '1', source: MEDIA_SOURCES.DEFAULT },
+      { id: '2', source: MEDIA_SOURCES.USER },
+    ]
+    const queue = [{ id: '2' }]
+    expect(getQueueableUserItems(playlist, queue)).toEqual([])
+  })
+
+  it('没有用户媒体返回空', () => {
+    const playlist = [{ id: '1', source: MEDIA_SOURCES.DEFAULT }]
+    expect(getQueueableUserItems(playlist, [])).toEqual([])
+  })
+
+  it('队列为空时返回所有用户媒体', () => {
+    const playlist = [
+      { id: '1', source: MEDIA_SOURCES.DEFAULT },
+      { id: '2', source: MEDIA_SOURCES.USER },
+      { id: '3', source: MEDIA_SOURCES.USER },
+    ]
+    const result = getQueueableUserItems(playlist, [])
+    expect(result).toHaveLength(2)
+  })
+})
+
+describe('hasQueueableUserItems', () => {
+  it('有可加入的用户媒体返回 true', () => {
+    const playlist = [
+      { id: '1', source: MEDIA_SOURCES.DEFAULT },
+      { id: '2', source: MEDIA_SOURCES.USER },
+    ]
+    expect(hasQueueableUserItems(playlist, [])).toBe(true)
+  })
+
+  it('无可加入的用户媒体返回 false', () => {
+    const playlist = [{ id: '1', source: MEDIA_SOURCES.DEFAULT }]
+    expect(hasQueueableUserItems(playlist, [])).toBe(false)
+  })
+
+  it('用户媒体已全部在队列中返回 false', () => {
+    const playlist = [
+      { id: '1', source: MEDIA_SOURCES.DEFAULT },
+      { id: '2', source: MEDIA_SOURCES.USER },
+    ]
+    const queue = [{ id: '2' }]
+    expect(hasQueueableUserItems(playlist, queue)).toBe(false)
+  })
+})
+
+describe('createMediaItem (source 参数)', () => {
+  it('默认 source 为 user', () => {
+    const item = createMediaItem('test', 'http://a.com/1.mp3')
+    expect(item.source).toBe(MEDIA_SOURCES.USER)
+  })
+
+  it('可指定 source 为 default', () => {
+    const item = createMediaItem('test', 'http://a.com/1.mp3', 'audio', MEDIA_SOURCES.DEFAULT)
+    expect(item.source).toBe(MEDIA_SOURCES.DEFAULT)
   })
 })

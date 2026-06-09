@@ -1,0 +1,4 @@
+过程不满意：
+模型在尝试用 useRef 在渲染期间缓存 loadFromStorage 结果时，没有意识到 React Compiler（React 19 的编译器规则）会禁止在 render 阶段访问 ref。第一次修改完成后运行 ESLint 才遇到报错，然后不得不推翻 useRef 方案，回到模块级缓存方案但改用 useEffect 清空。这是典型的"先动手、后验规"模式——在写代码前没有评估所选方案在目标运行环境（React 18+ Strict Mode + ESLint React Compiler 规则）下的合规性。根本原因是选择技术方案时没有做环境预检。正确做法是在动手写代码前先确认 useRef 在 render 阶段使用的限制，或先用最小代码片段验证方案可行性。
+
+产物满意，无不满意的产物问题。模型最终采用的方案——模块级缓存变量 + useEffect 中清空——对 React Strict Mode 是安全的，因为 Strict Mode 的双挂载/卸载/再挂载全部是同步执行，useEffect 在所有同步渲染结束后才运行，所以缓存在整个同步渲染周期内始终有效。alert 频率限制使用 useRef 记录上一次弹窗时间戳、5 秒冷却间隔的实现也是正确且合理的。

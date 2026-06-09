@@ -1,0 +1,5 @@
+你实现的数据库表设计器页面上轮的修复方案存在问题，需要修正：
+
+1. _getInitStorage 模块级缓存在 React 18 开发模式（Strict Mode）下会失效。Strict Mode 会让组件挂载→卸载→重新挂载，但 setTimeout(fn, 0) 在第一次挂载后就清空了缓存，第二次挂载时 loadFromStorage() 仍然会被调用两次。合并重复调用的方案应该对所有运行环境保持一致有效。
+2. saveToStorage 写入失败时改用 alert 弹窗提示是正确的方向，但 useEffect 的依赖是 [tables, relations]，用户在编辑表结构时每次修改字段都会触发一次保存尝试。如果连续写入失败，alert 弹窗会频繁弹出，用户体验很差。需要对失败提示做频率限制，避免短期内连续弹窗。
+3. 修复后重新运行 pnpm run test，需要让所有测试通过。

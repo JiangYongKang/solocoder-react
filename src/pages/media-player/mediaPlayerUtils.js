@@ -3,10 +3,12 @@ import {
   STORAGE_KEY_PLAYBACK_STATE,
   STORAGE_KEY_LYRICS,
   STORAGE_KEY_SETTINGS,
+  STORAGE_KEY_QUEUE,
   DEFAULT_SETTINGS,
   DEFAULT_PLAYLIST,
   PLAYBACK_SPEEDS,
   MEDIA_TYPES,
+  MEDIA_SOURCES,
 } from './constants'
 
 export function formatTime(seconds) {
@@ -106,12 +108,13 @@ export function validateMediaItem(item) {
   return { valid: Object.keys(errors).length === 0, errors }
 }
 
-export function createMediaItem(title, url, type) {
+export function createMediaItem(title, url, type, source) {
   return {
     id: generateMediaId(),
     title: (title || '').trim(),
     url: (url || '').trim(),
     type: type || detectMediaType(url),
+    source: source || MEDIA_SOURCES.USER,
   }
 }
 
@@ -368,4 +371,78 @@ export function findBufferedEnd(buffered, duration) {
 export function clampPercent(value) {
   const v = Number(value) || 0
   return Math.max(0, Math.min(100, v))
+}
+
+export function isDefaultMedia(mediaItem) {
+  if (!mediaItem || typeof mediaItem !== 'object' || typeof mediaItem.id !== 'string') return false
+  return mediaItem.source === MEDIA_SOURCES.DEFAULT
+}
+
+export function isUserMedia(mediaItem) {
+  if (!mediaItem || typeof mediaItem !== 'object' || typeof mediaItem.id !== 'string') return false
+  return mediaItem.source !== MEDIA_SOURCES.DEFAULT
+}
+
+export function filterUserMediaItems(playlist) {
+  if (!Array.isArray(playlist)) return []
+  return playlist.filter((item) => isUserMedia(item))
+}
+
+export function filterDefaultMediaItems(playlist) {
+  if (!Array.isArray(playlist)) return []
+  return playlist.filter((item) => isDefaultMedia(item))
+}
+
+export function saveQueue(queue) {
+  try {
+    localStorage.setItem(STORAGE_KEY_QUEUE, JSON.stringify(Array.isArray(queue) ? queue : []))
+    return true
+  } catch {
+    return false
+  }
+}
+
+export function loadQueue() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_QUEUE)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter(
+      (item) =>
+        item &&
+        typeof item === 'object' &&
+        typeof item.id === 'string' &&
+        typeof item.title === 'string' &&
+        typeof item.url === 'string'
+    )
+  } catch {
+    return []
+  }
+}
+
+export function appendToQueue(existingQueue, newItems) {
+  if (!Array.isArray(existingQueue)) existingQueue = []
+  if (!Array.isArray(newItems)) newItems = []
+  const existingIds = new Set(existingQueue.map((item) => item.id))
+  const result = [...existingQueue]
+  for (const item of newItems) {
+    if (item && typeof item === 'object' && typeof item.id === 'string' && !existingIds.has(item.id)) {
+      result.push(item)
+      existingIds.add(item.id)
+    }
+  }
+  return result
+}
+
+export function getQueueableUserItems(playlist, existingQueue) {
+  const userItems = filterUserMediaItems(playlist)
+  const existingIds = new Set(
+    Array.isArray(existingQueue) ? existingQueue.map((item) => item.id) : []
+  )
+  return userItems.filter((item) => !existingIds.has(item.id))
+}
+
+export function hasQueueableUserItems(playlist, existingQueue) {
+  return getQueueableUserItems(playlist, existingQueue).length > 0
 }

@@ -811,4 +811,94 @@ describe('computeDiff', () => {
       .join('')
     expect(reconstructed).toBe('你好中国')
   })
+
+  describe('多路径 LCS 场景（锁定操作顺序）', () => {
+    it("'ab' -> 'ba'：LCS 可选 'a' 或 'b'，算法应优先删除，输出 delete-a, equal-b, insert-a", () => {
+      const diff = computeDiff('ab', 'ba')
+      expect(diff).toEqual([
+        { type: 'delete', value: 'a' },
+        { type: 'equal', value: 'b' },
+        { type: 'insert', value: 'a' },
+      ])
+    })
+
+    it("'xy' -> 'yx'：应优先删除 x，匹配 y，最后插入 x", () => {
+      const diff = computeDiff('xy', 'yx')
+      expect(diff).toEqual([
+        { type: 'delete', value: 'x' },
+        { type: 'equal', value: 'y' },
+        { type: 'insert', value: 'x' },
+      ])
+    })
+
+    it("'12' -> '21'：应优先删除 1，匹配 2，最后插入 1", () => {
+      const diff = computeDiff('12', '21')
+      expect(diff).toEqual([
+        { type: 'delete', value: '1' },
+        { type: 'equal', value: '2' },
+        { type: 'insert', value: '1' },
+      ])
+    })
+
+    it("'abc' -> 'cba'：多字符反转，优先连续删除 ab，匹配 c，最后插入 ba", () => {
+      const diff = computeDiff('abc', 'cba')
+      expect(diff).toEqual([
+        { type: 'delete', value: 'ab' },
+        { type: 'equal', value: 'c' },
+        { type: 'insert', value: 'ba' },
+      ])
+    })
+
+    it("'acb' -> 'bca'：优先连续删除 ac，匹配 b，最后插入 ca", () => {
+      const diff = computeDiff('acb', 'bca')
+      expect(diff).toEqual([
+        { type: 'delete', value: 'ac' },
+        { type: 'equal', value: 'b' },
+        { type: 'insert', value: 'ca' },
+      ])
+    })
+
+    it("'aab' -> 'aba'：LCS 长度为 2，应 equal-a, delete-a, equal-b, insert-a", () => {
+      const diff = computeDiff('aab', 'aba')
+      expect(diff).toEqual([
+        { type: 'equal', value: 'a' },
+        { type: 'delete', value: 'a' },
+        { type: 'equal', value: 'b' },
+        { type: 'insert', value: 'a' },
+      ])
+    })
+
+    it("'abba' -> 'baab'：LCS 长度为 2，交错的 delete/equal/insert 顺序应可预期", () => {
+      const diff = computeDiff('abba', 'baab')
+      expect(diff).toEqual([
+        { type: 'delete', value: 'a' },
+        { type: 'equal', value: 'b' },
+        { type: 'delete', value: 'b' },
+        { type: 'equal', value: 'a' },
+        { type: 'insert', value: 'ab' },
+      ])
+    })
+
+    it("'kitten' -> 'sitting'：复杂多路径场景应输出确定的操作序列", () => {
+      const diff = computeDiff('kitten', 'sitting')
+      expect(diff).toEqual([
+        { type: 'delete', value: 'k' },
+        { type: 'insert', value: 's' },
+        { type: 'equal', value: 'itt' },
+        { type: 'delete', value: 'e' },
+        { type: 'insert', value: 'i' },
+        { type: 'equal', value: 'n' },
+        { type: 'insert', value: 'g' },
+      ])
+    })
+
+    it("dp[i+1][j] === dp[i][j+1] 时应稳定地优先选择删除而非插入", () => {
+      const diff1 = computeDiff('ab', 'ba')
+      const diff2 = computeDiff('ab', 'ba')
+      const diff3 = computeDiff('ab', 'ba')
+      expect(diff1).toEqual(diff2)
+      expect(diff2).toEqual(diff3)
+      expect(diff1[0].type).toBe('delete')
+    })
+  })
 })

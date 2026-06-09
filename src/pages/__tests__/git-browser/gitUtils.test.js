@@ -719,3 +719,89 @@ describe('buildFileTreeFromList DELETED 状态', () => {
     expect(contentCommit).not.toBe(contentBase)
   })
 })
+
+describe('applyLineTransformations 代码质量', () => {
+  const baseCode = [
+    'function processData(input) {',
+    '  const result = []',
+    '  for (let i = 0; i < input.length; i++) {',
+    '    result.push(input[i])',
+    '    const value = computeValue(i)',
+    '    const extra = value + offset',
+    '    result.push(extra)',
+    '  }',
+    '  return result',
+    '}',
+  ].join('\n')
+
+  it('modified 模式插入的内容不应包含注释占位', () => {
+    for (let seed = 0; seed < 30; seed++) {
+      const hash = `commit-seed-${seed}`
+      const transformed = transformContentForCommit('src/process.js', baseCode, hash)
+      expect(transformed).not.toContain('// TODO')
+      expect(transformed).not.toContain('TODO: handle edge case')
+      expect(transformed).not.toContain('istanbul ignore')
+      expect(transformed).not.toContain('logger.debug')
+      expect(transformed).not.toContain('step completed')
+    }
+  })
+
+  it('不应替换 import 语句中字符串路径内的单词', () => {
+    const file = {
+      path: 'src/App.js',
+      status: FILE_CHANGE_STATUS.MODIFIED,
+      content: 'import React from "react"\nimport Header from "./Header"\nfunction App() {\n  const data = fetchData()\n  const list = getAllData()\n  const value = compute()\n  const x = process()\n  return <div>Hello</div>\n}\nexport default App',
+    }
+    const result = generateOriginalContent(file)
+    expect(result).toContain('"./Header"')
+    expect(result).not.toContain('"./oldHeader"')
+    expect(result).not.toContain('"./OldHeader"')
+    expect(result).toContain('"react"')
+    expect(result).not.toContain('"oldReact"')
+  })
+
+  it('不应替换字符串字面量内的单词', () => {
+    const file = {
+      path: 'src/utils.js',
+      status: FILE_CHANGE_STATUS.MODIFIED,
+      content: "function greet() {\n  const msg = 'hello world'\n  const data = getUserData()\n  const list = fetchItems()\n  const value = parseInput()\n  const res = handleAction()\n  return msg\n}\nconsole.log(\"test message here\")",
+    }
+    const result = generateOriginalContent(file)
+    expect(result).toContain("'hello world'")
+    expect(result).not.toContain("'oldHello")
+    expect(result).toContain('"test message here"')
+  })
+
+  it('modified 模式插入的应是自然代码行而非注释', () => {
+    for (let seed = 100; seed < 130; seed++) {
+      const hash = `commit-v2-${seed}`
+      const transformed = transformContentForCommit('src/compute.js', baseCode, hash)
+      const codeLines = transformed.split('\n').filter((l) => l.trim())
+      const commentLines = codeLines.filter((l) => l.trim().startsWith('//'))
+      expect(commentLines.length).toBeLessThanOrEqual(Math.max(0, codeLines.length * 0.15))
+    }
+  })
+
+  it('不应替换行尾注释内的单词', () => {
+    const file = {
+      path: 'src/data.js',
+      status: FILE_CHANGE_STATUS.MODIFIED,
+      content: 'function compute() {\n  const data = fetchData() // fetch the data from API\n  const list = queryCache() // check local cache first\n  const value = transformData(data)\n  const res = validateInput(list)\n  return { value, res }\n}\n// end of module',
+    }
+    const result = generateOriginalContent(file)
+    expect(result).toContain('fetch the data from API')
+    expect(result).toContain('check local cache first')
+    expect(result).toContain('end of module')
+  })
+
+  it('模板字符串反引号内的内容不应被替换', () => {
+    const file = {
+      path: 'src/template.js',
+      status: FILE_CHANGE_STATUS.MODIFIED,
+      content: 'function buildMessage(userName) {\n  const data = fetchUserData()\n  const list = getRecentOrders()\n  const value = computeDiscount()\n  return `Hello ${userName}, welcome back!`\n}\nconsole.log(`today is ${new Date()}`)',
+    }
+    const result = generateOriginalContent(file)
+    expect(result).toContain('`Hello ${userName}, welcome back!`')
+    expect(result).toContain('`today is ${new Date()}`')
+  })
+})

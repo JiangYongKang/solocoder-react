@@ -1,0 +1,7 @@
+产物不满意：
+1. 模型在 handleDeleteMedia 函数中播放项删除逻辑使用了 stale closure 中的 queue.length 来判断索引调整。当用户当前正在播放队列中唯一的项并删除它时，`queue.length`（删除前的值）为 1，`queue.length > 1` 条件为 false，导致跳过索引修正分支，最终 currentIndex 停留在旧值、而队列已变为空数组，`queue[currentIndex]` 会取到 undefined。虽然组件对 undefined 有防御性处理，但正确的实现应该使用函数式 setState 中过滤后的新数组长度做判断。根本原因是模型在写删除逻辑时没有意识到 setQueue 是异步的，闭包中的 queue 引用的是旧值。正确做法是在 setQueue 的函数式更新器内部完成索引调整，而非依赖闭包中的旧 state 做条件分支。
+2. handlePlaylistItemClick 中当点击的项不在队列时，通过 `targetQueueIndex = queue.length` 获取新索引，这依赖于"setQueue 追加在队尾 + 旧 queue.length 正好等于新索引"的巧合。在 React 18 的自动批处理下这段代码能工作，但如果将来 setQueue 的调用方式发生变化或出现并发更新，这行代码会产生错误的索引。根本原因是模型使用了闭包中的旧 state 值来推算新 state 的索引。正确做法是同样在函数式更新器内部完成。
+
+过程不满意：
+1. 模型在实现过程中进行了极其大量的文件读取和编辑操作（思考过程文件 2111 行），大量操作是在同一个文件的相近区域反复查看。例如在读取 index.jsx 时先后查看了 handlePlaylistItemClick、handleNext/Prev、handleEnded、handleDelete、按钮 UI 区域等至少 10 次独立的 view_files 调用，每次读取范围高度重叠。根本原因是缺乏"先通读全文件、画好修改地图、再集中修改"的规划习惯，而是采用了"想到一处改一处、改完再看下一处"的零散方式。正确做法是先一次性通读整个组件函数，在脑中或笔记中列出所有需要修改的位置和修改内容，再按依赖顺序逐一执行修改。
+2. 模型在 Dev Server 启动后再次遇到 social-feed 模块的控制台报错，与前一轮同样处理：直接说"与我们的音视频播放器无关，不影响功能验证"后忽略。这已经是连续两轮对终端中报错信号的漠视。根本原因是缺乏对全局终端输出质量的最低关注度。正确做法是至少做一次快速确认该报错非本次修改引入，避免因忽视跨模块副作用而漏掉实际问题。

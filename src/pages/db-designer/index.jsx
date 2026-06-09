@@ -40,16 +40,10 @@ import {
 } from './dbDesignerCore'
 
 let _initStorageCache = null
-let _initStorageError = null
 
 function _getInitStorage() {
   if (!_initStorageCache) {
     _initStorageCache = loadFromStorage()
-    _initStorageError = _initStorageCache.error
-    setTimeout(() => {
-      _initStorageCache = null
-      _initStorageError = null
-    }, 0)
   }
   return _initStorageCache
 }
@@ -395,6 +389,7 @@ function DBDesignerPage() {
   const fileInputRef = useRef(null)
   const canvasRef = useRef(null)
   const innerRef = useRef(null)
+  const lastSaveAlertRef = useRef(0)
 
   const [tables, setTables] = useState(() => {
     const saved = _getInitStorage()
@@ -436,15 +431,21 @@ function DBDesignerPage() {
   }, [relationDraft])
 
   useEffect(() => {
-    if (_initStorageError) {
-      alert('读取本地存储失败: ' + _initStorageError)
+    const err = _initStorageCache?.error
+    _initStorageCache = null
+    if (err) {
+      alert('读取本地存储失败: ' + err)
     }
   }, [])
 
   useEffect(() => {
     const result = saveToStorage({ tables, relations })
     if (!result.success) {
-      alert('保存本地存储失败，数据可能丢失: ' + result.error)
+      const now = Date.now()
+      if (now - lastSaveAlertRef.current >= 5000) {
+        lastSaveAlertRef.current = now
+        alert('保存本地存储失败，数据可能丢失: ' + result.error)
+      }
     }
   }, [tables, relations])
 

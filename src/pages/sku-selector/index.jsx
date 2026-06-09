@@ -17,6 +17,7 @@ import {
   getSelectedSummary,
   getDisabledValues,
   getImagesForSelectionWithFallback,
+  cleanImageHistory,
   loadFromStorage,
   saveToStorage,
   clearStorage,
@@ -440,6 +441,7 @@ function SkuSelectorPage() {
   const handleGroupsChange = (newGroups) => {
     const newSkus = syncSkuList(skus, generateSkuList(newGroups))
     setPageData({ groups: newGroups, skus: newSkus })
+    setImageHistory((prev) => cleanImageHistory(newGroups, prev))
   }
 
   const handleSkusChange = (newSkus) => {
@@ -448,6 +450,11 @@ function SkuSelectorPage() {
 
   const handleSelectionChange = (newSelection) => {
     setSelection(newSelection)
+    const isEmpty = !newSelection || Object.keys(newSelection).length === 0
+    if (isEmpty) {
+      setImageHistory([])
+      return
+    }
     const freshImages = []
     groups.forEach((g) => {
       const valueId = newSelection[g.id]

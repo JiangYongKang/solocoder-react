@@ -25,7 +25,7 @@ import {
   getTopLevelKeys,
   getInitialExpandedKeys,
 } from '@/pages/i18n-manager/i18nUtils.js';
-import { FILTER_MODES, DEFAULT_LANGUAGES, STORAGE_KEY } from '@/pages/i18n-manager/constants.js';
+import { FILTER_MODES, STORAGE_KEY } from '@/pages/i18n-manager/constants.js';
 
 function createMockStorage() {
   const store = {};
@@ -728,20 +728,6 @@ describe('i18nUtils', () => {
       expect(coverage['zh-CN'].total).toBe(3);
       expect(coverage['en-US'].translated).toBe(1);
       expect(coverage['en-US'].total).toBe(3);
-    });
-
-    it('isKeyPartiallyUntranslated and isKeyFullyTranslated should work for view mode row highlighting', () => {
-      const fullyTranslated = { 'zh-CN': '你好', 'en-US': 'Hello' };
-      const partiallyTranslated = { 'zh-CN': '你好', 'en-US': '' };
-      const notTranslated = { 'zh-CN': '', 'en-US': '' };
-
-      expect(isKeyFullyTranslated(fullyTranslated, LANGS)).toBe(true);
-      expect(isKeyFullyTranslated(partiallyTranslated, LANGS)).toBe(false);
-      expect(isKeyFullyTranslated(notTranslated, LANGS)).toBe(false);
-
-      expect(isKeyPartiallyUntranslated(fullyTranslated, LANGS)).toBe(false);
-      expect(isKeyPartiallyUntranslated(partiallyTranslated, LANGS)).toBe(true);
-      expect(isKeyPartiallyUntranslated(notTranslated, LANGS)).toBe(true);
     });
 
     it('importTranslations should merge new namespaces into existing tree structure', () => {

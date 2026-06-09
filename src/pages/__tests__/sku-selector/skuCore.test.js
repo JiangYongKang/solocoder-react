@@ -23,6 +23,7 @@ import {
   getDisabledValues,
   getImagesForSelection,
   getImagesForSelectionWithFallback,
+  cleanImageHistory,
   getGroupsStructureSignature,
   loadFromStorage,
   saveToStorage,
@@ -755,5 +756,114 @@ describe('getImagesForSelectionWithFallback', () => {
     const images = getImagesForSelectionWithFallback(groupsWithImages, selection)
     expect(images).toHaveLength(1)
     expect(images[0].image).toBe('red.png')
+  })
+
+  it('should NOT include images from groups that no longer exist in groups list', () => {
+    const prevImages = [
+      {
+        groupId: 'g1',
+        groupName: '颜色',
+        valueId: 'v1',
+        valueName: '红色',
+        image: 'red.png',
+      },
+      {
+        groupId: 'g_deleted',
+        groupName: '已删除组',
+        valueId: 'v_del',
+        valueName: '已删除值',
+        image: 'deleted.png',
+      },
+    ]
+    const selection = {}
+    const images = getImagesForSelectionWithFallback(groupsWithImages, selection, prevImages)
+    const groupIds = images.map((i) => i.groupId)
+    expect(groupIds).toContain('g1')
+    expect(groupIds).not.toContain('g_deleted')
+  })
+})
+
+describe('cleanImageHistory', () => {
+  const groupsWithImages = [
+    {
+      id: 'g1',
+      name: '颜色',
+      values: [
+        { id: 'v1', name: '红色', image: 'red.png' },
+        { id: 'v2', name: '蓝色', image: 'blue.png' },
+      ],
+    },
+    {
+      id: 'g2',
+      name: '尺寸',
+      values: [{ id: 'v3', name: 'S', image: 'size-s.png' }],
+    },
+  ]
+
+  const makeImg = (groupId, valueId, image, groupName = '', valueName = '') => ({
+    groupId,
+    groupName,
+    valueId,
+    valueName,
+    image,
+  })
+
+  it('should return empty array when groups is empty', () => {
+    expect(cleanImageHistory([], [makeImg('g1', 'v1', 'red.png')])).toEqual([])
+  })
+
+  it('should return empty array when imageHistory is empty', () => {
+    expect(cleanImageHistory(groupsWithImages, [])).toEqual([])
+  })
+
+  it('should keep images from existing groups with valid values', () => {
+    const history = [makeImg('g1', 'v1', 'red.png', '颜色', '红色')]
+    const result = cleanImageHistory(groupsWithImages, history)
+    expect(result).toHaveLength(1)
+    expect(result[0].groupId).toBe('g1')
+    expect(result[0].valueId).toBe('v1')
+  })
+
+  it('should remove images from deleted groups', () => {
+    const history = [
+      makeImg('g1', 'v1', 'red.png'),
+      makeImg('g_deleted', 'v_del', 'deleted.png'),
+    ]
+    const result = cleanImageHistory(groupsWithImages, history)
+    const groupIds = result.map((i) => i.groupId)
+    expect(groupIds).toContain('g1')
+    expect(groupIds).not.toContain('g_deleted')
+  })
+
+  it('should remove images from deleted values within existing groups', () => {
+    const history = [
+      makeImg('g1', 'v1', 'red.png'),
+      makeImg('g1', 'v_deleted', 'deleted-value.png'),
+    ]
+    const result = cleanImageHistory(groupsWithImages, history)
+    const valueIds = result.map((i) => i.valueId)
+    expect(valueIds).toContain('v1')
+    expect(valueIds).not.toContain('v_deleted')
+  })
+
+  it('should handle mixed valid and invalid entries', () => {
+    const history = [
+      makeImg('g1', 'v1', 'red.png'),
+      null,
+      undefined,
+      { groupId: 'bad' },
+      makeImg('g_deleted', 'v_del', 'del.png'),
+      makeImg('g2', 'v3', 'size-s.png'),
+    ]
+    const result = cleanImageHistory(groupsWithImages, history)
+    expect(result).toHaveLength(2)
+    const ids = result.map((i) => `${i.groupId}:${i.valueId}`)
+    expect(ids).toContain('g1:v1')
+    expect(ids).toContain('g2:v3')
+  })
+
+  it('should handle non-array inputs gracefully', () => {
+    expect(cleanImageHistory(null, null)).toEqual([])
+    expect(cleanImageHistory(undefined, undefined)).toEqual([])
   })
 })

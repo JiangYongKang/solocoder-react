@@ -604,6 +604,14 @@ function ImageEditorPage() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [handleUndo, handleRedo])
 
+  useEffect(() => {
+    return () => {
+      if (filterDebounceRef.current) {
+        clearTimeout(filterDebounceRef.current)
+      }
+    }
+  }, [])
+
   const handleExport = () => {
     if (!baseCanvas) return
     setShowExportDialog(true)

@@ -331,9 +331,7 @@ export function getImagesForSelectionWithFallback(groups, selection, previousIma
   })
 
   const result = []
-  const seenGroupIds = new Set()
   groups.forEach((g) => {
-    seenGroupIds.add(g.id)
     const valueId = selection[g.id]
     if (valueId != null) {
       const value = getValueById(g, valueId)
@@ -352,12 +350,33 @@ export function getImagesForSelectionWithFallback(groups, selection, previousIma
       result.push(prevMap.get(g.id))
     }
   })
-  prevMap.forEach((img, groupId) => {
-    if (!seenGroupIds.has(groupId)) {
-      result.push(img)
+  return result
+}
+
+export function cleanImageHistory(groups, imageHistory) {
+  if (!Array.isArray(groups) || groups.length === 0) return []
+  if (!Array.isArray(imageHistory) || imageHistory.length === 0) return []
+
+  const validGroupIds = new Set()
+  const validGroupValueIds = new Map()
+  groups.forEach((g) => {
+    if (g?.id) {
+      validGroupIds.add(g.id)
+      const valueIds = new Set()
+      ;(g.values || []).forEach((v) => {
+        if (v?.id) valueIds.add(v.id)
+      })
+      validGroupValueIds.set(g.id, valueIds)
     }
   })
-  return result
+
+  return imageHistory.filter((img) => {
+    if (!img || !img.groupId || !img.valueId) return false
+    if (!validGroupIds.has(img.groupId)) return false
+    const validValueIds = validGroupValueIds.get(img.groupId)
+    if (!validValueIds || !validValueIds.has(img.valueId)) return false
+    return true
+  })
 }
 
 export function getGroupsStructureSignature(groups) {

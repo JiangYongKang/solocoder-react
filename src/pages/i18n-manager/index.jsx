@@ -355,15 +355,6 @@ export default function I18nManagerPage() {
     saveState(state);
   }, [state]);
 
-  useEffect(() => {
-    const initialKeys = getInitialExpandedKeys(translations);
-    setExpandedKeys((prev) => {
-      const next = new Set(prev);
-      initialKeys.forEach((k) => next.add(k));
-      return next;
-    });
-  }, [translations]);
-
   const sortedTranslations = useMemo(() => sortKeys(translations), [translations]);
 
   const filteredTranslations = useMemo(
@@ -401,6 +392,12 @@ export default function I18nManagerPage() {
     }
     const newTranslations = addTranslationKey(translations, key, languages);
     setState({ ...state, translations: newTranslations });
+    const topLevel = key.split('.')[0];
+    setExpandedKeys((prev) => {
+      const next = new Set(prev);
+      next.add(`${topLevel}_0`);
+      return next;
+    });
     setNewKeyInput('');
     setNewKeyError('');
     setSelectedKey(key);
@@ -476,6 +473,12 @@ export default function I18nManagerPage() {
         const data = JSON.parse(ev.target.result);
         const result = importTranslations(languages, translations, data);
         setState({ languages: result.languages, translations: result.translations });
+        const newExpanded = getInitialExpandedKeys(result.translations);
+        setExpandedKeys((prev) => {
+          const next = new Set(prev);
+          newExpanded.forEach((k) => next.add(k));
+          return next;
+        });
       } catch {
         alert('JSON 文件格式错误');
       }

@@ -1,0 +1,11 @@
+你实现的多语言国际化管理页面经过第二轮修复后，仍存在以下残留问题需要进行修复：
+
+1. 在 index.jsx 中新增的 useEffect 中直接调用了 setExpandedKeys，触发了 react-hooks/set-state-in-effect ESLint 报错。该 useEffect 在 translations 每次变化时都会执行（包括用户编辑翻译文本时），导致每次击键都触发不必要的级联渲染。自动展开逻辑不应依赖 useEffect 监听 translations 变化，应改为在导入数据完成的回调中直接调用。
+
+2. 新增的测试文件 i18nUtils.test.js 中导入了 DEFAULT_LANGUAGES 常量但从未使用，触发了 no-unused-vars ESLint 报错。需要清理未使用的导入。
+
+3. 测试文件 i18nUtils.test.js 中新增的"row operations for both view modes"测试组的用例与文件中已有的测试大量重复，没有覆盖到新的边界场景，且增加了冗余的测试运行时间。需要清理重复用例，只保留真正有增量覆盖价值的测试。
+
+4. 修复后需要确认已有的单元测试仍然全部通过，如有失败需修正。测试代码在 src/pages/__tests__/i18n-manager/ 下。
+
+5. 重新运行 pnpm run test 和 pnpm run lint，确保测试通过且无 ESLint 报错。修复完成后启动 pnpm run dev 验证页面可正常访问。

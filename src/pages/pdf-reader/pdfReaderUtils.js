@@ -147,15 +147,31 @@ export function isChapterTitle(line) {
 export function extractTableOfContents(pages) {
   if (!Array.isArray(pages)) return []
   const toc = []
+  const seenTitles = new Set()
   pages.forEach((page, pageIndex) => {
+    if (page?.isChapterStart && page?.chapterTitle && typeof page.chapterTitle === 'string') {
+      const trimmed = page.chapterTitle.trim()
+      if (trimmed && !seenTitles.has(trimmed)) {
+        toc.push({
+          title: trimmed,
+          page: pageIndex + 1,
+        })
+        seenTitles.add(trimmed)
+        return
+      }
+    }
     const content = page?.content || ''
     const lines = content.split(/\r?\n/)
     for (const line of lines) {
       if (isChapterTitle(line)) {
-        toc.push({
-          title: line.trim(),
-          page: pageIndex + 1,
-        })
+        const trimmed = line.trim()
+        if (trimmed && !seenTitles.has(trimmed)) {
+          toc.push({
+            title: trimmed,
+            page: pageIndex + 1,
+          })
+          seenTitles.add(trimmed)
+        }
         break
       }
     }
@@ -265,6 +281,14 @@ export function findPrevMatch(results, currentIndex) {
   if (!Array.isArray(results) || results.length === 0) return null
   if (currentIndex <= 0) return results[results.length - 1]
   return results[currentIndex - 1]
+}
+
+export function findFirstMatchFromPage(results, startPage) {
+  if (!Array.isArray(results) || results.length === 0) return -1
+  const page = Number(startPage)
+  if (!isFinite(page) || page < 1) return 0
+  const idx = results.findIndex((r) => r.page >= page)
+  return idx === -1 ? 0 : idx
 }
 
 export function calculateFitWidthZoom(containerWidth, pageWidth = DEFAULT_PAGE_WIDTH) {

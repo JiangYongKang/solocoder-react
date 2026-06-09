@@ -22,6 +22,8 @@ import {
   getSelectedSummary,
   getDisabledValues,
   getImagesForSelection,
+  getImagesForSelectionWithFallback,
+  getGroupsStructureSignature,
   loadFromStorage,
   saveToStorage,
   clearStorage,
@@ -265,7 +267,7 @@ describe('syncSkuList', () => {
       },
     ]
     const newSkus = generateSkuList(mockGroups)
-    const synced = syncSkuList(oldSkus, newSkus, mockGroups)
+    const synced = syncSkuList(oldSkus, newSkus)
     const matched = synced.find(
       (s) => s.specs.g1 === 'v1' && s.specs.g2 === 'v3'
     )
@@ -276,8 +278,12 @@ describe('syncSkuList', () => {
 
   it('should return new skus when no old skus', () => {
     const newSkus = generateSkuList(mockGroups)
-    const synced = syncSkuList([], newSkus, mockGroups)
-    expect(synced).toBe(newSkus)
+    const synced = syncSkuList([], newSkus)
+    expect(synced).toHaveLength(newSkus.length)
+    synced.forEach((sku) => {
+      expect(typeof sku.stock).toBe('number')
+      expect(typeof sku.price).toBe('number')
+    })
   })
 })
 
@@ -497,5 +503,257 @@ describe('DEFAULT_SPEC_GROUPS', () => {
       expect(Array.isArray(g.values)).toBe(true)
       expect(g.values.length).toBeGreaterThan(0)
     })
+  })
+})
+
+describe('getDisabledValues - edge cases for issue fix', () => {
+  it('should NOT disable any values when selection is empty', () => {
+    const skus = generateSkuList(mockGroups).map((s) => ({ ...s, stock: 0 }))
+    const disabled = getDisabledValues(mockGroups, skus, {})
+    expect(disabled).toEqual({})
+  })
+
+  it('should NOT disable any values when selection has null values only', () => {
+    const skus = generateSkuList(mockGroups).map((s) => ({ ...s, stock: 0 }))
+    const disabled = getDisabledValues(mockGroups, skus, { g1: null, g2: undefined })
+    expect(disabled).toEqual({})
+  })
+
+  it('should disable values only after a selection is made', () => {
+    const skus = generateSkuList(mockGroups).map((s, idx) => ({
+      ...s,
+      stock: idx === 0 ? 10 : 0,
+    }))
+    const selection = { g1: 'v1' }
+    const disabled = getDisabledValues(mockGroups, skus, selection)
+    expect(disabled.g2).toContain('v4')
+  })
+})
+
+describe('stock/price normalization - fix empty string issue', () => {
+  it('updateSku should convert empty string stock to 0', () => {
+    const skus = generateSkuList(mockGroups)
+    const targetId = skus[0].id
+    const updated = updateSku(skus, targetId, { stock: '' })
+    const target = updated.find((s) => s.id === targetId)
+    expect(target.stock).toBe(0)
+    expect(typeof target.stock).toBe('number')
+  })
+
+  it('updateSku should convert empty string price to 0', () => {
+    const skus = generateSkuList(mockGroups)
+    const targetId = skus[0].id
+    const updated = updateSku(skus, targetId, { price: '' })
+    const target = updated.find((s) => s.id === targetId)
+    expect(target.price).toBe(0)
+    expect(typeof target.price).toBe('number')
+  })
+
+  it('updateSku should convert null stock to 0', () => {
+    const skus = generateSkuList(mockGroups)
+    const targetId = skus[0].id
+    const updated = updateSku(skus, targetId, { stock: null })
+    expect(updated.find((s) => s.id === targetId).stock).toBe(0)
+  })
+
+  it('batchSetStock should convert empty string to 0', () => {
+    const skus = generateSkuList(mockGroups)
+    const result = batchSetStock(skus, '')
+    result.forEach((s) => {
+      expect(s.stock).toBe(0)
+      expect(typeof s.stock).toBe('number')
+    })
+  })
+
+  it('batchSetPrice should convert empty string to 0', () => {
+    const skus = generateSkuList(mockGroups)
+    const result = batchSetPrice(skus, '')
+    result.forEach((s) => {
+      expect(s.price).toBe(0)
+      expect(typeof s.price).toBe('number')
+    })
+  })
+
+  it('syncSkuList should normalize old empty string values to 0', () => {
+    const oldSkus = [
+      {
+        id: 'old1',
+        specs: { g1: 'v1', g2: 'v3' },
+        stock: '',
+        price: '',
+      },
+    ]
+    const newSkus = generateSkuList(mockGroups)
+    const synced = syncSkuList(oldSkus, newSkus)
+    const matched = synced.find((s) => s.specs.g1 === 'v1' && s.specs.g2 === 'v3')
+    expect(matched.stock).toBe(0)
+    expect(typeof matched.stock).toBe('number')
+    expect(matched.price).toBe(0)
+    expect(typeof matched.price).toBe('number')
+  })
+
+  it('generateSkuList should always produce number type stock and price', () => {
+    const skus = generateSkuList(mockGroups)
+    skus.forEach((sku) => {
+      expect(typeof sku.stock).toBe('number')
+      expect(typeof sku.price).toBe('number')
+    })
+  })
+})
+
+describe('getGroupsStructureSignature', () => {
+  it('should produce same signature when only names change', () => {
+    const groupsA = [
+      {
+        id: 'g1',
+        name: '颜色',
+        values: [
+          { id: 'v1', name: '红色', image: '' },
+          { id: 'v2', name: '蓝色', image: '' },
+        ],
+      },
+    ]
+    const groupsB = [
+      {
+        id: 'g1',
+        name: 'Colour',
+        values: [
+          { id: 'v1', name: 'Red', image: '' },
+          { id: 'v2', name: 'Blue', image: '' },
+        ],
+      },
+    ]
+    expect(getGroupsStructureSignature(groupsA)).toBe(getGroupsStructureSignature(groupsB))
+  })
+
+  it('should produce different signature when group IDs change', () => {
+    const groupsA = [{ id: 'g1', name: '颜色', values: [{ id: 'v1', name: '红', image: '' }] }]
+    const groupsB = [{ id: 'g2', name: '颜色', values: [{ id: 'v1', name: '红', image: '' }] }]
+    expect(getGroupsStructureSignature(groupsA)).not.toBe(getGroupsStructureSignature(groupsB))
+  })
+
+  it('should produce different signature when value IDs change', () => {
+    const groupsA = [{ id: 'g1', name: '颜色', values: [{ id: 'v1', name: '红', image: '' }] }]
+    const groupsB = [{ id: 'g1', name: '颜色', values: [{ id: 'v99', name: '红', image: '' }] }]
+    expect(getGroupsStructureSignature(groupsA)).not.toBe(getGroupsStructureSignature(groupsB))
+  })
+
+  it('should produce different signature when adding a value', () => {
+    const groupsA = [{ id: 'g1', name: '颜色', values: [{ id: 'v1', name: '红', image: '' }] }]
+    const groupsB = [
+      {
+        id: 'g1',
+        name: '颜色',
+        values: [
+          { id: 'v1', name: '红', image: '' },
+          { id: 'v2', name: '蓝', image: '' },
+        ],
+      },
+    ]
+    expect(getGroupsStructureSignature(groupsA)).not.toBe(getGroupsStructureSignature(groupsB))
+  })
+
+  it('should return empty string for non-array input', () => {
+    expect(getGroupsStructureSignature(null)).toBe('')
+    expect(getGroupsStructureSignature(undefined)).toBe('')
+  })
+})
+
+describe('getImagesForSelectionWithFallback', () => {
+  const groupsWithImages = [
+    {
+      id: 'g1',
+      name: '颜色',
+      values: [
+        { id: 'v1', name: '红色', image: 'red.png' },
+        { id: 'v2', name: '蓝色', image: 'blue.png' },
+        { id: 'v3', name: '绿色', image: '' },
+      ],
+    },
+    {
+      id: 'g2',
+      name: '尺寸',
+      values: [
+        { id: 'v4', name: 'S', image: '' },
+        { id: 'v5', name: 'M', image: 'size-m.png' },
+      ],
+    },
+  ]
+
+  it('should return images for current selection', () => {
+    const selection = { g1: 'v1', g2: 'v5' }
+    const images = getImagesForSelectionWithFallback(groupsWithImages, selection, [])
+    expect(images).toHaveLength(2)
+    expect(images.map((i) => i.image)).toContain('red.png')
+    expect(images.map((i) => i.image)).toContain('size-m.png')
+  })
+
+  it('should fall back to previous image when current value has no image', () => {
+    const prevImages = [
+      {
+        groupId: 'g1',
+        groupName: '颜色',
+        valueId: 'v1',
+        valueName: '红色',
+        image: 'red.png',
+      },
+    ]
+    const selection = { g1: 'v3' }
+    const images = getImagesForSelectionWithFallback(groupsWithImages, selection, prevImages)
+    expect(images).toHaveLength(1)
+    expect(images[0].image).toBe('red.png')
+  })
+
+  it('should fall back to previous image when group has no selection', () => {
+    const prevImages = [
+      {
+        groupId: 'g1',
+        groupName: '颜色',
+        valueId: 'v1',
+        valueName: '红色',
+        image: 'red.png',
+      },
+    ]
+    const selection = {}
+    const images = getImagesForSelectionWithFallback(groupsWithImages, selection, prevImages)
+    expect(images).toHaveLength(1)
+    expect(images[0].image).toBe('red.png')
+  })
+
+  it('should prefer current selection image over previous', () => {
+    const prevImages = [
+      {
+        groupId: 'g1',
+        groupName: '颜色',
+        valueId: 'v1',
+        valueName: '红色',
+        image: 'red.png',
+      },
+    ]
+    const selection = { g1: 'v2' }
+    const images = getImagesForSelectionWithFallback(groupsWithImages, selection, prevImages)
+    expect(images).toHaveLength(1)
+    expect(images[0].image).toBe('blue.png')
+  })
+
+  it('should return previous images when input is invalid', () => {
+    const prevImages = [
+      {
+        groupId: 'g1',
+        groupName: '颜色',
+        valueId: 'v1',
+        valueName: '红色',
+        image: 'red.png',
+      },
+    ]
+    expect(getImagesForSelectionWithFallback(null, null, prevImages)).toEqual(prevImages)
+    expect(getImagesForSelectionWithFallback([], {}, prevImages)).toEqual(prevImages)
+  })
+
+  it('should handle empty previous images gracefully', () => {
+    const selection = { g1: 'v1' }
+    const images = getImagesForSelectionWithFallback(groupsWithImages, selection)
+    expect(images).toHaveLength(1)
+    expect(images[0].image).toBe('red.png')
   })
 })

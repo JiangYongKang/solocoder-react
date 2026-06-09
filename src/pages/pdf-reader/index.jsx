@@ -28,6 +28,7 @@ import {
   searchTextInPages,
   findNextMatch,
   findPrevMatch,
+  findFirstMatchFromPage,
   calculateFitWidthZoom,
   calculateFitPageZoom,
   saveCustomDocument,
@@ -264,9 +265,10 @@ function PdfReaderPage() {
       const results = searchTextInPages(pages, keyword)
       setSearchResults(results)
       if (results.length > 0) {
-        setCurrentMatchIndex(0)
-        if (results[0].page !== currentPage) {
-          setCurrentPage(results[0].page)
+        const startIdx = findFirstMatchFromPage(results, currentPage)
+        setCurrentMatchIndex(startIdx)
+        if (results[startIdx].page !== currentPage) {
+          setCurrentPage(results[startIdx].page)
         }
       } else {
         setCurrentMatchIndex(-1)

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import './sku-selector.css'
 import {
@@ -16,7 +16,7 @@ import {
   findSkuBySelection,
   getSelectedSummary,
   getDisabledValues,
-  getImagesForSelection,
+  getImagesForSelectionWithFallback,
   loadFromStorage,
   saveToStorage,
   clearStorage,
@@ -48,7 +48,8 @@ function SpecConfigPanel({ groups, onGroupsChange }) {
   }
 
   const handleAddValue = (groupId) => {
-    onGroupsChange(addSpecValue(groups, groupId, `规格值${(groups.find((g) => g.id === groupId)?.values?.length || 0) + 1}`))
+    const currentCount = groups.find((g) => g.id === groupId)?.values?.length || 0
+    onGroupsChange(addSpecValue(groups, groupId, `规格值${currentCount + 1}`))
   }
 
   const handleUpdateValueName = (groupId, valueId, name) => {
@@ -156,7 +157,7 @@ function SpecConfigPanel({ groups, onGroupsChange }) {
   )
 }
 
-function SkuListPanel({ skus, groups, onSkusChange }) {
+function SkuListPanel({ skus, onSkusChange }) {
   const [batchStock, setBatchStock] = useState('')
   const [batchPrice, setBatchPrice] = useState('')
 
@@ -171,13 +172,11 @@ function SkuListPanel({ skus, groups, onSkusChange }) {
   }
 
   const handleSkuStockChange = (skuId, stock) => {
-    const num = stock === '' ? '' : Number(stock)
-    onSkusChange(updateSku(skus, skuId, { stock: num === '' ? '' : (Number.isFinite(num) ? num : 0) }))
+    onSkusChange(updateSku(skus, skuId, { stock }))
   }
 
   const handleSkuPriceChange = (skuId, price) => {
-    const num = price === '' ? '' : Number(price)
-    onSkusChange(updateSku(skus, skuId, { price: num === '' ? '' : (Number.isFinite(num) ? num : 0) }))
+    onSkusChange(updateSku(skus, skuId, { price }))
   }
 
   return (
@@ -265,7 +264,7 @@ function SkuListPanel({ skus, groups, onSkusChange }) {
   )
 }
 
-function PreviewPanel({ groups, skus, selection, onSelectionChange }) {
+function PreviewPanel({ groups, skus, selection, onSelectionChange, imageHistory }) {
   const disabledValues = useMemo(
     () => getDisabledValues(groups, skus, selection),
     [groups, skus, selection]
@@ -282,8 +281,8 @@ function PreviewPanel({ groups, skus, selection, onSelectionChange }) {
   )
 
   const images = useMemo(
-    () => getImagesForSelection(groups, selection),
-    [groups, selection]
+    () => getImagesForSelectionWithFallback(groups, selection, imageHistory),
+    [groups, selection, imageHistory]
   )
 
   const handleValueClick = (groupId, valueId) => {
@@ -316,12 +315,14 @@ function PreviewPanel({ groups, skus, selection, onSelectionChange }) {
         {images.length > 0 ? (
           <div className="sku-preview-images">
             {images.map((img) => (
-              <img
-                key={img.valueId}
-                className="sku-preview-image"
-                src={img.image}
-                alt={img.valueName}
-              />
+              <div key={img.groupId} className="sku-preview-image-item">
+                <img
+                  className="sku-preview-image"
+                  src={img.image}
+                  alt={img.valueName}
+                />
+                <span className="sku-preview-image-label">{img.groupName}: {img.valueName}</span>
+              </div>
             ))}
           </div>
         ) : (
@@ -385,34 +386,42 @@ function PreviewPanel({ groups, skus, selection, onSelectionChange }) {
 function SkuSelectorPage() {
   const navigate = useNavigate()
   const lastSaveAlertRef = useRef(0)
+  const initAlertShownRef = useRef(false)
 
-  const [groups, setGroups] = useState(() => {
+  const [pageData, setPageData] = useState(() => {
     const saved = _getInitStorage()
-    if (saved.groups && saved.groups.length > 0) return saved.groups
-    return DEFAULT_SPEC_GROUPS
+    if (saved.groups && saved.groups.length > 0) {
+      return {
+        groups: saved.groups,
+        skus: saved.skus && saved.skus.length > 0 ? saved.skus : generateSkuList(saved.groups),
+      }
+    }
+    return {
+      groups: DEFAULT_SPEC_GROUPS,
+      skus: generateSkuList(DEFAULT_SPEC_GROUPS),
+    }
   })
-
-  const [skus, setSkus] = useState(() => {
-    const saved = _getInitStorage()
-    if (saved.skus && saved.skus.length > 0) return saved.skus
-    return generateSkuList(DEFAULT_SPEC_GROUPS)
-  })
+  const { groups, skus } = pageData
 
   const [selection, setSelection] = useState({})
+  const [imageHistory, setImageHistory] = useState([])
 
-  useEffect(() => {
-    const newSkus = generateSkuList(groups)
-    setSkus((prevSkus) => syncSkuList(prevSkus, newSkus))
-  }, [groups])
-
-  useEffect(() => {
-    setSelection({})
-  }, [groups])
+  const validSelection = useMemo(() => {
+    const cleaned = {}
+    Object.entries(selection).forEach(([groupId, valueId]) => {
+      const group = groups.find((g) => g.id === groupId)
+      if (group && group.values?.some((v) => v.id === valueId)) {
+        cleaned[groupId] = valueId
+      }
+    })
+    return cleaned
+  }, [groups, selection])
 
   useEffect(() => {
     const err = _initStorageCache?.error
     _initStorageCache = null
-    if (err) {
+    if (err && !initAlertShownRef.current) {
+      initAlertShownRef.current = true
       alert('读取本地存储失败: ' + err)
     }
   }, [])
@@ -428,23 +437,50 @@ function SkuSelectorPage() {
     }
   }, [groups, skus])
 
-  const handleGroupsChange = useCallback((newGroups) => {
-    setGroups(newGroups)
-  }, [])
+  const handleGroupsChange = (newGroups) => {
+    const newSkus = syncSkuList(skus, generateSkuList(newGroups))
+    setPageData({ groups: newGroups, skus: newSkus })
+  }
 
-  const handleSkusChange = useCallback((newSkus) => {
-    setSkus(newSkus)
-  }, [])
+  const handleSkusChange = (newSkus) => {
+    setPageData({ groups, skus: newSkus })
+  }
 
-  const handleSelectionChange = useCallback((newSelection) => {
+  const handleSelectionChange = (newSelection) => {
     setSelection(newSelection)
-  }, [])
+    const freshImages = []
+    groups.forEach((g) => {
+      const valueId = newSelection[g.id]
+      if (valueId != null) {
+        const value = g.values?.find((v) => v.id === valueId)
+        if (value && value.image) {
+          freshImages.push({
+            groupId: g.id,
+            groupName: g.name,
+            valueId: value.id,
+            valueName: value.name,
+            image: value.image,
+          })
+        }
+      }
+    })
+    if (freshImages.length > 0) {
+      setImageHistory((prev) => {
+        const prevMap = new Map()
+        prev.forEach((img) => {
+          if (img && img.groupId) prevMap.set(img.groupId, img)
+        })
+        freshImages.forEach((img) => prevMap.set(img.groupId, img))
+        return Array.from(prevMap.values())
+      })
+    }
+  }
 
   const handleClearAll = () => {
     if (confirm('确定要清空所有配置吗？')) {
-      setGroups([])
-      setSkus([])
+      setPageData({ groups: [], skus: [] })
       setSelection({})
+      setImageHistory([])
       const result = clearStorage()
       if (!result.success) {
         console.warn('清除本地存储失败:', result.error)
@@ -454,9 +490,12 @@ function SkuSelectorPage() {
 
   const handleResetDefault = () => {
     if (confirm('确定要恢复默认示例配置吗？')) {
-      setGroups(DEFAULT_SPEC_GROUPS)
-      setSkus(generateSkuList(DEFAULT_SPEC_GROUPS))
+      setPageData({
+        groups: DEFAULT_SPEC_GROUPS,
+        skus: generateSkuList(DEFAULT_SPEC_GROUPS),
+      })
       setSelection({})
+      setImageHistory([])
     }
   }
 
@@ -481,12 +520,13 @@ function SkuSelectorPage() {
 
       <div className="sku-main">
         <SpecConfigPanel groups={groups} onGroupsChange={handleGroupsChange} />
-        <SkuListPanel skus={skus} groups={groups} onSkusChange={handleSkusChange} />
+        <SkuListPanel skus={skus} onSkusChange={handleSkusChange} />
         <PreviewPanel
           groups={groups}
           skus={skus}
-          selection={selection}
+          selection={validSelection}
           onSelectionChange={handleSelectionChange}
+          imageHistory={imageHistory}
         />
       </div>
     </div>

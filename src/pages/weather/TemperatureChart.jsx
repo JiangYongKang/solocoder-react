@@ -71,9 +71,6 @@ const TemperatureChart = ({ forecast }) => {
         strokeWidth="2.5"
         strokeLinecap="round"
         strokeLinejoin="round"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        round="round"
       />
 
       {layout.lowPoints.map((p, i) => (
@@ -114,7 +111,7 @@ const TemperatureChart = ({ forecast }) => {
           paintOrder="stroke"
           strokeLinejoin="round"
         >
-          {p.value}°
+          {p.value}°C
         </text>
       ))}
 
@@ -132,7 +129,7 @@ const TemperatureChart = ({ forecast }) => {
           paintOrder="stroke"
           strokeLinejoin="round"
         >
-          {p.value}°
+          {p.value}°C
         </text>
       ))}
     </svg>

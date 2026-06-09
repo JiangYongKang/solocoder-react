@@ -312,36 +312,33 @@ describe('tetrisCore', () => {
   })
 
   describe('calculateScore', () => {
-    it('should return 100 for 1 line at level 1', () => {
-      expect(calculateScore(1, 1)).toBe(100)
+    it('should return 100 for 1 line', () => {
+      expect(calculateScore(1)).toBe(100)
     })
 
-    it('should return 300 for 2 lines at level 1', () => {
-      expect(calculateScore(2, 1)).toBe(300)
+    it('should return 300 for 2 lines', () => {
+      expect(calculateScore(2)).toBe(300)
     })
 
-    it('should return 500 for 3 lines at level 1', () => {
-      expect(calculateScore(3, 1)).toBe(500)
+    it('should return 500 for 3 lines', () => {
+      expect(calculateScore(3)).toBe(500)
     })
 
-    it('should return 800 for 4 lines (Tetris) at level 1', () => {
-      expect(calculateScore(4, 1)).toBe(800)
+    it('should return 800 for 4 lines (Tetris)', () => {
+      expect(calculateScore(4)).toBe(800)
     })
 
-    it('should multiply score by level', () => {
-      expect(calculateScore(1, 3)).toBe(300)
-      expect(calculateScore(2, 5)).toBe(1500)
-      expect(calculateScore(4, 10)).toBe(8000)
+    it('should return fixed score regardless of level', () => {
+      expect(calculateScore(1)).toBe(100)
+      expect(calculateScore(2)).toBe(300)
+      expect(calculateScore(3)).toBe(500)
+      expect(calculateScore(4)).toBe(800)
     })
 
     it('should return 0 for invalid line count', () => {
-      expect(calculateScore(0, 1)).toBe(0)
-      expect(calculateScore(5, 1)).toBe(0)
-      expect(calculateScore(-1, 1)).toBe(0)
-    })
-
-    it('should default to level 1 when not specified', () => {
-      expect(calculateScore(1)).toBe(100)
+      expect(calculateScore(0)).toBe(0)
+      expect(calculateScore(5)).toBe(0)
+      expect(calculateScore(-1)).toBe(0)
     })
   })
 

@@ -417,11 +417,31 @@
   justify-content: center;
 }
 
-.se-fullscreen-slide {
+.se-fullscreen-slide-wrapper {
   position: relative;
+}
+
+.se-fullscreen-slide {
+  position: absolute;
+  top: 0;
+  left: 0;
   background: #ffffff;
   overflow: hidden;
-  animation: se-fade-in 0.4s ease;
+}
+
+.se-fullscreen-slide.fade-in {
+  animation: se-fade-in 0.4s ease forwards;
+  z-index: 2;
+}
+
+.se-fullscreen-slide.fade-out {
+  animation: se-fade-out 0.4s ease forwards;
+  z-index: 1;
+}
+
+.se-fullscreen-slide.visible {
+  opacity: 1;
+  z-index: 2;
 }
 
 @keyframes se-fade-in {
@@ -430,6 +450,15 @@
   }
   to {
     opacity: 1;
+  }
+}
+
+@keyframes se-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
   }
 }
 

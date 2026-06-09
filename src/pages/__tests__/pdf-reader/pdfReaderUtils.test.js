@@ -33,6 +33,7 @@ import {
   getTotalSearchCount,
   findNextMatch,
   findPrevMatch,
+  findFirstMatchFromPage,
   calculateFitWidthZoom,
   calculateFitPageZoom,
   saveCustomDocument,
@@ -284,6 +285,42 @@ describe('章节标题识别', () => {
     expect(extractTableOfContents(null)).toEqual([])
     expect(extractTableOfContents([])).toEqual([])
   })
+
+  it('extractTableOfContents 优先从 chapterTitle 元数据提取', () => {
+    const pages = [
+      { content: '普通内容', chapterTitle: '第一章 元数据章节', isChapterStart: true },
+      { content: '普通内容', chapterTitle: '第二章 元数据章节二', isChapterStart: true },
+      { content: '普通内容' },
+    ]
+    const toc = extractTableOfContents(pages)
+    expect(toc.length).toBe(2)
+    expect(toc[0].title).toBe('第一章 元数据章节')
+    expect(toc[0].page).toBe(1)
+    expect(toc[1].title).toBe('第二章 元数据章节二')
+    expect(toc[1].page).toBe(2)
+  })
+
+  it('extractTableOfContents 元数据和正文扫描混合', () => {
+    const pages = [
+      { content: '普通内容', chapterTitle: '第一章 元数据', isChapterStart: true },
+      { content: 'Chapter 2 From Content\n更多内容' },
+      { content: '普通内容' },
+    ]
+    const toc = extractTableOfContents(pages)
+    expect(toc.length).toBe(2)
+    expect(toc[0].title).toBe('第一章 元数据')
+    expect(toc[1].title).toBe('Chapter 2 From Content')
+  })
+
+  it('extractTableOfContents 去重相同章节标题', () => {
+    const pages = [
+      { content: '第一章 重复', chapterTitle: '第一章 重复', isChapterStart: true },
+      { content: '第一章 重复\n更多内容' },
+    ]
+    const toc = extractTableOfContents(pages)
+    expect(toc.length).toBe(1)
+    expect(toc[0].page).toBe(1)
+  })
 })
 
 describe('文本分页和换行', () => {
@@ -405,6 +442,31 @@ describe('搜索功能', () => {
   it('findNextMatch / findPrevMatch 空数组安全', () => {
     expect(findNextMatch([], 0)).toBeNull()
     expect(findPrevMatch([], 0)).toBeNull()
+  })
+
+  it('findFirstMatchFromPage 从当前页开始找第一个匹配', () => {
+    const results = searchTextInPages(
+      [{ content: '苹果' }, { content: '香蕉' }, { content: '苹果' }, { content: '橙子' }],
+      '苹果'
+    )
+    expect(findFirstMatchFromPage(results, 1)).toBe(0)
+    expect(findFirstMatchFromPage(results, 2)).toBe(1)
+    expect(findFirstMatchFromPage(results, 3)).toBe(1)
+    expect(findFirstMatchFromPage(results, 4)).toBe(0)
+  })
+
+  it('findFirstMatchFromPage 空数组安全', () => {
+    expect(findFirstMatchFromPage([], 1)).toBe(-1)
+  })
+
+  it('findFirstMatchFromPage 无效页码返回 0', () => {
+    const results = searchTextInPages(
+      [{ content: '苹果' }, { content: '香蕉' }, { content: '苹果' }],
+      '苹果'
+    )
+    expect(findFirstMatchFromPage(results, 0)).toBe(0)
+    expect(findFirstMatchFromPage(results, -5)).toBe(0)
+    expect(findFirstMatchFromPage(results, 'abc')).toBe(0)
   })
 })
 

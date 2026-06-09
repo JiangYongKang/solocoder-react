@@ -13,6 +13,7 @@ import {
   applyContrast,
   applySaturation,
   applyHue,
+  applyBlur,
   applyFiltersToData,
   normalizeCropRect,
   applyRatioToCrop,
@@ -243,6 +244,77 @@ describe('imageEditorCore - pixel filters', () => {
     const original = new Uint8ClampedArray(data)
     applyHue(data, 0)
     expect(data).toEqual(original)
+  })
+
+  it('applyBlur should not change data when amount is 0', () => {
+    const width = 2
+    const height = 2
+    const data = new Uint8ClampedArray(width * height * 4)
+    for (let i = 0; i < data.length; i += 4) {
+      data[i] = 100
+      data[i + 1] = 150
+      data[i + 2] = 200
+      data[i + 3] = 255
+    }
+    const original = new Uint8ClampedArray(data)
+    applyBlur(data, width, height, 0)
+    expect(data).toEqual(original)
+  })
+
+  it('applyBlur should not change data when amount is negative', () => {
+    const width = 2
+    const height = 2
+    const data = new Uint8ClampedArray(width * height * 4)
+    for (let i = 0; i < data.length; i += 4) {
+      data[i] = 100
+      data[i + 1] = 150
+      data[i + 2] = 200
+      data[i + 3] = 255
+    }
+    const original = new Uint8ClampedArray(data)
+    applyBlur(data, width, height, -5)
+    expect(data).toEqual(original)
+  })
+
+  it('applyBlur should blur the image (uniform color stays the same)', () => {
+    const width = 3
+    const height = 3
+    const data = new Uint8ClampedArray(width * height * 4)
+    for (let i = 0; i < data.length; i += 4) {
+      data[i] = 128
+      data[i + 1] = 128
+      data[i + 2] = 128
+      data[i + 3] = 255
+    }
+    const original = new Uint8ClampedArray(data)
+    applyBlur(data, width, height, 2)
+    expect(data).toEqual(original)
+  })
+
+  it('applyBlur should actually blur edges', () => {
+    const width = 3
+    const height = 3
+    const data = new Uint8ClampedArray(width * height * 4)
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const idx = (y * width + x) * 4
+        if (x === 0 && y === 0) {
+          data[idx] = 255
+          data[idx + 1] = 0
+          data[idx + 2] = 0
+          data[idx + 3] = 255
+        } else {
+          data[idx] = 0
+          data[idx + 1] = 0
+          data[idx + 2] = 255
+          data[idx + 3] = 255
+        }
+      }
+    }
+    applyBlur(data, width, height, 1)
+    const centerIdx = (1 * width + 1) * 4
+    expect(data[centerIdx]).toBeGreaterThan(0)
+    expect(data[centerIdx]).toBeLessThan(255)
   })
 
   it('applyFiltersToData should return filtered data', () => {

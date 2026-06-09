@@ -210,7 +210,7 @@ function TetrisPage() {
   }, [])
 
   const lockPiece = useCallback(() => {
-    const { board: b, currentPiece: piece, score: s, lines: l, level: lv } = stateRef.current
+    const { board: b, currentPiece: piece, score: s, lines: l } = stateRef.current
     if (!piece) return
 
     const merged = mergePieceToBoard(b, piece)
@@ -220,7 +220,7 @@ function TetrisPage() {
 
     if (clearedCount > 0) {
       const newLines = l + clearedCount
-      const newScore = s + calculateScore(clearedCount, lv)
+      const newScore = s + calculateScore(clearedCount)
       const newLevel = calculateLevel(newLines)
       setLines(newLines)
       setScore(newScore)
@@ -257,21 +257,20 @@ function TetrisPage() {
   }, [])
 
   const doHardDrop = useCallback(() => {
-    const { board: b, currentPiece: piece, status: st, score: s } = stateRef.current
+    const { board: b, currentPiece: piece, status: st, score: s, lines: l } = stateRef.current
     if (st !== GAME_STATUS.PLAYING || !piece) return
-    const { board: mergedBoard, piece: dropped, dropDistance } = hardDrop(b, piece)
+    const { board: mergedBoard } = hardDrop(b, piece)
     const { board: clearedBoard, clearedCount } = clearCompletedLines(mergedBoard)
     setBoard(clearedBoard)
-    setScore(s + dropDistance * 2)
+    setCurrentPiece(null)
     if (clearedCount > 0) {
-      const newLines = stateRef.current.lines + clearedCount
-      const newScore = stateRef.current.score + dropDistance * 2 + calculateScore(clearedCount, stateRef.current.level)
+      const newLines = l + clearedCount
+      const newScore = s + calculateScore(clearedCount)
       const newLevel = calculateLevel(newLines)
       setLines(newLines)
       setScore(newScore)
       setLevel(newLevel)
     }
-    setCurrentPiece(dropped)
     setTimeout(() => spawnPiece(), 0)
   }, [spawnPiece])
 
@@ -332,9 +331,7 @@ function TetrisPage() {
         case 's':
         case 'S':
           e.preventDefault()
-          if (tryMove(0, 1)) {
-            setScore((prev) => prev + 1)
-          }
+          tryMove(0, 1)
           break
         case 'ArrowUp':
         case 'w':

@@ -74,7 +74,7 @@ export function getSoldCount(currentStock, initialStock) {
 
 export function getStockColor(currentStock, initialStock) {
   const percentage = getStockPercentage(currentStock, initialStock) / 100
-  if (percentage >= STOCK_COLOR_THRESHOLDS.HIGH) {
+  if (percentage > STOCK_COLOR_THRESHOLDS.HIGH) {
     return STOCK_COLORS.HIGH
   }
   if (percentage >= STOCK_COLOR_THRESHOLDS.MEDIUM) {

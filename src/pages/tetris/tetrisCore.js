@@ -110,9 +110,8 @@ export function clearCompletedLines(board) {
   return { board: newBoard, clearedCount }
 }
 
-export function calculateScore(linesCleared, level = 1) {
-  const base = SCORE_TABLE[linesCleared] || 0
-  return base * level
+export function calculateScore(linesCleared) {
+  return SCORE_TABLE[linesCleared] || 0
 }
 
 export function calculateLevel(totalLines) {

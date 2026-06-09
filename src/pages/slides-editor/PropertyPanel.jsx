@@ -1,4 +1,4 @@
-import { ELEMENT_TYPES, PRESET_COLORS, MIN_FONT_SIZE, MAX_FONT_SIZE, DEFAULT_BORDER_WIDTH } from './constants.js'
+import { ELEMENT_TYPES, PRESET_COLORS, MIN_FONT_SIZE, MAX_FONT_SIZE } from './constants.js'
 
 function ColorPicker({ value, onChange, label }) {
   return (

@@ -67,6 +67,7 @@ function ImageEditorPage() {
 
   const [originalImage, setOriginalImage] = useState(null)
   const [originalImageSrc, setOriginalImageSrc] = useState('')
+  const [originalFileType, setOriginalFileType] = useState('image/png')
   const [baseCanvas, setBaseCanvas] = useState(null)
   const [filters, setFilters] = useState({ ...DEFAULT_FILTERS })
   const [currentTool, setCurrentTool] = useState(TOOL_TYPES.NONE)
@@ -99,6 +100,7 @@ function ImageEditorPage() {
   const [showColorPickerBrush, setShowColorPickerBrush] = useState(false)
   const [showColorPickerText, setShowColorPickerText] = useState(false)
   const [isDragOver, setIsDragOver] = useState(false)
+  const filterDebounceRef = useRef(null)
 
   const filtersRef = useRef(filters)
   const annotationsRef = useRef(annotations)
@@ -186,6 +188,7 @@ function ImageEditorPage() {
       ctx.drawImage(img, 0, 0)
       setOriginalImage(img)
       setOriginalImageSrc(dataUrl)
+      setOriginalFileType(file.type || 'image/png')
       setBaseCanvas(canvas)
       setFilters({ ...DEFAULT_FILTERS })
       setRotation(0)
@@ -269,22 +272,8 @@ function ImageEditorPage() {
     if (!areFiltersDefault(currentFilters)) {
       const imgData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height)
       const filtered = applyFiltersToData(imgData, currentFilters)
-      if (currentFilters.blur > 0) {
-        tempCtx.filter = `blur(${currentFilters.blur}px)`
-        tempCtx.clearRect(0, 0, tempCanvas.width, tempCanvas.height)
-        tempCtx.putImageData(filtered, 0, 0)
-        const blurred = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height)
-        tempCtx.filter = 'none'
-        tempCtx.clearRect(0, 0, tempCanvas.width, tempCanvas.height)
-        tempCtx.putImageData(blurred, 0, 0)
-      } else {
-        tempCtx.putImageData(filtered, 0, 0)
-      }
-    } else if (currentFilters.blur > 0) {
-      tempCtx.filter = `blur(${currentFilters.blur}px)`
       tempCtx.clearRect(0, 0, tempCanvas.width, tempCanvas.height)
-      tempCtx.drawImage(sourceCanvas, 0, 0)
-      tempCtx.filter = 'none'
+      tempCtx.putImageData(filtered, 0, 0)
     }
     ctx.drawImage(tempCanvas, 0, 0, info.displayWidth, info.displayHeight)
     const displayAnns = isComparing ? [] : annotationsRef.current
@@ -340,6 +329,12 @@ function ImageEditorPage() {
   const handleFilterChange = (key, value) => {
     const newFilters = clampFilters({ ...filters, [key]: Number(value) })
     setFilters(newFilters)
+    if (filterDebounceRef.current) {
+      clearTimeout(filterDebounceRef.current)
+    }
+    filterDebounceRef.current = setTimeout(() => {
+      saveHistory()
+    }, 500)
   }
 
   const handleResetFilters = () => {
@@ -628,26 +623,11 @@ function ImageEditorPage() {
       tempCtx.drawImage(baseCanvas, 0, 0)
       const imgData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height)
       const filtered = applyFiltersToData(imgData, filters)
-      if (filters.blur > 0) {
-        tempCtx.filter = `blur(${filters.blur}px)`
-        tempCtx.clearRect(0, 0, tempCanvas.width, tempCanvas.height)
-        tempCtx.putImageData(filtered, 0, 0)
-        const blurred = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height)
-        tempCtx.filter = 'none'
-        tempCtx.clearRect(0, 0, tempCanvas.width, tempCanvas.height)
-        tempCtx.putImageData(blurred, 0, 0)
-      } else {
-        tempCtx.putImageData(filtered, 0, 0)
-      }
+      tempCtx.clearRect(0, 0, tempCanvas.width, tempCanvas.height)
+      tempCtx.putImageData(filtered, 0, 0)
       ctx.drawImage(tempCanvas, 0, 0)
     } else {
       ctx.drawImage(baseCanvas, 0, 0)
-      if (filters.blur > 0) {
-        ctx.filter = `blur(${filters.blur}px)`
-        ctx.clearRect(0, 0, exportCanvas.width, exportCanvas.height)
-        ctx.drawImage(baseCanvas, 0, 0)
-        ctx.filter = 'none'
-      }
     }
     annotations.forEach((ann) => {
       if (ann.type === 'text') {
@@ -835,7 +815,7 @@ function ImageEditorPage() {
               <div className="ie-thumb-info">
                 尺寸: {baseCanvas.width} × {baseCanvas.height}
                 <br />
-                格式: {getImageFileExtension({ type: originalImage?.src?.includes('jpeg') ? 'image/jpeg' : 'image/png' }).toUpperCase()}
+                格式: {getImageFileExtension({ type: originalFileType }).toUpperCase()}
               </div>
             )}
           </div>

@@ -1,41 +1,40 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  loadFromStorage,
-  saveToStorage,
-  addSlide,
-  deleteSlide,
-  duplicateSlide,
-  reorderSlides,
-  addElement,
-  deleteElement,
-  updateElement,
-  createTextElement,
-  createImageElement,
-  createShapeElement,
-  findElementAtPoint,
-  screenToCanvas,
-  constrainToCanvas,
-  clampElementSize,
-  clampFontSize,
-  downloadJson,
-  importFromJson,
-  getSlideById,
-  getElementById,
-  clampNumber,
-} from './slidesEditorCore.js'
-import {
-  ELEMENT_TYPES,
-  SHAPE_TYPES,
-  CANVAS_WIDTH,
-  CANVAS_HEIGHT,
-  MIN_ELEMENT_SIZE,
+    CANVAS_HEIGHT,
+    CANVAS_WIDTH,
+    ELEMENT_TYPES,
+    SHAPE_TYPES,
 } from './constants.js'
-import './slides-editor.css'
-import SlideThumbnail from './SlideThumbnail.jsx'
-import SlideElement from './SlideElement.jsx'
-import PropertyPanel from './PropertyPanel.jsx'
 import FullscreenPlayer from './FullscreenPlayer.jsx'
+import PropertyPanel from './PropertyPanel.jsx'
+import SlideElement from './SlideElement.jsx'
+import './slides-editor.css'
+import {
+    addElement,
+    addSlide,
+    clampElementSize,
+    clampFontSize,
+    clampNumber,
+    constrainToCanvas,
+    createImageElement,
+    createShapeElement,
+    createTextElement,
+    deleteElement,
+    deleteSlide,
+    downloadJson,
+    duplicateSlide,
+    findElementAtPoint,
+    getElementById,
+    getSlideById,
+    importFromJson,
+    loadFromStorage,
+    reorderSlides,
+    saveToStorage,
+    screenToCanvas,
+    updateElement,
+} from './slidesEditorCore.js'
+import SlideThumbnail from './SlideThumbnail.jsx'
 
 function SlidesEditorPage() {
   const navigate = useNavigate()
@@ -51,7 +50,6 @@ function SlidesEditorPage() {
   const canvasRef = useRef(null)
   const imageInputRef = useRef(null)
   const importInputRef = useRef(null)
-  const fileRef = useRef(null)
 
   const dragStateRef = useRef({
     isDragging: false,
@@ -98,7 +96,7 @@ function SlidesEditorPage() {
     return canvasRef.current.offsetWidth / CANVAS_WIDTH
   }, [])
 
-  const handleCanvasMouseDown = (e) => {
+  const handleCanvasMouseDown = () => {
     if (isEditingText) return
     setSelectedElementId(null)
   }
@@ -215,15 +213,16 @@ function SlidesEditorPage() {
 
       if (element.type === ELEMENT_TYPES.IMAGE) {
         const aspectRatio = dragStateRef.current.elementStartWidth / dragStateRef.current.elementStartHeight
-        if (dir === 'se' || dir === 'nw') {
+        const isDiagonal = dir.length === 2
+        if (isDiagonal) {
           if (Math.abs(dx) > Math.abs(dy)) {
             newHeight = newWidth / aspectRatio
-            if (dir === 'nw') {
+            if (dir.includes('n')) {
               newY = dragStateRef.current.elementStartY + (dragStateRef.current.elementStartHeight - newHeight)
             }
           } else {
             newWidth = newHeight * aspectRatio
-            if (dir === 'nw') {
+            if (dir.includes('w')) {
               newX = dragStateRef.current.elementStartX + (dragStateRef.current.elementStartWidth - newWidth)
             }
           }
@@ -604,7 +603,6 @@ function SlidesEditorPage() {
                   key={element.id}
                   element={element}
                   isSelected={element.id === selectedElementId}
-                  scale={getCanvasScale()}
                   onMouseDown={handleElementMouseDown}
                   onResizeStart={handleResizeStart}
                   onDoubleClick={handleDoubleClickText}

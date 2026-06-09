@@ -508,12 +508,12 @@ describe('calculateTemperatureChartLayout', () => {
     expect(layout.xTicks[1].label).toBe(forecast[1].weekday)
   })
 
-  it('yTicks 带有度数符号', () => {
+  it('yTicks 带有 °C 单位', () => {
     const forecast = makeForecast()
     const layout = calculateTemperatureChartLayout(forecast)
     expect(layout.yTicks.length).toBeGreaterThan(0)
     layout.yTicks.forEach((t) => {
-      expect(t.label.endsWith('°')).toBe(true)
+      expect(t.label.endsWith('°C')).toBe(true)
     })
   })
 

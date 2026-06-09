@@ -113,45 +113,53 @@ function GeometryBoardPage() {
     }
     ctx.stroke()
 
+    const axisXScreenY = pan.y
+    const axisYScreenX = pan.x
+
     ctx.strokeStyle = COLORS.AXIS_LINE
     ctx.lineWidth = 2
     ctx.beginPath()
-    if (pan.y >= 0 && pan.y <= canvasSize.height) {
-      ctx.moveTo(0, pan.y)
-      ctx.lineTo(canvasSize.width, pan.y)
+    if (axisXScreenY >= -100 && axisXScreenY <= canvasSize.height + 100) {
+      ctx.moveTo(0, axisXScreenY)
+      ctx.lineTo(canvasSize.width, axisXScreenY)
     }
-    if (pan.x >= 0 && pan.x <= canvasSize.width) {
-      ctx.moveTo(pan.x, 0)
-      ctx.lineTo(pan.x, canvasSize.height)
+    if (axisYScreenX >= -100 && axisYScreenX <= canvasSize.width + 100) {
+      ctx.moveTo(axisYScreenX, 0)
+      ctx.lineTo(axisYScreenX, canvasSize.height)
     }
     ctx.stroke()
 
     ctx.fillStyle = COLORS.AXIS_LINE
-    if (pan.y >= 0 && pan.y <= canvasSize.height && pan.x < canvasSize.width) {
-      const arrowX = Math.min(canvasSize.width - 15, pan.x + canvasSize.width)
-      const baseArrowX = Math.min(canvasSize.width - 10, pan.x + 500)
+    const arrowMargin = 15
+    if (axisXScreenY >= -100 && axisXScreenY <= canvasSize.height + 100) {
+      const xArrowX = canvasSize.width - arrowMargin
       ctx.beginPath()
-      ctx.moveTo(baseArrowX, pan.y)
-      ctx.lineTo(baseArrowX - 10, pan.y - 6)
-      ctx.lineTo(baseArrowX - 10, pan.y + 6)
+      ctx.moveTo(xArrowX, axisXScreenY)
+      ctx.lineTo(xArrowX - 10, axisXScreenY - 6)
+      ctx.lineTo(xArrowX - 10, axisXScreenY + 6)
       ctx.closePath()
       ctx.fill()
     }
-    if (pan.x >= 0 && pan.x <= canvasSize.width && pan.y > 0) {
-      const baseArrowY = Math.max(10, pan.y - 500)
+    if (axisYScreenX >= -100 && axisYScreenX <= canvasSize.width + 100) {
+      const yArrowY = arrowMargin
       ctx.beginPath()
-      ctx.moveTo(pan.x, baseArrowY)
-      ctx.lineTo(pan.x - 6, baseArrowY + 10)
-      ctx.lineTo(pan.x + 6, baseArrowY + 10)
+      ctx.moveTo(axisYScreenX, yArrowY)
+      ctx.lineTo(axisYScreenX - 6, yArrowY + 10)
+      ctx.lineTo(axisYScreenX + 6, yArrowY + 10)
       ctx.closePath()
       ctx.fill()
     }
 
-    if (pan.x >= 0 && pan.x <= canvasSize.width && pan.y >= 0 && pan.y <= canvasSize.height) {
-      ctx.font = '12px sans-serif'
+    ctx.fillStyle = COLORS.AXIS_LINE
+    ctx.font = '12px sans-serif'
+    if (axisXScreenY >= -100 && axisXScreenY <= canvasSize.height + 100) {
+      ctx.fillText('X', canvasSize.width - arrowMargin - 2, axisXScreenY - 8)
+    }
+    if (axisYScreenX >= -100 && axisYScreenX <= canvasSize.width + 100) {
+      ctx.fillText('Y', axisYScreenX + 8, arrowMargin + 10)
+    }
+    if (pan.x >= -50 && pan.x <= canvasSize.width + 50 && pan.y >= -50 && pan.y <= canvasSize.height + 50) {
       ctx.fillText('O', pan.x + 4, pan.y + 14)
-      ctx.fillText('X', Math.min(canvasSize.width - 15, pan.x + 500), pan.y - 8)
-      ctx.fillText('Y', pan.x + 8, Math.max(15, pan.y - 500))
     }
 
     ctx.restore()
@@ -204,11 +212,16 @@ function GeometryBoardPage() {
           ctx.fill()
         }
 
+        ctx.fillStyle = COLORS.LABEL
+        ctx.font = `${12 * Math.max(0.7, zoom)}px sans-serif`
+        const label1 = `(${formatCoordinate(shape.x1)}, ${formatCoordinate(shape.y1)})`
+        const label2 = `(${formatCoordinate(shape.x2)}, ${formatCoordinate(shape.y2)})`
+        ctx.fillText(label1, s1.x + 10, s1.y - 8)
+        ctx.fillText(label2, s2.x + 10, s2.y - 8)
+
         const mid = getLineMidpoint(shape)
         const midScreen = worldToScreen(mid.x, mid.y, pan.x, pan.y, zoom)
         const len = getLineLength(shape)
-        ctx.fillStyle = COLORS.LABEL
-        ctx.font = `${12 * Math.max(0.7, zoom)}px sans-serif`
         ctx.fillText(formatLength(len), midScreen.x + 8, midScreen.y - 6)
         break
       }
@@ -320,11 +333,15 @@ function GeometryBoardPage() {
         ctx.arc(s1.x, s1.y, POINT_RADIUS, 0, Math.PI * 2)
         ctx.fill()
 
+        ctx.fillStyle = COLORS.LABEL
+        ctx.font = `${12 * Math.max(0.7, zoom)}px sans-serif`
+        ctx.fillText(`(${formatCoordinate(drawingState.startX)}, ${formatCoordinate(drawingState.startY)})`, s1.x + 10, s1.y - 8)
+        ctx.fillText(`(${formatCoordinate(drawingState.endX)}, ${formatCoordinate(drawingState.endY)})`, s2.x + 10, s2.y - 8)
+
         const len = distance(drawingState.startX, drawingState.startY, drawingState.endX, drawingState.endY)
         const midX = (s1.x + s2.x) / 2
         const midY = (s1.y + s2.y) / 2
         ctx.fillStyle = COLORS.LABEL
-        ctx.font = '12px sans-serif'
         ctx.fillText(formatLength(len), midX + 8, midY - 6)
         break
       }
@@ -349,7 +366,8 @@ function GeometryBoardPage() {
 
         ctx.setLineDash([])
         ctx.fillStyle = COLORS.LABEL
-        ctx.font = '12px sans-serif'
+        ctx.font = `${12 * Math.max(0.7, zoom)}px sans-serif`
+        ctx.fillText(`(${formatCoordinate(drawingState.cx)}, ${formatCoordinate(drawingState.cy)})`, center.x + 10, center.y - 10)
         ctx.fillText(`r=${formatLength(drawingState.r)}`, radiusEndScreen.x + 6, radiusEndScreen.y - 6)
         break
       }
@@ -803,8 +821,13 @@ function GeometryBoardPage() {
                 }
                 if (shape.type === SHAPE_TYPES.CIRCLE) {
                   return (
-                    <div key={id} className="gb-measurement-item">
-                      半径: <span className="gb-measurement-value">{formatLength(getCircleRadius(shape))}</span>
+                    <div key={id}>
+                      <div className="gb-measurement-item">
+                        圆心坐标: <span className="gb-measurement-value">({formatCoordinate(shape.cx)}, {formatCoordinate(shape.cy)})</span>
+                      </div>
+                      <div className="gb-measurement-item">
+                        半径: <span className="gb-measurement-value">{formatLength(getCircleRadius(shape))}</span>
+                      </div>
                     </div>
                   )
                 }

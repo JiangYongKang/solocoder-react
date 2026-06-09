@@ -18,6 +18,7 @@ import {
   sortKeys,
   isValidKey,
   isKeyDuplicated,
+  getInitialExpandedKeys,
 } from './i18nUtils.js';
 import { FILTER_MODES, FILTER_LABELS, VIEW_MODES, VIEW_LABELS } from './constants.js';
 import './i18n-manager.css';
@@ -102,7 +103,7 @@ function EditableCell({ value, onChange, placeholder, highlight }) {
   );
 }
 
-function KeyEditCell({ value, onChange, onBlur, hasError, errorMessage }) {
+function KeyEditCell({ value, onBlur, hasError, errorMessage }) {
   const [editing, setEditing] = useState(false);
   const [localValue, setLocalValue] = useState(value);
   const inputRef = useRef(null);
@@ -145,10 +146,7 @@ function KeyEditCell({ value, onChange, onBlur, hasError, errorMessage }) {
         type="text"
         className={`i18n-table-input i18n-key-input ${hasError ? 'i18n-table-input-error' : ''}`}
         value={localValue}
-        onChange={(e) => {
-          setLocalValue(e.target.value);
-          onChange && onChange(e.target.value);
-        }}
+        onChange={(e) => setLocalValue(e.target.value)}
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
       />
@@ -166,39 +164,72 @@ function KeyEditCell({ value, onChange, onBlur, hasError, errorMessage }) {
   );
 }
 
-function TreeRow({ nodeKey, node, level, translations, languages, selectedKey, onSelectKey, onUpdateValue, expandedKeys, onToggleExpand }) {
+function TreeRow({
+  nodeKey,
+  node,
+  level,
+  translations,
+  languages,
+  selectedKey,
+  onSelectKey,
+  onUpdateValue,
+  expandedKeys,
+  onToggleExpand,
+  onDeleteKey,
+  onKeyChange,
+  editingKeyErrors,
+}) {
   const paddingLeft = level * 20 + 8;
   const hasChildren = node.__children && Object.keys(node.__children).length > 0;
   const isExpanded = expandedKeys.has(nodeKey + '_' + level);
 
   if (node.__isLeaf && node.__fullKey) {
-    const keyData = translations[node.__fullKey];
+    const fullKey = node.__fullKey;
+    const keyData = translations[fullKey];
     const isUntranslated = isKeyPartiallyUntranslated(keyData, languages);
+    const hasError = editingKeyErrors[fullKey];
     return (
       <tr
-        className={`i18n-table-row ${selectedKey === node.__fullKey ? 'i18n-table-row-selected' : ''}`}
-        onClick={() => onSelectKey(node.__fullKey)}
+        className={`i18n-table-row ${selectedKey === fullKey ? 'i18n-table-row-selected' : ''}`}
+        onClick={() => onSelectKey(fullKey)}
       >
-        <td className="i18n-table-cell i18n-key-cell">
+        <td className="i18n-table-cell i18n-key-cell" onClick={(e) => e.stopPropagation()}>
           <span style={{ paddingLeft }} className="i18n-tree-indent" />
           <span className="i18n-tree-toggle-placeholder" />
-          <span className={`i18n-key-text ${isUntranslated ? 'i18n-key-untranslated' : ''}`}>
-            {nodeKey}
-          </span>
+          <KeyEditCell
+            value={nodeKey}
+            hasError={!!hasError}
+            errorMessage={editingKeyErrors[fullKey]}
+            onBlur={(newVal) => {
+              const parts = fullKey.split('.');
+              parts[parts.length - 1] = newVal;
+              onKeyChange(fullKey, parts.join('.'));
+            }}
+          />
+          {isUntranslated && <span className="i18n-untranslated-badge">未完成</span>}
         </td>
         {languages.map((lang) => {
           const val = keyData[lang.code] || '';
           return (
-            <td key={lang.code} className="i18n-table-cell">
+            <td key={lang.code} className="i18n-table-cell" onClick={(e) => e.stopPropagation()}>
               <EditableCell
                 value={val}
-                onChange={(v) => onUpdateValue(node.__fullKey, lang.code, v)}
+                onChange={(v) => onUpdateValue(fullKey, lang.code, v)}
                 placeholder={`${lang.name} 翻译`}
                 highlight={!val || !val.trim()}
               />
             </td>
           );
         })}
+        <td className="i18n-table-cell i18n-action-cell" onClick={(e) => e.stopPropagation()}>
+          <button
+            className="i18n-delete-btn"
+            onClick={() => onDeleteKey(fullKey)}
+            title="删除"
+          >
+            删除
+          </button>
+        </td>
       </tr>
     );
   }
@@ -222,6 +253,7 @@ function TreeRow({ nodeKey, node, level, translations, languages, selectedKey, o
         {languages.map((lang) => (
           <td key={lang.code} className="i18n-table-cell i18n-tree-branch-cell" />
         ))}
+        <td className="i18n-table-cell i18n-tree-branch-cell i18n-action-cell" />
       </tr>
       {isExpanded &&
         hasChildren &&
@@ -238,6 +270,9 @@ function TreeRow({ nodeKey, node, level, translations, languages, selectedKey, o
             onUpdateValue={onUpdateValue}
             expandedKeys={expandedKeys}
             onToggleExpand={onToggleExpand}
+            onDeleteKey={onDeleteKey}
+            onKeyChange={onKeyChange}
+            editingKeyErrors={editingKeyErrors}
           />
         ))}
     </>
@@ -304,7 +339,7 @@ export default function I18nManagerPage() {
   const [viewMode, setViewMode] = useState(VIEW_MODES.FLAT);
   const [filterMode, setFilterMode] = useState(FILTER_MODES.ALL);
   const [selectedKey, setSelectedKey] = useState(null);
-  const [expandedKeys, setExpandedKeys] = useState(() => new Set(['app_0', 'user_0', 'common_0', 'errors_0', 'menu_0']));
+  const [expandedKeys, setExpandedKeys] = useState(() => getInitialExpandedKeys(loadState().translations));
   const [newKeyInput, setNewKeyInput] = useState('');
   const [newKeyError, setNewKeyError] = useState('');
   const [editingKeyErrors, setEditingKeyErrors] = useState({});
@@ -319,6 +354,15 @@ export default function I18nManagerPage() {
   useEffect(() => {
     saveState(state);
   }, [state]);
+
+  useEffect(() => {
+    const initialKeys = getInitialExpandedKeys(translations);
+    setExpandedKeys((prev) => {
+      const next = new Set(prev);
+      initialKeys.forEach((k) => next.add(k));
+      return next;
+    });
+  }, [translations]);
 
   const sortedTranslations = useMemo(() => sortKeys(translations), [translations]);
 
@@ -659,6 +703,9 @@ export default function I18nManagerPage() {
                       onUpdateValue={handleUpdateValue}
                       expandedKeys={expandedKeys}
                       onToggleExpand={handleToggleExpand}
+                      onDeleteKey={handleDeleteKey}
+                      onKeyChange={handleKeyChange}
+                      editingKeyErrors={editingKeyErrors}
                     />
                   ))
                 )

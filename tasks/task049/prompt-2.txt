@@ -1,0 +1,11 @@
+你实现的 CRM 客户关系管理页面还存在一些问题，需要进行修复：
+
+1. index.jsx 的 handleFormSubmit 函数中存在复制粘贴残留——handleCustomersUpdate 的参数使用了 result.products || result.customers，但 createCustomer 返回的对象中不存在 products 属性，result.products 是一个永远为 undefined 的无效引用。
+
+2. CustomerTable.jsx 中空状态和正常数据状态的表头代码是分开维护的两份，归属人列在空状态时可点击排序（有 sortable 类和 onClick），但在正常数据状态下不可排序（缺少 sortable 类和排序事件），两处行为不一致。
+
+3. formatDate 函数使用 !timestamp 判断空值时存在边界问题——JavaScript 中 !0 为 true，因此 formatDate(0) 会错误返回空字符串，但 timestamp 为 0 是合法的 Unix 纪元时间。
+
+4. 修复后需要确认单元测试仍然全部通过，如有失败需修正。测试代码放在 src/pages/__tests__/crm/ 下。
+
+5. 重新运行 pnpm run test 和 pnpm run lint，确保测试通过且无 ESLint 报错。修复完成后启动 pnpm run dev 验证页面可正常访问。

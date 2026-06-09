@@ -423,6 +423,10 @@ export function exportToSvg(shapes, width, height) {
     svg += `  <line x1="${l.x1}" y1="${l.y1}" x2="${l.x2}" y2="${l.y2}" stroke="${l.color}" stroke-width="2" />\n`
     svg += `  <circle cx="${l.x1}" cy="${l.y1}" r="${POINT_RADIUS}" fill="${l.color}" />\n`
     svg += `  <circle cx="${l.x2}" cy="${l.y2}" r="${POINT_RADIUS}" fill="${l.color}" />\n`
+    const labelPos1 = getPointLabelPosition({ x: l.x1, y: l.y1 })
+    const labelPos2 = getPointLabelPosition({ x: l.x2, y: l.y2 })
+    svg += `  <text x="${labelPos1.x}" y="${labelPos1.y}" font-family="sans-serif" font-size="12" fill="#374151">(${formatCoordinate(l.x1)}, ${formatCoordinate(l.y1)})</text>\n`
+    svg += `  <text x="${labelPos2.x}" y="${labelPos2.y}" font-family="sans-serif" font-size="12" fill="#374151">(${formatCoordinate(l.x2)}, ${formatCoordinate(l.y2)})</text>\n`
     const mid = getLineMidpoint(l)
     const len = getLineLength(l)
     svg += `  <text x="${mid.x + 8}" y="${mid.y - 8}" font-family="sans-serif" font-size="12" fill="#374151">${formatLength(len)}</text>\n`

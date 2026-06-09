@@ -375,7 +375,7 @@ export function getUserName(userId) {
 }
 
 export function formatDate(timestamp) {
-  if (!timestamp) return ''
+  if (timestamp == null) return ''
   const d = new Date(timestamp)
   const y = d.getFullYear()
   const m = String(d.getMonth() + 1).padStart(2, '0')
@@ -386,7 +386,7 @@ export function formatDate(timestamp) {
 }
 
 export function formatDateOnly(timestamp) {
-  if (!timestamp) return ''
+  if (timestamp == null) return ''
   const d = new Date(timestamp)
   const y = d.getFullYear()
   const m = String(d.getMonth() + 1).padStart(2, '0')

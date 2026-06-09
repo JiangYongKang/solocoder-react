@@ -839,7 +839,12 @@ describe('formatDate', () => {
   it('空值返回空字符串', () => {
     expect(formatDate(null)).toBe('')
     expect(formatDate(undefined)).toBe('')
-    expect(formatDate(0)).toBe('')
+  })
+
+  it('timestamp=0（Unix纪元）正常格式化', () => {
+    const result = formatDate(0)
+    expect(result).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/)
+    expect(result).toContain('1970')
   })
 
   it('格式化时间戳为YYYY-MM-DD HH:mm', () => {
@@ -855,6 +860,12 @@ describe('formatDate', () => {
 describe('formatDateOnly', () => {
   it('空值返回空字符串', () => {
     expect(formatDateOnly(null)).toBe('')
+    expect(formatDateOnly(undefined)).toBe('')
+  })
+
+  it('timestamp=0（Unix纪元）正常格式化', () => {
+    const result = formatDateOnly(0)
+    expect(result).toContain('1970')
   })
 
   it('格式化时间戳为YYYY-MM-DD', () => {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { CANVAS_WIDTH, CANVAS_HEIGHT, ELEMENT_TYPES, SHAPE_TYPES } from './constants.js'
 import { calculateScaledCanvasSize, canGoToNextSlide, canGoToPrevSlide, getNextSlideIndex } from './slidesEditorCore.js'
 
@@ -85,30 +85,50 @@ function PlayerElement({ element }) {
 
 export default function FullscreenPlayer({ slides, startIndex, onClose }) {
   const [currentIndex, setCurrentIndex] = useState(startIndex)
+  const [prevIndex, setPrevIndex] = useState(null)
   const [containerSize, setContainerSize] = useState({ width: window.innerWidth, height: window.innerHeight })
-  const [animationKey, setAnimationKey] = useState(0)
+  const transitionTimerRef = useRef(null)
 
   useEffect(() => {
     const handleResize = () => {
       setContainerSize({ width: window.innerWidth, height: window.innerHeight })
     }
     window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
+    return () => {
+      window.removeEventListener('resize', handleResize)
+      if (transitionTimerRef.current) {
+        clearTimeout(transitionTimerRef.current)
+      }
+    }
   }, [])
 
-  const goToPrev = () => {
-    if (canGoToPrevSlide(currentIndex)) {
-      setCurrentIndex(getNextSlideIndex(currentIndex, slides.length, -1))
-      setAnimationKey((k) => k + 1)
-    }
-  }
+  const navigateTo = useCallback(
+    (nextIndex) => {
+      if (nextIndex === currentIndex) return
+      setPrevIndex(currentIndex)
+      setCurrentIndex(nextIndex)
+      if (transitionTimerRef.current) {
+        clearTimeout(transitionTimerRef.current)
+      }
+      transitionTimerRef.current = setTimeout(() => {
+        setPrevIndex(null)
+        transitionTimerRef.current = null
+      }, 400)
+    },
+    [currentIndex]
+  )
 
-  const goToNext = () => {
-    if (canGoToNextSlide(currentIndex, slides.length)) {
-      setCurrentIndex(getNextSlideIndex(currentIndex, slides.length, 1))
-      setAnimationKey((k) => k + 1)
+  const goToPrev = useCallback(() => {
+    if (canGoToPrevSlide(currentIndex)) {
+      navigateTo(getNextSlideIndex(currentIndex, slides.length, -1))
     }
-  }
+  }, [currentIndex, slides.length, navigateTo])
+
+  const goToNext = useCallback(() => {
+    if (canGoToNextSlide(currentIndex, slides.length)) {
+      navigateTo(getNextSlideIndex(currentIndex, slides.length, 1))
+    }
+  }, [currentIndex, slides.length, navigateTo])
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -122,7 +142,7 @@ export default function FullscreenPlayer({ slides, startIndex, onClose }) {
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [currentIndex, slides.length, onClose])
+  }, [goToPrev, goToNext, onClose])
 
   const handleClick = (e) => {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -136,13 +156,28 @@ export default function FullscreenPlayer({ slides, startIndex, onClose }) {
     }
   }
 
-  const currentSlide = slides[currentIndex]
   const { width: slideWidth, height: slideHeight } = calculateScaledCanvasSize(
     containerSize.width - 100,
     containerSize.height - 100
   )
 
   const scale = slideWidth / CANVAS_WIDTH
+
+  const renderSlideContent = (slide) => (
+    <div
+      style={{
+        position: 'relative',
+        width: CANVAS_WIDTH,
+        height: CANVAS_HEIGHT,
+        transform: `scale(${scale})`,
+        transformOrigin: 'top left',
+      }}
+    >
+      {slide.elements.map((el) => (
+        <PlayerElement key={el.id} element={el} />
+      ))}
+    </div>
+  )
 
   return (
     <div className="se-fullscreen-player" onClick={handleClick}>
@@ -165,27 +200,34 @@ export default function FullscreenPlayer({ slides, startIndex, onClose }) {
       </button>
 
       <div
-        key={animationKey}
-        className="se-fullscreen-slide"
+        className="se-fullscreen-slide-wrapper"
         style={{
           width: slideWidth,
           height: slideHeight,
-          backgroundColor: currentSlide.backgroundColor,
         }}
         onClick={(e) => e.stopPropagation()}
       >
+        {prevIndex !== null && slides[prevIndex] && (
+          <div
+            className="se-fullscreen-slide fade-out"
+            style={{
+              width: slideWidth,
+              height: slideHeight,
+              backgroundColor: slides[prevIndex].backgroundColor,
+            }}
+          >
+            {renderSlideContent(slides[prevIndex])}
+          </div>
+        )}
         <div
+          className={`se-fullscreen-slide ${prevIndex !== null ? 'fade-in' : 'visible'}`}
           style={{
-            position: 'relative',
-            width: CANVAS_WIDTH,
-            height: CANVAS_HEIGHT,
-            transform: `scale(${scale})`,
-            transformOrigin: 'top left',
+            width: slideWidth,
+            height: slideHeight,
+            backgroundColor: slides[currentIndex].backgroundColor,
           }}
         >
-          {currentSlide.elements.map((el) => (
-            <PlayerElement key={el.id} element={el} />
-          ))}
+          {renderSlideContent(slides[currentIndex])}
         </div>
       </div>
 

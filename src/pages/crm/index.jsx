@@ -197,7 +197,7 @@ export default function CRMPage() {
       const ownerId = viewMode === 'mine' ? currentUserId : null
       result = createCustomer(customers, { ...data, ownerId })
       if (result.success) {
-        handleCustomersUpdate(result.products || result.customers)
+        handleCustomersUpdate(result.customers)
         setFormModalOpen(false)
       }
     }

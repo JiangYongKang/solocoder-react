@@ -196,8 +196,8 @@ describe('getSoldCount', () => {
 })
 
 describe('getStockColor', () => {
-  it('库存>=50%返回绿色', () => {
-    expect(getStockColor(50, 100)).toBe(STOCK_COLORS.HIGH)
+  it('库存>50%返回绿色', () => {
+    expect(getStockColor(51, 100)).toBe(STOCK_COLORS.HIGH)
     expect(getStockColor(60, 100)).toBe(STOCK_COLORS.HIGH)
     expect(getStockColor(100, 100)).toBe(STOCK_COLORS.HIGH)
   })
@@ -205,6 +205,7 @@ describe('getStockColor', () => {
   it('库存20%-50%返回橙色', () => {
     expect(getStockColor(20, 100)).toBe(STOCK_COLORS.MEDIUM)
     expect(getStockColor(49, 100)).toBe(STOCK_COLORS.MEDIUM)
+    expect(getStockColor(50, 100)).toBe(STOCK_COLORS.MEDIUM)
   })
 
   it('库存<20%返回红色', () => {

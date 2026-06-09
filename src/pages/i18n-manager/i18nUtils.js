@@ -291,3 +291,19 @@ export function sortKeys(translations) {
     });
   return sorted;
 }
+
+export function getTopLevelKeys(translations) {
+  const topLevel = new Set();
+  Object.keys(translations).forEach((key) => {
+    const parts = getKeyParts(key);
+    if (parts.length > 0) {
+      topLevel.add(parts[0]);
+    }
+  });
+  return Array.from(topLevel).sort();
+}
+
+export function getInitialExpandedKeys(translations, level = 0) {
+  const topKeys = getTopLevelKeys(translations);
+  return new Set(topKeys.map((k) => `${k}_${level}`));
+}

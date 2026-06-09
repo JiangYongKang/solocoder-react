@@ -4,7 +4,6 @@ import { ELEMENT_TYPES, SHAPE_TYPES } from './constants.js'
 export default function SlideElement({
   element,
   isSelected,
-  scale,
   onMouseDown,
   onResizeStart,
   onDoubleClick,

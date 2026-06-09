@@ -135,8 +135,27 @@ export function generateSkuList(groups) {
   })
 }
 
+function normalizeStock(value) {
+  if (value === '' || value === null || value === undefined) return 0
+  const num = Number(value)
+  return Number.isFinite(num) ? num : 0
+}
+
+function normalizePrice(value) {
+  if (value === '' || value === null || value === undefined) return 0
+  const num = Number(value)
+  return Number.isFinite(num) ? num : 0
+}
+
 export function syncSkuList(oldSkus, newSkus) {
-  if (!Array.isArray(oldSkus) || oldSkus.length === 0) return newSkus
+  if (!Array.isArray(oldSkus) || oldSkus.length === 0) {
+    if (!Array.isArray(newSkus)) return []
+    return newSkus.map((sku) => ({
+      ...sku,
+      stock: normalizeStock(sku.stock),
+      price: normalizePrice(sku.price),
+    }))
+  }
   if (!Array.isArray(newSkus)) return []
 
   const buildKey = (specs) => {
@@ -159,29 +178,41 @@ export function syncSkuList(oldSkus, newSkus) {
       return {
         ...newSku,
         id: oldSku.id,
-        stock: oldSku.stock ?? 0,
-        price: oldSku.price ?? 0,
+        stock: normalizeStock(oldSku.stock),
+        price: normalizePrice(oldSku.price),
       }
     }
-    return newSku
+    return {
+      ...newSku,
+      stock: normalizeStock(newSku.stock),
+      price: normalizePrice(newSku.price),
+    }
   })
 }
 
 export function updateSku(skus, skuId, updates) {
   if (!Array.isArray(skus)) return []
-  return skus.map((s) => (s.id === skuId ? { ...s, ...updates } : s))
+  return skus.map((s) => {
+    if (s.id !== skuId) return s
+    const merged = { ...s, ...updates }
+    if ('stock' in updates) {
+      merged.stock = normalizeStock(updates.stock)
+    }
+    if ('price' in updates) {
+      merged.price = normalizePrice(updates.price)
+    }
+    return merged
+  })
 }
 
 export function batchSetStock(skus, stock) {
   if (!Array.isArray(skus)) return []
-  const safeStock = Number.isFinite(Number(stock)) ? Number(stock) : 0
-  return skus.map((s) => ({ ...s, stock: safeStock }))
+  return skus.map((s) => ({ ...s, stock: normalizeStock(stock) }))
 }
 
 export function batchSetPrice(skus, price) {
   if (!Array.isArray(skus)) return []
-  const safePrice = Number.isFinite(Number(price)) ? Number(price) : 0
-  return skus.map((s) => ({ ...s, price: safePrice }))
+  return skus.map((s) => ({ ...s, price: normalizePrice(price) }))
 }
 
 export function isSelectionComplete(groups, selection) {
@@ -226,6 +257,9 @@ export function getDisabledValues(groups, skus, selection) {
   if (!Array.isArray(groups) || groups.length === 0) return {}
   if (!Array.isArray(skus) || skus.length === 0) return {}
   if (!selection || typeof selection !== 'object') return {}
+
+  const hasAnySelection = Object.values(selection).some((v) => v != null)
+  if (!hasAnySelection) return {}
 
   const disabled = {}
 
@@ -282,6 +316,62 @@ export function getImagesForSelection(groups, selection) {
     }
   })
   return images
+}
+
+export function getImagesForSelectionWithFallback(groups, selection, previousImages = []) {
+  if (!Array.isArray(groups) || groups.length === 0 || !selection || typeof selection !== 'object') {
+    return previousImages || []
+  }
+
+  const prevMap = new Map()
+  ;(previousImages || []).forEach((img) => {
+    if (img && img.groupId) {
+      prevMap.set(img.groupId, img)
+    }
+  })
+
+  const result = []
+  const seenGroupIds = new Set()
+  groups.forEach((g) => {
+    seenGroupIds.add(g.id)
+    const valueId = selection[g.id]
+    if (valueId != null) {
+      const value = getValueById(g, valueId)
+      if (value && value.image) {
+        result.push({
+          groupId: g.id,
+          groupName: g.name,
+          valueId: value.id,
+          valueName: value.name,
+          image: value.image,
+        })
+      } else if (prevMap.has(g.id)) {
+        result.push(prevMap.get(g.id))
+      }
+    } else if (prevMap.has(g.id)) {
+      result.push(prevMap.get(g.id))
+    }
+  })
+  prevMap.forEach((img, groupId) => {
+    if (!seenGroupIds.has(groupId)) {
+      result.push(img)
+    }
+  })
+  return result
+}
+
+export function getGroupsStructureSignature(groups) {
+  if (!Array.isArray(groups)) return ''
+  return groups
+    .map((g) => {
+      const groupId = g?.id || ''
+      const valueIds = Array.isArray(g?.values)
+        ? g.values.map((v) => v?.id || '').sort().join(',')
+        : ''
+      return `${groupId}:${valueIds}`
+    })
+    .sort()
+    .join('|')
 }
 
 export function loadFromStorage(storage = typeof window !== 'undefined' ? window.localStorage : null) {

@@ -293,7 +293,7 @@ export function calculateTemperatureChartLayout(forecast, options = {}) {
     x: paddingLeft,
     y: paddingTop + yScale(v),
     value: v,
-    label: `${v}°`,
+    label: `${v}°C`,
   }))
 
   const gridLines = yTicks.map((v) => ({

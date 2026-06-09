@@ -1,0 +1,10 @@
+产物不满意：
+1. 模型在 index.jsx 第 358-365 行新增的 useEffect 中将 setExpandedKeys 放在 effect 同步执行体里，触发了 react-hooks/set-state-in-effect 报错。根本原因是该 useEffect 在 translations 每次变化时都直接调用 setExpandedKeys，而 translations 在任何翻译值编辑时都会变化（handleUpdateValue 产生新 state），导致每次击键都触发额外的级联渲染。同时该逻辑将"导入新数据时展开顶级节点"和"响应 translations 变化"这两个不同意图耦合在一个 effect 里。正确做法是将自动展开逻辑移到 handleFileChange 导入完成后的回调中直接调用，不依赖 useEffect 监听 translations 变化。
+2. 模型在 i18nUtils.test.js 第 28 行新增了对 DEFAULT_LANGUAGES 的导入，但测试文件中从未使用该常量，触发 no-unused-vars ESLint 报错。根本原因是添加新测试时批量复制了 imports，但遗漏了清理不再需要的导入。正确做法是在添加测试完成后检查导入声明，移除未使用的导入。
+3. 模型在 i18nUtils.test.js 中新增的"row operations for both view modes"测试组（第 629-774 行）中大量用例与文件中已有测试重复。例如 deleteTranslationKey（第 630 行）、updateTranslationValue（第 666 行）、filterTranslations（第 702 行）、calculateCoverage（第 720 行）、isKeyPartiallyUntranslated/isKeyFullyTranslated（第 733 行）、importTranslations（第 747 行）、sortKeys（第 765 行）这些函数在文件前面各自的 describe 块中已有完整覆盖，新测试仅更换了输入数据的嵌套层级，并未覆盖"两种视图模式下行操作一致性"的全新场景。根本原因是模型在写测试时没有先审阅已有测试覆盖情况，而是机械地为每个相关函数重新写了一个用例。正确做法是检查已有测试的覆盖范围，只补充真正缺失的边界用例，避免重复测试。
+
+过程不满意：
+1. 模型在收到任务后第一个工具调用就是 todo_write 创建 TodoList，没有先分析提示词中的 6 条需求、读取目标文件了解代码现状、确认问题范围后再做规划。这违反了标注规范中"不能在刚收到任务时直接创建 TodoList，应先分析问题再规划"的要求。根本原因是模型缺乏先探索后规划的工作习惯，上来就开始操作。正确做法是先读取相关文件了解代码上下文，确认每个问题的具体位置和范围后，再制定修改方案和 TodoList。
+2. 模型在修改测试文件前，连续三次读取了同一个文件 i18nUtils.test.js（session-cot-2.md 第 207、217、227 行的 view_files 调用），三次读取之间没有任何编辑操作。根本原因是模型没有在第一次读取时就完整理解文件内容，而是反复重新读取相同区域，推理效率低下。正确做法是一次性读取文件完整内容后先分析，再一次性完成所有测试代码的修改。
+3. 模型在整个修复过程中零散地读 index.jsx、改一个位置、再读一次、再改一个位置（session-cot-2.md 第 10、103、159 行的 view_files 之间穿插了多次 edit_file_search_replace），而非在第一次读取时规划好所有需要修改的位置。根本原因是模型的修改方式偏 trial-and-error，读一段改一段，缺乏整体规划。正确做法是第一次完整读取后，列出所有需要修改的函数和 JSX 区域，再按依赖顺序一键完成所有修改。
+4. 模型在验证阶段只使用了 GetDiagnostics 工具检查 IDE 语言服务器诊断信息，而没有按提示词第 6 条明确要求运行 pnpm run lint。GetDiagnostics 检查的是 TypeScript/ESLint 语言服务器的实时诊断，其规则集与项目的 ESLint 配置不完全一致，导致模型漏掉了 react-hooks/set-state-in-effect、no-useless-assignment、no-unused-vars 三条ESLint 规则触发的 5 个报错，并在总结中虚假声称"Lint 通过：index.jsx、i18nUtils.js、constants.js、i18nUtils.test.js、App.jsx 均为 0 错误 0 警告"。根本原因是模型没有严格按照提示词要求执行验证步骤，以 IDE 诊断替代了终端 lint 命令。正确做法是先执行 pnpm run lint 确认 ESLint 无报错，再结合 IDE 诊断信息定位和修复具体问题。

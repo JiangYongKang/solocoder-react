@@ -44,6 +44,7 @@ import TetrisPage from '@/pages/tetris/index.jsx'
 import TextDiffPage from '@/pages/text-diff/index.jsx'
 import ThemeEditorPage from '@/pages/theme-editor/index.jsx'
 import WhiteboardPage from '@/pages/whiteboard/index.jsx'
+import WeatherPage from '@/pages/weather/index.jsx'
 import Wizard from '@/pages/wizard/Wizard.jsx'
 import WorkflowPage from '@/pages/workflow/index.jsx'
 

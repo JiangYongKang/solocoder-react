@@ -158,6 +158,40 @@ export const applyHue = (data, amount) => {
   return data
 }
 
+export const applyBlur = (data, width, height, amount) => {
+  if (amount <= 0) return data
+  const radius = Math.min(Math.round(amount), 50)
+  if (radius < 1) return data
+  const src = new Uint8ClampedArray(data)
+  const w = width
+  const h = height
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let r = 0, g = 0, b = 0, a = 0, count = 0
+      for (let dy = -radius; dy <= radius; dy++) {
+        const ny = y + dy
+        if (ny < 0 || ny >= h) continue
+        for (let dx = -radius; dx <= radius; dx++) {
+          const nx = x + dx
+          if (nx < 0 || nx >= w) continue
+          const idx = (ny * w + nx) * 4
+          r += src[idx]
+          g += src[idx + 1]
+          b += src[idx + 2]
+          a += src[idx + 3]
+          count++
+        }
+      }
+      const idx = (y * w + x) * 4
+      data[idx] = r / count
+      data[idx + 1] = g / count
+      data[idx + 2] = b / count
+      data[idx + 3] = a / count
+    }
+  }
+  return data
+}
+
 export const applyFiltersToData = (imageData, filters) => {
   const data = new Uint8ClampedArray(imageData.data)
   const clamped = clampFilters(filters)
@@ -165,6 +199,9 @@ export const applyFiltersToData = (imageData, filters) => {
   applyContrast(data, clamped.contrast)
   applySaturation(data, clamped.saturation)
   applyHue(data, clamped.hue)
+  if (clamped.blur > 0) {
+    applyBlur(data, imageData.width, imageData.height, clamped.blur)
+  }
   if (typeof ImageData !== 'undefined') {
     return new ImageData(data, imageData.width, imageData.height)
   }

@@ -236,7 +236,7 @@ const WeatherPage = () => {
                     <div className="weather-current-details">
                       <div className="weather-detail-item">
                         <div className="weather-detail-label">体感温度</div>
-                        <div className="weather-detail-value">{weatherData.current.feelsLike}°</div>
+                        <div className="weather-detail-value">{weatherData.current.feelsLike}°C</div>
                       </div>
                       <div className="weather-detail-item">
                         <div className="weather-detail-label">湿度</div>
@@ -268,8 +268,8 @@ const WeatherPage = () => {
                         <div className="weather-forecast-date">{formatDateShort(day.date)}</div>
                         <div className="weather-forecast-icon">{day.icon}</div>
                         <div>
-                          <span className="weather-forecast-hi">{day.high}°</span>
-                          <span className="weather-forecast-lo">{day.low}°</span>
+                          <span className="weather-forecast-hi">{day.high}°C</span>
+                          <span className="weather-forecast-lo">{day.low}°C</span>
                         </div>
                         <div className="weather-forecast-humidity">💧 {day.humidity}%</div>
                       </div>

@@ -99,7 +99,9 @@ export default function CustomerTable({
             <th className="col-status sortable" onClick={() => handleSort('status')}>
               状态 {renderSortIcon('status')}
             </th>
-            <th className="col-owner">归属人</th>
+            <th className="col-owner sortable" onClick={() => handleSort('ownerId')}>
+              归属人 {renderSortIcon('ownerId')}
+            </th>
             <th className="col-date sortable" onClick={() => handleSort('createdAt')}>
               创建时间 {renderSortIcon('createdAt')}
             </th>

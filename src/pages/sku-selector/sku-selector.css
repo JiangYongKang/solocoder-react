@@ -370,22 +370,38 @@
 }
 
 .sku-preview-images {
-  width: 240px;
-  height: 240px;
-  position: relative;
+  width: 100%;
+  max-width: 280px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
   margin-bottom: 16px;
 }
 
+.sku-preview-image-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
 .sku-preview-image {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+  width: 120px;
+  height: 120px;
   object-fit: cover;
-  border-radius: 12px;
+  border-radius: 10px;
   background: var(--code-bg);
   border: 1px solid var(--border);
+}
+
+.sku-preview-image-label {
+  font-size: 11px;
+  color: var(--text);
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sku-preview-placeholder {

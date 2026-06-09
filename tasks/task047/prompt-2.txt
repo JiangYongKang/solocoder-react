@@ -1,0 +1,9 @@
+你实现的天气查询应用还存在一些问题，需要进行修复：
+
+1. TemperatureChart.jsx 中高温折线的 <path> 元素存在重复和无效的 SVG 属性：strokeLinecap 和 strokeLinejoin 各重复出现了一次，还有一个非法的 round="round" 属性。应删除重复项和无效属性。
+
+2. 主页面中温度值显示为 "25°C"（带 °C），但体感温度只显示 "23°"（缺少 C 字符），两处温度的单位格式不一致。需要统一温度单位的显示格式。
+
+3. 修复后需要确认单元测试仍然全部通过，如有失败需修正。测试代码放在 src/pages/__tests__/weather/ 下。
+
+4. 重新运行 pnpm run test 和 pnpm run lint，确保测试通过且无 ESLint 报错。修复完成后启动 pnpm run dev 验证页面可正常访问。

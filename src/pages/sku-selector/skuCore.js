@@ -379,20 +379,6 @@ export function cleanImageHistory(groups, imageHistory) {
   })
 }
 
-export function getGroupsStructureSignature(groups) {
-  if (!Array.isArray(groups)) return ''
-  return groups
-    .map((g) => {
-      const groupId = g?.id || ''
-      const valueIds = Array.isArray(g?.values)
-        ? g.values.map((v) => v?.id || '').sort().join(',')
-        : ''
-      return `${groupId}:${valueIds}`
-    })
-    .sort()
-    .join('|')
-}
-
 export function loadFromStorage(storage = typeof window !== 'undefined' ? window.localStorage : null) {
   if (!storage) return { groups: [], skus: [], error: 'localStorage 不可用' }
   try {

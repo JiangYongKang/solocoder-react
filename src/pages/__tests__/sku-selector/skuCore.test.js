@@ -24,7 +24,6 @@ import {
   getImagesForSelection,
   getImagesForSelectionWithFallback,
   cleanImageHistory,
-  getGroupsStructureSignature,
   loadFromStorage,
   saveToStorage,
   clearStorage,
@@ -599,64 +598,6 @@ describe('stock/price normalization - fix empty string issue', () => {
       expect(typeof sku.stock).toBe('number')
       expect(typeof sku.price).toBe('number')
     })
-  })
-})
-
-describe('getGroupsStructureSignature', () => {
-  it('should produce same signature when only names change', () => {
-    const groupsA = [
-      {
-        id: 'g1',
-        name: '颜色',
-        values: [
-          { id: 'v1', name: '红色', image: '' },
-          { id: 'v2', name: '蓝色', image: '' },
-        ],
-      },
-    ]
-    const groupsB = [
-      {
-        id: 'g1',
-        name: 'Colour',
-        values: [
-          { id: 'v1', name: 'Red', image: '' },
-          { id: 'v2', name: 'Blue', image: '' },
-        ],
-      },
-    ]
-    expect(getGroupsStructureSignature(groupsA)).toBe(getGroupsStructureSignature(groupsB))
-  })
-
-  it('should produce different signature when group IDs change', () => {
-    const groupsA = [{ id: 'g1', name: '颜色', values: [{ id: 'v1', name: '红', image: '' }] }]
-    const groupsB = [{ id: 'g2', name: '颜色', values: [{ id: 'v1', name: '红', image: '' }] }]
-    expect(getGroupsStructureSignature(groupsA)).not.toBe(getGroupsStructureSignature(groupsB))
-  })
-
-  it('should produce different signature when value IDs change', () => {
-    const groupsA = [{ id: 'g1', name: '颜色', values: [{ id: 'v1', name: '红', image: '' }] }]
-    const groupsB = [{ id: 'g1', name: '颜色', values: [{ id: 'v99', name: '红', image: '' }] }]
-    expect(getGroupsStructureSignature(groupsA)).not.toBe(getGroupsStructureSignature(groupsB))
-  })
-
-  it('should produce different signature when adding a value', () => {
-    const groupsA = [{ id: 'g1', name: '颜色', values: [{ id: 'v1', name: '红', image: '' }] }]
-    const groupsB = [
-      {
-        id: 'g1',
-        name: '颜色',
-        values: [
-          { id: 'v1', name: '红', image: '' },
-          { id: 'v2', name: '蓝', image: '' },
-        ],
-      },
-    ]
-    expect(getGroupsStructureSignature(groupsA)).not.toBe(getGroupsStructureSignature(groupsB))
-  })
-
-  it('should return empty string for non-array input', () => {
-    expect(getGroupsStructureSignature(null)).toBe('')
-    expect(getGroupsStructureSignature(undefined)).toBe('')
   })
 })
 

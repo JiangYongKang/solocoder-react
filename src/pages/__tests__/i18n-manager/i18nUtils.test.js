@@ -627,57 +627,6 @@ describe('i18nUtils', () => {
   });
 
   describe('row operations for both view modes', () => {
-    it('deleteTranslationKey should work consistently regardless of key nesting depth', () => {
-      const translations = {
-        'simple': { 'zh-CN': '简单', 'en-US': 'Simple' },
-        'nested.key': { 'zh-CN': '嵌套', 'en-US': 'Nested' },
-        'deeply.nested.key': { 'zh-CN': '深层嵌套', 'en-US': 'Deep' },
-      };
-
-      const afterDeleteSimple = deleteTranslationKey(translations, 'simple');
-      expect(Object.keys(afterDeleteSimple)).toEqual(['nested.key', 'deeply.nested.key']);
-
-      const afterDeleteNested = deleteTranslationKey(afterDeleteSimple, 'nested.key');
-      expect(Object.keys(afterDeleteNested)).toEqual(['deeply.nested.key']);
-
-      const afterDeleteDeep = deleteTranslationKey(afterDeleteNested, 'deeply.nested.key');
-      expect(Object.keys(afterDeleteDeep)).toEqual([]);
-
-      expect(Object.keys(translations)).toHaveLength(3);
-    });
-
-    it('updateTranslationKey should handle renaming leaf nodes in nested keys', () => {
-      const translations = {
-        'user.profile.name': { 'zh-CN': '姓名', 'en-US': 'Name' },
-        'user.profile.email': { 'zh-CN': '邮箱', 'en-US': 'Email' },
-      };
-
-      const result = updateTranslationKey(
-        translations,
-        'user.profile.name',
-        'user.profile.fullName'
-      );
-
-      expect(result['user.profile.fullName']).toEqual({ 'zh-CN': '姓名', 'en-US': 'Name' });
-      expect(result['user.profile.name']).toBeUndefined();
-      expect(result['user.profile.email']).toBeDefined();
-    });
-
-    it('updateTranslationValue should work for both simple and nested keys', () => {
-      const translations = {
-        'simple': { 'zh-CN': '', 'en-US': '' },
-        'a.b.c': { 'zh-CN': '', 'en-US': '' },
-      };
-
-      let result = updateTranslationValue(translations, 'simple', 'zh-CN', '简单值');
-      result = updateTranslationValue(result, 'a.b.c', 'en-US', 'Nested Value');
-
-      expect(result['simple']['zh-CN']).toBe('简单值');
-      expect(result['a.b.c']['en-US']).toBe('Nested Value');
-      expect(result['simple']['en-US']).toBe('');
-      expect(result['a.b.c']['zh-CN']).toBe('');
-    });
-
     it('addTranslationKey should support adding nested keys with dot notation', () => {
       const translations = {};
       const result = addTranslationKey(translations, 'new.nested.deep.key', LANGS);
@@ -697,66 +646,6 @@ describe('i18nUtils', () => {
       const tree = buildTree(translations);
       const leaves = getLeafKeys(tree).sort();
       expect(leaves).toEqual(Object.keys(translations).sort());
-    });
-
-    it('filterTranslations should correctly filter both flat and nested keys', () => {
-      const translations = {
-        'flat.done': { 'zh-CN': '已完成', 'en-US': 'Done' },
-        'flat.partial': { 'zh-CN': '部分', 'en-US': '' },
-        'nested.key.done': { 'zh-CN': '嵌套完成', 'en-US': 'Nested Done' },
-        'nested.key.empty': { 'zh-CN': '', 'en-US': '' },
-      };
-
-      const allKeys = filterTranslations(translations, LANGS, FILTER_MODES.ALL);
-      expect(Object.keys(allKeys)).toHaveLength(4);
-
-      const doneKeys = filterTranslations(translations, LANGS, FILTER_MODES.TRANSLATED);
-      expect(Object.keys(doneKeys).sort()).toEqual(['flat.done', 'nested.key.done']);
-
-      const untranslatedKeys = filterTranslations(translations, LANGS, FILTER_MODES.UNTRANSLATED);
-      expect(Object.keys(untranslatedKeys).sort()).toEqual(['flat.partial', 'nested.key.empty']);
-    });
-
-    it('coverage calculation should account for all keys regardless of nesting', () => {
-      const translations = {
-        'top': { 'zh-CN': '顶', 'en-US': 'Top' },
-        'mid.a': { 'zh-CN': '中A', 'en-US': '' },
-        'deep.x.y': { 'zh-CN': '', 'en-US': '' },
-      };
-      const coverage = calculateCoverage(translations, LANGS);
-      expect(coverage['zh-CN'].translated).toBe(2);
-      expect(coverage['zh-CN'].total).toBe(3);
-      expect(coverage['en-US'].translated).toBe(1);
-      expect(coverage['en-US'].total).toBe(3);
-    });
-
-    it('importTranslations should merge new namespaces into existing tree structure', () => {
-      const existing = {
-        'app.title': { 'zh-CN': '标题', 'en-US': 'Title' },
-      };
-      const importData = {
-        'dashboard.stats': { 'zh-CN': '统计', 'en-US': 'Stats' },
-        'dashboard.chart': { 'zh-CN': '图表', 'en-US': 'Chart' },
-        'app.title': { 'zh-CN': '新标题', 'en-US': 'New Title' },
-      };
-
-      const result = importTranslations(LANGS, existing, importData);
-      const topLevel = getTopLevelKeys(result.translations);
-      expect(topLevel).toEqual(['app', 'dashboard']);
-      expect(result.translations['app.title']['zh-CN']).toBe('新标题');
-      expect(result.translations['dashboard.stats']).toBeDefined();
-      expect(result.translations['dashboard.chart']).toBeDefined();
-    });
-
-    it('sortKeys should sort both simple and deeply nested keys lexicographically', () => {
-      const translations = {
-        'z.y.x': {},
-        'a.b.c': {},
-        'm': {},
-        'a.a.a': {},
-      };
-      const sorted = sortKeys(translations);
-      expect(Object.keys(sorted)).toEqual(['a.a.a', 'a.b.c', 'm', 'z.y.x']);
     });
   });
 });

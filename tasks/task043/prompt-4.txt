@@ -1,0 +1,11 @@
+你实现的多语言国际化管理页面经过第三轮修复后，仍存在以下残留问题需要进行修复：
+
+1. index.jsx 第 118-120 行 InlineEdit 组件内的 useEffect 中直接调用了 setLocalValue(value)，触发了 react-hooks/set-state-in-effect ESLint 报错。该 effect 在 value prop 每次变化时都触发 setState，造成不必要的级联渲染。需要修复这个 ESLint 报错。
+
+2. index.jsx 第 307-308 行 TranslationCompare 组件中 statusClass 和 statusLabel 的 let 初始化赋值从未被任何路径使用，触发了 no-useless-assignment ESLint 报错。所有 if/else 分支都会在读取前重新赋值，初始化值是冗余的。需要修复这个 ESLint 报错。
+
+3. 测试文件 i18nUtils.test.js 中"row operations for both view modes"测试组仍有大量重复用例未被清理。这些用例将输入数据从简单 key 换为带点号的嵌套 key，但被测试函数操作的底层数据结构是扁平字典（key 字符串 → value 对象），输入字符串格式差异不改变任何函数代码分支，不构成增量覆盖。需要继续清理，只保留真正有增量覆盖价值的测试。
+
+4. 修复后需要确认已有的单元测试仍然全部通过，如有失败需修正。测试代码在 src/pages/__tests__/i18n-manager/ 下。
+
+5. 重新运行 pnpm run test 和 pnpm run lint，确保测试通过且无 ESLint 报错。修复完成后启动 pnpm run dev 验证页面可正常访问。

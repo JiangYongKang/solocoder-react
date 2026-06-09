@@ -105,7 +105,7 @@ function EditableCell({ value, onChange, placeholder, highlight }) {
 
 function KeyEditCell({ value, onBlur, hasError, errorMessage }) {
   const [editing, setEditing] = useState(false);
-  const [localValue, setLocalValue] = useState(value);
+  const draftRef = useRef(value);
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -115,18 +115,15 @@ function KeyEditCell({ value, onBlur, hasError, errorMessage }) {
     }
   }, [editing]);
 
-  useEffect(() => {
-    setLocalValue(value);
-  }, [value]);
-
   const handleDoubleClick = () => {
+    draftRef.current = value;
     setEditing(true);
   };
 
   const handleBlur = () => {
     setEditing(false);
-    if (localValue !== value) {
-      onBlur(localValue);
+    if (draftRef.current !== value) {
+      onBlur(draftRef.current);
     }
   };
 
@@ -134,7 +131,7 @@ function KeyEditCell({ value, onBlur, hasError, errorMessage }) {
     if (e.key === 'Enter') {
       handleBlur();
     } else if (e.key === 'Escape') {
-      setLocalValue(value);
+      draftRef.current = value;
       setEditing(false);
     }
   };
@@ -145,8 +142,10 @@ function KeyEditCell({ value, onBlur, hasError, errorMessage }) {
         ref={inputRef}
         type="text"
         className={`i18n-table-input i18n-key-input ${hasError ? 'i18n-table-input-error' : ''}`}
-        value={localValue}
-        onChange={(e) => setLocalValue(e.target.value)}
+        defaultValue={draftRef.current}
+        onChange={(e) => {
+          draftRef.current = e.target.value;
+        }}
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
       />
@@ -279,6 +278,12 @@ function TreeRow({
   );
 }
 
+const COMPARE_STATUS_MAP = {
+  missing: { statusClass: 'i18n-compare-missing', statusLabel: '未翻译' },
+  same: { statusClass: 'i18n-compare-same', statusLabel: '一致' },
+  different: { statusClass: 'i18n-compare-different', statusLabel: '差异' },
+};
+
 function ComparePanel({ selectedKey, translations, languages }) {
   if (!selectedKey) {
     return (
@@ -304,18 +309,7 @@ function ComparePanel({ selectedKey, translations, languages }) {
         {languages.map((lang) => {
           const status = getKeyCompareStatus(keyData, lang.code, languages);
           const val = keyData[lang.code] || '';
-          let statusClass = '';
-          let statusLabel = '';
-          if (status === 'missing') {
-            statusClass = 'i18n-compare-missing';
-            statusLabel = '未翻译';
-          } else if (status === 'same') {
-            statusClass = 'i18n-compare-same';
-            statusLabel = '一致';
-          } else {
-            statusClass = 'i18n-compare-different';
-            statusLabel = '差异';
-          }
+          const { statusClass, statusLabel } = COMPARE_STATUS_MAP[status] || COMPARE_STATUS_MAP.different;
           return (
             <div key={lang.code} className={`i18n-compare-item ${statusClass}`}>
               <div className="i18n-compare-item-header">

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import {
   clamp,
   clampFilters,
@@ -47,7 +47,6 @@ import {
   FILTER_RANGES,
   CROP_RATIOS,
   EXPORT_FORMATS,
-  EXPORT_FORMAT_NAMES,
 } from '../../image-editor/constants.js'
 
 describe('imageEditorCore - clamp', () => {

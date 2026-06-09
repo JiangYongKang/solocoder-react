@@ -1,0 +1,7 @@
+你实现的图片编辑器页面经过第三轮修复后，仍存在以下残留问题需要进行修复：
+
+1. imageEditorCore.test.js 测试文件中导入了 beforeEach 和 EXPORT_FORMAT_NAMES 两个变量但从未使用，触发了 no-unused-vars ESLint 报错。需要删除这两个未使用的导入，确保 ESLint 无报错。
+
+2. 修复后需要确认已有的单元测试仍然全部通过，如有失败需修正。测试代码在 src/pages/__tests__/image-editor/ 下。
+
+3. 重新运行 pnpm run test 和 pnpm run lint，确保测试通过且无 ESLint 报错。

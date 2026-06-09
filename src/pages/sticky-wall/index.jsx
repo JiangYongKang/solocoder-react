@@ -1,26 +1,26 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { FONT_COLORS, FONT_SIZES, PRESET_COLORS } from './constants.js'
 import './sticky-wall.css'
 import {
-  loadFromStorage,
-  saveToStorage,
-  loadSettings,
-  saveSettings,
-  createNote,
-  addNote,
-  updateNote,
-  deleteNote,
-  archiveNote,
-  unarchiveNote,
-  bringToFront,
-  moveNote,
-  getActiveNotes,
-  getArchivedNotes,
-  formatTime,
-  sortNotesByZIndex,
-  stripHtml,
+    addNote,
+    archiveNote,
+    bringToFront,
+    createNote,
+    deleteNote,
+    formatTime,
+    getActiveNotes,
+    getArchivedNotes,
+    loadFromStorage,
+    loadSettings,
+    moveNote,
+    saveSettings,
+    saveToStorage,
+    sortNotesByZIndex,
+    stripHtml,
+    unarchiveNote,
+    updateNote,
 } from './stickyWallCore.js'
-import { FONT_SIZES, FONT_COLORS, PRESET_COLORS } from './constants.js'
 
 const StickyNote = ({
   note,
@@ -368,9 +368,9 @@ const StickyWallPage = () => {
   }, [])
 
   const handleExitEdit = useCallback((noteId) => {
-    void noteId
+    if (noteId && editingId !== noteId) return
     setEditingId(null)
-  }, [])
+  }, [editingId])
 
   const handleToggleFormat = useCallback((noteId, format) => {
     setState((s) => {
@@ -442,7 +442,8 @@ const StickyWallPage = () => {
   }, [editingId])
 
   const handleZoomChange = useCallback((e) => {
-    const zoom = Number(e.target.value)
+    const zoomPercent = Number(e.target.value)
+    const zoom = zoomPercent / 100
     setSettings((s) => ({ ...s, zoom }))
   }, [])
 
@@ -477,7 +478,7 @@ const StickyWallPage = () => {
             transform: `scale(${settings.zoom})`,
             width: `${canvasSize.width / settings.zoom}px`,
             height: `${canvasSize.height / settings.zoom}px`,
-            backgroundSize: `${20 * settings.zoom}px ${20 * settings.zoom}px`,
+            backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`,
           }}
         >
           {activeNotes.length === 0 && !editingId && (

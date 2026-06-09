@@ -1,0 +1,5 @@
+你实现的在线简历编辑器页面还存在一些问题，需要进行修复：
+
+1. Modern 模板自定义模块内容不显示：ResumePreview.jsx 的 ModernTemplate 组件中，当用户添加自定义模块（CUSTOM 类型）时，该模块被归入 mainMods 渲染区域，但 mainMods 的渲染分支只处理了 EDUCATION、WORK_EXPERIENCE、PROJECT_EXPERIENCE 和 SELF_EVALUATION 四种类型，缺少对 CUSTOM 类型的处理。导致 Modern 模板下自定义模块只显示标题而不渲染实际内容。需要补全 CUSTOM 类型的渲染分支。
+2. 代码中存在遗留废弃代码：index.jsx 中 reorderModules 虽然已导入但从未使用，handleLegacyReorder 和 onLegacyReorder 等变量已被废弃但仍残留在代码中。FormEditor.jsx 中 ListEditor 调用处还传递了一个未被 ListEditor 组件接收的 onChange prop。需要清理这些废弃代码。
+3. 重新运行 pnpm run test，确保所有测试通过。

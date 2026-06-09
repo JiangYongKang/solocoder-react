@@ -1,14 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import {
-  LineChart as RechartsLineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from 'recharts'
 import './points-mall.css'
 import {
   TRANSACTION_TYPES,
@@ -49,6 +40,12 @@ const TAB_MALL = 'mall'
 const TAB_HISTORY = 'history'
 const TAB_ORDERS = 'orders'
 const TAB_TREND = 'trend'
+
+const CHART_WIDTH = 700
+const CHART_HEIGHT = 300
+const CHART_PADDING = { top: 20, right: 20, bottom: 40, left: 60 }
+const CHART_INNER_W = CHART_WIDTH - CHART_PADDING.left - CHART_PADDING.right
+const CHART_INNER_H = CHART_HEIGHT - CHART_PADDING.top - CHART_PADDING.bottom
 
 function Toast({ message, type, onClose }) {
   useEffect(() => {
@@ -328,8 +325,8 @@ function PointsHistory({ history }) {
                 <p className="pm-history-time">{formatDateTime(tx.createdAt)}</p>
               </div>
               <div className={`pm-history-amount ${tx.type}`}>
-                {(tx.type === TRANSACTION_TYPES.EARN || (tx.type === TRANSACTION_TYPES.ADJUST && tx.balanceAfter > 0)) ? '+' : '-'}
-                {tx.amount}
+                {(tx.type === TRANSACTION_TYPES.EARN || (tx.type === TRANSACTION_TYPES.ADJUST && tx.amount > 0)) ? '+' : '-'}
+                {tx.type === TRANSACTION_TYPES.ADJUST ? Math.abs(tx.amount) : tx.amount}
               </div>
               <div className="pm-history-balance">
                 余额: {tx.balanceAfter !== undefined ? tx.balanceAfter : '-'}
@@ -406,6 +403,71 @@ function OrdersList({ orders }) {
 function TrendChart({ history }) {
   const trendData = useMemo(() => buildTrendData(history, 30), [history])
   const monthlyStats = useMemo(() => calculateMonthlyStats(history), [history])
+  const [hoverIndex, setHoverIndex] = useState(null)
+
+  const { yMin, yMax, yTicks, xStep } = useMemo(() => {
+    const balances = trendData.map((d) => d.balance)
+    const min = Math.min(...balances)
+    const max = Math.max(...balances)
+    const range = max - min || 100
+    const niceMax = Math.ceil((max + range * 0.1) / 100) * 100
+    const niceMin = Math.max(0, Math.floor((min - range * 0.1) / 100) * 100)
+    const step = Math.ceil((niceMax - niceMin) / 5 / 100) * 100 || 100
+    const ticks = []
+    for (let v = niceMin; v <= niceMax; v += step) {
+      ticks.push(v)
+    }
+    return { yMin: niceMin, yMax: niceMax, yTicks: ticks, xStep: CHART_INNER_W / (trendData.length - 1) }
+  }, [trendData])
+
+  const yRange = yMax - yMin || 1
+  const getX = (i) => CHART_PADDING.left + i * xStep
+  const getY = (balance) => CHART_PADDING.top + CHART_INNER_H - ((balance - yMin) / yRange) * CHART_INNER_H
+
+  const linePath = useMemo(() => {
+    const range = yMax - yMin || 1
+    return trendData.map((d, i) => {
+      const x = CHART_PADDING.left + i * xStep
+      const y = CHART_PADDING.top + CHART_INNER_H - ((d.balance - yMin) / range) * CHART_INNER_H
+      return `${i === 0 ? 'M' : 'L'} ${x} ${y}`
+    }).join(' ')
+  }, [trendData, yMin, yMax, xStep])
+
+  const areaPath = useMemo(() => {
+    const range = yMax - yMin || 1
+    const line = trendData.map((d, i) => {
+      const x = CHART_PADDING.left + i * xStep
+      const y = CHART_PADDING.top + CHART_INNER_H - ((d.balance - yMin) / range) * CHART_INNER_H
+      return `${i === 0 ? 'M' : 'L'} ${x} ${y}`
+    }).join(' ')
+    const lastX = CHART_PADDING.left + (trendData.length - 1) * xStep
+    return `${line} L ${lastX} ${CHART_PADDING.top + CHART_INNER_H} L ${CHART_PADDING.left} ${CHART_PADDING.top + CHART_INNER_H} Z`
+  }, [trendData, yMin, yMax, xStep])
+
+  const xLabelIndices = useMemo(() => {
+    const indices = [0]
+    const step = Math.ceil(trendData.length / 6)
+    for (let i = step; i < trendData.length - 1; i += step) {
+      indices.push(i)
+    }
+    indices.push(trendData.length - 1)
+    return indices
+  }, [trendData.length])
+
+  const handleMouseMove = useCallback((e) => {
+    const svg = e.currentTarget
+    const rect = svg.getBoundingClientRect()
+    const scaleX = CHART_WIDTH / rect.width
+    const x = (e.clientX - rect.left) * scaleX
+    const idx = Math.round((x - CHART_PADDING.left) / xStep)
+    if (idx >= 0 && idx < trendData.length) {
+      setHoverIndex(idx)
+    }
+  }, [trendData.length, xStep])
+
+  const handleMouseLeave = useCallback(() => {
+    setHoverIndex(null)
+  }, [])
 
   return (
     <div>
@@ -427,34 +489,87 @@ function TrendChart({ history }) {
       </div>
       <div className="pm-chart-container">
         <h3 className="pm-chart-title">近30天积分趋势</h3>
-        <div style={{ width: '100%', height: 300 }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <RechartsLineChart data={trendData} margin={{ top: 10, right: 20, left: 10, bottom: 10 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis
-                dataKey="label"
-                tick={{ fontSize: 12, fill: '#6b7280' }}
-                interval="preserveStartEnd"
+        <div style={{ width: '100%', position: 'relative' }}>
+          <svg
+            viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
+            style={{ width: '100%', height: 300 }}
+            onMouseMove={handleMouseMove}
+            onMouseLeave={handleMouseLeave}
+          >
+            <defs>
+              <linearGradient id="lineGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#6366f1" stopOpacity="0.3" />
+                <stop offset="100%" stopColor="#6366f1" stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            {yTicks.map((tick, i) => (
+              <g key={i}>
+                <line
+                  x1={CHART_PADDING.left}
+                  y1={getY(tick)}
+                  x2={CHART_WIDTH - CHART_PADDING.right}
+                  y2={getY(tick)}
+                  stroke="#e5e7eb"
+                  strokeDasharray="3 3"
+                />
+                <text
+                  x={CHART_PADDING.left - 8}
+                  y={getY(tick) + 4}
+                  textAnchor="end"
+                  fontSize="12"
+                  fill="#6b7280"
+                >
+                  {tick}
+                </text>
+              </g>
+            ))}
+            {xLabelIndices.map((idx) => (
+              <text
+                key={idx}
+                x={getX(idx)}
+                y={CHART_HEIGHT - CHART_PADDING.bottom + 20}
+                textAnchor="middle"
+                fontSize="12"
+                fill="#6b7280"
+              >
+                {trendData[idx].label}
+              </text>
+            ))}
+            <path d={areaPath} fill="url(#lineGradient)" />
+            <path d={linePath} fill="none" stroke="#6366f1" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+            {trendData.map((d, i) => (
+              <circle
+                key={i}
+                cx={getX(i)}
+                cy={getY(d.balance)}
+                r={hoverIndex === i ? 6 : 0}
+                fill="#6366f1"
               />
-              <YAxis
-                tick={{ fontSize: 12, fill: '#6b7280' }}
-                width={60}
-              />
-              <Tooltip
-                formatter={(value) => [value + ' 积分', '余额']}
-                labelFormatter={(label) => `日期: ${label}`}
-                contentStyle={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8 }}
-              />
-              <Line
-                type="monotone"
-                dataKey="balance"
+            ))}
+            {hoverIndex !== null && (
+              <line
+                x1={getX(hoverIndex)}
+                y1={CHART_PADDING.top}
+                x2={getX(hoverIndex)}
+                y2={CHART_HEIGHT - CHART_PADDING.bottom}
                 stroke="#6366f1"
-                strokeWidth={2.5}
-                dot={false}
-                activeDot={{ r: 6, fill: '#6366f1' }}
+                strokeDasharray="4 4"
+                strokeOpacity="0.5"
               />
-            </RechartsLineChart>
-          </ResponsiveContainer>
+            )}
+          </svg>
+          {hoverIndex !== null && (
+            <div
+              className="pm-chart-tooltip"
+              style={{
+                left: `${(getX(hoverIndex) / CHART_WIDTH) * 100}%`,
+                top: `${(getY(trendData[hoverIndex].balance) / CHART_HEIGHT) * 100}%`,
+              }}
+            >
+              <div>日期: {trendData[hoverIndex].date}</div>
+              <div>余额: {trendData[hoverIndex].balance} 积分</div>
+            </div>
+          )}
         </div>
       </div>
     </div>

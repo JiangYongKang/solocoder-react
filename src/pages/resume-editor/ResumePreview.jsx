@@ -227,7 +227,8 @@ function ModernTemplate({ modules }) {
               </div>
             )}
 
-            {(mod.type === MODULE_TYPES.SELF_EVALUATION) && (
+            {(mod.type === MODULE_TYPES.SELF_EVALUATION ||
+              mod.type === MODULE_TYPES.CUSTOM) && (
               <div className="re-cv-text-content">{mod.data?.content || ''}</div>
             )}
           </div>

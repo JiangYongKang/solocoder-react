@@ -38,32 +38,15 @@ function MinesweeperPage() {
   const [currentRankInfo, setCurrentRankInfo] = useState(null)
 
   const timerRef = useRef(null)
-  const timeRef = useRef(0)
-  const difficultyRef = useRef(difficulty)
-  const rankInfoRef = useRef(null)
-
-  useEffect(() => {
-    timeRef.current = time
-  }, [time])
-
-  useEffect(() => {
-    difficultyRef.current = difficulty
-  }, [difficulty])
-
-  useEffect(() => {
-    rankInfoRef.current = currentRankInfo
-  }, [currentRankInfo])
 
   useEffect(() => {
     if (game.status === GAME_STATUS.PLAYING) {
       timerRef.current = setInterval(() => {
         setTime((t) => Math.min(t + 1, 999))
       }, 1000)
-    } else {
-      if (timerRef.current) {
-        clearInterval(timerRef.current)
-        timerRef.current = null
-      }
+    } else if (timerRef.current) {
+      clearInterval(timerRef.current)
+      timerRef.current = null
     }
     return () => {
       if (timerRef.current) {
@@ -74,9 +57,7 @@ function MinesweeperPage() {
 
   const startNewGame = useCallback((diff, custom = null) => {
     setCurrentRankInfo(null)
-    rankInfoRef.current = null
     setTime(0)
-    timeRef.current = 0
     let rows, cols, mines
     if (diff === DIFFICULTY.CUSTOM && custom) {
       rows = custom.rows
@@ -89,32 +70,31 @@ function MinesweeperPage() {
       mines = cfg.mines
     }
     setDifficulty(diff)
-    difficultyRef.current = diff
     setGame(initializeGame(rows, cols, mines))
   }, [])
 
   const handleDifficultyClick = (diff) => {
     if (diff === DIFFICULTY.CUSTOM) {
+      setDifficulty(DIFFICULTY.CUSTOM)
       return
     }
     startNewGame(diff)
   }
 
   const handleCustomStart = () => {
-    const validation = validateCustomConfig(
-      parseInt(customConfig.rows, 10),
-      parseInt(customConfig.cols, 10),
-      parseInt(customConfig.mines, 10)
-    )
+    const rowsVal = parseInt(customConfig.rows, 10)
+    const colsVal = parseInt(customConfig.cols, 10)
+    const minesVal = parseInt(customConfig.mines, 10)
+    const validation = validateCustomConfig(rowsVal, colsVal, minesVal)
     if (!validation.valid) {
       setCustomError(validation.error)
       return
     }
     setCustomError('')
     startNewGame(DIFFICULTY.CUSTOM, {
-      rows: parseInt(customConfig.rows, 10),
-      cols: parseInt(customConfig.cols, 10),
-      mines: parseInt(customConfig.mines, 10),
+      rows: rowsVal,
+      cols: colsVal,
+      mines: minesVal,
     })
   }
 
@@ -123,8 +103,11 @@ function MinesweeperPage() {
 
     const revealed = revealCell(game, row, col)
 
-    if (revealed.status === GAME_STATUS.WON && !rankInfoRef.current) {
-      const result = addToLeaderboard(difficultyRef.current, timeRef.current)
+    if (revealed.status === GAME_STATUS.WON && !currentRankInfo) {
+      const customCfg = difficulty === DIFFICULTY.CUSTOM
+        ? { rows: game.rows, cols: game.cols, mines: game.mineCount }
+        : null
+      const result = addToLeaderboard(difficulty, time, undefined, customCfg)
       setLeaderboard(result.leaderboard)
       if (result.rank > 0) {
         setCurrentRankInfo({ rank: result.rank, date: result.date })
@@ -197,6 +180,13 @@ function MinesweeperPage() {
     return DIFFICULTY_LABELS[difficulty]
   }
 
+  const allDifficulties = [
+    { key: DIFFICULTY.BEGINNER, name: DIFFICULTY_CONFIG[DIFFICULTY.BEGINNER].name },
+    { key: DIFFICULTY.INTERMEDIATE, name: DIFFICULTY_CONFIG[DIFFICULTY.INTERMEDIATE].name },
+    { key: DIFFICULTY.EXPERT, name: DIFFICULTY_CONFIG[DIFFICULTY.EXPERT].name },
+    { key: DIFFICULTY.CUSTOM, name: '自定义' },
+  ]
+
   return (
     <div className="ms-page">
       <div className="ms-header">
@@ -206,7 +196,12 @@ function MinesweeperPage() {
           </button>
           <h1 className="ms-title">扫雷游戏</h1>
         </div>
-        <button className="ms-new-game-btn" onClick={() => startNewGame(difficulty, difficulty === DIFFICULTY.CUSTOM ? customConfig : null)}>
+        <button
+          className="ms-new-game-btn"
+          onClick={() =>
+            startNewGame(difficulty, difficulty === DIFFICULTY.CUSTOM ? customConfig : null)
+          }
+        >
           新游戏
         </button>
       </div>
@@ -225,6 +220,7 @@ function MinesweeperPage() {
             ))}
             <button
               className={`ms-diff-btn ${difficulty === DIFFICULTY.CUSTOM ? 'active' : ''}`}
+              onClick={() => handleDifficultyClick(DIFFICULTY.CUSTOM)}
             >
               自定义
             </button>
@@ -285,7 +281,9 @@ function MinesweeperPage() {
                   ? 'ms-face-lose'
                   : ''
               }`}
-              onClick={() => startNewGame(difficulty, difficulty === DIFFICULTY.CUSTOM ? customConfig : null)}
+              onClick={() =>
+                startNewGame(difficulty, difficulty === DIFFICULTY.CUSTOM ? customConfig : null)
+              }
             >
               {game.status === GAME_STATUS.WON ? '😎' : game.status === GAME_STATUS.LOST ? '😵' : '🙂'}
             </div>
@@ -311,18 +309,19 @@ function MinesweeperPage() {
                 <div className="ms-overlay-title">🎉 恭喜通关！</div>
                 <div className="ms-overlay-info">用时：{formatTime(time)}</div>
                 {currentRankInfo && currentRankInfo.rank > 0 && (
-                  <div className="ms-overlay-rank">
-                    🏆 排行榜第 {currentRankInfo.rank} 名！
-                  </div>
+                  <div className="ms-overlay-rank">🏆 排行榜第 {currentRankInfo.rank} 名！</div>
                 )}
                 <button
                   className="ms-overlay-btn"
-                  onClick={() => startNewGame(difficulty, difficulty === DIFFICULTY.CUSTOM ? customConfig : null)}
+                  onClick={() =>
+                    startNewGame(difficulty, difficulty === DIFFICULTY.CUSTOM ? customConfig : null)
+                  }
                 >
                   再来一局
                 </button>
               </div>
-            )}
+              )}
+            )
 
             {game.status === GAME_STATUS.LOST && (
               <div className="ms-overlay">
@@ -330,7 +329,9 @@ function MinesweeperPage() {
                 <div className="ms-overlay-info">踩到雷了！</div>
                 <button
                   className="ms-overlay-btn"
-                  onClick={() => startNewGame(difficulty, difficulty === DIFFICULTY.CUSTOM ? customConfig : null)}
+                  onClick={() =>
+                    startNewGame(difficulty, difficulty === DIFFICULTY.CUSTOM ? customConfig : null)
+                  }
                 >
                   重新开始
                 </button>
@@ -343,18 +344,24 @@ function MinesweeperPage() {
           <div className="ms-panel">
             <div className="ms-panel-title">操作说明</div>
             <div className="ms-controls">
-              <div><span className="ms-key">左键</span> 翻开格子</div>
-              <div><span className="ms-key">右键</span> 插旗/取消</div>
-              <div><span className="ms-key">表情</span> 重新开始</div>
+              <div>
+                <span className="ms-key">左键</span> 翻开格子
+              </div>
+              <div>
+                <span className="ms-key">右键</span> 插旗/取消
+              </div>
+              <div>
+                <span className="ms-key">表情</span> 重新开始
+              </div>
             </div>
           </div>
 
           <div className="ms-panel">
             <div className="ms-panel-title">排行榜</div>
             <div className="ms-leaderboard">
-              {[DIFFICULTY.BEGINNER, DIFFICULTY.INTERMEDIATE, DIFFICULTY.EXPERT].map((diff) => (
+              {allDifficulties.map(({ key: diff, name }) => (
                 <div key={diff} className="ms-lb-group">
-                  <div className="ms-lb-group-title">{DIFFICULTY_CONFIG[diff].name}</div>
+                  <div className="ms-lb-group-title">{name}</div>
                   {leaderboard[diff] && leaderboard[diff].length > 0 ? (
                     <div className="ms-lb-list">
                       {leaderboard[diff].map((entry, idx) => (
@@ -371,7 +378,11 @@ function MinesweeperPage() {
                         >
                           <span className="ms-lb-rank">{idx + 1}.</span>
                           <span className="ms-lb-time">{formatTime(entry.time)}</span>
-                          <span className="ms-lb-date">{formatDate(entry.date)}</span>
+                          <span className="ms-lb-date">
+                            {diff === DIFFICULTY.CUSTOM && entry.rows
+                              ? `${entry.rows}×${entry.cols}/${entry.mines}雷 · ${formatDate(entry.date)}`
+                              : formatDate(entry.date)}
+                          </span>
                         </div>
                       ))}
                     </div>

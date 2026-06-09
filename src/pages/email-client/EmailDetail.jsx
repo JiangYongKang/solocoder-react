@@ -1,6 +1,6 @@
 import { sanitizeHtml, formatFullDateTime } from './emailUtils'
 
-export default function EmailDetail({ email, onReply, onForward }) {
+export default function EmailDetail({ email, onReply, onForward, onMarkAsSpam }) {
   if (!email) {
     return (
       <div className="ec-detail-panel">
@@ -46,6 +46,11 @@ export default function EmailDetail({ email, onReply, onForward }) {
           </svg>
           转发
         </button>
+        {email && email.folder !== 'trash' && (
+          <button type="button" className="ec-forward-btn" onClick={() => onMarkAsSpam && onMarkAsSpam(email.id)}>
+            🚫 标记垃圾
+          </button>
+        )}
       </div>
     </div>
   )

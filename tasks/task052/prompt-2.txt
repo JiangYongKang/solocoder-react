@@ -1,0 +1,5 @@
+你实现的数据透视表页面还存在一些问题，需要进行修复：
+
+1. CSV 导出冗余合计行：pivotTableToCSV 函数在列字段为空时，getAllKeys 返回 ['__all__']，colTotals['__all__'] 与 grandTotal 值相同，但 hasColFields || hasValueFields 条件仍为 true，导致 CSV 中同一个合计值被重复输出两次——先以 colTotals 形式再以 grandTotal 形式出现。需要修正列字段为空时的合计行生成逻辑。
+2. aggregate 函数存在永远不可达的死代码：当 values 为空数组或非数组时，if 条件枚举了所有五种聚合类型（COUNT/SUM/AVG/MAX/MIN），使得最后的 return null 语句永远执行不到。需要清理这段死代码。
+3. 重新运行 pnpm run test，确保所有测试通过。

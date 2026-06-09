@@ -10,6 +10,7 @@ import {
   saveEmails,
   markEmailRead,
   toggleEmailStarred,
+  markAsSpam,
   moveToTrash,
   deletePermanently,
   restoreFromTrash,
@@ -101,6 +102,24 @@ export default function EmailClient() {
     setSelectedIds([])
     showToast('已标记为未读')
   }, [selectedIds, showToast])
+
+  const handleMarkAsSpam = useCallback((emailId) => {
+    setEmails((prev) => markAsSpam(prev, [emailId]))
+    if (selectedEmailId === emailId) {
+      setSelectedEmailId(null)
+    }
+    showToast('已标记为垃圾邮件')
+  }, [selectedEmailId, showToast])
+
+  const handleBatchMarkAsSpam = useCallback(() => {
+    if (selectedIds.length === 0) return
+    setEmails((prev) => markAsSpam(prev, selectedIds))
+    setSelectedIds([])
+    if (selectedIds.includes(selectedEmailId)) {
+      setSelectedEmailId(null)
+    }
+    showToast('已标记为垃圾邮件')
+  }, [selectedIds, selectedEmailId, showToast])
 
   const handleBatchDelete = useCallback(() => {
     if (selectedIds.length === 0) return
@@ -239,10 +258,12 @@ export default function EmailClient() {
           currentPage={currentPage}
           onEmailClick={handleEmailClick}
           onToggleStar={handleToggleStar}
+          onMarkAsSpam={handleMarkAsSpam}
           onToggleSelect={handleToggleSelect}
           onToggleSelectAll={handleToggleSelectAll}
           onBatchMarkRead={handleBatchMarkRead}
           onBatchMarkUnread={handleBatchMarkUnread}
+          onBatchMarkAsSpam={handleBatchMarkAsSpam}
           onBatchDelete={handleBatchDelete}
           onBatchRestore={handleBatchRestore}
           onEmptyTrash={handleEmptyTrash}
@@ -252,6 +273,7 @@ export default function EmailClient() {
           email={selectedEmail}
           onReply={handleReply}
           onForward={handleForward}
+          onMarkAsSpam={handleMarkAsSpam}
         />
       </div>
 

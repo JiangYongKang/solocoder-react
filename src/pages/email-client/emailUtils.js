@@ -1,4 +1,4 @@
-import { FOLDERS } from './constants'
+import { FOLDERS, ALLOWED_HTML_TAGS } from './constants'
 import { createInitialEmails } from './initialData'
 import { STORAGE_KEY } from './constants'
 
@@ -217,12 +217,60 @@ export function validateEmailInput({ to, subject }) {
 
 export function sanitizeHtml(html) {
   if (!html) return ''
-  const div = typeof document !== 'undefined'
-    ? document.createElement('div')
-    : null
-  if (!div) return html
+  if (typeof document === 'undefined') return html
+  const allowedTags = new Set(ALLOWED_HTML_TAGS.map((t) => t.toUpperCase()))
+  const allowedAttrs = {
+    A: ['href', 'target', 'rel', 'title'],
+    IMG: ['src', 'alt', 'title'],
+    default: [],
+  }
+  const urlRegex = /^(https?:\/\/|mailto:|\/)/i
+
+  function sanitizeNode(node) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      return document.createTextNode(node.textContent)
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) {
+      return null
+    }
+    const tagName = node.tagName.toUpperCase()
+    if (!allowedTags.has(tagName)) {
+      const fragment = document.createDocumentFragment()
+      node.childNodes.forEach((child) => {
+        const sanitized = sanitizeNode(child)
+        if (sanitized) fragment.appendChild(sanitized)
+      })
+      return fragment
+    }
+    const safe = document.createElement(node.tagName.toLowerCase())
+    const attrs = allowedAttrs[tagName] || allowedAttrs.default
+    attrs.forEach((attr) => {
+      const value = node.getAttribute(attr)
+      if (value == null) return
+      if ((tagName === 'A' && attr === 'href') || (tagName === 'IMG' && attr === 'src')) {
+        if (!urlRegex.test(value)) return
+      }
+      safe.setAttribute(attr, value)
+    })
+    if (tagName === 'A') {
+      safe.setAttribute('target', '_blank')
+      safe.setAttribute('rel', 'noopener noreferrer')
+    }
+    node.childNodes.forEach((child) => {
+      const sanitized = sanitizeNode(child)
+      if (sanitized) safe.appendChild(sanitized)
+    })
+    return safe
+  }
+
+  const div = document.createElement('div')
   div.innerHTML = html
-  return div.innerHTML
+  const output = document.createElement('div')
+  div.childNodes.forEach((child) => {
+    const sanitized = sanitizeNode(child)
+    if (sanitized) output.appendChild(sanitized)
+  })
+  return output.innerHTML
 }
 
 export function createReplyEmail(email) {

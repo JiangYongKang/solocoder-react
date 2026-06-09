@@ -495,6 +495,20 @@
   margin: 0 0 16px 0;
 }
 
+.pm-chart-tooltip {
+  position: absolute;
+  transform: translate(-50%, -120%);
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 10;
+}
+
 .pm-modal-backdrop {
   position: fixed;
   top: 0;

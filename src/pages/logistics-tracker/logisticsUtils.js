@@ -1,7 +1,15 @@
 import { STORAGE_KEY, MAX_HISTORY, STATUS_TYPES, CITY_COORDINATES } from './constants.js'
 import { getMockDataByCompany, getExceptionReason } from './mockData.js'
 
-export function loadQueryHistory(storage = typeof window !== 'undefined' ? window.localStorage : null) {
+function getStorage() {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    return window.localStorage
+  }
+  return null
+}
+
+export function loadQueryHistory() {
+  const storage = getStorage()
   if (!storage) return []
   try {
     const raw = storage.getItem(STORAGE_KEY)
@@ -9,12 +17,14 @@ export function loadQueryHistory(storage = typeof window !== 'undefined' ? windo
     const parsed = JSON.parse(raw)
     if (!Array.isArray(parsed)) return []
     return parsed.filter(item => item && typeof item.trackingNo === 'string' && typeof item.companyId === 'string')
-  } catch {
+  } catch (e) {
+    void e
     return []
   }
 }
 
-export function saveQueryHistory(history, storage = typeof window !== 'undefined' ? window.localStorage : null) {
+export function saveQueryHistory(history) {
+  const storage = getStorage()
   if (!storage) return
   try {
     const trimmed = Array.isArray(history) ? history.slice(0, MAX_HISTORY) : []
@@ -24,12 +34,12 @@ export function saveQueryHistory(history, storage = typeof window !== 'undefined
   }
 }
 
-export function addQueryRecord(trackingNo, companyId, companyName, storage = typeof window !== 'undefined' ? window.localStorage : null) {
+export function addQueryRecord(trackingNo, companyId, companyName) {
   if (!trackingNo || !companyId) return null
   const trimmedNo = String(trackingNo).trim()
   if (!trimmedNo) return null
 
-  const history = loadQueryHistory(storage)
+  const history = loadQueryHistory()
   const filtered = history.filter(item => !(item.trackingNo === trimmedNo && item.companyId === companyId))
   const newRecord = {
     trackingNo: trimmedNo,
@@ -38,11 +48,12 @@ export function addQueryRecord(trackingNo, companyId, companyName, storage = typ
     queryTime: Date.now(),
   }
   const newHistory = [newRecord, ...filtered]
-  saveQueryHistory(newHistory, storage)
+  saveQueryHistory(newHistory)
   return newRecord
 }
 
-export function clearQueryHistory(storage = typeof window !== 'undefined' ? window.localStorage : null) {
+export function clearQueryHistory() {
+  const storage = getStorage()
   if (!storage) return
   try {
     storage.removeItem(STORAGE_KEY)
@@ -51,7 +62,7 @@ export function clearQueryHistory(storage = typeof window !== 'undefined' ? wind
   }
 }
 
-function mapSfOpcode(opcode, remark) {
+function mapSfOpcode(opcode, hasOrderException) {
   switch (opcode) {
     case '10': return STATUS_TYPES.PICKED_UP
     case '30': return STATUS_TYPES.IN_TRANSIT
@@ -60,7 +71,7 @@ function mapSfOpcode(opcode, remark) {
     case '80': return STATUS_TYPES.SIGNED
     case '99': return STATUS_TYPES.EXCEPTION
     default:
-      if (remark && remark.includes('异常')) return STATUS_TYPES.EXCEPTION
+      if (hasOrderException) return STATUS_TYPES.EXCEPTION
       return STATUS_TYPES.IN_TRANSIT
   }
 }
@@ -124,8 +135,9 @@ function mapEmsType(type) {
 
 export function parseSfOrder(order) {
   if (!order || !order.routes) return null
+  const hasOrderException = !!order.hasException
   const nodes = order.routes.map((route, index) => {
-    const status = mapSfOpcode(route.opcode, route.remark)
+    const status = mapSfOpcode(route.opcode, hasOrderException)
     const isException = status === STATUS_TYPES.EXCEPTION
     const isLatest = index === 0
     return {
@@ -146,13 +158,29 @@ export function parseSfOrder(order) {
     signTime: order.signTime || null,
     origin: order.origin,
     destination: order.destination,
-    hasException: !!order.hasException,
+    hasException: hasOrderException,
     nodes,
   }
 }
 
 export function parseYtOrder(order) {
   if (!order || !order.data) return null
+  let signer = null
+  let signTime = null
+  if (order.signerName) {
+    signer = order.signerName
+  } else if (order.data && order.data.length > 0) {
+    const firstNode = order.data[0]
+    if (firstNode.status === '已签收' && firstNode.operator) {
+      signer = firstNode.operator
+    }
+  }
+  if (order.signTime) {
+    signTime = order.signTime
+  } else if (order.data && order.data.length > 0 && order.data[0].status === '已签收') {
+    signTime = order.data[0].time
+  }
+
   const nodes = order.data.map((item, index) => {
     const status = mapYtStatus(item.status)
     const isException = status === STATUS_TYPES.EXCEPTION
@@ -171,8 +199,8 @@ export function parseYtOrder(order) {
     trackingNo: order.number,
     company: 'yt',
     isSigned: order.statusCode === 'SIGNED',
-    signer: null,
-    signTime: null,
+    signer,
+    signTime,
     origin: order.senderCity,
     destination: order.receiverCity,
     hasException: false,
@@ -182,6 +210,17 @@ export function parseYtOrder(order) {
 
 export function parseZtOrder(order) {
   if (!order || !order.traces) return null
+  let signer = null
+  let signTime = null
+  if (order.signedName) {
+    signer = order.signedName
+  }
+  if (order.signTime) {
+    signTime = order.signTime
+  } else if (order.traces && order.traces.length > 0 && order.traces[0].scanType === '已签收') {
+    signTime = order.traces[0].scanDate
+  }
+
   const nodes = order.traces.map((trace, index) => {
     const status = mapZtScanType(trace.scanType)
     const isException = status === STATUS_TYPES.EXCEPTION
@@ -200,8 +239,8 @@ export function parseZtOrder(order) {
     trackingNo: order.billCode,
     company: 'zt',
     isSigned: !!order.signed,
-    signer: order.signedName || null,
-    signTime: null,
+    signer,
+    signTime,
     origin: order.from,
     destination: order.to,
     hasException: false,
@@ -211,6 +250,17 @@ export function parseZtOrder(order) {
 
 export function parseYdOrder(order) {
   if (!order || !order.result) return null
+  let signer = null
+  let signTime = null
+  if (order.signer) {
+    signer = order.signer
+  }
+  if (order.signTimestamp) {
+    signTime = order.signTimestamp
+  } else if (order.result && order.result.length > 0 && order.result[0].state === '签收') {
+    signTime = order.result[0].time
+  }
+
   const nodes = order.result.map((item, index) => {
     const status = mapYdState(item.state)
     const isException = status === STATUS_TYPES.EXCEPTION
@@ -229,8 +279,8 @@ export function parseYdOrder(order) {
     trackingNo: order.mailNo,
     company: 'yd',
     isSigned: order.signStatus === '1',
-    signer: null,
-    signTime: null,
+    signer,
+    signTime,
     origin: order.originationName,
     destination: order.destinationName,
     hasException: false,
@@ -240,6 +290,17 @@ export function parseYdOrder(order) {
 
 export function parseJdOrder(order) {
   if (!order || !order.detailList) return null
+  let signer = null
+  let signTime = null
+  if (order.receiver) {
+    signer = order.receiver
+  }
+  if (order.receivedTime) {
+    signTime = order.receivedTime
+  } else if (order.detailList && order.detailList.length > 0 && order.detailList[0].statusCode === 50) {
+    signTime = order.detailList[0].operatorTime
+  }
+
   const nodes = order.detailList.map((item, index) => {
     const status = mapJdStatusCode(item.statusCode)
     const isException = status === STATUS_TYPES.EXCEPTION
@@ -258,8 +319,8 @@ export function parseJdOrder(order) {
     trackingNo: order.waybillCode,
     company: 'jd',
     isSigned: !!order.finished,
-    signer: null,
-    signTime: null,
+    signer,
+    signTime,
     origin: order.startProvince,
     destination: order.endProvince,
     hasException: false,
@@ -270,6 +331,17 @@ export function parseJdOrder(order) {
 export function parseEmsOrder(order) {
   if (!order || !order.steps) return null
   const hasException = order.deliveryStatus === 'exception'
+  let signer = null
+  let signTime = null
+  if (order.signedBy) {
+    signer = order.signedBy
+  }
+  if (order.signedAt) {
+    signTime = order.signedAt
+  } else if (order.steps && order.steps.length > 0 && order.steps[0].type === 'delivered') {
+    signTime = order.steps[0].occurTime
+  }
+
   const nodes = order.steps.map((step, index) => {
     const status = mapEmsType(step.type)
     const isException = status === STATUS_TYPES.EXCEPTION
@@ -288,8 +360,8 @@ export function parseEmsOrder(order) {
     trackingNo: order.trackingNumber,
     company: 'ems',
     isSigned: order.deliveryStatus === 'delivered',
-    signer: null,
-    signTime: null,
+    signer,
+    signTime,
     origin: order.originCity,
     destination: order.destCity,
     hasException,
@@ -351,27 +423,24 @@ export function isLatestNodeException(parsedData) {
 
 export function extractRoutePoints(parsedData) {
   if (!parsedData) return []
-  const points = []
-  const added = new Set()
+
+  const pointMap = new Map()
 
   if (parsedData.origin) {
     const coord = CITY_COORDINATES[parsedData.origin]
-    if (coord && !added.has(parsedData.origin)) {
-      points.push({ city: parsedData.origin, x: coord.x, y: coord.y, type: 'origin' })
-      added.add(parsedData.origin)
+    if (coord) {
+      pointMap.set(parsedData.origin, { city: parsedData.origin, x: coord.x, y: coord.y, type: 'origin' })
     }
   }
 
-  const routeCities = []
   if (parsedData.nodes && parsedData.nodes.length > 0) {
     for (let i = parsedData.nodes.length - 1; i >= 0; i--) {
       const node = parsedData.nodes[i]
       const city = extractCityName(node.location)
-      if (city && !added.has(city)) {
+      if (city && !pointMap.has(city)) {
         const coord = CITY_COORDINATES[city]
         if (coord) {
-          routeCities.push({ city, x: coord.x, y: coord.y, type: 'route' })
-          added.add(city)
+          pointMap.set(city, { city, x: coord.x, y: coord.y, type: 'route' })
         }
       }
     }
@@ -379,13 +448,27 @@ export function extractRoutePoints(parsedData) {
 
   if (parsedData.destination) {
     const coord = CITY_COORDINATES[parsedData.destination]
-    if (coord && !added.has(parsedData.destination)) {
-      routeCities.push({ city: parsedData.destination, x: coord.x, y: coord.y, type: 'destination' })
-      added.add(parsedData.destination)
+    if (coord) {
+      pointMap.set(parsedData.destination, { city: parsedData.destination, x: coord.x, y: coord.y, type: 'destination' })
     }
   }
 
-  return [...points, ...routeCities]
+  const result = []
+  if (parsedData.origin && pointMap.has(parsedData.origin)) {
+    result.push(pointMap.get(parsedData.origin))
+    pointMap.delete(parsedData.origin)
+  }
+
+  if (parsedData.destination && pointMap.has(parsedData.destination)) {
+    const destPoint = pointMap.get(parsedData.destination)
+    pointMap.delete(parsedData.destination)
+    result.push(...pointMap.values())
+    result.push(destPoint)
+  } else {
+    result.push(...pointMap.values())
+  }
+
+  return result
 }
 
 export function extractCityName(locationStr) {

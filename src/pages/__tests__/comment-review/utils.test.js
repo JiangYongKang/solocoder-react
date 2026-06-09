@@ -636,7 +636,7 @@ describe('addSensitiveWord', () => {
     expect(result.success).toBe(false)
   })
 
-  it('fails when word exists (case insensitive', () => {
+  it('fails when word exists (case insensitive)', () => {
     const result = addSensitiveWord(words, 'EXISTING', SENSITIVE_LEVEL.LOW)
     expect(result.success).toBe(false)
   })

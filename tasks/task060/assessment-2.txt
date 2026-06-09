@@ -1,0 +1,7 @@
+过程不满意：
+1. 模型在分析 ModernTemplate 渲染逻辑时，对 ResumePreview.jsx 进行了四次分段读取，每次仅覆盖约 50 行代码。这种逐段读取的方式导致模型在比较三个模板的 CUSTOM 处理逻辑时反复回看已读区域，效率低下。正确做法是第一次就完整读取整个文件（约 350 行），一次性理解三个模板的完整结构后再定位修改点，避免重复读取。
+2. 模型执行 pnpm run test 命令后，终端只运行了 sticky-wall 的测试，模型随即意识到测试配置与预期不符，转而使用 npx vitest run 显式指定路径。但模型没有在第一次执行命令前查看 package.json 中 test 脚本的配置内容，属于未确认命令行为就盲执行的低效操作。正确流程是先确认测试命令覆盖范围再执行。
+3. 在做完 ResumePreview.jsx 的单行修改后，模型又反复执行了 6 次正则搜索和 1 次文件读取来验证废弃代码是否已清理。这些搜索（reorderModules、handleLegacyReorder、onLegacyReorder、ListEditor 等）在修改前已执行过一次且结果均为空，修改完全不影响这些搜索的结果。重复执行同一验证逻辑是对上下文记忆不信任导致的浪费，模型应信任已完成的检查结果。
+
+产物不满意：
+ModernTemplate 中 sidebarMods 的渲染分支（ResumePreview.jsx 第 170-175 行）已包含对 CUSTOM 类型的处理，但 CUSTOM 模块实际上永远不会进入 sidebarMods，因为 sidebarMods 过滤条件仅包含 JOB_INTENTION 和 SKILLS（第 113-115 行），CUSTOM 被归入 mainMods。该渲染分支成为永不触发的死代码。虽然不影响功能，但残留的不可能分支降低了代码的可读性和维护性，应在清理遗留代码时一并移除。主修复本身正确——mainMods 区域的 CUSTOM 补全与 Classic、Minimal 模板处理方式一致，84 个测试全部通过，lint 零报错。

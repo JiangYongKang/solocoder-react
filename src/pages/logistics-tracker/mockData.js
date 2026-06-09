@@ -109,6 +109,8 @@ const ytData = {
       statusCode: 'SIGNED',
       senderCity: '广州',
       receiverCity: '杭州',
+      signerName: '前台代收',
+      signTime: '2026-06-07 14:20:00',
       data: [
         {
           time: '2026-06-07 14:20:00',
@@ -155,6 +157,7 @@ const ztData = {
       billCode: 'ZT777888999000',
       signed: false,
       signedName: null,
+      signTime: null,
       from: '南京',
       to: '青岛',
       traces: [
@@ -190,6 +193,46 @@ const ztData = {
         },
       ],
     },
+    'ZT111222333444': {
+      billCode: 'ZT111222333444',
+      signed: true,
+      signedName: '李女士',
+      signTime: '2026-06-06 16:00:00',
+      from: '苏州',
+      to: '合肥',
+      traces: [
+        {
+          scanDate: '2026-06-06 16:00:00',
+          scanLocation: '合肥市蜀山区网点',
+          scanType: '已签收',
+          desc: '已签收，签收人：李女士',
+        },
+        {
+          scanDate: '2026-06-06 09:30:00',
+          scanLocation: '合肥市蜀山区网点',
+          scanType: '派送中',
+          desc: '业务员正在派送',
+        },
+        {
+          scanDate: '2026-06-06 04:00:00',
+          scanLocation: '合肥转运中心',
+          scanType: '到达',
+          desc: '快件到达合肥转运中心',
+        },
+        {
+          scanDate: '2026-06-05 20:00:00',
+          scanLocation: '南京转运中心',
+          scanType: '发出',
+          desc: '快件离开南京转运中心',
+        },
+        {
+          scanDate: '2026-06-05 10:00:00',
+          scanLocation: '苏州市姑苏区网点',
+          scanType: '已揽收',
+          desc: '中通快递已揽收',
+        },
+      ],
+    },
   },
 }
 
@@ -202,6 +245,8 @@ const ydData = {
       signStatus: '1',
       originationName: '厦门',
       destinationName: '沈阳',
+      signer: '本人',
+      signTimestamp: '2026-06-05 16:00:00',
       result: [
         {
           time: '2026-06-05 16:00:00',
@@ -253,6 +298,8 @@ const jdData = {
       finished: true,
       startProvince: '天津',
       endProvince: '重庆',
+      receiver: '本人',
+      receivedTime: '2026-06-04 11:00:00',
       detailList: [
         {
           operatorTime: '2026-06-04 11:00:00',
@@ -296,6 +343,8 @@ const emsData = {
     'EMS3334445556': {
       trackingNumber: 'EMS3334445556',
       deliveryStatus: 'delivered',
+      signedBy: '本人',
+      signedAt: '2026-06-06 15:45:00',
       originCity: '郑州',
       destCity: '长沙',
       steps: [

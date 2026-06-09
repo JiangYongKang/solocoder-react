@@ -1,0 +1,5 @@
+你实现的邮件客户端模拟页面还存在一些问题，需要进行修复：
+
+1. sanitizeHtml 函数实现为空壳：当前实现仅将 HTML 赋值给 div.innerHTML 再读回，没有执行任何标签过滤或安全处理。constants.js 中定义的 ALLOWED_HTML_TAGS 常量完全未被使用。同时提示词要求邮件正文中的链接以新窗口打开，但当前没有为目标 a 标签添加 target="_blank" 属性。需要使用定义好的标签白名单做过滤，并为链接添加新窗口打开属性。
+2. 垃圾邮件标记功能无 UI 入口：emailUtils.js 中已实现 markAsSpam 函数且测试已覆盖，但 index.jsx 主页面和 EmailList.jsx 批量操作栏中均未提供调用该函数的按钮——既没有单条邮件"标记为垃圾"的操作项，也没有批量标记垃圾的按钮。需要补全 UI 入口。
+3. 重新运行 pnpm run test，确保所有测试通过。

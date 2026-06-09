@@ -460,11 +460,25 @@ describe('minesweeperCore', () => {
       expect(result.rank).toBe(1)
     })
 
-    it('addToLeaderboard should not add custom difficulty entries', () => {
-      const result = addToLeaderboard(DIFFICULTY.CUSTOM, 50, storage)
-      expect(result.rank).toBe(-1)
+    it('addToLeaderboard should add custom difficulty entries with config', () => {
+      const customCfg = { rows: 10, cols: 10, mines: 15 }
+      const result = addToLeaderboard(DIFFICULTY.CUSTOM, 50, storage, customCfg)
+      expect(result.rank).toBe(1)
       const loaded = loadLeaderboard(storage)
-      expect(loaded.custom).toEqual([])
+      expect(loaded.custom.length).toBe(1)
+      expect(loaded.custom[0].time).toBe(50)
+      expect(loaded.custom[0].rows).toBe(10)
+      expect(loaded.custom[0].cols).toBe(10)
+      expect(loaded.custom[0].mines).toBe(15)
+    })
+
+    it('addToLeaderboard custom entries should be sorted by time', () => {
+      addToLeaderboard(DIFFICULTY.CUSTOM, 100, storage, { rows: 8, cols: 8, mines: 10 })
+      addToLeaderboard(DIFFICULTY.CUSTOM, 50, storage, { rows: 12, cols: 12, mines: 20 })
+      const loaded = loadLeaderboard(storage)
+      expect(loaded.custom.length).toBe(2)
+      expect(loaded.custom[0].time).toBe(50)
+      expect(loaded.custom[1].time).toBe(100)
     })
 
     it('loadLeaderboard should handle invalid data gracefully', () => {

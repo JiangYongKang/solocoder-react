@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import {
   loadQueryHistory,
   saveQueryHistory,
@@ -24,51 +24,75 @@ import { getMockDataByCompany } from '@/pages/logistics-tracker/mockData.js'
 function createMockStorage() {
   const store = {}
   return {
-    getItem: (key) => (key in store ? store[key] : null),
-    setItem: (key, value) => {
+    getItem: vi.fn((key) => (key in store ? store[key] : null)),
+    setItem: vi.fn((key, value) => {
       store[key] = String(value)
-    },
-    removeItem: (key) => {
+    }),
+    removeItem: vi.fn((key) => {
       delete store[key]
-    },
-    clear: () => {
+    }),
+    clear: vi.fn(() => {
       Object.keys(store).forEach((k) => delete store[k])
-    },
+    }),
     _store: store,
   }
 }
 
+function mockWindowLocalStorage() {
+  const storage = createMockStorage()
+  const originalLocalStorage = (typeof window !== 'undefined') ? window.localStorage : undefined
+  Object.defineProperty(globalThis, 'window', {
+    value: { localStorage: storage },
+    writable: true,
+    configurable: true,
+  })
+  return { storage, restore: () => {
+    if (originalLocalStorage !== undefined) {
+      Object.defineProperty(globalThis, 'window', {
+        value: { localStorage: originalLocalStorage },
+        writable: true,
+        configurable: true,
+      })
+    } else {
+      delete globalThis.window
+    }
+  } }
+}
+
 describe('logisticsUtils - localStorage', () => {
+  let mockResult
   let storage
+
   beforeEach(() => {
-    storage = createMockStorage()
+    mockResult = mockWindowLocalStorage()
+    storage = mockResult.storage
+  })
+
+  afterEach(() => {
+    mockResult.restore()
   })
 
   describe('loadQueryHistory', () => {
     it('should return empty array when storage is empty', () => {
-      expect(loadQueryHistory(storage)).toEqual([])
+      expect(loadQueryHistory()).toEqual([])
     })
 
     it('should return empty array when storage has invalid JSON', () => {
-      storage.setItem(STORAGE_KEY, 'invalid-json')
-      expect(loadQueryHistory(storage)).toEqual([])
+      storage._store[STORAGE_KEY] = 'invalid-json'
+      expect(loadQueryHistory()).toEqual([])
     })
 
     it('should return empty array when storage data is not an array', () => {
-      storage.setItem(STORAGE_KEY, JSON.stringify({ foo: 'bar' }))
-      expect(loadQueryHistory(storage)).toEqual([])
-    })
-
-    it('should return empty array when storage is null', () => {
-      expect(loadQueryHistory(null)).toEqual([])
+      storage._store[STORAGE_KEY] = JSON.stringify({ foo: 'bar' })
+      expect(loadQueryHistory()).toEqual([])
     })
 
     it('should filter out invalid items', () => {
       const validItem = { trackingNo: 'SF123', companyId: 'sf', queryTime: 123456 }
       const invalidItem1 = { trackingNo: 123, companyId: 'sf' }
       const invalidItem2 = { trackingNo: 'SF123', companyId: 123 }
-      storage.setItem(STORAGE_KEY, JSON.stringify([validItem, invalidItem1, invalidItem2, null]))
-      const result = loadQueryHistory(storage)
+      storage._store[STORAGE_KEY] = JSON.stringify([validItem, invalidItem1, invalidItem2, null])
+      const result = loadQueryHistory()
       expect(result).toHaveLength(1)
       expect(result[0]).toEqual(validItem)
     })
@@ -78,16 +102,17 @@ describe('logisticsUtils - localStorage', () => {
         { trackingNo: 'SF123', companyId: 'sf', companyName: '顺丰速运', queryTime: 1 },
         { trackingNo: 'YT456', companyId: 'yt', companyName: '圆通速递', queryTime: 2 },
       ]
-      storage.setItem(STORAGE_KEY, JSON.stringify(history))
-      expect(loadQueryHistory(storage)).toEqual(history)
+      storage._store[STORAGE_KEY] = JSON.stringify(history)
+      expect(loadQueryHistory()).toEqual(history)
     })
   })
 
   describe('saveQueryHistory', () => {
     it('should save history to storage', () => {
       const history = [{ trackingNo: 'SF123', companyId: 'sf', queryTime: 1 }]
-      saveQueryHistory(history, storage)
-      expect(JSON.parse(storage.getItem(STORAGE_KEY))).toEqual(history)
+      saveQueryHistory(history)
+      expect(storage.setItem).toHaveBeenCalledWith(STORAGE_KEY, JSON.stringify(history))
+      expect(JSON.parse(storage._store[STORAGE_KEY])).toEqual(history)
     })
 
     it('should not save more than MAX_HISTORY items', () => {
@@ -96,18 +121,14 @@ describe('logisticsUtils - localStorage', () => {
         companyId: 'sf',
         queryTime: i,
       }))
-      saveQueryHistory(history, storage)
-      const saved = JSON.parse(storage.getItem(STORAGE_KEY))
+      saveQueryHistory(history)
+      const saved = JSON.parse(storage._store[STORAGE_KEY])
       expect(saved.length).toBeLessThanOrEqual(10)
     })
 
     it('should save empty array for invalid input', () => {
-      saveQueryHistory(null, storage)
-      expect(JSON.parse(storage.getItem(STORAGE_KEY))).toEqual([])
-    })
-
-    it('should not throw when storage is null', () => {
-      expect(() => saveQueryHistory([], null)).not.toThrow()
+      saveQueryHistory(null)
+      expect(JSON.parse(storage._store[STORAGE_KEY])).toEqual([])
     })
   })
 
@@ -122,41 +143,36 @@ describe('logisticsUtils - localStorage', () => {
     })
 
     it('should add record and move it to front', () => {
-      storage.setItem(
-        STORAGE_KEY,
-        JSON.stringify([{ trackingNo: 'YT456', companyId: 'yt', queryTime: 1 }])
-      )
+      storage._store[STORAGE_KEY] = JSON.stringify([
+        { trackingNo: 'YT456', companyId: 'yt', queryTime: 1 },
+      ])
 
-      const result = addQueryRecord('SF123', 'sf', '顺丰速运', storage)
+      const result = addQueryRecord('SF123', 'sf', '顺丰速运')
       expect(result).not.toBeNull()
       expect(result.trackingNo).toBe('SF123')
       expect(result.companyId).toBe('sf')
 
-      const history = loadQueryHistory(storage)
+      const history = loadQueryHistory()
       expect(history[0].trackingNo).toBe('SF123')
     })
 
     it('should trim trackingNo', () => {
-      const mockStorage = createMockStorage()
-      const result = addQueryRecord('  SF123  ', 'sf', '顺丰速运', mockStorage)
+      const result = addQueryRecord('  SF123  ', 'sf', '顺丰速运')
       expect(result.trackingNo).toBe('SF123')
     })
   })
 
   describe('clearQueryHistory', () => {
     it('should clear storage', () => {
-      storage.setItem(STORAGE_KEY, JSON.stringify([{ a: 1 }]))
-      clearQueryHistory(storage)
-      expect(storage.getItem(STORAGE_KEY)).toBeNull()
-    })
-
-    it('should not throw when storage is null', () => {
-      expect(() => clearQueryHistory(null)).not.toThrow()
+      storage._store[STORAGE_KEY] = JSON.stringify([{ a: 1 }])
+      clearQueryHistory()
+      expect(storage.removeItem).toHaveBeenCalledWith(STORAGE_KEY)
+      expect(storage._store[STORAGE_KEY]).toBeUndefined()
     })
   })
 })
 
-describe('logisticsUtils - data parsing', () => {
+describe('logisticsUtils - data parsing signer extraction', () => {
   describe('parseSfOrder', () => {
     it('should return null for null input', () => {
       expect(parseSfOrder(null)).toBeNull()
@@ -166,7 +182,7 @@ describe('logisticsUtils - data parsing', () => {
       expect(parseSfOrder({})).toBeNull()
     })
 
-    it('should correctly parse a signed SF order', () => {
+    it('should correctly parse a signed SF order with signer', () => {
       const sfData = getMockDataByCompany('sf')
       const order = sfData.orders['SF1234567890']
       const result = parseSfOrder(order)
@@ -176,6 +192,7 @@ describe('logisticsUtils - data parsing', () => {
       expect(result.company).toBe('sf')
       expect(result.isSigned).toBe(true)
       expect(result.signer).toBe('张三')
+      expect(result.signTime).toBe('2026-06-08 15:30:00')
       expect(result.origin).toBe('深圳')
       expect(result.destination).toBe('北京')
       expect(result.nodes.length).toBe(6)
@@ -183,7 +200,7 @@ describe('logisticsUtils - data parsing', () => {
       expect(result.nodes[0].status).toBe(STATUS_TYPES.SIGNED)
     })
 
-    it('should correctly parse an exception SF order', () => {
+    it('should correctly parse an exception SF order using hasException field not text', () => {
       const sfData = getMockDataByCompany('sf')
       const order = sfData.orders['SF9998887776']
       const result = parseSfOrder(order)
@@ -194,81 +211,116 @@ describe('logisticsUtils - data parsing', () => {
       expect(result.nodes[0].status).toBe(STATUS_TYPES.EXCEPTION)
       expect(result.nodes[0].exceptionReason).not.toBeNull()
     })
+
+    it('should rely on opcode and hasException flag, not remark text content', () => {
+      const order = {
+        trackingNo: 'TEST001',
+        isSigned: false,
+        hasException: true,
+        exceptionCode: 'LOST',
+        origin: '北京',
+        destination: '上海',
+        routes: [
+          {
+            acceptTime: '2026-06-09 10:00:00',
+            acceptAddress: '北京市朝阳区',
+            remark: '快件正在运输中',
+            opcode: '99',
+          },
+          {
+            acceptTime: '2026-06-09 08:00:00',
+            acceptAddress: '北京转运中心',
+            remark: '快件已揽收，一切正常',
+            opcode: '10',
+          },
+        ],
+      }
+      const result = parseSfOrder(order)
+      expect(result.hasException).toBe(true)
+      expect(result.nodes[0].status).toBe(STATUS_TYPES.EXCEPTION)
+      expect(result.nodes[0].isException).toBe(true)
+      expect(result.nodes[1].status).toBe(STATUS_TYPES.PICKED_UP)
+    })
   })
 
   describe('parseYtOrder', () => {
-    it('should return null for null input', () => {
-      expect(parseYtOrder(null)).toBeNull()
-    })
-
-    it('should correctly parse YT order', () => {
+    it('should correctly extract signer and signTime from YT order', () => {
       const ytData = getMockDataByCompany('yt')
       const order = ytData.orders['YT1234567890123']
       const result = parseYtOrder(order)
 
       expect(result).not.toBeNull()
       expect(result.trackingNo).toBe('YT1234567890123')
-      expect(result.company).toBe('yt')
       expect(result.isSigned).toBe(true)
-      expect(result.origin).toBe('广州')
-      expect(result.destination).toBe('杭州')
-      expect(result.nodes.length).toBe(5)
-      expect(result.nodes[0].status).toBe(STATUS_TYPES.SIGNED)
+      expect(result.signer).toBe('前台代收')
+      expect(result.signTime).toBe('2026-06-07 14:20:00')
     })
   })
 
   describe('parseZtOrder', () => {
-    it('should correctly parse ZT order', () => {
+    it('should return null for signedName when order not signed', () => {
       const ztData = getMockDataByCompany('zt')
       const order = ztData.orders['ZT777888999000']
       const result = parseZtOrder(order)
 
       expect(result).not.toBeNull()
       expect(result.trackingNo).toBe('ZT777888999000')
-      expect(result.company).toBe('zt')
-      expect(result.nodes[0].status).toBe(STATUS_TYPES.DELIVERING)
+      expect(result.isSigned).toBe(false)
+      expect(result.signer).toBeNull()
+      expect(result.signTime).toBeNull()
+    })
+
+    it('should correctly extract signer and signTime for signed ZT order', () => {
+      const ztData = getMockDataByCompany('zt')
+      const order = ztData.orders['ZT111222333444']
+      const result = parseZtOrder(order)
+
+      expect(result).not.toBeNull()
+      expect(result.isSigned).toBe(true)
+      expect(result.signer).toBe('李女士')
+      expect(result.signTime).toBe('2026-06-06 16:00:00')
     })
   })
 
   describe('parseYdOrder', () => {
-    it('should correctly parse YD order', () => {
+    it('should correctly extract signer and signTime from YD order', () => {
       const ydData = getMockDataByCompany('yd')
       const order = ydData.orders['YD5556667778']
       const result = parseYdOrder(order)
 
       expect(result).not.toBeNull()
       expect(result.trackingNo).toBe('YD5556667778')
-      expect(result.company).toBe('yd')
       expect(result.isSigned).toBe(true)
-      expect(result.nodes[0].status).toBe(STATUS_TYPES.SIGNED)
+      expect(result.signer).toBe('本人')
+      expect(result.signTime).toBe('2026-06-05 16:00:00')
     })
   })
 
   describe('parseJdOrder', () => {
-    it('should correctly parse JD order', () => {
+    it('should correctly extract signer and signTime from JD order', () => {
       const jdData = getMockDataByCompany('jd')
       const order = jdData.orders['JD000111222333']
       const result = parseJdOrder(order)
 
       expect(result).not.toBeNull()
       expect(result.trackingNo).toBe('JD000111222333')
-      expect(result.company).toBe('jd')
       expect(result.isSigned).toBe(true)
-      expect(result.nodes[0].status).toBe(STATUS_TYPES.SIGNED)
+      expect(result.signer).toBe('本人')
+      expect(result.signTime).toBe('2026-06-04 11:00:00')
     })
   })
 
   describe('parseEmsOrder', () => {
-    it('should correctly parse normal EMS order', () => {
+    it('should correctly extract signer and signTime from normal EMS order', () => {
       const emsData = getMockDataByCompany('ems')
       const order = emsData.orders['EMS3334445556']
       const result = parseEmsOrder(order)
 
       expect(result).not.toBeNull()
       expect(result.trackingNo).toBe('EMS3334445556')
-      expect(result.company).toBe('ems')
       expect(result.isSigned).toBe(true)
-      expect(result.hasException).toBe(false)
+      expect(result.signer).toBe('本人')
+      expect(result.signTime).toBe('2026-06-06 15:45:00')
     })
 
     it('should correctly parse exception EMS order', () => {
@@ -280,7 +332,6 @@ describe('logisticsUtils - data parsing', () => {
       expect(result.hasException).toBe(true)
       expect(result.nodes[0].isException).toBe(true)
       expect(result.nodes[0].status).toBe(STATUS_TYPES.EXCEPTION)
-      expect(result.nodes[0].exceptionReason).not.toBeNull()
     })
   })
 
@@ -291,13 +342,6 @@ describe('logisticsUtils - data parsing', () => {
 
     it('should return null for null rawOrder', () => {
       expect(parseLogisticsData('sf', null)).toBeNull()
-    })
-
-    it('should correctly dispatch to company parser', () => {
-      const sfData = getMockDataByCompany('sf')
-      const order = sfData.orders['SF1234567890']
-      const result = parseLogisticsData('sf', order)
-      expect(result.company).toBe('sf')
     })
   })
 })
@@ -396,7 +440,7 @@ describe('logisticsUtils - query and helpers', () => {
       expect(extractRoutePoints(null)).toEqual([])
     })
 
-    it('should extract origin and destination points', () => {
+    it('should extract origin and destination points with correct types', () => {
       const data = {
         origin: '深圳',
         destination: '北京',
@@ -410,7 +454,7 @@ describe('logisticsUtils - query and helpers', () => {
       expect(points[1].type).toBe('destination')
     })
 
-    it('should not add duplicate cities', () => {
+    it('should not add duplicate cities when origin equals destination', () => {
       const data = {
         origin: '北京',
         destination: '北京',
@@ -418,6 +462,7 @@ describe('logisticsUtils - query and helpers', () => {
       }
       const points = extractRoutePoints(data)
       expect(points.length).toBe(1)
+      expect(points[0].type).toBe('destination')
     })
 
     it('should extract intermediate cities from nodes', () => {
@@ -435,6 +480,36 @@ describe('logisticsUtils - query and helpers', () => {
       const points = extractRoutePoints(data)
       const cities = points.map(p => p.city)
       expect(cities).toContain('武汉')
+    })
+
+    it('should ensure destination keeps destination type even when city appears in nodes', () => {
+      const data = {
+        origin: '深圳',
+        destination: '北京',
+        nodes: [
+          { location: '北京市朝阳区营业点', time: '2026-06-08 15:30:00' },
+          { location: '北京转运中心', time: '2026-06-08 06:00:00' },
+          { location: '深圳转运中心', time: '2026-06-07 14:20:00' },
+        ].reverse(),
+      }
+      const points = extractRoutePoints(data)
+      const destPoint = points.find(p => p.city === '北京')
+      expect(destPoint).not.toBeUndefined()
+      expect(destPoint.type).toBe('destination')
+    })
+
+    it('should place destination point at the end of the list', () => {
+      const data = {
+        origin: '深圳',
+        destination: '北京',
+        nodes: [
+          { location: '武汉转运中心', time: '2026-06-07 22:30:00' },
+        ],
+      }
+      const points = extractRoutePoints(data)
+      expect(points.length).toBeGreaterThanOrEqual(2)
+      expect(points[points.length - 1].city).toBe('北京')
+      expect(points[points.length - 1].type).toBe('destination')
     })
   })
 

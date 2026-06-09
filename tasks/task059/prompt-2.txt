@@ -1,0 +1,5 @@
+你实现的评论审核系统页面还存在一些问题，需要进行修复：
+
+1. 全选逻辑使用硬编码：handleSelectAll 函数中使用了硬编码的 20 来计算分页起止索引，而不是引用 constants.js 中已定义的 PAGE_SIZE 常量。如果以后修改每页条数，全选范围会与实际展示的评论不匹配。需要改为使用 PAGE_SIZE 常量。
+2. 测试文件存在笔误：utils.test.js 中有一条测试描述字符串 "fails when word exists (case insensitive" 缺少右括号。需要修复这个笔误。
+3. 重新运行 pnpm run test，确保所有测试通过。

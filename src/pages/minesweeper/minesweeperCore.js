@@ -304,15 +304,17 @@ export function saveLeaderboard(leaderboard, storage = typeof window !== 'undefi
   }
 }
 
-export function addToLeaderboard(difficulty, time, storage = typeof window !== 'undefined' ? window.localStorage : null) {
-  if (difficulty === DIFFICULTY.CUSTOM) {
-    return { leaderboard: loadLeaderboard(storage), rank: -1 }
-  }
-
+export function addToLeaderboard(difficulty, time, storage = typeof window !== 'undefined' ? window.localStorage : null, customConfig = null) {
   const leaderboard = loadLeaderboard(storage)
   const entry = {
     time,
     date: new Date().toISOString(),
+  }
+
+  if (difficulty === DIFFICULTY.CUSTOM && customConfig) {
+    entry.rows = customConfig.rows
+    entry.cols = customConfig.cols
+    entry.mines = customConfig.mines
   }
 
   const list = leaderboard[difficulty] || []

@@ -25,10 +25,7 @@ const toNumber = (val) => {
 
 export const aggregate = (values, aggregation) => {
   if (!Array.isArray(values) || values.length === 0) {
-    if (aggregation === AGGREGATIONS.COUNT || aggregation === AGGREGATIONS.SUM || aggregation === AGGREGATIONS.AVG || aggregation === AGGREGATIONS.MAX || aggregation === AGGREGATIONS.MIN) {
-      return 0
-    }
-    return null
+    return 0
   }
 
   switch (aggregation) {
@@ -307,7 +304,6 @@ export const pivotTableToCSV = (pivotResult, fieldLabels = {}) => {
         const aggLabel = AGGREGATION_LABELS[vf.aggregation] || vf.aggregation
         header.push(`${vfLabel}(${aggLabel})`)
       }
-      header.push('合计')
     }
     lines.push(header.map(escapeCSVField).join(','))
   }
@@ -321,16 +317,23 @@ export const pivotTableToCSV = (pivotResult, fieldLabels = {}) => {
       for (const v of rh) row.push(v)
     }
 
-    for (const ck of colKeys) {
-      const key = `${rk}__${ck}`
-      for (const vf of valueFields) {
-        row.push(formatValue(values[key]?.[vf.field], vf.aggregation))
+    if (hasColFields) {
+      for (const ck of colKeys) {
+        const key = `${rk}__${ck}`
+        for (const vf of valueFields) {
+          row.push(formatValue(values[key]?.[vf.field], vf.aggregation))
+        }
       }
-    }
-
-    if (hasValueFields) {
-      for (const vf of valueFields) {
-        row.push(formatValue(rowTotals[rk]?.[vf.field], vf.aggregation))
+      if (hasValueFields) {
+        for (const vf of valueFields) {
+          row.push(formatValue(rowTotals[rk]?.[vf.field], vf.aggregation))
+        }
+      }
+    } else {
+      if (hasValueFields) {
+        for (const vf of valueFields) {
+          row.push(formatValue(rowTotals[rk]?.[vf.field], vf.aggregation))
+        }
       }
     }
 
@@ -343,16 +346,26 @@ export const pivotTableToCSV = (pivotResult, fieldLabels = {}) => {
       for (let i = 0; i < rowFields.length - 1; i++) totalRow.push('')
       totalRow.push('合计')
     }
-    for (const ck of colKeys) {
-      for (const vf of valueFields) {
-        totalRow.push(formatValue(colTotals[ck]?.[vf.field], vf.aggregation))
+
+    if (hasColFields) {
+      for (const ck of colKeys) {
+        for (const vf of valueFields) {
+          totalRow.push(formatValue(colTotals[ck]?.[vf.field], vf.aggregation))
+        }
+      }
+      if (hasValueFields) {
+        for (const vf of valueFields) {
+          totalRow.push(formatValue(grandTotal[vf.field], vf.aggregation))
+        }
+      }
+    } else {
+      if (hasValueFields) {
+        for (const vf of valueFields) {
+          totalRow.push(formatValue(grandTotal[vf.field], vf.aggregation))
+        }
       }
     }
-    if (hasValueFields) {
-      for (const vf of valueFields) {
-        totalRow.push(formatValue(grandTotal[vf.field], vf.aggregation))
-      }
-    }
+
     lines.push(totalRow.map(escapeCSVField).join(','))
   }
 

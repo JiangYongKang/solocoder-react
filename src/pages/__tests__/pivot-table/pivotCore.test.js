@@ -92,7 +92,11 @@ describe('pivotCore', () => {
       expect(aggregate([], AGGREGATIONS.MIN)).toBe(0)
     })
 
-    it('should return null for invalid aggregation', () => {
+    it('should return 0 for invalid aggregation when values empty', () => {
+      expect(aggregate([], 'invalid')).toBe(0)
+    })
+
+    it('should return null for invalid aggregation when values non-empty', () => {
       expect(aggregate([1, 2, 3], 'invalid')).toBeNull()
     })
 
@@ -100,7 +104,7 @@ describe('pivotCore', () => {
       expect(aggregate(null, AGGREGATIONS.COUNT)).toBe(0)
       expect(aggregate(undefined, AGGREGATIONS.SUM)).toBe(0)
       expect(aggregate('not array', AGGREGATIONS.AVG)).toBe(0)
-      expect(aggregate(null, 'invalid')).toBeNull()
+      expect(aggregate(null, 'invalid')).toBe(0)
     })
   })
 
@@ -406,6 +410,35 @@ describe('pivotCore', () => {
       })
       const csv = pivotTableToCSV(result)
       expect(csv.length).toBeGreaterThan(0)
+    })
+
+    it('should not output duplicate grand total when col fields empty', () => {
+      const result = buildPivotTable(MOCK_DATA, {
+        rowFields: ['region'],
+        colFields: [],
+        valueFields: [{ field: 'salesAmount', aggregation: AGGREGATIONS.SUM }],
+        filters: {},
+      })
+      const csv = pivotTableToCSV(result)
+      const lines = csv.split('\n')
+      expect(lines.length).toBe(5)
+      expect(lines[0]).toBe('region,salesAmount(求和)')
+      expect(lines[4]).toBe('合计,"6,100"')
+    })
+
+    it('should not have row total column when col fields empty with multiple values', () => {
+      const result = buildPivotTable(MOCK_DATA, {
+        rowFields: ['region'],
+        colFields: [],
+        valueFields: [
+          { field: 'salesAmount', aggregation: AGGREGATIONS.SUM },
+          { field: 'quantity', aggregation: AGGREGATIONS.SUM },
+        ],
+        filters: {},
+      })
+      const csv = pivotTableToCSV(result)
+      const lines = csv.split('\n')
+      expect(lines[0]).toBe('region,salesAmount(求和),quantity(求和)')
     })
 
     it('should handle pivot with multiple value fields', () => {

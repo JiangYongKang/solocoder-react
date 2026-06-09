@@ -1,0 +1,5 @@
+你实现的像素画编辑器页面还存在一些问题，需要进行修复：
+
+1. JSON 导入尺寸不匹配时未阻止导入：handleImportFile 函数在处理尺寸不匹配的 JSON 时，同时设置了 importError 错误提示和 importPendingData 数据，导致「导入」按钮仍可点击，用户可以强行导入不同尺寸的数据来重置画布。提示词要求尺寸不匹配时应提示并取消导入，不应该让 importPendingData 被赋值。
+2. PICKER 工具重复调用 processCell：handleMouseDown 中当工具为 PICKER 时，processCell 先被调用一次来拾取颜色并切换工具，之后又在 else if 分支中被冗余调用第二次。第二次调用的返回值未被使用，且此时工具状态仍为 PICKER（React 状态尚未更新），属于多余的无用调用。需要清理冗余的调用。
+3. 重新运行 pnpm run test，确保所有测试通过。

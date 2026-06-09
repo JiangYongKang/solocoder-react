@@ -1,0 +1,9 @@
+产物不满意：
+1. sanitizeHtml 重写后测试文件 emailUtils.test.js 第3-27行导入了除 sanitizeHtml 外所有工具函数（generateId、markAsSpam 等 22 个函数），唯独缺少 sanitizeHtml，整个测试文件中没有任何用例覆盖重写后的 HTML 白名单过滤、属性过滤、链接 target="_blank" 注入等关键逻辑。提示词第3条要求"确保所有测试通过"，但本次最核心的代码改动完全没有测试验证，model 仅凭 49 项已有测试通过就声称完成，遗漏了对新代码的测试覆盖。应补充 sanitizeHtml 的单元测试，覆盖白名单标签保留、非法标签剥离但保留子内容、a 标签 URL 协议校验、target="_blank" 自动注入等场景。
+2. EmailDetail.jsx 第49行使用硬编码字符串 `email.folder !== 'trash'` 判断是否显示垃圾标记按钮，未导入 constants.js 中的 FOLDERS.TRASH 常量。而同一修改批次中的 EmailList.jsx 在第2行正确导入了 FOLDERS，并在第48行和第106行均使用 `FOLDERS.TRASH` 做条件判断。两端代码判断同一逻辑却使用了不同的引用方式，若 constants.js 中 FOLDERS.TRASH 的值发生变更，EmailDetail 中硬编码字符串不会同步更新，导致垃圾邮件详情页仍然显示"标记垃圾"按钮，功能异常。应导入 FOLDERS 常量并统一使用 FOLDERS.TRASH。
+3. EmailList.jsx 第109行单条邮件垃圾标记按钮使用了 `className="ec-email-star"`，与上方星标按钮（第97行）共用完全相同的 CSS 类名。🚫 图标与 ☆/★ 图标在列表行中共享同一套样式，用户无法从视觉上区分星标操作和垃圾标记操作，两者语义完全不同却外观一致，容易造成误操作。应使用独立 CSS 类名如 ec-email-spam 为垃圾标记按钮定义专属样式。
+
+过程不满意：
+1. 模型在收到提示词后，仅说了一句"我来修复这些问题。让我先查看相关代码"就立即调用 todo_write 创建了包含 3 项子任务的 TodoList，此时尚未读取任何一个文件。项目标注规范明确要求"不能在刚收到任务时就直接创建 TodoList，应先分析问题再规划"。正确做法是先阅读 emailUtils.js、EmailList.jsx、index.jsx、constants.js 等全部相关文件，理解 sanitizeHtml 空壳结构、ALLOWED_HTML_TAGS 定义、markAsSpam 函数调用位置等现状，在此基础上再做任务分解和规划。
+2. 模型重写了 sanitizeHtml 约 60 行新代码（第218-274行），随后运行 vitest 看到 49/49 通过就直接判定完成，完全没有检查 sanitizeHtml 是否有测试覆盖。模型在第1轮标注中已因 sanitizeHtml 为空壳被指出"走形式地完成函数体而未对照提示词逐项检查"，本轮虽然在实现层面完成度较好，但在验证层面再次暴露了"走形式"倾向——执行测试命令看到绿色通过就结束，没有检查测试覆盖率是否足够。提示词第3条要求确保测试通过，模型应在重写函数后检查测试文件是否已导入该函数，并补充缺失的测试用例。
+3. 模型对 emailUtils.js、index.jsx、EmailList.jsx、EmailDetail.jsx 四份文件分别进行了多次编辑，但没有任何一次在编辑后重新读取完整文件以验证编辑结果。第1轮标注（assessment-1.txt 过程不满意第1条）已明确指出"模型应该在每次编辑后重新 read 完整文件确认变更已写入，而非仅凭工具返回 status: success 就假设正确"，本轮修复中该问题完全重现，模型对前一轮的标注反馈没有任何改进。应养成每次编辑后 Read 回文件的习惯，确认最终产物状态后再进入下一步。

@@ -6,7 +6,7 @@ import ReviewedList from './ReviewedList.jsx'
 import SensitiveWords from './SensitiveWords.jsx'
 import RejectModal from './RejectModal.jsx'
 import ConfirmDialog from './ConfirmDialog.jsx'
-import { TABS, TAB_LABEL, REVIEW_RESULT_OPTIONS } from './constants'
+import { TABS, TAB_LABEL, REVIEW_RESULT_OPTIONS, PAGE_SIZE } from './constants'
 import {
   loadComments,
   saveComments,
@@ -128,8 +128,8 @@ export default function CommentReviewPage() {
 
   const handleSelectAll = (checked) => {
     const pending = getPendingComments(comments)
-    const startIdx = (pendingPage - 1) * 20
-    const endIdx = startIdx + 20
+    const startIdx = (pendingPage - 1) * PAGE_SIZE
+    const endIdx = startIdx + PAGE_SIZE
     const visibleIds = pending.slice(startIdx, endIdx).map((c) => c.id)
     if (checked) {
       setSelectedIds(Array.from(new Set([...selectedIds, ...visibleIds])))

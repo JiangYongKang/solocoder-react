@@ -510,14 +510,15 @@ export function calculateMonthlyStats(history, now = Date.now()) {
       return
     }
     const amount = Number(tx.amount) || 0
-    if (tx.type === TRANSACTION_TYPES.EARN || (tx.type === TRANSACTION_TYPES.ADJUST && amount > 0 && tx.balanceAfter > 0)) {
-      if (tx.type === TRANSACTION_TYPES.EARN) {
+    if (tx.type === TRANSACTION_TYPES.EARN) {
+      earned += amount
+    } else if (tx.type === TRANSACTION_TYPES.ADJUST) {
+      if (amount > 0) {
         earned += amount
-      } else if (tx.type === TRANSACTION_TYPES.ADJUST) {
-        earned += amount
+      } else {
+        spent += Math.abs(amount)
       }
-    }
-    if (tx.type === TRANSACTION_TYPES.EXCHANGE || tx.type === TRANSACTION_TYPES.EXPIRE) {
+    } else if (tx.type === TRANSACTION_TYPES.EXCHANGE || tx.type === TRANSACTION_TYPES.EXPIRE) {
       spent += amount
     }
   })

@@ -9,10 +9,12 @@ export default function EmailList({
   currentPage,
   onEmailClick,
   onToggleStar,
+  onMarkAsSpam,
   onToggleSelect,
   onToggleSelectAll,
   onBatchMarkRead,
   onBatchMarkUnread,
+  onBatchMarkAsSpam,
   onBatchDelete,
   onBatchRestore,
   onEmptyTrash,
@@ -43,6 +45,11 @@ export default function EmailList({
             <button type="button" className="ec-toolbar-btn" onClick={onBatchMarkUnread}>
               未读
             </button>
+            {folder !== FOLDERS.TRASH && (
+              <button type="button" className="ec-toolbar-btn" onClick={onBatchMarkAsSpam}>
+                垃圾
+              </button>
+            )}
             <button type="button" className="ec-toolbar-btn" onClick={onBatchDelete}>
               {folder === FOLDERS.TRASH ? '彻底删除' : '删除'}
             </button>
@@ -96,6 +103,20 @@ export default function EmailList({
             >
               {email.isStarred ? '★' : '☆'}
             </button>
+            {folder !== FOLDERS.TRASH && (
+              <button
+                type="button"
+                className="ec-email-star"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onMarkAsSpam(email.id)
+                }}
+                aria-label="标记为垃圾邮件"
+                title="标记为垃圾邮件"
+              >
+                🚫
+              </button>
+            )}
             <div className="ec-email-content">
               <div className="ec-email-header">
                 <span className="ec-email-sender">{email.from}</span>

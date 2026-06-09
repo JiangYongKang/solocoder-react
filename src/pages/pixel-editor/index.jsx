@@ -232,14 +232,18 @@ function PixelEditorPage() {
     isDrawingRef.current = true
     lastCellRef.current = cell
 
-    if (t === TOOLS.FILL || t === TOOLS.PICKER) {
+    if (t === TOOLS.PICKER) {
+      processCell(cell.x, cell.y)
+      isDrawingRef.current = false
+      return
+    }
+
+    if (t === TOOLS.FILL) {
       const prevGrid = cloneGrid(g)
       const result = processCell(cell.x, cell.y)
       if (result && result !== g) {
         pushToHistory(prevGrid)
         setGrid(result)
-      } else if (t === TOOLS.PICKER) {
-        processCell(cell.x, cell.y)
       }
       isDrawingRef.current = false
       return
@@ -356,7 +360,7 @@ function PixelEditorPage() {
       }
       if (result.data.width !== gridWidth || result.data.height !== gridHeight) {
         setImportError(`导入的画布尺寸 (${result.data.width}×${result.data.height}) 与当前画布 (${gridWidth}×${gridHeight}) 不匹配`)
-        setImportPendingData(result.data)
+        setImportPendingData(null)
         return
       }
       setImportError('')
@@ -664,11 +668,6 @@ function PixelEditorPage() {
               {importPendingData && !importError && (
                 <p style={{ marginTop: '12px', color: '#00d4ff' }}>
                   ✓ 已读取: {importPendingData.width}×{importPendingData.height} 画布
-                </p>
-              )}
-              {importPendingData && importError && (
-                <p style={{ marginTop: '4px', color: '#888', fontSize: '12px' }}>
-                  继续导入将重置当前画布尺寸
                 </p>
               )}
             </div>

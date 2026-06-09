@@ -3,6 +3,7 @@ import { Route, Routes, useNavigate } from 'react-router-dom'
 
 import ApiDebuggerPage from '@/pages/api-debugger/index.jsx'
 import AuthPage from '@/pages/auth/index.jsx'
+import BudgetTrackerPage from '@/pages/budget-tracker/index.jsx'
 import CalendarPage from '@/pages/calendar/index.jsx'
 import ChatPage from '@/pages/chat/index.jsx'
 import CouponPage from '@/pages/coupon/index.jsx'
@@ -98,6 +99,9 @@ const TASKS = [
     { id: 48, title: '天气查询应用', route: 'weather', description: '城市天气查询工具，支持搜索、收藏、历史记录、一周预报、温度趋势图和天气主题背景，基于 localStorage 持久化。' },
     { id: 49, title: '记账预算管理', route: 'budget-tracker', description: '个人月度预算管理工具，设置分类预算并追踪消费进度，消费进度可视化、分类明细、剩余日均额度、环比增减、调整记录时间线，基于 localStorage 持久化。' },
     { id: 50, title: '扫雷游戏', route: 'minesweeper', description: '经典 Windows 扫雷游戏复刻，支持三种难度和自定义难度，左键翻开/右键插旗、泛洪自动展开、计时与雷数计数、胜负判定、localStorage 排行榜持久化。' },
+    { id: 54, title: '物流轨迹追踪', route: 'logistics-tracker', description: '快递物流轨迹查询工具，输入快递单号查看包裹运输轨迹、物流节点时间线和Canvas地图轨迹动画。' },
+    { id: 54, title: '便签墙', route: 'sticky-wall', description: '自由排列的数字便签墙，支持彩色便签创建、自由拖拽定位、层级管理、富文本编辑、归档与删除、画布缩放与网格吸附，数据本地持久化。' },
+    { id: 51, title: '积分商城', route: 'points-mall', description: '用户积分兑换商城，积分规则展示、商品兑换、积分流水管理、过期倒计时、订单查询、积分趋势图，基于 localStorage 持久化。' },
 ]
 
 function HomePage() {

@@ -1,95 +1,14 @@
-我来帮你实现 Git 仓库浏览器页面。首先让我探索一下项目结构，了解代码组织方式和约定。
-        
-            
-toolName: view_folder
-            
-status: success
-          
-c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react
-          
+让我先创建任务列表，然后逐一修复这些问题。
 
         
             
-toolName: view_folder
+toolName: todo_write
             
 status: success
           
-c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src
+Todos updated: 5 items
           
-让我进一步了解项目结构，查看 App.jsx 路由配置、text-diff 和 file-manager 页面作为参考，以及测试文件的风格。
-
-        
-            
-toolName: view_files
-            
-status: success
-          
-            
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\App.jsx
-          
-
-        
-            
-toolName: view_files
-            
-status: success
-          
-            
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\text-diff\diffUtils.js
-          
-
-        
-            
-toolName: view_files
-            
-status: success
-          
-            
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\file-manager\utils.js
-          
-
-        
-            
-toolName: view_files
-            
-status: success
-          
-            
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\package.json
-          
-让我再查看一个测试文件和一个页面组件来了解代码风格。
-
-
-        
-            
-toolName: view_files
-            
-status: success
-          
-            
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\__tests__\text-diff\diffUtils.test.js
-          
-
-        
-            
-toolName: view_files
-            
-status: success
-          
-            
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\text-diff\index.jsx
-          
-
-        
-            
-toolName: view_files
-            
-status: success
-          
-            
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\text-diff\text-diff.css
-          
-现在我对项目结构有了全面了解。让我创建详细的任务计划并开始实现 Git 仓库浏览器。
+好的，让我开始修复。先标记第一个任务并开始分析代码。
 
 
 
@@ -99,57 +18,47 @@ toolName: todo_write
             
 status: success
           
-Todos updated: 9 items
+Todos updated: 5 items
           
-开始创建文件。首先创建常量定义文件。
+让我再仔细查看一下相关文件，特别是提交历史的数据结构。我需要先修改提交历史结构以支持删除操作。
 
-
-        
-            
-toolName: Write
-            
-status: success
-          
-            
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\git-browser\constants.js
-          
-changes: undefined
-          
-
-        
-            
-toolName: todo_write
-            
-status: success
-          
-Todos updated: 9 items
-          
-现在创建模拟数据文件。
 
 
 
 
         
             
-toolName: Write
+toolName: view_files
             
 status: success
           
             
 filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\git-browser\mockData.js
           
-changes: undefined
-          
+好的，我理解了问题。让我开始逐一修复。首先修改提交历史的数据结构，让它支持区分 added/modified/deleted，然后修改 `computeCommitFileSnapshot`。
+
+让我先修改 `gitUtils.js`，因为这里有核心逻辑需要支持 DELETED 状态以及不同提交的内容变化：
+
+
+
+
+
+
+
 
         
             
-toolName: todo_write
+toolName: view_files
             
 status: success
           
-Todos updated: 9 items
+            
+filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\git-browser\gitUtils.js
           
-现在创建纯 JS 工具函数文件。
+现在我需要进行多个修改。让我重新设计并修改核心文件。首先修改 `gitUtils.js`，支持 DELETED 状态、不同提交的内容差异，以及改进 `generateOriginalContent`：
+
+
+
 
 
 
@@ -158,7 +67,7 @@ Todos updated: 9 items
 
         
             
-toolName: Write
+toolName: edit_file_search_replace
             
 status: success
           
@@ -167,7 +76,117 @@ filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\git-bro
           
 changes: undefined
           
-现在创建单元测试文件。
+现在让我修改 `buildFileTreeFromList` 和 `computeCommitFileSnapshot`。先看一下现有代码然后修改：
+
+
+
+
+
+
+
+
+
+
+        
+            
+toolName: edit_file_search_replace
+            
+status: success
+          
+            
+filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\git-browser\gitUtils.js
+          
+changes: undefined
+          
+好的，现在让我更新 `index.jsx`，把 commitHash 传入 `buildFileTreeFromList`：
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+toolName: edit_file_search_replace
+            
+status: success
+          
+            
+filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\git-browser\index.jsx
+          
+changes: undefined
+          
+现在让我修改 `mockData.js`，在提交历史中增加 `deletedFiles` 字段，特别是 bugfix/header 分支中提到的移除 Footer 组件的提交：
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+toolName: edit_file_search_replace
+            
+status: success
+          
+            
+filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\git-browser\mockData.js
+          
+changes: undefined
+          
+让我修改 `buildFileTreeFromList`，让 DELETED 文件也能显示在文件树中（但用红色状态标识），这样用户可以查看删除内容的 diff：
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+toolName: edit_file_search_replace
+            
+status: success
+          
+            
+filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\git-browser\gitUtils.js
+          
+changes: undefined
+          
+现在让我更新任务进度并更新测试。首先标记已完成的任务：
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -179,12 +198,57 @@ toolName: todo_write
             
 status: success
           
-Todos updated: 9 items
+Todos updated: 5 items
           
+现在让我更新单元测试，覆盖新增的逻辑（`transformContentForCommit`、`DELETED` 状态支持、提交内容差异等）。先看现有的测试：
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
         
             
-toolName: Write
+toolName: view_files
+            
+status: success
+          
+            
+filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\__tests__\git-browser\gitUtils.test.js
+          
+现在让我更新测试文件，添加新函数的测试用例并扩展现有测试：
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+toolName: edit_file_search_replace
             
 status: success
           
@@ -193,44 +257,42 @@ filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\__tests
           
 changes: undefined
           
+现在让我在测试文件末尾追加新增测试用例：
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
         
             
-toolName: todo_write
-            
-status: success
-          
-Todos updated: 9 items
-          
-现在创建 CSS 样式文件。
-
-
-
-
-
-
-
-        
-            
-toolName: Write
+toolName: edit_file_search_replace
             
 status: success
           
             
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\git-browser\git-browser.css
+filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\__tests__\git-browser\gitUtils.test.js
           
 changes: undefined
           
+现在让我标记任务进度并运行测试：
 
-        
-            
-toolName: todo_write
-            
-status: success
-          
-Todos updated: 9 items
-          
-现在创建主页面组件 index.jsx，这是核心组件文件。
 
 
 
@@ -243,18 +305,6 @@ Todos updated: 9 items
 
 
 
-        
-            
-toolName: Write
-            
-status: success
-          
-            
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\git-browser\index.jsx
-          
-changes: undefined
-          
-现在在 App.jsx 中注册路由和添加任务卡片。
 
 
 
@@ -262,322 +312,10 @@ changes: undefined
 
 
 
-        
-            
-toolName: todo_write
-            
-status: success
-          
-Todos updated: 9 items
-          
-现在修改 App.jsx 添加路由和任务卡片。
 
 
 
 
-
-
-        
-            
-toolName: edit_file_search_replace
-            
-status: failed
-          
-            
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\App.jsx
-          
-          
-让我重新读取准确内容。
-
-
-
-
-
-
-
-        
-            
-toolName: view_files
-            
-status: success
-          
-            
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\App.jsx
-          
-
-        
-            
-toolName: edit_file_search_replace
-            
-status: failed
-          
-            
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\App.jsx
-          
-          
-
-        
-            
-toolName: view_files
-            
-status: success
-          
-            
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\App.jsx
-          
-
-        
-            
-toolName: view_files
-            
-status: success
-          
-            
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\App.jsx
-          
-
-        
-            
-toolName: view_files
-            
-status: success
-          
-            
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\App.jsx
-          
-让我添加 import 语句、任务卡片和路由。首先添加 import。
-
-
-
-
-
-
-
-        
-            
-toolName: edit_file_search_replace
-            
-status: failed
-          
-            
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\App.jsx
-          
-          
-
-        
-            
-toolName: search_by_regex
-            
-status: success
-          
-query: coupon/index
-          
-
-        
-            
-toolName: search_by_regex
-            
-status: success
-          
-query: FitnessTrackerPage|const TASKS
-          
-现在我有了准确内容。让我修改 App.jsx：添加 import、任务卡片和路由。
-
-
-
-
-
-        
-            
-toolName: edit_file_search_replace
-            
-status: success
-          
-            
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\App.jsx
-          
-changes: undefined
-          
-现在添加任务卡片。让我先看看 TASKS 数组末尾的准确内容。
-
-
-
-
-
-
-
-
-        
-            
-toolName: view_files
-            
-status: success
-          
-            
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\App.jsx
-          
-
-        
-            
-toolName: edit_file_search_replace
-            
-status: success
-          
-            
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\App.jsx
-          
-changes: undefined
-          
-我看到文件里有重复和错误的行，让我修复这个问题。
-
-
-
-
-
-
-
-
-
-        
-            
-toolName: todo_write
-            
-status: success
-          
-Todos updated: 9 items
-          
-
-        
-            
-toolName: view_files
-            
-status: success
-          
-            
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\App.jsx
-          
-我需要修复这个语法错误。让我删除错误的重复行。
-
-
-
-
-
-
-
-
-        
-            
-toolName: edit_file_search_replace
-            
-status: failed
-          
-            
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\App.jsx
-          
-          
-让我用 Grep 查看准确的内容。
-
-
-
-
-
-
-
-        
-            
-toolName: search_by_regex
-            
-status: success
-          
-query: Git 仓库浏览器
-          
-
-        
-            
-toolName: view_files
-            
-status: success
-          
-            
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\App.jsx
-          
-看起来 TASKS 数组已经正确了。现在让我添加路由。让我先看看 Routes 部分。
-
-
-
-
-
-
-
-
-
-        
-            
-toolName: view_files
-            
-status: success
-          
-            
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\App.jsx
-          
-我看到第150行有错误，缺少闭合标签。让我修复这个并添加 git-browser 路由。
-
-
-
-
-
-
-
-
-        
-            
-toolName: edit_file_search_replace
-            
-status: success
-          
-            
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\App.jsx
-          
-changes: undefined
-          
-现在让我运行测试和 lint 来验证代码。
-
-
-
-
-
-
-
-
-
-
-        
-            
-toolName: todo_write
-            
-status: success
-          
-Todos updated: 9 items
-          
-现在运行测试来验证代码。
-
-
-
-
-
-
-
-
-
-        
-            
-toolName: run_command
-            
-status: success
-          
-command: cd c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react ; npx vitest run src/pages/__tests__/git-browser/gitUtils.test.js undefined
-          
-所有 49 个测试用例都通过了！现在运行 lint 检查代码规范。
 
 
 
@@ -595,7 +333,7 @@ toolName: todo_write
             
 status: success
           
-Todos updated: 9 items
+Todos updated: 5 items
           
 
         
@@ -604,394 +342,15 @@ toolName: run_command
             
 status: success
           
-command: cd c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react ; npx eslint src/pages/git-browser --no-warn-ignored undefined
+command: pnpm exec vitest run src/pages/__tests__/git-browser/ undefined
           
-让我修复这些 lint 错误。先读取文件来修改。
+完美！所有 104 个测试通过。现在让我再运行 lint 检查确保代码规范：
 
 
 
 
 
 
-
-        
-            
-toolName: view_files
-            
-status: success
-          
-            
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\git-browser\index.jsx
-          
-让我修复这些 lint 错误。首先删除未使用的 import 和变量，并修复 useEffect 中的问题。
-
-
-
-
-
-
-
-
-
-        
-            
-toolName: edit_file_search_replace
-            
-status: success
-          
-            
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\git-browser\index.jsx
-          
-changes: undefined
-          
-
-        
-            
-toolName: edit_file_search_replace
-            
-status: success
-          
-            
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\git-browser\index.jsx
-          
-changes: undefined
-          
-现在修复 useEffect 中同步调用 setState 的问题。让我先看看这部分代码。
-
-
-
-
-
-
-
-
-
-
-        
-            
-toolName: view_files
-            
-status: success
-          
-            
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\git-browser\index.jsx
-          
-让我用 useMemo 来派生状态，而不是在 useEffect 中调用 setState。先读取更多代码。
-
-
-
-
-
-
-
-
-
-
-
-        
-            
-toolName: view_files
-            
-status: success
-          
-            
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\git-browser\index.jsx
-          
-让我找到组件的 state 声明部分。
-
-
-
-
-
-
-
-
-
-
-        
-            
-toolName: view_files
-            
-status: success
-          
-            
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\git-browser\index.jsx
-          
-让我修改代码，将 useEffect 中的逻辑改为使用 useMemo 来派生展开状态，而不是在 effect 中调用 setState。让我先看看第二个 useEffect。
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        
-            
-toolName: view_files
-            
-status: success
-          
-            
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\git-browser\index.jsx
-          
-现在让我用 useMemo 替换这两个 useEffect，避免在 effect 中同步调用 setState。我需要重写这部分逻辑。
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        
-            
-toolName: edit_file_search_replace
-            
-status: success
-          
-            
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\git-browser\index.jsx
-          
-changes: undefined
-          
-现在删除第二个 useEffect，并更新所有使用 `expanded` 的地方为 `computedExpanded`。让我先找到第二个 useEffect。
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        
-            
-toolName: view_files
-            
-status: success
-          
-            
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\git-browser\index.jsx
-          
-
-        
-            
-toolName: view_files
-            
-status: success
-          
-            
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\git-browser\index.jsx
-          
-删除第二个 useEffect，然后把渲染中使用 expanded 的地方替换成 computedExpanded。
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        
-            
-toolName: edit_file_search_replace
-            
-status: success
-          
-            
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\git-browser\index.jsx
-          
-changes: undefined
-          
-现在把渲染代码中使用 `expanded` 改为 `computedExpanded` 的地方替换。让我先搜索使用的地方。
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        
-            
-toolName: search_by_regex
-            
-status: success
-          
-query: expanded
-          
-现在把第113行和第491行的 `expanded={expanded}` 替换为 `expanded={computedExpanded}`。
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        
-            
-toolName: view_files
-            
-status: success
-          
-            
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\git-browser\index.jsx
-          
-让我找到主组件渲染 TreeNode 的地方。
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        
-            
-toolName: view_files
-            
-status: success
-          
-            
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\git-browser\index.jsx
-          
-
-        
-            
-toolName: edit_file_search_replace
-            
-status: success
-          
-            
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\git-browser\index.jsx
-          
-changes: undefined
-          
-现在检查 useEffect 是否还被使用，以及清理一下 import。
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        
-            
-toolName: search_by_regex
-            
-status: success
-          
-query: useEffect
-          
-useEffect 已经不再使用，需要从 import 中移除。
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        
-            
-toolName: edit_file_search_replace
-            
-status: success
-          
-            
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\git-browser\index.jsx
-          
-changes: undefined
-          
-现在再次运行 lint 检查。
 
 
 
@@ -1017,9 +376,9 @@ toolName: run_command
             
 status: success
           
-command: cd c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react ; npx eslint src/pages/git-browser --no-warn-ignored undefined
+command: pnpm exec eslint src/pages/git-browser/ src/pages/__tests__/git-browser/ undefined
           
-Lint 检查通过了！让我再运行一次测试确认，确保一切正常。
+完美！测试和 lint 全部通过。让我标记所有任务完成：
 
 
 
@@ -1030,23 +389,6 @@ Lint 检查通过了！让我再运行一次测试确认，确保一切正常。
 
 
 
-
-
-
-
-
-
-
-
-        
-            
-toolName: run_command
-            
-status: success
-          
-command: cd c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react ; npx vitest run src/pages/__tests__/git-browser/gitUtils.test.js undefined
-          
-所有测试都通过，lint 也通过了。让我完成所有任务。
 
 
 
@@ -1070,34 +412,41 @@ toolName: todo_write
             
 status: success
           
-Todos updated: 9 items
+Todos updated: 5 items
           
-Git 仓库浏览器页面已经实现完成！以下是实现的功能和文件结构总结：
+所有修复已完成！以下是本轮修复的详细内容：
 
-## 📁 实现文件
+## 修复总结
 
-### 页面代码（`src/pages/git-browser/`）
-- [constants.js](file:///c:/Users/vince/GoletaLab/SoloCoder-3/solocoder-react/src/pages/git-browser/constants.js) — 常量定义（文件变更状态、视图模式、分支列表、作者列表）
-- [mockData.js](file:///c:/Users/vince/GoletaLab/SoloCoder-3/solocoder-react/src/pages/git-browser/mockData.js) — 模拟数据（4个分支、20+个文件、每个分支独立的提交历史）
-- [gitUtils.js](file:///c:/Users/vince/GoletaLab/SoloCoder-3/solocoder-react/src/pages/git-browser/gitUtils.js) — 纯 JS 工具函数（20个函数）
-- [index.jsx](file:///c:/Users/vince/GoletaLab/SoloCoder-3/solocoder-react/src/pages/git-browser/index.jsx) — 主页面组件
-- [git-browser.css](file:///c:/Users/vince/GoletaLab/SoloCoder-3/solocoder-react/src/pages/git-browser/git-browser.css) — 样式（支持明暗主题、响应式布局）
+### 1. ✅ `computeCommitFileSnapshot` 支持 DELETED 状态
+- 修改 [gitUtils.js](file:///c:/Users/vince/GoletaLab/SoloCoder-3/solocoder-react/src/pages/git-browser/gitUtils.js#L400-L448)，新增对 `deletedFiles` 字段的处理
+- 目标提交中的 `deletedFiles` 标记为 `FILE_CHANGE_STATUS.DELETED`
+- 前序提交的 `deletedFiles` 会从后续快照中彻底移除（模拟真实 Git 行为）
+- 支持 `{ path, status }` 对象和纯字符串两种文件条目格式
 
-### 测试代码（`src/pages/__tests__/git-browser/`）
-- [gitUtils.test.js](file:///c:/Users/vince/GoletaLab/SoloCoder-3/solocoder-react/src/pages/__tests__/git-browser/gitUtils.test.js) — 49 个单元测试用例
+### 2. ✅ 不同提交下文件内容有差异
+- 新增 [transformContentForCommit](file:///c:/Users/vince/GoletaLab/SoloCoder-3/solocoder-react/src/pages/git-browser/gitUtils.js#L315-L325) 函数
+- 基于 `文件路径::commitHash` 做确定性种子随机，对代码行做合理变换（变量名加前缀、插入代码行等）
+- [buildFileTreeFromList](file:///c:/Users/vince/GoletaLab/SoloCoder-3/solocoder-react/src/pages/git-browser/gitUtils.js#L347-L398) 新增 `commitHash` 参数，ADDED 文件使用基础内容，MODIFIED 文件使用变换后内容
+- [index.jsx](file:///c:/Users/vince/GoletaLab/SoloCoder-3/solocoder-react/src/pages/git-browser/index.jsx#L182-L185) 选中提交时传入对应 hash
 
-### 路由注册
-- 已在 [App.jsx](file:///c:/Users/vince/GoletaLab/SoloCoder-3/solocoder-react/src/App.jsx) 中添加任务卡片（id: 36）和路由 `/git-browser`
+### 3. ✅ `generateOriginalContent` 移除硬编码占位注释
+- 重构为通用的 `applyLineTransformations` 辅助函数
+- **mode = 'original'**（生成旧版本内容）：
+  - 变量名加 `Old`/`old` 前缀或 `_old` 后缀
+  - 确定性删除少量代码行（而非插入 "// removed line" 注释）
+- **mode = 'modified'**（生成新版本内容）：
+  - 变量名加 `New`/`new` 前缀或 `_v2` 后缀
+  - 插入合理的代码行（如 `const processed = input.trim()`、`// TODO: handle edge case` 等）
 
-## ✨ 功能特性
+### 4. ✅ `mockData.js` 补充删除提交示例
+- `bugfix/header` 分支的 `fix9012` 提交增加 `deletedFiles: ['src/components/Footer.jsx']`，真实模拟"移除废弃 Footer 组件"的场景
 
-1. **文件树侧边栏** — 4级深度目录，文件夹展开/折叠，每个文件前有颜色状态图标（绿色+新增、红色-删除、橙色~修改、灰色未变更），支持搜索过滤
-2. **文件内容与 Diff 对比** — 工作区内容 / 变更 Diff 切换，Diff 支持左右分栏和统一视图两种模式，行级+字符级高亮
-3. **提交历史时间线** — 竖线串联的时间线样式，显示短哈希、作者头像、时间、提交信息，点击切换提交视图
-4. **分支切换** — 顶部下拉选择器，4个模拟分支（main/develop/feature/login/bugfix/header），每个分支有独立的文件状态和提交历史
-5. **Stage/Unstage 面板** — 已暂存/未暂存双区域，支持点击和拖拽两种操作方式，模拟 git add / git reset
-
-## ✅ 验证结果
-
-- **单元测试**：49 passed (49) ✅
-- **ESLint 检查**：0 errors, 0 warnings ✅
+### 5. ✅ 测试覆盖
+- 新增测试从 93 个增至 **104 个全部通过**，覆盖：
+  - `deletedFiles` 字段 → DELETED 状态标记
+  - 前序提交删除文件后续快照不出现
+  - `transformContentForCommit` 确定性、内容差异、空值处理
+  - `generateOriginalContent` 不包含硬编码占位注释
+  - `buildFileTreeFromList` DELETED 文件出现在树中、commitHash 内容差异
+- **Lint 检查：0 errors, 0 warnings**

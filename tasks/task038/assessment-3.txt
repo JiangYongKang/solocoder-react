@@ -1,0 +1,6 @@
+产物不满意：
+模型在合并两个 useState 懒初始化器对 loadFromStorage() 的重复调用时，引入了一个模块级缓存变量 _initStorageCache 和 _getInitStorage() 函数，并用 setTimeout(() => { _initStorageCache = null }, 0) 立即清空缓存。这个方案存在两个问题：第一，setTimeout(fn, 0) 清空缓存时间太早——在 React 18 Strict Mode 下组件会执行挂载→卸载→再挂载，第二次挂载时缓存已被清空，loadFromStorage() 仍会被重复调用，缓存实际上没有起到合并作用；第二，方案引入了模块级可变状态和 setTimeout 副作用，增加了不必要的复杂度。提示词要求的"两处初始化调用应该合并为一次"完全可以用更简单的方式实现：在组件函数体内调用一次 loadFromStorage() 后解构结果给两个 useState 非懒初始化器。根本原因是模型过度设计了解决方案，没有选择最简单直接的方式。正确做法是 const data = loadFromStorage(); const [tables, setTables] = useState(data.tables || []); const [relations, setRelations] = useState(data.relations || []);。
+
+过程不满意：
+1. 模型在第一次修改中引入 _getInitStorage 缓存和 setTimeout 清理后，意识到读取错误的 useEffect 仍会第三次调用 loadFromStorage，于是又追加了两轮 edit 来替换读取错误逻辑。这说明在一次性解决"合并调用"问题时没有通盘考虑所有 loadFromStorage 的调用点（两个 useState + 一个 useEffect），导致改完两处发现还有第三处需要联动修改。根本原因是在动手修改前没有完整列出所有调用点。正确做法是先搜索 loadFromStorage 的所有引用，确认全部调用位置后再一次性修改。
+2. 模型用 alert 替代 console.warn 做保存失败提示是正确的，但 saveToStorage 的 useEffect 依赖了 [tables, relations]，意味着用户每次对表结构做任何修改都会触发写入，如果恰巧写入失败会反复弹出 alert，对用户造成骚扰。根本原因是未考虑 alert 在频繁触发时的侵入性影响。正确做法是至少做去抖或设置弹窗冷却间隔，避免短时间内连续弹窗。

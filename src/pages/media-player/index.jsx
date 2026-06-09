@@ -628,9 +628,9 @@ const MediaPlayerPage = () => {
               <button
                 className="playlist-action-btn"
                 onClick={handleAddAllDefaults}
-                title="添加示例媒体到播放列表"
+                title="批量添加示例媒体到播放列表"
               >
-                + 添加示例
+                添加示例媒体
               </button>
               <button
                 className="playlist-action-btn danger"

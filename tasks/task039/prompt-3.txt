@@ -1,0 +1,6 @@
+你实现的正则测试器页面还存在以下问题，需要进行修复：
+
+1. regexUtils.js 中 debounce.flush() 方法只清除了计时器，但没有执行待执行的函数，与标准防抖实现 flush 时应即刻执行的语义不一致。
+2. regexUtils.js 中 computeDiff 算法使用"公共前缀/后缀 + 贪心最长公共子串"策略，当文本中间部分存在多个等长的最长公共子串时，贪心选择可能导致次优的 diff 结果，delete 和 insert 段交错而非最优的连续删除后连续插入。需要改进为更精确的 diff 算法。
+3. tokenizeRegexPattern 函数对连续的普通字符每个都单独拆为一个 token，导致渲染时每个普通字符被包裹在独立的 span 中，增加了不必要的 DOM 节点数量。连续的同类 token 应该合并。
+4. 修复后重新运行 pnpm run test，需要让所有测试通过。

@@ -13,9 +13,6 @@ const DonutChart = ({ data, valueKey = 'value', width = 300, height = 240, inner
 
   if (!data || data.length === 0) return null
 
-  const textColor = getComputedStyle(document.documentElement).getPropertyValue('--text').trim() || '#6b7280'
-  const textHColor = getComputedStyle(document.documentElement).getPropertyValue('--text-h').trim() || '#111827'
-
   const hoveredItem = hoverIndex !== null ? data[hoverIndex] : null
 
   return (
@@ -38,7 +35,7 @@ const DonutChart = ({ data, valueKey = 'value', width = 300, height = 240, inner
             y={layout.cy - 6}
             textAnchor="middle"
             dominantBaseline="middle"
-            fill={textHColor}
+            fill="var(--text-h)"
             fontSize="18"
             fontWeight="600"
           >
@@ -49,7 +46,7 @@ const DonutChart = ({ data, valueKey = 'value', width = 300, height = 240, inner
             y={layout.cy + 14}
             textAnchor="middle"
             dominantBaseline="middle"
-            fill={textColor}
+            fill="var(--text)"
             fontSize="11"
           >
             总分钟

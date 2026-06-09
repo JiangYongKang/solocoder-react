@@ -1,0 +1,4 @@
+你实现的社交动态流页面还存在一个问题没修彻底：
+
+1. utils.test.js 中新增的深度边界测试用例在函数内部用 const MAX_DEPTH = 3 硬编码构造测试数据，没有从 constants 模块导入 MAX_COMMENT_DEPTH 常量。虽然当前数值碰巧一致，但测试没有真正验证"两处使用统一常量"这个核心要求——如果将来 MAX_COMMENT_DEPTH 值被修改，这些测试仍按硬编码的 3 断言，测试会失准。需要改为直接导入并使用统一的 MAX_COMMENT_DEPTH 常量。
+2. 修复后重新运行 pnpm run test，需要让所有测试通过。

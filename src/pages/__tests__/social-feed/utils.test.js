@@ -34,6 +34,7 @@ import {
   PAGE_SIZE,
   MAX_IMAGES,
   MAX_TEXT_LENGTH,
+  MAX_COMMENT_DEPTH,
   CURRENT_USER,
   POSTS_STORAGE_KEY,
 } from '@/pages/social-feed/constants'
@@ -683,7 +684,6 @@ describe('addComment', () => {
   })
 
   it('嵌套回复超过 MAX_COMMENT_DEPTH 层时返回错误', () => {
-    const MAX_DEPTH = 3
     const buildNestedComments = (depth) => {
       if (depth === 0) return []
       return [
@@ -708,9 +708,9 @@ describe('addComment', () => {
       topics: [],
       createdAt: Date.now(),
       likeCount: 0,
-      commentCount: MAX_DEPTH,
+      commentCount: MAX_COMMENT_DEPTH,
       repostCount: 0,
-      comments: buildNestedComments(MAX_DEPTH),
+      comments: buildNestedComments(MAX_COMMENT_DEPTH),
       repostOf: null,
     }
     const posts = [deeplyNestedPost]
@@ -744,9 +744,9 @@ describe('addComment', () => {
       topics: [],
       createdAt: Date.now(),
       likeCount: 0,
-      commentCount: 2,
+      commentCount: MAX_COMMENT_DEPTH - 1,
       repostCount: 0,
-      comments: buildNestedComments(2),
+      comments: buildNestedComments(MAX_COMMENT_DEPTH - 1),
       repostOf: null,
     }
     const posts = [post]

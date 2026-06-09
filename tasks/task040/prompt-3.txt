@@ -1,0 +1,5 @@
+你实现的健身运动追踪页面还存在一个问题，需要进行修复：
+
+1. TrendChart.jsx 和 DonutChart.jsx 在组件渲染阶段调用了 getComputedStyle(document.documentElement) 来读取 CSS 自定义属性，这属于 React 渲染中的副作用，每次渲染都会强制浏览器同步计算样式。SVG 元素天然继承 CSS 变量，应该直接在 JSX 中使用 var(--accent) 等 CSS 变量值，而非通过 JS 读取。
+2. 修复后启动 pnpm run dev，手动验证图表展示效果与之前一致。
+3. 重新运行 pnpm run test，需要让所有测试通过。

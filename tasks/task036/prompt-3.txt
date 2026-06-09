@@ -1,0 +1,4 @@
+你实现的二维码工具页面还存在一个问题没修彻底：
+
+1. qrcodeDecoder.js 第 223 行仍保留了 export { unmaskGrid as applyMask } 别名导出，意味着外部仍可以使用旧名称 applyMask 导入解码器的 unmaskGrid 函数，编码器和解码器的同名函数冲突未真正消除。需要彻底清理这个别名导出。
+2. 修复后重新运行 pnpm run test，需要让所有测试通过。

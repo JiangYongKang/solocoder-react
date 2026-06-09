@@ -13,10 +13,6 @@ const TrendChart = ({ data, type = 'bar', valueKey = 'calories', width = 600, he
 
   if (!data || data.length === 0) return null
 
-  const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#6366f1'
-  const borderColor = getComputedStyle(document.documentElement).getPropertyValue('--border').trim() || '#e5e7eb'
-  const textColor = getComputedStyle(document.documentElement).getPropertyValue('--text').trim() || '#6b7280'
-
   const hoveredItem = hoverIndex !== null ? data[hoverIndex] : null
   const tooltipStyle = useMemo(() => {
     if (hoverIndex === null) return { display: 'none' }
@@ -44,7 +40,7 @@ const TrendChart = ({ data, type = 'bar', valueKey = 'calories', width = 600, he
             y1={line.y1}
             x2={line.x2}
             y2={line.y2}
-            stroke={borderColor}
+            stroke="var(--border)"
             strokeDasharray="3,3"
             strokeWidth="1"
           />
@@ -56,7 +52,7 @@ const TrendChart = ({ data, type = 'bar', valueKey = 'calories', width = 600, he
               y1={t.y}
               x2={layout.paddingLeft}
               y2={t.y}
-              stroke={textColor}
+              stroke="var(--text)"
               strokeWidth="1"
             />
             <text
@@ -64,7 +60,7 @@ const TrendChart = ({ data, type = 'bar', valueKey = 'calories', width = 600, he
               y={t.y}
               textAnchor="end"
               dominantBaseline="middle"
-              fill={textColor}
+              fill="var(--text)"
               fontSize="11"
             >
               {t.label}
@@ -78,14 +74,14 @@ const TrendChart = ({ data, type = 'bar', valueKey = 'calories', width = 600, he
               y1={layout.paddingTop + layout.chartHeight}
               x2={t.x}
               y2={layout.paddingTop + layout.chartHeight + 4}
-              stroke={textColor}
+              stroke="var(--text)"
               strokeWidth="1"
             />
             <text
               x={t.x}
               y={layout.paddingTop + layout.chartHeight + 18}
               textAnchor="middle"
-              fill={textColor}
+              fill="var(--text)"
               fontSize="11"
             >
               {t.label}
@@ -97,7 +93,7 @@ const TrendChart = ({ data, type = 'bar', valueKey = 'calories', width = 600, he
           y1={layout.paddingTop + layout.chartHeight}
           x2={layout.paddingLeft + layout.chartWidth}
           y2={layout.paddingTop + layout.chartHeight}
-          stroke={textColor}
+          stroke="var(--text)"
           strokeWidth="1"
         />
         <line
@@ -105,7 +101,7 @@ const TrendChart = ({ data, type = 'bar', valueKey = 'calories', width = 600, he
           y1={layout.paddingTop}
           x2={layout.paddingLeft}
           y2={layout.paddingTop + layout.chartHeight}
-          stroke={textColor}
+          stroke="var(--text)"
           strokeWidth="1"
         />
 
@@ -117,7 +113,7 @@ const TrendChart = ({ data, type = 'bar', valueKey = 'calories', width = 600, he
                 y={bar.y}
                 width={bar.width}
                 height={bar.height}
-                fill={accentColor}
+                fill="var(--accent)"
                 rx="3"
                 ry="3"
                 opacity={hoverIndex === null || hoverIndex === i ? 1 : 0.4}
@@ -128,19 +124,26 @@ const TrendChart = ({ data, type = 'bar', valueKey = 'calories', width = 600, he
           <>
             <defs>
               <linearGradient id="trendAreaGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={accentColor} stopOpacity="0.2" />
-                <stop offset="100%" stopColor={accentColor} stopOpacity="0" />
+                <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.2" />
+                <stop offset="100%" stopColor="var(--accent)" stopOpacity="0" />
               </linearGradient>
             </defs>
             <path d={layout.areaD} fill="url(#trendAreaGradient)" />
-            <path d={layout.pathD} fill="none" stroke={accentColor} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+            <path
+              d={layout.pathD}
+              fill="none"
+              stroke="var(--accent)"
+              strokeWidth="2"
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
             {layout.points.map((p, i) => (
               <circle
                 key={`dot-${i}`}
                 cx={p.x}
                 cy={p.y}
                 r={hoverIndex === i ? 5 : 3}
-                fill={accentColor}
+                fill="var(--accent)"
                 onMouseEnter={() => setHoverIndex(i)}
                 onMouseLeave={() => setHoverIndex(null)}
                 style={{ cursor: 'pointer' }}

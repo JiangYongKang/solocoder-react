@@ -39,6 +39,21 @@ import {
   DEFAULT_CONTEXT_MENU_HEIGHT,
 } from './dbDesignerCore'
 
+let _initStorageCache = null
+let _initStorageError = null
+
+function _getInitStorage() {
+  if (!_initStorageCache) {
+    _initStorageCache = loadFromStorage()
+    _initStorageError = _initStorageCache.error
+    setTimeout(() => {
+      _initStorageCache = null
+      _initStorageError = null
+    }, 0)
+  }
+  return _initStorageCache
+}
+
 function DBFieldRow({ table, field, fieldIndex, onUpdate, onDelete, onReorder, onStartDragRelation }) {
   const [dragOver, setDragOver] = useState(false)
 
@@ -382,11 +397,11 @@ function DBDesignerPage() {
   const innerRef = useRef(null)
 
   const [tables, setTables] = useState(() => {
-    const saved = loadFromStorage()
+    const saved = _getInitStorage()
     return saved.tables || []
   })
   const [relations, setRelations] = useState(() => {
-    const saved = loadFromStorage()
+    const saved = _getInitStorage()
     return saved.relations || []
   })
   const [selectedTableId, setSelectedTableId] = useState(null)
@@ -421,16 +436,15 @@ function DBDesignerPage() {
   }, [relationDraft])
 
   useEffect(() => {
-    const saved = loadFromStorage()
-    if (saved.error) {
-      alert('读取本地存储失败: ' + saved.error)
+    if (_initStorageError) {
+      alert('读取本地存储失败: ' + _initStorageError)
     }
   }, [])
 
   useEffect(() => {
     const result = saveToStorage({ tables, relations })
     if (!result.success) {
-      console.warn('保存本地存储失败:', result.error)
+      alert('保存本地存储失败，数据可能丢失: ' + result.error)
     }
   }, [tables, relations])
 

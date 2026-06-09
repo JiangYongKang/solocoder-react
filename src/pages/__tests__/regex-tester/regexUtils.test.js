@@ -405,28 +405,27 @@ describe('tokenizeRegexPattern', () => {
     expect(tokenizeRegexPattern(123)).toEqual([])
   })
 
-  it('普通字符应该被识别为 plain', () => {
+  it('普通字符应该被识别为 plain 并合并为单个 token', () => {
     const tokens = tokenizeRegexPattern('abc')
-    expect(tokens.length).toBe(3)
+    expect(tokens.length).toBe(1)
     expect(tokens.every((t) => t.type === 'plain')).toBe(true)
-    expect(tokens[0].value).toBe('a')
-    expect(tokens[1].value).toBe('b')
-    expect(tokens[2].value).toBe('c')
+    expect(tokens[0].value).toBe('abc')
+    expect(tokens[0].start).toBe(0)
+    expect(tokens[0].end).toBe(3)
   })
 
-  it('转义字符 \\d, \\w, \\s 等应该被识别为 escape', () => {
+  it('转义字符 \\d, \\w, \\s 等应该被识别为 escape 并合并', () => {
     const tokens = tokenizeRegexPattern('\\d\\w\\s')
-    expect(tokens.length).toBe(3)
-    expect(tokens.every((t) => t.type === 'escape')).toBe(true)
-    expect(tokens[0].value).toBe('\\d')
-    expect(tokens[1].value).toBe('\\w')
-    expect(tokens[2].value).toBe('\\s')
+    expect(tokens.length).toBe(1)
+    expect(tokens[0].type).toBe('escape')
+    expect(tokens[0].value).toBe('\\d\\w\\s')
   })
 
-  it('普通转义字符也应该识别为 escape', () => {
+  it('普通转义字符也应该识别为 escape 并合并', () => {
     const tokens = tokenizeRegexPattern('\\.\\+\\*')
-    expect(tokens.length).toBe(3)
-    expect(tokens.every((t) => t.type === 'escape')).toBe(true)
+    expect(tokens.length).toBe(1)
+    expect(tokens[0].type).toBe('escape')
+    expect(tokens[0].value).toBe('\\.\\+\\*')
   })
 
   it('字符类 [...] 应该被识别为 charClass', () => {
@@ -452,14 +451,13 @@ describe('tokenizeRegexPattern', () => {
 
   it('普通捕获组括号 ( ) 应该被识别为 group', () => {
     const tokens = tokenizeRegexPattern('(abc)')
+    expect(tokens.length).toBe(3)
     expect(tokens[0].type).toBe('group')
     expect(tokens[0].value).toBe('(')
     expect(tokens[1].type).toBe('plain')
-    expect(tokens[1].value).toBe('a')
-    expect(tokens[2].type).toBe('plain')
-    expect(tokens[3].type).toBe('plain')
-    expect(tokens[4].type).toBe('group')
-    expect(tokens[4].value).toBe(')')
+    expect(tokens[1].value).toBe('abc')
+    expect(tokens[2].type).toBe('group')
+    expect(tokens[2].value).toBe(')')
   })
 
   it('非捕获组 (?:...) 应该被识别为 group', () => {
@@ -565,6 +563,37 @@ describe('tokenizeRegexPattern', () => {
       expect(reconstructed).toBe(p)
     }
   })
+
+  it('连续的同类 token 应该被正确合并', () => {
+    const tokens = tokenizeRegexPattern('hello')
+    expect(tokens.length).toBe(1)
+    expect(tokens[0].type).toBe('plain')
+    expect(tokens[0].value).toBe('hello')
+  })
+
+  it('合并后 token 的 start 和 end 应该正确', () => {
+    const tokens = tokenizeRegexPattern('foo\\d\\dbar')
+    expect(tokens.length).toBe(3)
+    expect(tokens[0].type).toBe('plain')
+    expect(tokens[0].value).toBe('foo')
+    expect(tokens[0].start).toBe(0)
+    expect(tokens[0].end).toBe(3)
+    expect(tokens[1].type).toBe('escape')
+    expect(tokens[1].value).toBe('\\d\\d')
+    expect(tokens[1].start).toBe(3)
+    expect(tokens[1].end).toBe(7)
+    expect(tokens[2].type).toBe('plain')
+    expect(tokens[2].value).toBe('bar')
+    expect(tokens[2].start).toBe(7)
+    expect(tokens[2].end).toBe(10)
+  })
+
+  it('连续的量词 token 不应该被错误合并（通常不会连续出现）', () => {
+    const tokens = tokenizeRegexPattern('a*?+')
+    expect(tokens.length).toBe(2)
+    expect(tokens[0].type).toBe('plain')
+    expect(tokens[1].type).toBe('quantifier')
+  })
 })
 
 describe('debounce', () => {
@@ -625,13 +654,42 @@ describe('debounce', () => {
     expect(fn).not.toHaveBeenCalled()
   })
 
-  it('flush 方法应该立即清除待执行的计时器', () => {
+  it('flush 方法应该立即执行待执行的函数', () => {
+    const fn = vi.fn()
+    const debounced = debounce(fn, 100)
+    debounced()
+    expect(fn).not.toHaveBeenCalled()
+    debounced.flush()
+    expect(fn).toHaveBeenCalledTimes(1)
+  })
+
+  it('flush 方法应该正确传递参数和上下文', () => {
+    const context = { value: 99 }
+    const fn = vi.fn(function (x, y) {
+      return this.value + x + y
+    })
+    const debounced = debounce(fn, 100)
+    debounced.call(context, 1, 2)
+    debounced.flush()
+    expect(fn).toHaveBeenCalledWith(1, 2)
+    expect(fn).toHaveReturnedWith(102)
+  })
+
+  it('flush 在没有待执行函数时不应该调用', () => {
+    const fn = vi.fn()
+    const debounced = debounce(fn, 100)
+    debounced.flush()
+    expect(fn).not.toHaveBeenCalled()
+  })
+
+  it('flush 执行后，等待时间内不应该再次执行', () => {
     const fn = vi.fn()
     const debounced = debounce(fn, 100)
     debounced()
     debounced.flush()
-    vi.advanceTimersByTime(100)
-    expect(fn).not.toHaveBeenCalled()
+    expect(fn).toHaveBeenCalledTimes(1)
+    vi.advanceTimersByTime(200)
+    expect(fn).toHaveBeenCalledTimes(1)
   })
 
   it('传入非函数参数应该抛出 TypeError', () => {

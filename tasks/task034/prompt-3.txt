@@ -1,0 +1,7 @@
+你实现的音视频播放器页面还存在以下问题，需要进行修复：
+
+1. 播放列表的批量操作按钮文案为"+ 添加示例"，功能是添加默认示例项，与提示词要求的"全部添加到队列"功能语义不符。应该实现将播放列表中所有可用项批量加入播放队列的功能。
+2. media-player.css 中 .fullscreen-hidden:hover 规则设置了 pointer-events: auto，意图在鼠标悬停隐藏的控制栏时恢复交互。但由于 .fullscreen-hidden 本身设置了 pointer-events: none，:hover 伪类不会被触发，这条 CSS 规则是无效的死代码，需要清理或改用其他方式实现。
+3. 测试文件 mediaPlayerUtils.test.js 中有一处断言用了 .toBe('A'.replace('A', 'B')) 写法，用 replace 包裹纯常量字符串运算，增加了不必要的阅读成本，应简化为直接断言目标值。
+4. 修复完成后启动 pnpm run dev，手动验证"全部添加到队列"功能和控制栏隐藏后的交互表现。
+5. 重新运行 pnpm run test，需要让所有测试通过。

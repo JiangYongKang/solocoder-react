@@ -220,8 +220,6 @@ export function unmaskGrid(grid, maskIndex, version) {
   return result
 }
 
-export { unmaskGrid as applyMask }
-
 function isDataArea(r, c, size, version) {
   return !isReservedFunction(r, c, size, version)
 }

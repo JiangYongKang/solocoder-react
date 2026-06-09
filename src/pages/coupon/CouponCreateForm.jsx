@@ -128,9 +128,9 @@ export default function CouponCreateForm({ coupons, onCouponsChange }) {
               <input
                 type="number"
                 step="0.01"
-                min="0"
+                min="0.01"
                 className="coupon-form-input"
-                placeholder="满多少元可用，0表示无门槛"
+                placeholder="请输入最低消费金额（元），必须为正数"
                 value={form.threshold}
                 onChange={(e) => handleChange('threshold', e.target.value)}
               />

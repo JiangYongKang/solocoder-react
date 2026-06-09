@@ -180,9 +180,9 @@ const GitBrowserPage = () => {
   }, [commitHistory, selectedCommit, baseFileList])
 
   const commitFileTree = useMemo(() => {
-    if (!commitFileList) return null
-    return buildFileTreeFromList(commitFileList, baseFileContents)
-  }, [commitFileList, baseFileContents])
+    if (!commitFileList || !selectedCommit) return null
+    return buildFileTreeFromList(commitFileList, baseFileContents, selectedCommit.hash)
+  }, [commitFileList, baseFileContents, selectedCommit])
 
   const fileTree = useMemo(() => commitFileTree || baseFileTree, [commitFileTree, baseFileTree])
 

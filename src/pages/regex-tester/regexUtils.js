@@ -412,7 +412,25 @@ export const tokenizeRegexPattern = (pattern) => {
     i++
   }
 
-  return tokens
+  if (tokens.length <= 1) {
+    return tokens
+  }
+
+  const merged = []
+  let current = { ...tokens[0] }
+  for (let k = 1; k < tokens.length; k++) {
+    const t = tokens[k]
+    if (t.type === current.type && t.start === current.end) {
+      current.value += t.value
+      current.end = t.end
+    } else {
+      merged.push(current)
+      current = { ...t }
+    }
+  }
+  merged.push(current)
+
+  return merged
 }
 
 export const debounce = (fn, wait) => {
@@ -420,14 +438,21 @@ export const debounce = (fn, wait) => {
     throw new TypeError('Expected a function')
   }
   let timeoutId = null
+  let lastArgs = null
+  let lastContext = null
   const debounced = function (...args) {
-    const context = this
+    lastArgs = args
+    lastContext = this
     if (timeoutId !== null) {
       clearTimeout(timeoutId)
     }
     timeoutId = setTimeout(() => {
+      const ctx = lastContext
+      const a = lastArgs
       timeoutId = null
-      fn.apply(context, args)
+      lastArgs = null
+      lastContext = null
+      fn.apply(ctx, a)
     }, wait)
   }
   debounced.cancel = function () {
@@ -435,11 +460,20 @@ export const debounce = (fn, wait) => {
       clearTimeout(timeoutId)
       timeoutId = null
     }
+    lastArgs = null
+    lastContext = null
   }
   debounced.flush = function () {
     if (timeoutId !== null) {
       clearTimeout(timeoutId)
       timeoutId = null
+      const ctx = lastContext
+      const a = lastArgs
+      lastArgs = null
+      lastContext = null
+      if (a !== null) {
+        fn.apply(ctx, a)
+      }
     }
   }
   return debounced
@@ -464,6 +498,60 @@ const findCommonSuffix = (a, b, prefixLen) => {
   const max = Math.min(maxA, maxB)
   while (i < max && a[a.length - 1 - i] === b[b.length - 1 - i]) i++
   return i
+}
+
+const buildDiffFromLCS = (aArr, bArr) => {
+  const n = aArr.length
+  const m = bArr.length
+  const dp = Array.from({ length: n + 1 }, () => new Uint32Array(m + 1))
+
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) {
+      if (aArr[i] === bArr[j]) {
+        dp[i][j] = dp[i + 1][j + 1] + 1
+      } else {
+        dp[i][j] = Math.max(dp[i + 1][j], dp[i][j + 1])
+      }
+    }
+  }
+
+  const ops = []
+  let i = 0
+  let j = 0
+
+  while (i < n && j < m) {
+    if (aArr[i] === bArr[j]) {
+      ops.push({ type: 'equal', value: aArr[i] })
+      i++
+      j++
+    } else if (dp[i + 1][j] >= dp[i][j + 1]) {
+      ops.push({ type: 'delete', value: aArr[i] })
+      i++
+    } else {
+      ops.push({ type: 'insert', value: bArr[j] })
+      j++
+    }
+  }
+
+  while (i < n) {
+    ops.push({ type: 'delete', value: aArr[i] })
+    i++
+  }
+  while (j < m) {
+    ops.push({ type: 'insert', value: bArr[j] })
+    j++
+  }
+
+  const merged = []
+  for (const op of ops) {
+    if (merged.length > 0 && merged[merged.length - 1].type === op.type) {
+      merged[merged.length - 1].value += op.value
+    } else {
+      merged.push({ type: op.type, value: op.value })
+    }
+  }
+
+  return merged
 }
 
 export const computeDiff = (oldStr, newStr) => {
@@ -496,58 +584,14 @@ export const computeDiff = (oldStr, newStr) => {
   const bMid = bArr.slice(prefixLen, bArr.length - suffixLen)
 
   if (aMid.length === 0 && bMid.length === 0) {
-    // all equal, should not reach here due to initial equality check
+    // should not happen due to initial equality check
   } else if (aMid.length === 0) {
     result.push({ type: 'insert', value: bMid.join('') })
   } else if (bMid.length === 0) {
     result.push({ type: 'delete', value: aMid.join('') })
   } else {
-    let i = 0
-    let j = 0
-    const n = aMid.length
-    const m = bMid.length
-
-    while (i < n && j < m) {
-      let bestMatchLen = 0
-      let bestI = -1
-      let bestJ = -1
-
-      for (let di = i; di < n; di++) {
-        for (let dj = j; dj < m; dj++) {
-          let matchLen = 0
-          while (di + matchLen < n && dj + matchLen < m && aMid[di + matchLen] === bMid[dj + matchLen]) {
-            matchLen++
-          }
-          if (matchLen > bestMatchLen) {
-            bestMatchLen = matchLen
-            bestI = di
-            bestJ = dj
-          }
-        }
-      }
-
-      if (bestMatchLen === 0) {
-        break
-      }
-
-      if (bestI > i) {
-        result.push({ type: 'delete', value: aMid.slice(i, bestI).join('') })
-      }
-      if (bestJ > j) {
-        result.push({ type: 'insert', value: bMid.slice(j, bestJ).join('') })
-      }
-      result.push({ type: 'equal', value: aMid.slice(bestI, bestI + bestMatchLen).join('') })
-
-      i = bestI + bestMatchLen
-      j = bestJ + bestMatchLen
-    }
-
-    if (i < n) {
-      result.push({ type: 'delete', value: aMid.slice(i).join('') })
-    }
-    if (j < m) {
-      result.push({ type: 'insert', value: bMid.slice(j).join('') })
-    }
+    const midOps = buildDiffFromLCS(aMid, bMid)
+    result.push(...midOps)
   }
 
   if (suffixLen > 0) {

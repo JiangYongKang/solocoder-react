@@ -1263,7 +1263,7 @@ const BUILD_COMMIT_HISTORY = (branch) => {
       { hash: 'e4f5g6h', author: AUTHORS[1], message: 'feat: 添加核心页面组件', timestamp: baseTime - 86400000 * 6, files: ['src/App.js', 'src/index.js', 'src/components/Header.jsx', 'src/components/Footer.jsx'] },
       { hash: 'fix1234', author: AUTHORS[2], message: 'fix: 修复 Header 响应式布局', timestamp: baseTime - 86400000 * 4, files: ['src/components/Header.jsx', 'src/styles/main.css'] },
       { hash: 'fix5678', author: AUTHORS[1], message: 'fix: 修复用户资料页面滚动', timestamp: baseTime - 86400000 * 3, files: ['src/pages/UserProfile.jsx'] },
-      { hash: 'fix9012', author: AUTHORS[2], message: 'fix: 移除废弃的 Footer 组件', timestamp: baseTime - 86400000 * 2, files: ['src/components/Footer.jsx', 'src/styles/main.css'] },
+      { hash: 'fix9012', author: AUTHORS[2], message: 'fix: 移除废弃的 Footer 组件', timestamp: baseTime - 86400000 * 2, files: ['src/styles/main.css'], deletedFiles: ['src/components/Footer.jsx'] },
       { hash: 'fix3456', author: AUTHORS[0], message: 'fix: 修复 localStorage hook 类型错误', timestamp: baseTime - 86400000 * 1.5, files: ['src/hooks/useLocalStorage.js'] },
       { hash: 'fix7890', author: AUTHORS[3], message: 'fix: 添加 ESLint 配置', timestamp: baseTime - 86400000, files: ['.eslintrc.js', 'babel.config.js', 'package.json'] },
       { hash: 'fix0123', author: AUTHORS[1], message: 'fix: 修复构建配置', timestamp: baseTime - 86400000 * 0.5, files: ['config/webpack.config.js'] },

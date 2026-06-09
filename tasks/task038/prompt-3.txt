@@ -1,0 +1,5 @@
+你实现的数据库表设计器页面还存在以下问题，需要进行修复：
+
+1. index.jsx 中 saveToStorage 在 localStorage 写入失败时只用了 console.warn 输出警告，没有任何用户可见的错误反馈。数据持久化是关键操作，如果写入失败用户不会察觉数据未保存，刷新页面后所有修改会丢失。需要给用户可见的失败提示。
+2. index.jsx 中 useState 的懒初始化器对 loadFromStorage() 进行了重复调用——两个 useState 分别独立调用了一次，导致同一份 localStorage 数据在同一次页面加载中被读取和 JSON 解析了两次。两处初始化调用应该合并为一次。
+3. 修复后重新运行 pnpm run test，需要让所有测试通过。

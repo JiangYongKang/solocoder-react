@@ -237,6 +237,93 @@ export const filterFileTree = (node, searchTerm) => {
   return null
 }
 
+const normalizeFileEntry = (entry) => {
+  if (typeof entry === 'string') {
+    return { path: entry, status: null }
+  }
+  return entry
+}
+
+const applyLineTransformations = (lines, rand, options = {}) => {
+  const { mode = 'original' } = options
+  const result = [...lines]
+  const lineCount = result.length
+
+  if (lineCount === 0) return result
+
+  const numReplacements = Math.min(
+    Math.max(1, Math.floor(lineCount * 0.15) + 1),
+    Math.floor(lineCount / 2),
+    3
+  )
+
+  for (let i = 0; i < numReplacements; i++) {
+    const idx = Math.floor(rand() * lineCount)
+    if (typeof result[idx] === 'string' && result[idx].length > 5) {
+      if (mode === 'original') {
+        result[idx] = result[idx].replace(/[A-Za-z_][A-Za-z0-9_]*/, (match) => {
+          if (match.length >= 3 && /^[A-Z]/.test(match)) {
+            return 'Old' + match.slice(1)
+          }
+          if (match.length >= 3) {
+            return 'old' + match.charAt(0).toUpperCase() + match.slice(1)
+          }
+          return match + '_old'
+        })
+      } else {
+        result[idx] = result[idx].replace(/[A-Za-z_][A-Za-z0-9_]*/, (match) => {
+          if (match.length >= 3 && /^[A-Z]/.test(match)) {
+            return 'New' + match.slice(1)
+          }
+          if (match.length >= 3) {
+            return 'new' + match.charAt(0).toUpperCase() + match.slice(1)
+          }
+          return match + '_v2'
+        })
+      }
+    }
+  }
+
+  if (mode === 'original' && lineCount > 4) {
+    const numDeletions = Math.min(2, Math.floor(lineCount / 6) + 1)
+    for (let i = 0; i < numDeletions; i++) {
+      const delIdx = Math.floor(rand() * result.length)
+      if (delIdx >= 0 && delIdx < result.length) {
+        result.splice(delIdx, 1)
+      }
+    }
+  }
+
+  if (mode === 'modified' && lineCount > 3) {
+    const numInsertions = Math.min(2, Math.floor(lineCount / 8) + 1)
+    for (let i = 0; i < numInsertions; i++) {
+      const insIdx = Math.floor(rand() * (result.length + 1))
+      const placeholderLines = [
+        '  // TODO: handle edge case',
+        '  const processed = input.trim()',
+        '  return result ?? defaultValue',
+        '  /* istanbul ignore next */',
+        '  logger.debug("step completed")',
+      ]
+      result.splice(insIdx, 0, placeholderLines[Math.floor(rand() * placeholderLines.length)])
+    }
+  }
+
+  return result
+}
+
+export const transformContentForCommit = (filePath, baseContent, commitHash) => {
+  if (!baseContent || typeof baseContent !== 'string') return baseContent || ''
+  const seed = simpleHash(`${filePath}::${commitHash || 'base'}`)
+  const rand = seededRandom(seed)
+  const lines = baseContent.split('\n')
+
+  if (!commitHash) return baseContent
+
+  const transformed = applyLineTransformations(lines, rand, { mode: 'modified' })
+  return transformed.join('\n')
+}
+
 export const generateOriginalContent = (file) => {
   if (!file || !file.content) return ''
   const content = file.content
@@ -251,24 +338,13 @@ export const generateOriginalContent = (file) => {
   if (file.status === FILE_CHANGE_STATUS.MODIFIED) {
     const seed = simpleHash(file.path || file.name || 'default')
     const rand = seededRandom(seed)
-    const modified = [...lines]
-    const numChanges = Math.min(3, Math.max(1, Math.floor(rand() * 3) + 1))
-    for (let i = 0; i < numChanges; i++) {
-      const idx = Math.floor(rand() * modified.length)
-      if (modified[idx] && modified[idx].length > 10) {
-        modified[idx] = modified[idx].replace(/\w+/, 'old')
-      }
-    }
-    if (modified.length > 2) {
-      const insertIdx = Math.floor(modified.length / 2)
-      modified.splice(insertIdx, 0, '// removed line 1', '// removed line 2')
-    }
+    const modified = applyLineTransformations(lines, rand, { mode: 'original' })
     return modified.join('\n')
   }
   return content
 }
 
-export const buildFileTreeFromList = (fileList, fileContents) => {
+export const buildFileTreeFromList = (fileList, fileContents, commitHash) => {
   if (!Array.isArray(fileList)) return null
   const tree = {
     id: 'root',
@@ -284,19 +360,28 @@ export const buildFileTreeFromList = (fileList, fileContents) => {
     for (let i = 0; i < parts.length; i++) {
       const part = parts[i]
       if (i === parts.length - 1) {
+        const baseContent = fileContents[path] || `// ${part}\n// This is the content of ${path}`
+        let finalContent
+        if (status === FILE_CHANGE_STATUS.DELETED) {
+          finalContent = baseContent
+        } else if (commitHash && status !== FILE_CHANGE_STATUS.ADDED) {
+          finalContent = transformContentForCommit(path, baseContent, commitHash)
+        } else {
+          finalContent = baseContent
+        }
         current.children.push({
-          id: `file-${path}`,
+          id: `file-${path}-${commitHash || 'base'}`,
           name: part,
           type: FILE_TYPE.FILE,
           path,
           status,
-          content: fileContents[path] || `// ${part}\n// This is the content of ${path}`,
+          content: finalContent,
         })
       } else {
         let existing = current.children.find((c) => c.name === part && c.type === FILE_TYPE.FOLDER)
         if (!existing) {
           existing = {
-            id: `folder-${parts.slice(0, i + 1).join('/')}`,
+            id: `folder-${parts.slice(0, i + 1).join('/')}-${commitHash || 'base'}`,
             name: part,
             type: FILE_TYPE.FOLDER,
             status: FILE_CHANGE_STATUS.UNCHANGED,
@@ -322,16 +407,43 @@ export const computeCommitFileSnapshot = (commitHistory, targetCommitHash, baseF
 
   for (let i = 0; i <= targetIdx; i++) {
     const commit = commitHistory[i]
-    if (!commit || !Array.isArray(commit.files)) continue
-    commit.files.forEach((filePath) => {
+    if (!commit) continue
+    const files = Array.isArray(commit.files) ? commit.files : []
+    const deletedFiles = Array.isArray(commit.deletedFiles) ? commit.deletedFiles : []
+
+    files.forEach((entry) => {
+      const { path, status: explicitStatus } = normalizeFileEntry(entry)
       if (i === targetIdx) {
-        if (fileMap.has(filePath)) {
-          fileMap.set(filePath, { path: filePath, status: FILE_CHANGE_STATUS.MODIFIED })
-        } else {
-          fileMap.set(filePath, { path: filePath, status: FILE_CHANGE_STATUS.ADDED })
+        if (explicitStatus === FILE_CHANGE_STATUS.ADDED && !fileMap.has(path)) {
+          fileMap.set(path, { path, status: FILE_CHANGE_STATUS.ADDED })
+        } else if (explicitStatus === FILE_CHANGE_STATUS.MODIFIED && fileMap.has(path)) {
+          fileMap.set(path, { path, status: FILE_CHANGE_STATUS.MODIFIED })
+        } else if (!explicitStatus) {
+          if (fileMap.has(path)) {
+            fileMap.set(path, { path, status: FILE_CHANGE_STATUS.MODIFIED })
+          } else {
+            fileMap.set(path, { path, status: FILE_CHANGE_STATUS.ADDED })
+          }
         }
       } else {
-        fileMap.set(filePath, { path: filePath, status: FILE_CHANGE_STATUS.UNCHANGED })
+        if (!fileMap.has(path)) {
+          fileMap.set(path, { path, status: FILE_CHANGE_STATUS.UNCHANGED })
+        } else {
+          fileMap.set(path, { path, status: FILE_CHANGE_STATUS.UNCHANGED })
+        }
+      }
+    })
+
+    deletedFiles.forEach((entry) => {
+      const { path } = normalizeFileEntry(entry)
+      if (i === targetIdx) {
+        if (fileMap.has(path)) {
+          fileMap.set(path, { path, status: FILE_CHANGE_STATUS.DELETED })
+        } else {
+          fileMap.set(path, { path, status: FILE_CHANGE_STATUS.DELETED })
+        }
+      } else {
+        fileMap.delete(path)
       }
     })
   }

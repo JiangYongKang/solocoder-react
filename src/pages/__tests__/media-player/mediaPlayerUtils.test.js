@@ -993,7 +993,7 @@ describe('mergePlaylistItems', () => {
     expect(result.length).toBe(3)
     expect(result[0].id).toBe('a')
     expect(result[1].id).toBe('b')
-    expect(result[1].title).toBe('A'.replace('A', 'B'))
+    expect(result[1].title).toBe('B')
     expect(result[2].id).toBe('c')
   })
 

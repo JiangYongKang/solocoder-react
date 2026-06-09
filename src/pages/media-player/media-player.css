@@ -497,7 +497,6 @@
   pointer-events: none;
 }
 
-.media-player-controls.fullscreen-hidden:hover,
 .media-player-controls.fullscreen-visible {
   opacity: 1;
   pointer-events: auto;

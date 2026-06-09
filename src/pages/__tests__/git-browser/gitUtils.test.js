@@ -21,6 +21,7 @@ import {
   sortTreeChildren,
   filterFileTree,
   generateOriginalContent,
+  transformContentForCommit,
   buildFileTreeFromList,
   computeCommitFileSnapshot,
 } from '../../git-browser/gitUtils'
@@ -583,5 +584,138 @@ describe('computeCommitFileSnapshot', () => {
   it('非数组输入应返回空数组', () => {
     expect(computeCommitFileSnapshot(null, 'c001', baseFileList)).toEqual([])
     expect(computeCommitFileSnapshot(commitHistory, 'c001', null)).toEqual([])
+  })
+
+  it('应正确处理包含 deletedFiles 的提交（DELETED 状态）', () => {
+    const history = [
+      { hash: 'c001', files: ['README.md', 'src/old.js'] },
+      { hash: 'c002', files: ['package.json'], deletedFiles: ['src/old.js'] },
+    ]
+    const baseList = [
+      { path: 'package.json', status: FILE_CHANGE_STATUS.UNCHANGED },
+      { path: 'README.md', status: FILE_CHANGE_STATUS.UNCHANGED },
+      { path: 'src/old.js', status: FILE_CHANGE_STATUS.UNCHANGED },
+    ]
+    const result = computeCommitFileSnapshot(history, 'c002', baseList)
+    const deleted = result.find((f) => f.path === 'src/old.js')
+    expect(deleted).not.toBeUndefined()
+    expect(deleted.status).toBe(FILE_CHANGE_STATUS.DELETED)
+
+    const pkg = result.find((f) => f.path === 'package.json')
+    expect(pkg.status).toBe(FILE_CHANGE_STATUS.MODIFIED)
+  })
+
+  it('前序提交的 deletedFiles 应从快照中彻底移除文件', () => {
+    const history = [
+      { hash: 'c001', files: ['README.md', 'src/old.js'] },
+      { hash: 'c002', files: [], deletedFiles: ['src/old.js'] },
+      { hash: 'c003', files: ['package.json'] },
+    ]
+    const baseList = [
+      { path: 'package.json', status: FILE_CHANGE_STATUS.UNCHANGED },
+      { path: 'README.md', status: FILE_CHANGE_STATUS.UNCHANGED },
+      { path: 'src/old.js', status: FILE_CHANGE_STATUS.UNCHANGED },
+    ]
+    const result = computeCommitFileSnapshot(history, 'c003', baseList)
+    const deleted = result.find((f) => f.path === 'src/old.js')
+    expect(deleted).toBeUndefined()
+  })
+})
+
+describe('generateOriginalContent 内容真实度', () => {
+  it('MODIFIED 状态生成的内容不应包含硬编码的 removed line 占位注释', () => {
+    const file = {
+      path: 'src/App.js',
+      status: FILE_CHANGE_STATUS.MODIFIED,
+      content: 'import React from "react"\nimport Header from "./Header"\nfunction App() {\n  return <div>Hello</div>\n}\nexport default App',
+    }
+    const result = generateOriginalContent(file)
+    expect(result).not.toContain('// removed line 1')
+    expect(result).not.toContain('// removed line 2')
+    expect(result).not.toContain('removed line')
+  })
+
+  it('MODIFIED 状态应生成与代码风格相符的变换结果', () => {
+    const file = {
+      path: 'src/App.js',
+      status: FILE_CHANGE_STATUS.MODIFIED,
+      content: 'import React from "react"\nimport Header from "./Header"\nfunction App() {\n  const data = fetchData()\n  return <div>Hello</div>\n}\nexport default App',
+    }
+    const result = generateOriginalContent(file)
+    expect(typeof result).toBe('string')
+    expect(result.length).toBeGreaterThan(0)
+    expect(result.split('\n').length).toBeGreaterThan(0)
+  })
+})
+
+describe('transformContentForCommit', () => {
+  it('未提供 commitHash 时应返回原始内容', () => {
+    const content = 'const foo = 1\nconst bar = 2'
+    const result = transformContentForCommit('src/test.js', content, null)
+    expect(result).toBe(content)
+    const result2 = transformContentForCommit('src/test.js', content, '')
+    expect(result2).toBe(content)
+  })
+
+  it('相同 commitHash 对同一文件应生成确定性内容', () => {
+    const content = 'const foo = 1\nconst bar = 2\nconst baz = 3\nconst qux = 4\nconst quux = 5'
+    const r1 = transformContentForCommit('src/a.js', content, 'abc123')
+    const r2 = transformContentForCommit('src/a.js', content, 'abc123')
+    expect(r1).toBe(r2)
+  })
+
+  it('不同 commitHash 应生成不同的内容变换', () => {
+    const content = 'const foo = 1\nconst bar = 2\nconst baz = 3\nconst qux = 4\nconst quux = 5'
+    const r1 = transformContentForCommit('src/a.js', content, 'abc123')
+    const r2 = transformContentForCommit('src/a.js', content, 'def456')
+    expect(r1).not.toBe(r2)
+  })
+
+  it('空内容或非字符串应安全处理', () => {
+    expect(transformContentForCommit('src/x.js', '', 'abc')).toBe('')
+    expect(transformContentForCommit('src/x.js', null, 'abc')).toBe('')
+    expect(transformContentForCommit('src/x.js', undefined, 'abc')).toBe('')
+  })
+
+  it('ADDED 状态的文件在 buildFileTreeFromList 中应使用基础内容', () => {
+    const fileList = [{ path: 'src/new.js', status: FILE_CHANGE_STATUS.ADDED }]
+    const fileContents = { 'src/new.js': '// brand new file content' }
+    const tree = buildFileTreeFromList(fileList, fileContents, 'commit-hash-123')
+    const files = getAllFilesFromTree(tree)
+    expect(files[0].content).toBe('// brand new file content')
+  })
+})
+
+describe('buildFileTreeFromList DELETED 状态', () => {
+  it('DELETED 状态的文件应出现在树中并标记为删除', () => {
+    const fileList = [
+      { path: 'src/keep.js', status: FILE_CHANGE_STATUS.UNCHANGED },
+      { path: 'src/removed.js', status: FILE_CHANGE_STATUS.DELETED },
+    ]
+    const fileContents = {
+      'src/keep.js': 'const keep = true',
+      'src/removed.js': 'const removed = true',
+    }
+    const tree = buildFileTreeFromList(fileList, fileContents)
+    const files = getAllFilesFromTree(tree)
+    expect(files.length).toBe(2)
+    const deleted = files.find((f) => f.path === 'src/removed.js')
+    expect(deleted).not.toBeUndefined()
+    expect(deleted.status).toBe(FILE_CHANGE_STATUS.DELETED)
+    expect(deleted.content).toBe('const removed = true')
+  })
+
+  it('传入 commitHash 时 MODIFIED 文件内容应与基础内容不同', () => {
+    const fileList = [
+      { path: 'src/App.js', status: FILE_CHANGE_STATUS.MODIFIED },
+    ]
+    const fileContents = {
+      'src/App.js': 'import React from "react"\nimport Header from "./Header"\nfunction App() {\n  return <div>Hi</div>\n}\nexport default App',
+    }
+    const treeBase = buildFileTreeFromList(fileList, fileContents)
+    const treeCommit = buildFileTreeFromList(fileList, fileContents, 'commit-xyz')
+    const contentBase = getAllFilesFromTree(treeBase)[0].content
+    const contentCommit = getAllFilesFromTree(treeCommit)[0].content
+    expect(contentCommit).not.toBe(contentBase)
   })
 })

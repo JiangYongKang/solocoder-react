@@ -1,113 +1,21 @@
-我来逐一修复这些问题。首先创建任务列表：
+我来修复这些问题。首先让我创建一个任务列表来跟踪这些修复工作：
         
             
 toolName: todo_write
             
 status: success
           
-Todos updated: 8 items
+Todos updated: 6 items
           
-先检查 App.jsx 中 TASKS 数组的情况：
-
-
-        
-            
-toolName: view_files
-            
-status: success
-          
-            
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\App.jsx
-          
-好的，我发现了问题。现在逐一修复：
-
-1. **TASKS 数组**：确实没有优惠券任务条目，id 36 是数据库表设计器，需要添加新条目
-2. **couponUtils.js**：需要修复 validateCoupon 和 createCoupon 的问题
-3. **还有一个问题**：第145行用了 `ApiDebuggerPage` 但没有 import（不过这是之前的问题，不是我需要关注的）
-
-先修复 TASKS 数组：
+让我先看看项目根目录的调试临时文件，然后逐一修复问题：
 
         
             
-toolName: edit_file_search_replace
+toolName: file_search
             
 status: success
           
-            
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\App.jsx
-          
-changes: undefined
-          
-
-        
-            
-toolName: todo_write
-            
-status: success
-          
-Todos updated: 8 items
-          
-现在读取 couponUtils.js 中的 validateCoupon 和 createCoupon 函数：
-
-
-
-        
-            
-toolName: view_files
-            
-status: success
-          
-            
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\coupon\couponUtils.js
-          
-现在修复这两个问题。首先是 validateCoupon 的门槛校验（改为必须为正数）：
-
-
-
-        
-            
-toolName: edit_file_search_replace
-            
-status: success
-          
-            
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\coupon\couponUtils.js
-          
-changes: undefined
-          
-现在修复 createCoupon 中的 `|| 0` 默认值处理问题：
-
-        
-            
-toolName: todo_write
-            
-status: success
-          
-Todos updated: 8 items
-          
-
-        
-            
-toolName: edit_file_search_replace
-            
-status: success
-          
-            
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\coupon\couponUtils.js
-          
-changes: undefined
-          
-现在修复 CheckoutPanel.jsx 中对 `useCoupon` 的引用（改为 `markCouponAsUsed`）：
-
-
-
-        
-            
-toolName: todo_write
-            
-status: success
-          
-Todos updated: 8 items
+file_pattern: debug-*.mjs
           
 
         
@@ -117,7 +25,19 @@ toolName: view_files
 status: success
           
             
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\coupon\CheckoutPanel.jsx
+filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\qrcode\qrcodeDecoder.js
+          
+好的，我现在看到了 qrcodeDecoder.js 的完整代码。让我先检查项目根目录的调试文件，然后逐一修复问题：
+
+
+
+        
+            
+toolName: view_folder
+            
+status: success
+          
+c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react
           
 
         
@@ -127,13 +47,35 @@ toolName: view_files
 status: success
           
             
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\coupon\index.jsx
+filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\qrcode\qrcodeEncoder.js
           
-很好，我看到：
-1. **CheckoutPanel.jsx** 已经正确导入并使用了 `markCouponAsUsed`（第11行导入，第52行调用）✅
-2. **index.jsx** 已经使用了 `useState(() => loadCoupons())` 的懒加载方式，没有 useEffect 同步 setState 的问题✅
+让我检查调试文件并查看 index.jsx 中是否有导入 applyMask 的地方，以便进行全面的重命名：
 
-现在让我检查现有的测试文件，然后补充边界情况的测试：
+
+
+
+
+        
+            
+toolName: run_command
+            
+status: success
+          
+command: Get-ChildItem -Path "c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react" -Filter "debug-*" -File undefined
+          
+
+        
+            
+toolName: search_by_regex
+            
+status: success
+          
+query: applyMask
+          
+很好，我已经清楚了所有需要修复的问题。调试临时文件看起来已经不存在了。现在开始逐一修复：
+
+首先重命名两个 applyMask 函数并修复所有问题。让我从 qrcodeEncoder.js 开始：
+
 
 
 
@@ -145,40 +87,11 @@ toolName: todo_write
             
 status: success
           
-Todos updated: 8 items
+Todos updated: 4 items
           
-
-        
-            
-toolName: view_files
-            
-status: success
-          
-            
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\__tests__\coupon\couponUtils.test.js
-          
-现在补充边界情况的单元测试。我需要在现有测试文件中添加以下测试用例：
-1. 满减券门槛为0时报错
-2. 折扣券门槛为0时报错
-3. createCoupon 传入无效门槛值时返回失败
-4. createCoupon 传入门槛为0时返回失败
+首先修复 qrcodeEncoder.js，将 applyMask 重命名为 applyDataMask：
 
 
-
-
-
-        
-            
-toolName: edit_file_search_replace
-            
-status: success
-          
-            
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\__tests__\coupon\couponUtils.test.js
-          
-changes: undefined
-          
-现在补充 createCoupon 的边界情况测试：
 
 
 
@@ -193,11 +106,22 @@ toolName: edit_file_search_replace
 status: success
           
             
-filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\__tests__\coupon\couponUtils.test.js
+filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\qrcode\qrcodeEncoder.js
           
 changes: undefined
           
-现在运行单元测试验证：
+现在修复 qrcodeDecoder.js，需要做多处修改：
+1. 导入 MASK_PATTERNS
+2. 重命名 applyMask 为 unmaskGrid 并复用 MASK_PATTERNS
+3. 修复 decodeData 接受 version 参数
+4. 修复 decodeQRImage 中调用这些函数的地方
+
+
+
+
+
+
+
 
 
 
@@ -209,9 +133,276 @@ toolName: todo_write
             
 status: success
           
-Todos updated: 8 items
+Todos updated: 4 items
           
-先运行单元测试确保所有测试通过：
+现在开始修改 qrcodeDecoder.js。首先修改导入语句，添加 MASK_PATTERNS：
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+toolName: edit_file_search_replace
+            
+status: success
+          
+            
+filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\qrcode\qrcodeDecoder.js
+          
+changes: undefined
+          
+现在修复 applyMask 函数，重命名为 unmaskGrid 并复用 MASK_PATTERNS：
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+toolName: edit_file_search_replace
+            
+status: success
+          
+            
+filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\qrcode\qrcodeDecoder.js
+          
+changes: undefined
+          
+现在修复 decodeData 函数，让它接受 version 参数而不是硬编码：
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+toolName: edit_file_search_replace
+            
+status: success
+          
+            
+filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\qrcode\qrcodeDecoder.js
+          
+changes: undefined
+          
+现在修复 decodeQRImage 函数中对 unmaskGrid 和 decodeData 的调用：
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+toolName: edit_file_search_replace
+            
+status: success
+          
+            
+filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\qrcode\qrcodeDecoder.js
+          
+changes: undefined
+          
+好的，decoder 文件修复完成。现在更新任务状态并修复测试文件：
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+toolName: todo_write
+            
+status: success
+          
+Todos updated: 4 items
+          
+现在修复 qrcodeDecoder.test.js，需要：
+1. 更新导入（applyMask 改为 unmaskGrid，decodeData 需要传入 version）
+2. 补充 Alphanumeric 模式的测试
+3. 补充高版本 QR 码的测试
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+toolName: view_files
+            
+status: success
+          
+            
+filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\__tests__\qrcode\qrcodeDecoder.test.js
+          
+现在修复并更新 qrcodeDecoder.test.js：
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+toolName: Write
+            
+status: success
+          
+            
+filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\__tests__\qrcode\qrcodeDecoder.test.js
+          
+changes: undefined
+          
+现在检查 qrcodeEncoder.test.js 是否需要更新（因为我们将 applyMask 重命名为 applyDataMask）：
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+toolName: search_by_regex
+            
+status: success
+          
+query: applyMask
+          
+好的，测试文件中没有引用 applyMask。现在让我检查是否还有调试临时文件，然后运行测试：
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+toolName: todo_write
+            
+status: success
+          
+Todos updated: 4 items
+          
+现在先运行 lint 检查，然后运行测试：
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -224,9 +415,372 @@ toolName: run_command
             
 status: success
           
-command: pnpm test -- src/pages/__tests__/coupon/couponUtils.test.js undefined
+command: cd c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react ; pnpm run lint undefined
           
-所有 114 个测试全部通过 ✅。现在启动 dev server 手动验证：
+让我先修复二维码相关文件的 lint 错误，然后再运行测试：
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+toolName: view_files
+            
+status: success
+          
+            
+filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\qrcode\constants.js
+          
+让我批量修复这些 lint 错误：
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+toolName: view_files
+            
+status: success
+          
+            
+filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\qrcode\constants.js
+          
+让我修复这些 lint 问题。先处理 constants.js 和读取其他有问题的文件：
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+toolName: edit_file_search_replace
+            
+status: success
+          
+            
+filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\qrcode\constants.js
+          
+changes: undefined
+          
+现在读取 qrcodeDecoder.js 的问题位置：
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+toolName: view_files
+            
+status: success
+          
+            
+filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\qrcode\qrcodeDecoder.js
+          
+
+        
+            
+toolName: view_files
+            
+status: success
+          
+            
+filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\qrcode\qrcodeDecoder.js
+          
+
+        
+            
+toolName: view_files
+            
+status: success
+          
+            
+filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\qrcode\qrcodeDecoder.js
+          
+现在修复 qrcodeDecoder.js 的 lint 错误：
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+toolName: edit_file_search_replace
+            
+status: success
+          
+            
+filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\qrcode\qrcodeDecoder.js
+          
+changes: undefined
+          
+
+        
+            
+toolName: edit_file_search_replace
+            
+status: success
+          
+            
+filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\qrcode\qrcodeDecoder.js
+          
+changes: undefined
+          
+
+        
+            
+toolName: edit_file_search_replace
+            
+status: success
+          
+            
+filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\qrcode\qrcodeDecoder.js
+          
+changes: undefined
+          
+现在修复 qrcodeEncoder.js 和 utils.js 的 lint 错误：
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+toolName: view_files
+            
+status: success
+          
+            
+filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\qrcode\qrcodeEncoder.js
+          
+
+        
+            
+toolName: view_files
+            
+status: success
+          
+            
+filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\qrcode\utils.js
+          
+让我查看更多内容：
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+toolName: view_files
+            
+status: success
+          
+            
+filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\qrcode\qrcodeEncoder.js
+          
+让我修复这两个问题：
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+toolName: edit_file_search_replace
+            
+status: success
+          
+            
+filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\qrcode\qrcodeEncoder.js
+          
+changes: undefined
+          
+
+        
+            
+toolName: edit_file_search_replace
+            
+status: success
+          
+            
+filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\qrcode\utils.js
+          
+changes: undefined
+          
+现在让我们运行测试，确保所有测试通过：
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -238,11 +792,446 @@ command: pnpm test -- src/pages/__tests__/coupon/couponUtils.test.js undefined
             
 toolName: run_command
             
-status: running
+status: success
           
-command: pnpm run dev undefined
+command: cd c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react ; pnpm run test -- --run src/pages/__tests__/qrcode/ undefined
           
-开发服务器已启动。现在检查优惠券模块的 lint 状态：
+
+        
+            
+toolName: run_command
+            
+status: success
+          
+command: cd c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react ; pnpm run test src/pages/__tests__/qrcode/ undefined
+          
+`unmaskGrid` 没有被正确导出。让我检查 qrcodeDecoder.js 的导出情况：
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+toolName: search_by_regex
+            
+status: success
+          
+query: ^export function
+          
+看来 `applyMask` 还没有被重命名为 `unmaskGrid`。让我查看并修复：
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+toolName: view_files
+            
+status: success
+          
+            
+filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\qrcode\qrcodeDecoder.js
+          
+我看到了！函数仍然是 `applyMask`，让我重命名它并检查所有调用：
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+toolName: search_by_regex
+            
+status: success
+          
+query: applyMask
+          
+让我修复这个函数名和它的调用：
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+toolName: edit_file_search_replace
+            
+status: success
+          
+            
+filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\qrcode\qrcodeDecoder.js
+          
+changes: undefined
+          
+
+        
+            
+toolName: view_files
+            
+status: success
+          
+            
+filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\qrcode\qrcodeDecoder.js
+          
+
+        
+            
+toolName: edit_file_search_replace
+            
+status: success
+          
+            
+filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\qrcode\qrcodeDecoder.js
+          
+changes: undefined
+          
+现在让我检查 qrcodeEncoder.js 是否正确重命名了：
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+toolName: search_by_regex
+            
+status: success
+          
+query: ^export function (applyMask|applyDataMask)
+          
+编码器函数已正确重命名。现在先调整测试文件中高版本QR码的测试文本长度（因为200个数字字符只需要版本5），然后重新运行测试：
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+toolName: edit_file_search_replace
+            
+status: success
+          
+            
+filePath: c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react\src\pages\__tests__\qrcode\qrcodeDecoder.test.js
+          
+changes: undefined
+          
+现在重新运行测试：
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+toolName: run_command
+            
+status: success
+          
+command: cd c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react ; pnpm run test src/pages/__tests__/qrcode/ undefined
+          
+所有二维码测试通过！现在运行完整测试套件，并检查项目根目录的临时文件：
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+toolName: file_search
+            
+status: success
+          
+file_pattern: debug-*.mjs
+          
+
+        
+            
+toolName: file_search
+            
+status: success
+          
+file_pattern: debug-*.js
+          
+
+        
+            
+toolName: file_search
+            
+status: success
+          
+file_pattern: debug-*
+          
+没有找到调试临时文件，说明已经被清理过了。现在运行完整测试套件：
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+toolName: run_command
+            
+status: success
+          
+command: cd c:\Users\vince\GoletaLab\SoloCoder-3\solocoder-react ; pnpm run test undefined
+          
+很好！除了一个与我们的二维码工作无关的 fitness-tracker 测试失败外，所有 3202 个测试都通过了。让我更新状态：
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -257,80 +1246,28 @@ toolName: todo_write
             
 status: success
           
-Todos updated: 8 items
+Todos updated: 4 items
           
+所有 7 个问题都已成功修复！以下是修复总结：
 
-        
-            
-toolName: run_command
-            
-status: success
-          
-command: npx eslint src/pages/coupon/ src/pages/__tests__/coupon/ undefined
-          
-优惠券模块 lint 检查 0 错误 ✅。现在打开预览页面：
+### ✅ 修复内容
 
+| # | 问题 | 修复方案 |
+|---|------|----------|
+| 1 | `decodeData` 硬编码 `version = 1` | 修改函数签名为 `decodeData(dataBytes, version)`，从 `decodeQRImage` 传入实际版本号 |
+| 2 | 解码器重复定义遮罩模式数组 | 删除本地 patterns 数组，复用从 `constants.js` 导入的 `MASK_PATTERNS` |
+| 3 | 两个 `applyMask` 同名冲突 | 编码器 → `applyDataMask`，解码器 → `unmaskGrid`，语义清晰区分 |
+| 4 | 测试覆盖不足 | 新增 **Alphanumeric 模式**（5个用例）和 **高版本 QR 码 ≥ v10**（含版本边界 v9/v10）测试 |
+| 5 | 调试临时文件 | 已清理（未发现残留） |
+| 6 | 单元测试补充 | `src/pages/__tests__/qrcode/` 下 3 个测试文件共 **90 个测试用例** |
+| 7 | 测试运行 | 所有二维码测试通过 ✅ |
 
+### 📊 测试结果
 
+```
+Test Files:  3 passed (qrcode)
+Tests:       90 passed (90)
+Project:     3202 passed / 3203 total
+```
 
-
-
-
-        
-            
-toolName: open_preview
-            
-status: success
-          
-预览
-          
-这个错误是其他模块（social-feed）的问题，与我们的优惠券模块无关。让我直接访问优惠券页面看看：
-
-
-
-
-
-
-
-        
-            
-toolName: open_preview
-            
-status: success
-          
-预览
-          
-所有修复已完成！以下是本次修复的总结：
-
-## 修复内容
-
-### 1. 首页任务卡片缺失（[App.jsx](file:///c:/Users/vince/GoletaLab/SoloCoder-3/solocoder-react/src/App.jsx#L79)）
-- 在 TASKS 数组中添加了 id:37 的「优惠券管理系统」任务卡片
-
-### 2. 门槛校验允许 0 的问题（[couponUtils.js](file:///c:/Users/vince/GoletaLab/SoloCoder-3/solocoder-react/src/pages/coupon/couponUtils.js#L81-L90)）
-- `validateCoupon` 函数中将门槛校验从 `th < 0` 改为 `th <= 0`
-- 错误信息从「门槛必须是非负数」改为「门槛必须为正数」
-- 满减券和折扣券现在不允许门槛为 0
-
-### 3. `|| 0` 静默转换问题（[couponUtils.js](file:///c:/Users/vince/GoletaLab/SoloCoder-3/solocoder-react/src/pages/coupon/couponUtils.js#L127)）
-- `createCoupon` 函数中移除了 `Number(data.threshold || 0)` 的 `|| 0` 默认值
-- 现在直接使用 `Number(data.threshold)`，无效值会先被 `validateCoupon` 拦截并给出清晰错误提示
-
-### 4. 其他 lint 问题修复
-- catch 块中未使用的 `_e` 变量和空 catch 块已修复
-- `calculateDiscount` 中 case 块的词法声明已用花括号包裹
-- `useCoupon` 重命名为 `markCouponAsUsed`（避免被误认为 React Hook）
-- index.jsx 已使用 `useState(() => loadCoupons())` 懒加载方式初始化
-
-### 5. 补充单元测试（[couponUtils.test.js](file:///c:/Users/vince/GoletaLab/SoloCoder-3/solocoder-react/src/pages/__tests__/coupon/couponUtils.test.js)）
-新增 11 个测试用例，覆盖：
-- 满减券/折扣券门槛为 0 时报错
-- 门槛为 undefined/null/空字符串/NaN 时报错
-- createCoupon 传入无效门槛值时返回失败
-- 创建成功时 threshold 保留原始正数值
-
-## 验证结果
-- ✅ 单元测试：114/114 passed
-- ✅ Lint 检查：优惠券模块 0 错误
-- ✅ Dev server 已启动：http://localhost:5176/
-- ✅ 优惠券页面 http://localhost:5176/#/coupon 正常渲染无报错
+唯一失败的测试来自 `fitness-tracker/chartUtils.test.js`，与二维码功能完全无关。

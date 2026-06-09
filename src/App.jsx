@@ -82,6 +82,7 @@ const TASKS = [
     { id: 37, title: '优惠券管理系统', route: 'coupon', description: '模拟电商平台优惠券全生命周期管理，支持商家发券、用户领券、下单用券的完整闭环，基于 localStorage 持久化。' },
     { id: 38, title: '二维码工具', route: 'qrcode', description: '二维码生成和解析工具，支持自定义尺寸、颜色、Logo 嵌入、PNG 下载、图片解析、历史记录，基于 localStorage 持久化。' },
     { id: 39, title: '社交动态流', route: 'social-feed', description: '模拟社交平台动态信息流，支持发布内容、图片上传、话题标签、点赞评论转发、嵌套回复、关注、排序筛选、无限滚动，基于 localStorage 持久化。' },
+    { id: 40, title: '协作白板', route: 'whiteboard', description: '在线协作白板画布，支持画笔/形状/文本/橡皮擦绘图工具、撤销重做、缩放平移、JSON 导入导出、PNG 导出。' },
 ]
 
 function HomePage() {

@@ -1,0 +1,7 @@
+产物不满意：
+1. App.jsx 中缺少简历编辑器的路由注册、任务卡片和组件导入。提示词第 7 条要求代码放在 src/pages/resume-editor/ 下，但前提是该页面需要通过首页任务卡片「在线简历编辑器」点击进入。当前 App.jsx 中没有 import ResumeEditor、TASKS 数组中无对应条目、Routes 中无 /resume-editor 路由，导致页面完全无法从首页访问。模型在编辑 App.jsx 时多次 edit_file_search_replace 操作导致文件损坏，虽随后尝试修复，但最终未将简历编辑器的三项注册写入文件。
+2. ResumePreview.jsx 的 ModernTemplate 组件中，自定义模块（CUSTOM）存在渲染缺陷。sidebarMods 筛选条件为 JOB_INTENTION 和 SKILLS 类型，不包含 CUSTOM，因此自定义模块被归入 mainMods。但 mainMods 渲染循环中只处理了 EDUCATION/WORK_EXPERIENCE/PROJECT_EXPERIENCE 和 SELF_EVALUATION，缺少对 CUSTOM 类型的渲染分支（第 230 行只判断 SELF_EVALUATION）。导致在 Modern 模板下，自定义模块只显示标题而不渲染实际内容。同样的问题会出现在 Classic 模板中，如果用户将自定义模块放在 BASIC_INFO 之后——ClassicTemplate 对非列表模块只处理了 SKILLS、SELF_EVALUATION、CUSTOM（第 99-103 行），看似 CUSTOM 被覆盖了，但实际上 BasicInfo 之后 otherMods 的遍历中并未遗漏。经查 Classic 和 Minimal 模板的渲染逻辑均已包含 CUSTOM 分支，只有 Modern 模板遗漏。
+过程不满意：
+1. App.jsx 编辑阶段，模型多次使用 edit_file_search_replace 进行字符串级替换，导致文件内容损坏（模型自述 "The file got corrupted"）。模型识别到损坏后反复尝试修复，但修复过程中未使用 view_files 确认 App.jsx 最终是否包含 resume-editor 的三项必需注册（import、TASKS 条目、Route）。模型直接跳转到测试和 lint 阶段，总结时声称「7 大功能全部实现完成」且包含路由注册的虚假完成声明。
+2. 测试文件编写阶段，模型将 resumeCore.test.js 的导入路径写为 ../resume-editor/resumeCore（相对于 src/pages/__tests__/resume-editor/ 解析到不存在的 src/pages/__tests__/resumeCore.js），constants 导入路径同样错误。模型直到执行 pnpm test 报错后才返工修复路径。应先确认测试文件的目录层级关系，确保导入路径书写正确。
+3. 初始代码包含多处遗留废弃代码：index.jsx 中有未使用的 reorderModules 导入和 handleLegacyReorder、onLegacyReorder 等废弃变量；FormEditor.jsx 的 ListEditor 调用处传递了未被 ListEditor 接收的 onChange prop。模型是在 ESLint 检查后才逐一清理这些死代码，说明编写阶段缺乏自检，存在「先写后修」的试错模式。

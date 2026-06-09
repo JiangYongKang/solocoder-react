@@ -1,0 +1,9 @@
+产物不满意：
+1. App.jsx 缺少 email-client 的路由注册和首页任务卡片。当前 App.jsx 中没有 EmailClientPage 的 import 语句，Routes 中没有 /email-client 路径，TASKS 数组中也没有对应的任务条目。提示词第1句明确要求"该页面是首页任务卡片'邮件客户端模拟'点击后的二级页面"，用户无法从首页进入该页面。应补全 import、路由注册和任务卡片。
+2. sanitizeHtml 函数在 emailUtils.js 中实现为空壳——仅将 HTML 赋值给 div.innerHTML 再读回，完全未执行任何标签过滤或安全处理。constants.js 中定义的 ALLOWED_HTML_TAGS 常量（b、strong、i、em、a、img 等 15 个标签）从未被 sanitizeHtml 引用，形同虚设。提示词第2条要求"正文中的链接以新窗口打开"，但 sanitizeHtml 没有为 a 标签添加 target="_blank" 属性，EmailDetail.jsx 中使用 dangerouslySetInnerHTML 直接渲染未经处理的 HTML，链接无法在新窗口打开。
+3. 垃圾邮件标记功能缺少 UI 入口。emailUtils.js 中已实现 markAsSpam 函数，测试文件中也覆盖了该函数，但 index.jsx 的主页面逻辑和 EmailList.jsx 的批量操作栏中均未调用 markAsSpam——既没有单条邮件的"标记为垃圾"按钮，也没有批量标记垃圾的操作项。提示词第3条要求"垃圾标记（标记为垃圾邮件后移入垃圾箱文件夹）"，该功能在界面上完全不可用。
+
+过程不满意：
+1. 模型在写完所有组件文件后开始编辑 App.jsx 添加路由（思考过程第312-372行），第一次 edit_file_search_replace 失败，随后两次声称成功。但模型在每次编辑后都没有重新读取完整文件验证编辑结果，便直接跳转到编写测试文件的步骤。实际上所有编辑均未生效——最终 App.jsx 中不存在任何 email-client 的引用。模型应该在每次编辑 App.jsx 后重新 read 完整文件确认变更已写入，而非仅凭工具返回 status: success 就假设正确。
+2. 初版 ComposeModal.jsx 在 useEffect 中调用 setState 来重置表单状态（思考过程第609行 lint 报错"setState in useEffect"），这是 React 中明确不推荐的反模式。模型直到 ESLint 报错后才将方案改为通过 key prop 驱动组件重新挂载（第620-654行）。说明模型对 React Hooks 使用场景理解不足，应在编写 stage 就选择合适的重置方案，而非依赖 lint 工具事后发现。
+3. sanitizeHtml 的实现暴露出模型未做需求拆解。模型在 constants.js 中认真定义了 ALLOWED_HTML_TAGS 常量，说明它意识到了需要标签白名单过滤和 HTML 安全处理，但在实现 sanitizeHtml 时却只写了 innerHTML 赋值和回读的空操作，既没用上自己定义的常量，也没处理提示词要求的"链接新窗口打开"。模型在写这个函数时只是走形式地完成函数体，没有对照提示词逐项检查功能覆盖。

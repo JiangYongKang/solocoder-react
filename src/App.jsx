@@ -26,6 +26,7 @@ import MediaGallery from '@/pages/media-gallery/index.jsx'
 import MediaPlayerPage from '@/pages/media-player/index.jsx'
 import MeetingRoomPage from '@/pages/meeting-room/index.jsx'
 import MindMapPage from '@/pages/mind-map/index.jsx'
+import MinesweeperPage from '@/pages/minesweeper/index.jsx'
 import NotificationsPage from '@/pages/notifications/index.jsx'
 import OrdersPage from '@/pages/orders/index.jsx'
 import PermissionsPage from '@/pages/permissions/index.jsx'
@@ -43,8 +44,8 @@ import SurveyPage from '@/pages/survey/index.jsx'
 import TetrisPage from '@/pages/tetris/index.jsx'
 import TextDiffPage from '@/pages/text-diff/index.jsx'
 import ThemeEditorPage from '@/pages/theme-editor/index.jsx'
-import WhiteboardPage from '@/pages/whiteboard/index.jsx'
 import WeatherPage from '@/pages/weather/index.jsx'
+import WhiteboardPage from '@/pages/whiteboard/index.jsx'
 import Wizard from '@/pages/wizard/Wizard.jsx'
 import WorkflowPage from '@/pages/workflow/index.jsx'
 
@@ -94,7 +95,9 @@ const TASKS = [
     { id: 43, title: '秒杀抢购页面', route: 'flash-sale', description: '模拟电商秒杀抢购场景，包含活动倒计时、库存展示进度条、抢购交互与防重复点击、模拟延迟与概率性抢购结果。' },
     { id: 44, title: '几何画板', route: 'geometry-board', description: '交互式几何图形绘制工具，在坐标系网格上绘制点、线、圆，支持图形编辑、角度与长度测量、SVG 导出。' },
     { id: 45, title: '多语言国际化管理', route: 'i18n-manager', description: '管理应用多语言翻译键值对的工具，支持多语言并行编辑、嵌套 key 树形视图、翻译对比、导入导出和覆盖率统计。' },
-    { id: 46, title: '天气查询应用', route: 'weather', description: '城市天气查询工具，支持搜索、收藏、历史记录、一周预报、温度趋势图和天气主题背景，基于 localStorage 持久化。' },
+    { id: 48, title: '天气查询应用', route: 'weather', description: '城市天气查询工具，支持搜索、收藏、历史记录、一周预报、温度趋势图和天气主题背景，基于 localStorage 持久化。' },
+    { id: 49, title: '记账预算管理', route: 'budget-tracker', description: '个人月度预算管理工具，设置分类预算并追踪消费进度，消费进度可视化、分类明细、剩余日均额度、环比增减、调整记录时间线，基于 localStorage 持久化。' },
+    { id: 50, title: '扫雷游戏', route: 'minesweeper', description: '经典 Windows 扫雷游戏复刻，支持三种难度和自定义难度，左键翻开/右键插旗、泛洪自动展开、计时与雷数计数、胜负判定、localStorage 排行榜持久化。' },
 ]
 
 function HomePage() {
@@ -171,10 +174,12 @@ function App() {
             <Route path="/social-feed" element={<SocialFeedPage />} />
             <Route path="/sku-selector" element={<SkuSelectorPage />} />
             <Route path="/tetris" element={<TetrisPage />} />
+            <Route path="/minesweeper" element={<MinesweeperPage />} />
             <Route path="/geometry-board" element={<GeometryBoardPage />} />
             <Route path="/flash-sale" element={<FlashSalePage />} />
             <Route path="/i18n-manager" element={<I18nManagerPage />} />
             <Route path="/weather" element={<WeatherPage />} />
+            <Route path="/budget-tracker" element={<BudgetTrackerPage />} />
         </Routes>
     )
 }

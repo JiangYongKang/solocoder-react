@@ -1,0 +1,9 @@
+产物不满意：
+1. App.jsx 中完全没有 logistics-tracker 的 import、Route 路由注册和 TASKS 任务卡片。思考过程显示模型调用了 edit_file_search_replace 并声称成功，但实际文件的第 101 行末尾就是任务卡片数组结束，第 183 行末尾是 Routes 结束，中间和末尾都没有物流轨迹追踪的任何入口。这导致从首页根本无法进入该二级页面，提示词第 1 条要求的「首页任务卡片点击进入」完全没有实现。根本原因是模型产生了幻觉，以为编辑操作已生效但实际并未写入文件。
+2. parseYtOrder 函数的 signer 字段始终设为 null（第 174 行），但 YT 的 mockData 中已签收节点的 data 数组包含 operator 字段（如 YT1234567890123 签收节点的 operator 为「前台代收」）。圆通数据的签收人完全丢失，提示词第 4 条要求的「签收节点显示签收人信息」在圆通快递场景下无法展示。同样，parseZtOrder、parseYdOrder、parseJdOrder 的 signer 也都硬编码为 null，只有顺丰数据能显示签收人。
+3. extractRoutePoints 函数存在目的地类型被覆盖的问题。当目的地城市名称也出现在物流节点的 location 字段中时（如 SF1234567890 的目的地「北京」同时出现在节点「北京市朝阳区营业点」中），该城市先通过节点遍历被加入 routeCities 并标记为 type: 'route'（第 373 行），后续第 382 行的 added.has 判断拦截了 type: 'destination' 的写入，导致地图上终点无法以「终」或「✓」图标渲染，仅显示为普通灰色途径点。提示词第 3 条要求的「标记终点」和「地图上终点标记变为签收图标」在此场景下失效。
+4. mapSfOpcode 函数的 default 分支（第 62-65 行）依赖 remark 字符串中是否包含「异常」中文文本来判断异常状态，而非基于数据结构中的 opcode 值或 hasException 字段驱动。这是不可靠的字符串匹配逻辑，如果快递公司修改 remark 措辞但 opcode 保持为异常码，就会被错误映射为 IN_TRANSIT 状态。正确的做法是依赖数据本身的异常标识字段或为每个 opcode 做完整映射，不应以 remark 内容做兜底判断。
+
+过程不满意：
+1. session-cot-1 第 260-367 行，模型调用了 edit_file_search_replace 修改 App.jsx，工具调用返回 status: success，模型据此认为路由和任务卡片已添加完成，随后直接进入测试编写阶段。但实际 App.jsx 完全没有 logistics-tracker 的任何痕迹，模型在整个后续流程（测试、lint 修复、总结）中从未验证 App.jsx 的实际内容是否包含修改结果，也未通过启动项目或检查路由数组末尾来确认修改生效。这是典型的虚假完成——工具返回 success 但操作实际未产生预期效果，模型未做二次验证就声称完成。正确做法是在修改 App.jsx 后立即重新读取文件末尾内容进行交叉验证。
+2. 模型在写测试时发现 addQueryRecord 使用了全局 window.localStorage 导致测试无法运行（第 418 行），选择了修改生产代码 logisticsUtils.js 的 addQueryRecord 函数签名，添加 storage 参数来配合测试（第 466-481 行）。这本质上是「生产代码向测试妥协」的行为——工具函数不应该为了测试便利而改变其职责接口。正确的做法是在测试中 mock window.localStorage 而非要求生产函数额外接收 storage 参数。虽然后来也改了 loadQueryHistory 和 saveQueryHistory，但这些函数也用同样的方式适应了测试，整体上 API 设计被测试方案绑架了。

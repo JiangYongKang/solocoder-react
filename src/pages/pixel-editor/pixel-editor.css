@@ -1,0 +1,473 @@
+.pixel-editor-page {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100vh;
+  background: #1a1a2e;
+  color: #eee;
+  overflow: hidden;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.pixel-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  background: #16213e;
+  border-bottom: 1px solid #0f3460;
+  flex-shrink: 0;
+}
+
+.pixel-editor-header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.pixel-editor-back-btn {
+  padding: 6px 14px;
+  background: #0f3460;
+  border: 1px solid #533483;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #eee;
+  transition: all 0.2s;
+}
+
+.pixel-editor-back-btn:hover {
+  background: #533483;
+}
+
+.pixel-editor-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #00d4ff;
+  letter-spacing: 2px;
+}
+
+.pixel-editor-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pixel-editor-btn {
+  padding: 8px 16px;
+  background: #0f3460;
+  border: 1px solid #533483;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #eee;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pixel-editor-btn:hover {
+  background: #533483;
+}
+
+.pixel-editor-btn--primary {
+  background: #00d4ff;
+  border-color: #00d4ff;
+  color: #1a1a2e;
+  font-weight: 600;
+}
+
+.pixel-editor-btn--primary:hover {
+  background: #33ddff;
+  border-color: #33ddff;
+}
+
+.pixel-editor-btn--danger {
+  background: #e94560;
+  border-color: #e94560;
+  color: #fff;
+}
+
+.pixel-editor-btn--danger:hover {
+  background: #ff6b81;
+  border-color: #ff6b81;
+}
+
+.pixel-editor-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pixel-editor-main {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.pixel-editor-left-panel {
+  width: 220px;
+  background: #16213e;
+  border-right: 1px solid #0f3460;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.pixel-editor-center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  overflow: auto;
+  position: relative;
+}
+
+.pixel-editor-canvas-wrapper {
+  position: relative;
+  background: #2a2a4a;
+  border: 2px solid #0f3460;
+  border-radius: 4px;
+  padding: 8px;
+  background-image:
+    linear-gradient(45deg, #222 25%, transparent 25%),
+    linear-gradient(-45deg, #222 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #222 75%),
+    linear-gradient(-45deg, transparent 75%, #222 75%);
+  background-size: 20px 20px;
+  background-position: 0 0, 0 10px, 10px -10px, 10px 0px;
+}
+
+.pixel-editor-canvas {
+  display: block;
+  cursor: crosshair;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+.pixel-editor-right-panel {
+  width: 280px;
+  background: #16213e;
+  border-left: 1px solid #0f3460;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.pixel-editor-panel-title {
+  margin: 0 0 12px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.pixel-editor-section {
+  background: #0f0f1e;
+  border: 1px solid #0f3460;
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.pixel-editor-tools {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.pixel-editor-tool-btn {
+  width: 100%;
+  padding: 10px 0;
+  background: #0f3460;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  color: #eee;
+  transition: all 0.2s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.pixel-editor-tool-btn:hover {
+  background: #533483;
+}
+
+.pixel-editor-tool-btn--active {
+  background: #00d4ff;
+  border-color: #00d4ff;
+  color: #1a1a2e;
+  font-weight: 600;
+}
+
+.pixel-editor-tool-icon {
+  font-size: 18px;
+}
+
+.pixel-editor-brush-sizes {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.pixel-editor-brush-size-btn {
+  width: 40px;
+  height: 40px;
+  background: #0f3460;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #eee;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.pixel-editor-brush-size-btn:hover {
+  background: #533483;
+}
+
+.pixel-editor-brush-size-btn--active {
+  background: #00d4ff;
+  border-color: #00d4ff;
+  color: #1a1a2e;
+}
+
+.pixel-editor-grid-size {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pixel-editor-grid-size label {
+  font-size: 13px;
+  color: #888;
+  min-width: 30px;
+}
+
+.pixel-editor-grid-size input {
+  flex: 1;
+  padding: 6px 10px;
+  background: #0f0f1e;
+  border: 1px solid #0f3460;
+  border-radius: 4px;
+  color: #eee;
+  font-size: 13px;
+  width: 60px;
+}
+
+.pixel-editor-grid-size input:focus {
+  outline: none;
+  border-color: #00d4ff;
+}
+
+.pixel-editor-grid-size span {
+  color: #888;
+}
+
+.pixel-editor-palette {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.pixel-editor-palette-color {
+  width: 100%;
+  aspect-ratio: 1;
+  border: 2px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.15s;
+  background: #2a2a4a;
+}
+
+.pixel-editor-palette-color:hover {
+  transform: scale(1.1);
+  z-index: 2;
+}
+
+.pixel-editor-palette-color--selected {
+  border-color: #00d4ff;
+  box-shadow: 0 0 8px rgba(0, 212, 255, 0.5);
+}
+
+.pixel-editor-palette-color--empty {
+  background-image:
+    linear-gradient(45deg, #444 25%, transparent 25%),
+    linear-gradient(-45deg, #444 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #444 75%),
+    linear-gradient(-45deg, transparent 75%, #444 75%);
+  background-size: 8px 8px;
+  background-position: 0 0, 0 4px, 4px -4px, 4px 0px;
+}
+
+.pixel-editor-palette-color-delete {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 16px;
+  height: 16px;
+  background: #e94560;
+  border: none;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 10px;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
+}
+
+.pixel-editor-palette-color:hover .pixel-editor-palette-color-delete {
+  display: flex;
+}
+
+.pixel-editor-color-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pixel-editor-color-picker-row input[type='color'] {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 2px solid #0f3460;
+  border-radius: 4px;
+  background: none;
+  cursor: pointer;
+}
+
+.pixel-editor-color-picker-row button {
+  flex: 1;
+}
+
+.pixel-editor-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.pixel-editor-preview-canvas {
+  background: #0f0f1e;
+  border: 2px solid #0f3460;
+  border-radius: 4px;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+.pixel-editor-preview-info {
+  font-size: 12px;
+  color: #888;
+}
+
+.pixel-editor-zoom-info {
+  font-size: 12px;
+  color: #888;
+  text-align: center;
+}
+
+.pixel-editor-hint {
+  font-size: 11px;
+  color: #666;
+  line-height: 1.5;
+}
+
+.pixel-editor-modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.pixel-editor-modal {
+  background: #16213e;
+  border: 1px solid #0f3460;
+  border-radius: 12px;
+  padding: 24px;
+  min-width: 320px;
+  max-width: 480px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.pixel-editor-modal-title {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  color: #00d4ff;
+}
+
+.pixel-editor-modal-body {
+  margin-bottom: 20px;
+}
+
+.pixel-editor-modal-body p {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  color: #ccc;
+}
+
+.pixel-editor-modal-body p.error {
+  color: #e94560;
+}
+
+.pixel-editor-scale-options {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.pixel-editor-scale-btn {
+  flex: 1;
+  padding: 12px 0;
+  background: #0f3460;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #eee;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.pixel-editor-scale-btn:hover {
+  background: #533483;
+}
+
+.pixel-editor-scale-btn--active {
+  background: #00d4ff;
+  border-color: #00d4ff;
+  color: #1a1a2e;
+}
+
+.pixel-editor-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.pixel-editor-file-input {
+  display: none;
+}

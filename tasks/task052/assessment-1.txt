@@ -1,0 +1,10 @@
+产物不满意：
+1. App.jsx 中完全缺失 pivot-table 的路由注册、组件导入和任务卡片，页面对用户不可达。模型在思考过程第 763-806 行总结中声称「在 App.jsx 中添加了任务卡片（ID: 51）和路由 /pivot-table」，但实际文件第 1-187 行没有任何 PivotTablePage 的 import、TASKS 数组条目和 Route 配置，属于虚假完成。实测构建虽能通过，但访问 /pivot-table 路径会触发 404 或无匹配路由，无法满足提示词要求「该页面是首页任务卡片点击后的二级页面」。
+2. 模型在修改 App.jsx 时引入了回归问题：第 182 行使用了 BudgetTrackerPage 组件，但文件头部第 1-50 行的 import 列表中缺少 BudgetTrackerPage 的导入语句。虽然 Vite 构建未报错（可能因 tree-shaking 或缓存），但其实体运行时会抛出 ReferenceError，导致 budget-tracker 路由不可用。这是模型在反复编辑 App.jsx 过程中产生的附带破坏。
+3. pivotTableToCSV 函数在列字段为空的场景下生成冗余合计行。当 colFields 为空时，getAllKeys 返回 ['__all__']，colTotals['__all__'] 的值与 grandTotal 相同。第 340 行条件 hasColFields || hasValueFields 为 true，额外追加了一行合计，导致 CSV 中 grandTotal 值先以 colTotals 形式出现再以 grandTotal 形式出现，列值为空时合计行内容与数据行的行合计列重复。
+4. aggregate 函数的空值处理逻辑存在死代码。第 28-31 行在 values 为空数组或非数组时，if 条件穷举了所有五种合法聚合类型（COUNT/SUM/AVG/MAX/MIN），使得第 31 行的 return null 永远不可达，逻辑虽不影响功能正确性但污染了代码可读性。
+
+过程不满意：
+1. 模型在编辑 App.jsx 时反复失败，前后至少 6 次 edit_file_search_replace 调用，其中 3 次返回 failed。失败后继续读取相同文件再次尝试替换，但多次重试中定位字符串不准确导致编辑持续失败或产生副作用。在第 637 行模型发现「App.jsx 的 TASKS 数组有语法错误」，但其修复操作（第 675、688、709 行）最终只修复了语法错误，却没有验证 pivot-table 相关条目是否被保留，导致已添加的路由和任务卡片在修复过程中一并丢失。
+2. 模型缺乏实际可用性验证意识。第 759 行 npm run build 成功后，模型直接判定「所有测试通过、项目构建成功」即任务完成，未启动 dev server 访问 /pivot-table 路径验证页面能否正常渲染，未检查 App.jsx 文件最终状态是否包含 pivot-table 的路由和入口。提示词第 2 条明确要求该页面是首页任务卡片点击后的二级页面，模型没有验证此入口条件是否成立。
+3. 总结阶段存在严重的幻觉行为。第 802 行声称「首页集成：在 App.jsx 中添加了任务卡片（ID: 51）和路由 /pivot-table」，但该声明与实际文件内容矛盾。模型将曾经进行过但最终被覆盖的编辑操作当作已交付的成果写入总结，缺乏对最终产物状态的事后核对。

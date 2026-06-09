@@ -1,5 +1,5 @@
 import { GF_EXP, GF_LOG, VERSION_INFORMATION, ALIGNMENT_PATTERN_POSITIONS } from './tables.js'
-import { MODE, MODE_INDICATOR_BITS, ALPHANUMERIC_TABLE, FORMAT_INFO_GPOLY, FORMAT_INFO_MASK, VERSION_INFO_GPOLY, ERROR_CORRECTION_LEVELS } from './constants.js'
+import { MODE, MODE_INDICATOR_BITS, ALPHANUMERIC_TABLE, FORMAT_INFO_GPOLY, FORMAT_INFO_MASK, ERROR_CORRECTION_LEVELS, MASK_PATTERNS } from './constants.js'
 
 function gfMul(a, b) {
   if (a === 0 || b === 0) return 0
@@ -198,19 +198,9 @@ function isReservedFunction(r, c, size, version) {
   return false
 }
 
-export function applyMask(grid, maskIndex, version) {
+export function unmaskGrid(grid, maskIndex, version) {
   const size = grid.length
-  const patterns = [
-    (r, c) => (r + c) % 2 === 0,
-    (r, c) => r % 2 === 0,
-    (r, c) => c % 3 === 0,
-    (r, c) => (r + c) % 3 === 0,
-    (r, c) => (Math.floor(r / 2) + Math.floor(c / 3)) % 2 === 0,
-    (r, c) => ((r * c) % 2) + ((r * c) % 3) === 0,
-    (r, c) => (((r * c) % 2) + ((r * c) % 3)) % 2 === 0,
-    (r, c) => (((r + c) % 2) + ((r * c) % 3)) % 2 === 0,
-  ]
-  const mask = patterns[maskIndex]
+  const mask = MASK_PATTERNS[maskIndex]
 
   const result = new Array(size)
   for (let r = 0; r < size; r++) {
@@ -229,6 +219,8 @@ export function applyMask(grid, maskIndex, version) {
   }
   return result
 }
+
+export { unmaskGrid as applyMask }
 
 function isDataArea(r, c, size, version) {
   return !isReservedFunction(r, c, size, version)
@@ -356,7 +348,7 @@ export function rsDecode(data, ecLen) {
 export function extractDataBlocks(codewords, version, ecLevel) {
   const ecIndex = { L: 0, M: 1, Q: 2, H: 3 }[ecLevel]
   const info = VERSION_INFORMATION[version - 1][ecIndex]
-  const [totalCodewords, ecPerBlock, g1Blocks, g1DataLen, g2Blocks, g2DataLen] = info
+  const [, ecPerBlock, g1Blocks, g1DataLen, g2Blocks, g2DataLen] = info
   const totalBlocks = g1Blocks + g2Blocks
 
   const blocks = []
@@ -437,7 +429,7 @@ function byteDecode(bits, startIdx, count) {
   return { text: decoder.decode(new Uint8Array(bytes)), idx }
 }
 
-export function decodeData(dataBytes) {
+export function decodeData(dataBytes, version) {
   const bits = []
   for (const b of dataBytes) {
     for (let j = 7; j >= 0; j--) bits.push((b >> j) & 1)
@@ -452,7 +444,6 @@ export function decodeData(dataBytes) {
 
     if (mode === MODE.TERMINATOR) break
 
-    const version = 1
     const charCountBits = MODE_INDICATOR_BITS[mode]
       ? (version <= 9 ? MODE_INDICATOR_BITS[mode][0] : version <= 26 ? MODE_INDICATOR_BITS[mode][1] : MODE_INDICATOR_BITS[mode][2])
       : 8
@@ -498,7 +489,7 @@ export function decodeQRImage(imageData) {
       throw new Error('Could not read format info')
     }
 
-    const unmasked = applyMask(grid, formatInfo.maskIndex)
+    const unmasked = unmaskGrid(grid, formatInfo.maskIndex, version)
     const codewords = readDataCodewords(unmasked, version)
     const dataBytes = extractDataBlocks(codewords, version, formatInfo.ecLevel)
 
@@ -506,9 +497,9 @@ export function decodeQRImage(imageData) {
       throw new Error('Error correction failed')
     }
 
-    const text = decodeData(dataBytes)
+    const text = decodeData(dataBytes, version)
     return { text, version, ecLevel: formatInfo.ecLevel }
   } catch (e) {
-    throw new Error('Failed to decode QR code: ' + e.message)
+    throw new Error('Failed to decode QR code: ' + e.message, { cause: e })
   }
 }

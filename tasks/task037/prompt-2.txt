@@ -1,0 +1,8 @@
+你实现的社交动态流页面还存在一些问题，需要进行修复：
+
+1. 页面从首页完全无法访问——App.jsx 中没有社交流页面的 import、路由和 TASKS 数组条目，需要补全这些集成代码。
+2. CommentItem.jsx 中评论嵌套的渲染限制条件 depth < 3 与 utils.js 中 addReplyToComments 的 MAX_COMMENT_DEPTH 阈值语义不一致：UI 层实际限制最多展示 2 层嵌套，而数据层允许添加 3 层递归回复。两处应该使用统一的深度定义。
+3. utils.test.js 中缺少 addReplyToComments 嵌套深度超限时返回 null 的边界测试用例，需要补充覆盖。
+4. 修复后需要补充纯 JS 函数的单元测试，只测和页面渲染无关的逻辑。测试代码放在 src/pages/__tests__/social-feed/ 下。
+5. 修复完成后启动 pnpm run dev，手动验证从首页点击"社交动态流"任务卡片能正常进入页面，评论嵌套层级展示正确。
+6. 重新运行 pnpm run test，需要让所有测试通过。

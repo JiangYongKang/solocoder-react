@@ -1,0 +1,5 @@
+产物不满意：
+1. qrcodeDecoder.js 第 223 行仍保留了 `export { unmaskGrid as applyMask }` 别名导出。提示词要求编码器和解码器的 applyMask 使用不同的函数名以避免导入错误，编码器已正确改名为 applyDataMask，解码器内部函数也改名为 unmaskGrid，但这条别名导出意味着 import { applyMask } from './qrcodeDecoder.js' 仍然合法有效，同名冲突并未真正根除。根本原因是完成函数重命名后遗漏了清理别名导出语句。正确做法是在重命名后全局搜索 applyMask 的所有导出点，确保旧名称不复存在。
+
+过程不满意：
+1. session-cot-2.md 记录的整个思考过程是 coupon（优惠券/TASK_037）模块的修复工作，而非 task036 二维码工具的修复。从第一步开始，模型的 TodoList 内容和后续操作就围绕 couponUtils.js 的 validateCoupon、createCoupon、CheckoutPanel.jsx 等 coupon 模块代码展开，记录中无任何一行涉及 qrcodeDecoder、decodeData、applyMask、qrcodeEncoder 等 QR 相关代码的改动决策。最终模型在总结中声称修复了 coupon 模块的问题并运行了 couponUtils.test.js 的测试，与 task036 的提示词要求完全脱节。根本原因是会话记录指向了错误的任务上下文，导致思考过程没有覆盖 QR 工具的任何修复逻辑。正确做法是会话开始前确认当前任务编号和提示词对应的模块，确保所有操作围绕目标任务的代码包展开。

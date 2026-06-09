@@ -1,0 +1,6 @@
+产物不满意：
+1. TrendChart.jsx 第16-18行和 DonutChart.jsx 第16-17行在组件渲染阶段直接调用 getComputedStyle(document.documentElement) 读取 CSS 自定义属性（--accent、--border、--text 等）。getComputedStyle 是 DOM API，在 React 函数组件体中调用属于副作用，每次渲染都会强制浏览器同步计算样式，违反 React 渲染函数应为纯函数的原则。根本原因是模型未区分样式获取与渲染逻辑的边界，将样式读取嵌入了渲染流程。正确做法是利用 SVG 元素天然继承 CSS 变量的特性，直接在 JSX 中使用 var(--accent) 等 CSS 变量值，无需在 JS 中调用 getComputedStyle。
+
+过程不满意：
+1. 模型编写 chartUtils.test.js 后需要经过 3 轮编辑才能让测试全部通过：第一次运行测试失败后，模型查看 chartUtils.js 确认导出函数名再修改测试文件；第二次运行仍失败，继续编辑测试文件；第三次才全部通过。根本原因是写测试前没有对照 chartUtils.js 中实际导出函数的签名和参数，测试用例中的函数调用与实现不一致。正确做法是写测试代码前先完整 Review 源代码中所有导出函数名、参数列表和返回结构，再逐一编写对应的测试用例，避免往返修正。
+2. 模型在开发流程末尾启动了 pnpm run dev 并调用了浏览器预览，但只打开了预览窗口，没有导航到 /fitness-tracker 路由进行实际的图表渲染验证。虽然模型在总结中声称"Dev Server：已启动在 http://localhost:5176/#/fitness-tracker ✅"，但从思考过程记录看，open_preview 仅打开了默认页面，没有截图或页面元素检查来确认 SVG 图表的实际渲染效果。根本原因是模型将"打开预览窗口"等同于"验证通过"，缺乏端到端的视觉确认步骤。正确做法是启动 dev server 后导航到目标路由，通过截图或页面快照确认图表正常展示。

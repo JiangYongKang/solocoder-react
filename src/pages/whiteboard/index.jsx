@@ -31,6 +31,12 @@ import {
   findTextAtPoint,
   generateId,
   getShapesBounds as coreGetShapesBounds,
+  getTextInputScreenParams,
+  distance,
+  pointNearRect,
+  pointNearEllipse,
+  pointNearLine,
+  isShapeIntersectingPoint,
 } from './whiteboardCore.js'
 import {
   TOOL_TYPES,
@@ -49,74 +55,6 @@ import {
   MAX_FONT_SIZE,
 } from './constants.js'
 import './whiteboard.css'
-
-const distance = (x1, y1, x2, y2) => Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
-
-const pointNearRect = (px, py, rx, ry, rw, rh, radius) => {
-  const closestX = Math.max(rx, Math.min(px, rx + rw))
-  const closestY = Math.max(ry, Math.min(py, ry + rh))
-  return distance(px, py, closestX, closestY) <= radius
-}
-
-const pointNearEllipse = (px, py, cx, cy, rx, ry, radius) => {
-  if (rx === 0 || ry === 0) return distance(px, py, cx, cy) <= radius
-  const nx = (px - cx) / rx
-  const ny = (py - cy) / ry
-  const dist = Math.sqrt(nx * nx + ny * ny)
-  if (dist <= 1) return true
-  const ratio = 1 / dist
-  return distance(px, py, cx + (px - cx) * ratio, cy + (py - cy) * ratio) <= radius
-}
-
-const pointNearLine = (px, py, x1, y1, x2, y2, radius) => {
-  const A = px - x1
-  const B = py - y1
-  const C = x2 - x1
-  const D = y2 - y1
-  const dot = A * C + B * D
-  const lenSq = C * C + D * D
-  let param = -1
-  if (lenSq !== 0) param = dot / lenSq
-  let xx, yy
-  if (param < 0) {
-    xx = x1
-    yy = y1
-  } else if (param > 1) {
-    xx = x2
-    yy = y2
-  } else {
-    xx = x1 + param * C
-    yy = y1 + param * D
-  }
-  return distance(px, py, xx, yy) <= radius
-}
-
-const isShapeIntersectingPoint = (shape, px, py, radius) => {
-  switch (shape.type) {
-    case SHAPE_TYPES.BRUSH:
-      return shape.points?.some((p) => distance(p.x, p.y, px, py) <= radius) || false
-    case SHAPE_TYPES.RECTANGLE: {
-      const r = normalizeRectangle(shape.x, shape.y, shape.width, shape.height)
-      return pointNearRect(px, py, r.x, r.y, r.width, r.height, radius)
-    }
-    case SHAPE_TYPES.CIRCLE: {
-      const c = normalizeCircle(shape.cx, shape.cy, shape.rx, shape.ry)
-      return pointNearEllipse(px, py, c.cx, c.cy, c.rx, c.ry, radius)
-    }
-    case SHAPE_TYPES.LINE:
-      return pointNearLine(px, py, shape.x1, shape.y1, shape.x2, shape.y2, radius)
-    case SHAPE_TYPES.TEXT: {
-      const charCount = shape.text?.length || 1
-      const approxWidth = Math.max(charCount * (shape.fontSize || 16) * 0.6, shape.fontSize || 16)
-      const approxHeight = (shape.fontSize || 16) * 1.2
-      const top = shape.y - approxHeight
-      const left = shape.x
-      return pointNearRect(px, py, left, top, approxWidth, approxHeight, radius)
-    }
-    default:
-      return false
-  }
-}
 
 function WhiteboardPage() {
   const navigate = useNavigate()
@@ -182,7 +120,6 @@ function WhiteboardPage() {
     (ctx, shape) => {
       ctx.save()
       ctx.strokeStyle = shape.color || DEFAULT_COLOR
-      ctx.fillStyle = shape.color || DEFAULT_COLOR
       ctx.lineWidth = shape.lineWidth || lineWidthRef.current
       ctx.lineCap = 'round'
       ctx.lineJoin = 'round'
@@ -219,6 +156,7 @@ function WhiteboardPage() {
           ctx.stroke()
           break
         case SHAPE_TYPES.TEXT:
+          ctx.fillStyle = shape.color || DEFAULT_COLOR
           ctx.font = `${shape.fontSize || fontSizeRef.current}px sans-serif`
           ctx.textBaseline = 'alphabetic'
           ctx.fillText(shape.text || '', shape.x, shape.y)
@@ -251,6 +189,25 @@ function WhiteboardPage() {
   useEffect(() => {
     saveToStorage(shapes)
   }, [shapes])
+
+  useEffect(() => {
+    if (!editingTextId || !textInputRef.current) return
+    const textShape = shapes.find((s) => s.id === editingTextId)
+    if (!textShape) return
+    const params = getTextInputScreenParams(
+      textShape.x,
+      textShape.y,
+      textShape.fontSize || fontSize,
+      textShape.color || color,
+      pan.x,
+      pan.y,
+      zoom
+    )
+    textInputRef.current.style.left = `${params.left}px`
+    textInputRef.current.style.top = `${params.top}px`
+    textInputRef.current.style.fontSize = `${params.fontSize}px`
+    textInputRef.current.style.color = params.color
+  }, [zoom, pan.x, pan.y, editingTextId, shapes, fontSize, color])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -422,13 +379,13 @@ function WhiteboardPage() {
       if (existingText) {
         setEditingTextId(existingText.id)
         setEditingText(existingText.text)
-        const screenPos = worldToScreen(existingText.x, existingText.y, pan.x, pan.y, zoom)
+        const params = getTextInputScreenParams(existingText.x, existingText.y, existingText.fontSize, existingText.color, pan.x, pan.y, zoom)
         setTimeout(() => {
           if (textInputRef.current) {
-            textInputRef.current.style.left = `${screenPos.x}px`
-            textInputRef.current.style.top = `${screenPos.y - existingText.fontSize}px`
-            textInputRef.current.style.fontSize = `${existingText.fontSize}px`
-            textInputRef.current.style.color = existingText.color
+            textInputRef.current.style.left = `${params.left}px`
+            textInputRef.current.style.top = `${params.top}px`
+            textInputRef.current.style.fontSize = `${params.fontSize}px`
+            textInputRef.current.style.color = params.color
             textInputRef.current.focus()
           }
         }, 0)
@@ -442,13 +399,13 @@ function WhiteboardPage() {
       const result = pushHistory(history, historyIndex, tempShapes)
       setHistory(result.history)
       setHistoryIndex(result.historyIndex)
-      const screenPos = worldToScreen(world.x, world.y, pan.x, pan.y, zoom)
+      const params = getTextInputScreenParams(world.x, world.y, fontSize, color, pan.x, pan.y, zoom)
       setTimeout(() => {
         if (textInputRef.current) {
-          textInputRef.current.style.left = `${screenPos.x}px`
-          textInputRef.current.style.top = `${screenPos.y - fontSize}px`
-          textInputRef.current.style.fontSize = `${fontSize}px`
-          textInputRef.current.style.color = color
+          textInputRef.current.style.left = `${params.left}px`
+          textInputRef.current.style.top = `${params.top}px`
+          textInputRef.current.style.fontSize = `${params.fontSize}px`
+          textInputRef.current.style.color = params.color
           textInputRef.current.focus()
         }
       }, 0)

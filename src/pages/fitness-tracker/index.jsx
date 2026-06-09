@@ -1,20 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import {
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Legend,
-} from 'recharts'
 import './fitness-tracker.css'
 import { SPORT_TYPES, SPORT_MAP } from './constants'
 import {
@@ -35,59 +20,8 @@ import {
   formatDateTime,
   getTodayKey,
 } from './utils'
-
-const PIE_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16']
-
-const TrendTooltip = ({ active, payload }) => {
-  if (active && payload && payload.length) {
-    const d = payload[0].payload
-    return (
-      <div
-        style={{
-          background: 'var(--bg)',
-          border: '1px solid var(--border)',
-          borderRadius: '6px',
-          padding: '8px 12px',
-          boxShadow: 'var(--shadow)',
-        }}
-      >
-        <div style={{ fontSize: '13px', color: 'var(--text-h)', fontWeight: 500 }}>{d.date}</div>
-        <div style={{ fontSize: '12px', color: 'var(--text)', marginTop: '4px' }}>
-          消耗热量: {d.calories} 千卡
-        </div>
-        <div style={{ fontSize: '12px', color: 'var(--text)' }}>
-          运动时长: {d.minutes} 分钟
-        </div>
-      </div>
-    )
-  }
-  return null
-}
-
-const PieTooltip = ({ active, payload }) => {
-  if (active && payload && payload.length) {
-    const d = payload[0].payload
-    return (
-      <div
-        style={{
-          background: 'var(--bg)',
-          border: '1px solid var(--border)',
-          borderRadius: '6px',
-          padding: '8px 12px',
-          boxShadow: 'var(--shadow)',
-        }}
-      >
-        <div style={{ fontSize: '13px', color: 'var(--text-h)', fontWeight: 500 }}>
-          {d.icon} {d.name}
-        </div>
-        <div style={{ fontSize: '12px', color: 'var(--text)', marginTop: '4px' }}>
-          时长: {d.value} 分钟
-        </div>
-      </div>
-    )
-  }
-  return null
-}
+import TrendChart from './TrendChart'
+import DonutChart from './DonutChart'
 
 const FitnessTrackerPage = () => {
   const navigate = useNavigate()
@@ -507,55 +441,13 @@ const FitnessTrackerPage = () => {
             </div>
             {hasTrendData ? (
               <div className="chart-container">
-                <ResponsiveContainer width="100%" height="100%">
-                  {trendChartType === 'line' ? (
-                    <LineChart data={trendData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                      <XAxis
-                        dataKey="label"
-                        stroke="var(--text)"
-                        fontSize={11}
-                        tick={{ fill: 'var(--text)' }}
-                        interval={Math.floor(trendData.length / 8)}
-                      />
-                      <YAxis
-                        stroke="var(--text)"
-                        fontSize={11}
-                        tick={{ fill: 'var(--text)' }}
-                        allowDecimals={false}
-                      />
-                      <Tooltip content={<TrendTooltip />} />
-                      <Line
-                        type="monotone"
-                        dataKey="calories"
-                        stroke="var(--accent)"
-                        strokeWidth={2}
-                        dot={{ fill: 'var(--accent)', r: 3 }}
-                        activeDot={{ r: 5, fill: 'var(--accent)' }}
-                        name="千卡"
-                      />
-                    </LineChart>
-                  ) : (
-                    <BarChart data={trendData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                      <XAxis
-                        dataKey="label"
-                        stroke="var(--text)"
-                        fontSize={11}
-                        tick={{ fill: 'var(--text)' }}
-                        interval={Math.floor(trendData.length / 8)}
-                      />
-                      <YAxis
-                        stroke="var(--text)"
-                        fontSize={11}
-                        tick={{ fill: 'var(--text)' }}
-                        allowDecimals={false}
-                      />
-                      <Tooltip content={<TrendTooltip />} />
-                      <Bar dataKey="calories" fill="var(--accent)" radius={[3, 3, 0, 0]} name="千卡" />
-                    </BarChart>
-                  )}
-                </ResponsiveContainer>
+                <TrendChart
+                  data={trendData}
+                  type={trendChartType}
+                  valueKey="calories"
+                  width={600}
+                  height={240}
+                />
               </div>
             ) : (
               <div className="empty-state">暂无运动数据</div>
@@ -564,47 +456,14 @@ const FitnessTrackerPage = () => {
           <div className="chart-card">
             <h3 className="chart-title">运动类型时长占比</h3>
             {hasPieData ? (
-              <>
-                <div className="chart-container">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={pieData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={40}
-                        outerRadius={80}
-                        paddingAngle={2}
-                        dataKey="value"
-                        nameKey="name"
-                      >
-                        {pieData.map((entry, index) => (
-                          <Cell key={entry.key} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip content={<PieTooltip />} />
-                      <Legend
-                        formatter={(value, entry) => (
-                          <span style={{ color: 'var(--text)', fontSize: 12 }}>
-                            {entry.payload.icon} {value}
-                          </span>
-                        )}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="pie-legend">
-                  {pieData.map((item, index) => (
-                    <div key={item.key} className="pie-legend-item">
-                      <span
-                        className="pie-legend-color"
-                        style={{ background: PIE_COLORS[index % PIE_COLORS.length] }}
-                      />
-                      <span>{item.icon} {item.name}: {item.value}分钟</span>
-                    </div>
-                  ))}
-                </div>
-              </>
+              <DonutChart
+                data={pieData}
+                valueKey="value"
+                width={300}
+                height={240}
+                innerRadius={40}
+                outerRadius={80}
+              />
             ) : (
               <div className="empty-state">暂无运动数据</div>
             )}

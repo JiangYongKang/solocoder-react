@@ -34,6 +34,14 @@ import {
   getPrevMediaIndex,
   findMediaIndexById,
   seekWithinDuration,
+  calculateProgressPercent,
+  calculateTimeFromPercent,
+  mergePlaylistItems,
+  generateDefaultPlaylistItems,
+  validateBatchMediaItems,
+  createMediaItemsBatch,
+  findBufferedEnd,
+  clampPercent,
 } from '../../media-player/mediaPlayerUtils'
 
 const createMockLocalStorage = () => {
@@ -886,5 +894,320 @@ describe('seekWithinDuration', () => {
     expect(seekWithinDuration(30, null, 100)).toBe(30)
     expect(seekWithinDuration('invalid', 10, 100)).toBe(10)
     expect(seekWithinDuration(30, 'invalid', 100)).toBe(30)
+  })
+})
+
+describe('calculateProgressPercent', () => {
+  it('计算正确的进度百分比', () => {
+    expect(calculateProgressPercent(0, 100)).toBe(0)
+    expect(calculateProgressPercent(50, 100)).toBe(50)
+    expect(calculateProgressPercent(100, 100)).toBe(100)
+    expect(calculateProgressPercent(25, 100)).toBe(25)
+  })
+
+  it('限制在 0-100 范围内', () => {
+    expect(calculateProgressPercent(-10, 100)).toBe(0)
+    expect(calculateProgressPercent(150, 100)).toBe(100)
+  })
+
+  it('无效时长返回 0', () => {
+    expect(calculateProgressPercent(50, 0)).toBe(0)
+    expect(calculateProgressPercent(50, -10)).toBe(0)
+    expect(calculateProgressPercent(50, NaN)).toBe(0)
+    expect(calculateProgressPercent(50, Infinity)).toBe(0)
+  })
+
+  it('处理无效时间值', () => {
+    expect(calculateProgressPercent(null, 100)).toBe(0)
+    expect(calculateProgressPercent(undefined, 100)).toBe(0)
+    expect(calculateProgressPercent('invalid', 100)).toBe(0)
+    expect(calculateProgressPercent(NaN, 100)).toBe(0)
+  })
+})
+
+describe('calculateTimeFromPercent', () => {
+  it('根据百分比计算正确的时间', () => {
+    expect(calculateTimeFromPercent(0, 100)).toBe(0)
+    expect(calculateTimeFromPercent(50, 100)).toBe(50)
+    expect(calculateTimeFromPercent(100, 100)).toBe(100)
+    expect(calculateTimeFromPercent(25, 100)).toBe(25)
+  })
+
+  it('限制百分比范围后计算', () => {
+    expect(calculateTimeFromPercent(-10, 100)).toBe(0)
+    expect(calculateTimeFromPercent(150, 100)).toBe(100)
+  })
+
+  it('无效时长返回 0', () => {
+    expect(calculateTimeFromPercent(50, 0)).toBe(0)
+    expect(calculateTimeFromPercent(50, -10)).toBe(0)
+    expect(calculateTimeFromPercent(50, NaN)).toBe(0)
+  })
+
+  it('处理无效百分比值', () => {
+    expect(calculateTimeFromPercent(null, 100)).toBe(0)
+    expect(calculateTimeFromPercent(undefined, 100)).toBe(0)
+    expect(calculateTimeFromPercent('invalid', 100)).toBe(0)
+    expect(calculateTimeFromPercent(NaN, 100)).toBe(0)
+  })
+})
+
+describe('clampPercent', () => {
+  it('返回 0-100 之间的百分比值', () => {
+    expect(clampPercent(0)).toBe(0)
+    expect(clampPercent(50)).toBe(50)
+    expect(clampPercent(100)).toBe(100)
+  })
+
+  it('限制超出范围的值', () => {
+    expect(clampPercent(-10)).toBe(0)
+    expect(clampPercent(150)).toBe(100)
+    expect(clampPercent(-999)).toBe(0)
+    expect(clampPercent(999)).toBe(100)
+  })
+
+  it('处理无效值返回 0', () => {
+    expect(clampPercent(null)).toBe(0)
+    expect(clampPercent(undefined)).toBe(0)
+    expect(clampPercent('invalid')).toBe(0)
+    expect(clampPercent(NaN)).toBe(0)
+  })
+})
+
+describe('mergePlaylistItems', () => {
+  it('合并两个播放列表（不重复）', () => {
+    const existing = [{ id: 'a', title: 'A' }, { id: 'b', title: 'B' }]
+    const newItems = [{ id: 'c', title: 'C' }, { id: 'd', title: 'D' }]
+    const result = mergePlaylistItems(existing, newItems)
+    expect(result.length).toBe(4)
+    expect(result[0].id).toBe('a')
+    expect(result[1].id).toBe('b')
+    expect(result[2].id).toBe('c')
+    expect(result[3].id).toBe('d')
+  })
+
+  it('跳过已存在的 ID', () => {
+    const existing = [{ id: 'a', title: 'A' }, { id: 'b', title: 'B' }]
+    const newItems = [{ id: 'b', title: 'Updated B' }, { id: 'c', title: 'C' }]
+    const result = mergePlaylistItems(existing, newItems)
+    expect(result.length).toBe(3)
+    expect(result[0].id).toBe('a')
+    expect(result[1].id).toBe('b')
+    expect(result[1].title).toBe('A'.replace('A', 'B'))
+    expect(result[2].id).toBe('c')
+  })
+
+  it('保留原有顺序，新项追加在末尾', () => {
+    const existing = [{ id: 'x', title: 'X' }]
+    const newItems = [{ id: 'a', title: 'A' }, { id: 'b', title: 'B' }]
+    const result = mergePlaylistItems(existing, newItems)
+    expect(result[0].id).toBe('x')
+    expect(result[1].id).toBe('a')
+    expect(result[2].id).toBe('b')
+  })
+
+  it('过滤无效的新项目', () => {
+    const existing = [{ id: 'a', title: 'A' }]
+    const newItems = [null, { id: 'b', title: 'B' }, { noId: true }, 'string', { id: 123, title: 'invalid id type' }]
+    const result = mergePlaylistItems(existing, newItems)
+    expect(result.length).toBe(2)
+    expect(result[0].id).toBe('a')
+    expect(result[1].id).toBe('b')
+  })
+
+  it('处理无效输入参数', () => {
+    expect(mergePlaylistItems(null, [{ id: 'a' }])).toEqual([{ id: 'a' }])
+    expect(mergePlaylistItems(undefined, [{ id: 'a' }])).toEqual([{ id: 'a' }])
+    expect(mergePlaylistItems([{ id: 'a' }], null)).toEqual([{ id: 'a' }])
+    expect(mergePlaylistItems([{ id: 'a' }], undefined)).toEqual([{ id: 'a' }])
+    expect(mergePlaylistItems('string', { not: 'array' })).toEqual([])
+  })
+
+  it('空数组合并', () => {
+    expect(mergePlaylistItems([], [])).toEqual([])
+    expect(mergePlaylistItems([], [{ id: 'a' }])).toEqual([{ id: 'a' }])
+    expect(mergePlaylistItems([{ id: 'a' }], [])).toEqual([{ id: 'a' }])
+  })
+})
+
+describe('generateDefaultPlaylistItems', () => {
+  it('生成默认播放列表项', () => {
+    const items = generateDefaultPlaylistItems()
+    expect(Array.isArray(items)).toBe(true)
+    expect(items.length).toBe(DEFAULT_PLAYLIST.length)
+  })
+
+  it('每个项都有新的唯一 ID', () => {
+    const items1 = generateDefaultPlaylistItems()
+    const items2 = generateDefaultPlaylistItems()
+    const ids1 = items1.map((item) => item.id)
+    const ids2 = items2.map((item) => item.id)
+    for (const id of ids1) {
+      expect(ids2.includes(id)).toBe(false)
+    }
+  })
+
+  it('每个项的属性正确', () => {
+    const items = generateDefaultPlaylistItems()
+    for (let i = 0; i < items.length; i++) {
+      expect(items[i].id).toMatch(/^media_/)
+      expect(items[i].title).toBe(DEFAULT_PLAYLIST[i].title)
+      expect(items[i].url).toBe(DEFAULT_PLAYLIST[i].url)
+      expect(items[i].type).toBe(DEFAULT_PLAYLIST[i].type)
+    }
+  })
+
+  it('所有生成的 ID 都唯一', () => {
+    const items = generateDefaultPlaylistItems()
+    const ids = items.map((item) => item.id)
+    const uniqueIds = new Set(ids)
+    expect(uniqueIds.size).toBe(ids.length)
+  })
+})
+
+describe('validateBatchMediaItems', () => {
+  it('验证多个有效媒体项', () => {
+    const items = [
+      { title: 'A', url: 'https://example.com/a.mp3' },
+      { title: 'B', url: 'https://example.com/b.mp4' },
+    ]
+    const result = validateBatchMediaItems(items)
+    expect(result.valid).toBe(true)
+    expect(result.results.length).toBe(2)
+    expect(result.results[0].valid).toBe(true)
+    expect(result.results[1].valid).toBe(true)
+  })
+
+  it('检测部分无效的媒体项', () => {
+    const items = [
+      { title: 'A', url: 'https://example.com/a.mp3' },
+      { title: '', url: 'https://example.com/b.mp4' },
+      { title: 'C', url: '' },
+    ]
+    const result = validateBatchMediaItems(items)
+    expect(result.valid).toBe(false)
+    expect(result.results.length).toBe(3)
+    expect(result.results[0].valid).toBe(true)
+    expect(result.results[0].index).toBe(0)
+    expect(result.results[1].valid).toBe(false)
+    expect(result.results[1].index).toBe(1)
+    expect(result.results[2].valid).toBe(false)
+    expect(result.results[2].index).toBe(2)
+  })
+
+  it('包含每个项的详细错误信息', () => {
+    const items = [{ title: '', url: '' }]
+    const result = validateBatchMediaItems(items)
+    expect(result.results[0].errors.title).toBeTruthy()
+    expect(result.results[0].errors.url).toBeTruthy()
+  })
+
+  it('非数组输入返回无效并带错误信息', () => {
+    const result = validateBatchMediaItems('not an array')
+    expect(result.valid).toBe(false)
+    expect(result.results).toEqual([])
+    expect(result.errors.length).toBeGreaterThan(0)
+  })
+
+  it('空数组返回有效结果', () => {
+    const result = validateBatchMediaItems([])
+    expect(result.valid).toBe(true)
+    expect(result.results.length).toBe(0)
+  })
+})
+
+describe('createMediaItemsBatch', () => {
+  it('从原始数据批量创建有效媒体项', () => {
+    const rawItems = [
+      { title: 'Item 1', url: 'https://example.com/a.mp3' },
+      { title: 'Item 2', url: 'https://example.com/b.mp4', type: 'video' },
+    ]
+    const items = createMediaItemsBatch(rawItems)
+    expect(items.length).toBe(2)
+    expect(items[0].id).toMatch(/^media_/)
+    expect(items[0].title).toBe('Item 1')
+    expect(items[0].type).toBe(MEDIA_TYPES.AUDIO)
+    expect(items[1].type).toBe(MEDIA_TYPES.VIDEO)
+  })
+
+  it('过滤掉无效的媒体项', () => {
+    const rawItems = [
+      { title: 'Valid', url: 'https://example.com/a.mp3' },
+      { title: '', url: 'https://example.com/b.mp3' },
+      { title: 'No URL', url: '' },
+      null,
+    ]
+    const items = createMediaItemsBatch(rawItems)
+    expect(items.length).toBe(1)
+    expect(items[0].title).toBe('Valid')
+  })
+
+  it('非数组返回空数组', () => {
+    expect(createMediaItemsBatch(null)).toEqual([])
+    expect(createMediaItemsBatch(undefined)).toEqual([])
+    expect(createMediaItemsBatch('string')).toEqual([])
+  })
+
+  it('空数组返回空数组', () => {
+    expect(createMediaItemsBatch([])).toEqual([])
+  })
+
+  it('每个项都有唯一 ID', () => {
+    const rawItems = [
+      { title: 'A', url: 'https://example.com/a.mp3' },
+      { title: 'B', url: 'https://example.com/b.mp3' },
+      { title: 'C', url: 'https://example.com/c.mp3' },
+    ]
+    const items = createMediaItemsBatch(rawItems)
+    const ids = new Set(items.map((item) => item.id))
+    expect(ids.size).toBe(3)
+  })
+})
+
+describe('findBufferedEnd', () => {
+  it('从 buffered 对象获取缓冲结束位置', () => {
+    const mockBuffered = {
+      length: 2,
+      end: (index) => {
+        if (index === 0) return 10
+        if (index === 1) return 50
+        return 0
+      },
+    }
+    expect(findBufferedEnd(mockBuffered, 100)).toBe(50)
+  })
+
+  it('限制缓冲结束位置不超过总时长', () => {
+    const mockBuffered = {
+      length: 1,
+      end: () => 200,
+    }
+    expect(findBufferedEnd(mockBuffered, 100)).toBe(100)
+  })
+
+  it('空 buffered 返回 0', () => {
+    const mockBuffered = { length: 0, end: () => 50 }
+    expect(findBufferedEnd(mockBuffered, 100)).toBe(0)
+  })
+
+  it('无效 buffered 返回 0', () => {
+    expect(findBufferedEnd(null, 100)).toBe(0)
+    expect(findBufferedEnd(undefined, 100)).toBe(0)
+    expect(findBufferedEnd({}, 100)).toBe(0)
+  })
+
+  it('处理无效的时长', () => {
+    const mockBuffered = { length: 1, end: () => 50 }
+    expect(findBufferedEnd(mockBuffered, -10)).toBe(50)
+    expect(findBufferedEnd(mockBuffered, 0)).toBe(50)
+    expect(findBufferedEnd(mockBuffered, NaN)).toBe(50)
+  })
+
+  it('处理非有限的 end 值', () => {
+    const mockBuffered = {
+      length: 1,
+      end: () => Infinity,
+    }
+    expect(findBufferedEnd(mockBuffered, 100)).toBe(0)
   })
 })

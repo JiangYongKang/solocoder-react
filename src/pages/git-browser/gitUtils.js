@@ -1,5 +1,25 @@
 import { FILE_CHANGE_STATUS, FILE_TYPE } from './constants'
 
+export const simpleHash = (str) => {
+  if (typeof str !== 'string' || str.length === 0) return 0
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i)
+    hash = ((hash << 5) - hash) + char
+    hash |= 0
+  }
+  return Math.abs(hash)
+}
+
+export const seededRandom = (seed) => {
+  let s = seed % 2147483647
+  if (s <= 0) s += 2147483646
+  return () => {
+    s = (s * 16807) % 2147483647
+    return (s - 1) / 2147483646
+  }
+}
+
 export const getChangeStatusIcon = (status) => {
   switch (status) {
     case FILE_CHANGE_STATUS.ADDED:
@@ -229,17 +249,92 @@ export const generateOriginalContent = (file) => {
     return content
   }
   if (file.status === FILE_CHANGE_STATUS.MODIFIED) {
+    const seed = simpleHash(file.path || file.name || 'default')
+    const rand = seededRandom(seed)
     const modified = [...lines]
-    for (let i = 0; i < Math.min(3, modified.length); i++) {
-      const idx = Math.floor(Math.random() * modified.length)
-      if (modified[idx].length > 10) {
+    const numChanges = Math.min(3, Math.max(1, Math.floor(rand() * 3) + 1))
+    for (let i = 0; i < numChanges; i++) {
+      const idx = Math.floor(rand() * modified.length)
+      if (modified[idx] && modified[idx].length > 10) {
         modified[idx] = modified[idx].replace(/\w+/, 'old')
       }
     }
     if (modified.length > 2) {
-      modified.splice(Math.floor(modified.length / 2), 0, '// removed line 1', '// removed line 2')
+      const insertIdx = Math.floor(modified.length / 2)
+      modified.splice(insertIdx, 0, '// removed line 1', '// removed line 2')
     }
     return modified.join('\n')
   }
   return content
+}
+
+export const buildFileTreeFromList = (fileList, fileContents) => {
+  if (!Array.isArray(fileList)) return null
+  const tree = {
+    id: 'root',
+    name: 'my-project',
+    type: FILE_TYPE.FOLDER,
+    status: FILE_CHANGE_STATUS.UNCHANGED,
+    children: [],
+  }
+
+  fileList.forEach(({ path, status }) => {
+    const parts = path.split('/')
+    let current = tree
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i]
+      if (i === parts.length - 1) {
+        current.children.push({
+          id: `file-${path}`,
+          name: part,
+          type: FILE_TYPE.FILE,
+          path,
+          status,
+          content: fileContents[path] || `// ${part}\n// This is the content of ${path}`,
+        })
+      } else {
+        let existing = current.children.find((c) => c.name === part && c.type === FILE_TYPE.FOLDER)
+        if (!existing) {
+          existing = {
+            id: `folder-${parts.slice(0, i + 1).join('/')}`,
+            name: part,
+            type: FILE_TYPE.FOLDER,
+            status: FILE_CHANGE_STATUS.UNCHANGED,
+            children: [],
+          }
+          current.children.push(existing)
+        }
+        current = existing
+      }
+    }
+  })
+
+  return tree
+}
+
+export const computeCommitFileSnapshot = (commitHistory, targetCommitHash, baseFileList) => {
+  if (!Array.isArray(commitHistory) || !Array.isArray(baseFileList)) return []
+  const targetIdx = commitHistory.findIndex((c) => c.hash === targetCommitHash)
+  if (targetIdx === -1) return baseFileList
+
+  const fileMap = new Map()
+  baseFileList.forEach((f) => fileMap.set(f.path, { path: f.path, status: FILE_CHANGE_STATUS.UNCHANGED }))
+
+  for (let i = 0; i <= targetIdx; i++) {
+    const commit = commitHistory[i]
+    if (!commit || !Array.isArray(commit.files)) continue
+    commit.files.forEach((filePath) => {
+      if (i === targetIdx) {
+        if (fileMap.has(filePath)) {
+          fileMap.set(filePath, { path: filePath, status: FILE_CHANGE_STATUS.MODIFIED })
+        } else {
+          fileMap.set(filePath, { path: filePath, status: FILE_CHANGE_STATUS.ADDED })
+        }
+      } else {
+        fileMap.set(filePath, { path: filePath, status: FILE_CHANGE_STATUS.UNCHANGED })
+      }
+    })
+  }
+
+  return Array.from(fileMap.values())
 }

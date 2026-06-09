@@ -34,6 +34,9 @@ import {
   importFromJson,
   autoLayout,
   fitToView,
+  adjustContextMenuPosition,
+  DEFAULT_CONTEXT_MENU_WIDTH,
+  DEFAULT_CONTEXT_MENU_HEIGHT,
 } from './dbDesignerCore'
 
 function DBFieldRow({ table, field, fieldIndex, onUpdate, onDelete, onReorder, onStartDragRelation }) {
@@ -66,8 +69,8 @@ function DBFieldRow({ table, field, fieldIndex, onUpdate, onDelete, onReorder, o
       if (parsed.tableId === table.id && parsed.fieldIndex !== fieldIndex) {
         onReorder(parsed.fieldIndex, fieldIndex)
       }
-    } catch {
-      void 0
+    } catch (err) {
+      console.warn('字段拖拽数据解析失败:', err)
     }
   }
 
@@ -251,6 +254,22 @@ function DBTable({ table, selected, onSelect, onUpdate, onDelete, onAddField, on
 
 function ContextMenu({ x, y, items, onClose }) {
   const menuRef = useRef(null)
+  const [position, setPosition] = useState(() => adjustContextMenuPosition(
+    x, y,
+    DEFAULT_CONTEXT_MENU_WIDTH,
+    Math.max(items.length * 40 + 16, DEFAULT_CONTEXT_MENU_HEIGHT),
+    typeof window !== 'undefined' ? window.innerWidth : 1024,
+    typeof window !== 'undefined' ? window.innerHeight : 768
+  ))
+
+  useEffect(() => {
+    const vw = typeof window !== 'undefined' ? window.innerWidth : 1024
+    const vh = typeof window !== 'undefined' ? window.innerHeight : 768
+    const menuEl = menuRef.current
+    const mw = menuEl?.offsetWidth || DEFAULT_CONTEXT_MENU_WIDTH
+    const mh = menuEl?.offsetHeight || Math.max(items.length * 40 + 16, DEFAULT_CONTEXT_MENU_HEIGHT)
+    setPosition(adjustContextMenuPosition(x, y, mw, mh, vw, vh))
+  }, [x, y, items.length])
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -266,7 +285,7 @@ function ContextMenu({ x, y, items, onClose }) {
     <div
       ref={menuRef}
       className="dbd-context-menu"
-      style={{ left: x, top: y }}
+      style={{ left: position.x, top: position.y }}
     >
       {items.map((item, idx) => (
         <div
@@ -301,8 +320,8 @@ function DDLModal({ tables, relations, initialTableId, onClose }) {
       await navigator.clipboard.writeText(ddl)
       setCopySuccess(true)
       setTimeout(() => setCopySuccess(false), 2000)
-    } catch {
-      void 0
+    } catch (err) {
+      alert('复制失败: ' + (err?.message || '请手动复制'))
     }
   }
 
@@ -379,8 +398,40 @@ function DBDesignerPage() {
   const [contextMenu, setContextMenu] = useState(null)
   const [ddlModal, setDdlModal] = useState({ open: false, tableId: null })
 
+  const latestRef = useRef({ tables: [], relations: [], pan: { x: 0, y: 0 }, zoom: 1, relationDraft: null })
+
   useEffect(() => {
-    saveToStorage({ tables, relations })
+    latestRef.current.tables = tables
+  }, [tables])
+
+  useEffect(() => {
+    latestRef.current.relations = relations
+  }, [relations])
+
+  useEffect(() => {
+    latestRef.current.pan = pan
+  }, [pan])
+
+  useEffect(() => {
+    latestRef.current.zoom = zoom
+  }, [zoom])
+
+  useEffect(() => {
+    latestRef.current.relationDraft = relationDraft
+  }, [relationDraft])
+
+  useEffect(() => {
+    const saved = loadFromStorage()
+    if (saved.error) {
+      alert('读取本地存储失败: ' + saved.error)
+    }
+  }, [])
+
+  useEffect(() => {
+    const result = saveToStorage({ tables, relations })
+    if (!result.success) {
+      console.warn('保存本地存储失败:', result.error)
+    }
   }, [tables, relations])
 
   const handleWheel = useCallback((e) => {
@@ -466,20 +517,23 @@ function DBDesignerPage() {
     const handleMouseMove = (e) => {
       if (!canvasRef.current) return
       const rect = canvasRef.current.getBoundingClientRect()
-      const world = screenToWorld(e.clientX - rect.left, e.clientY - rect.top, pan.x, pan.y, zoom)
+      const { pan: curPan, zoom: curZoom } = latestRef.current
+      const world = screenToWorld(e.clientX - rect.left, e.clientY - rect.top, curPan.x, curPan.y, curZoom)
       setRelationDraft((prev) => prev ? { ...prev, currentX: world.x, currentY: world.y } : null)
     }
 
     const handleMouseUp = (e) => {
-      const draft = relationDraft
+      const draft = latestRef.current.relationDraft
       setRelationDraft(null)
+      if (!draft) return
 
       if (!canvasRef.current) return
       const rect = canvasRef.current.getBoundingClientRect()
-      const worldX = (e.clientX - rect.left - pan.x) / zoom
-      const worldY = (e.clientY - rect.top - pan.y) / zoom
+      const { pan: curPan, zoom: curZoom, tables: curTables, relations: curRelations } = latestRef.current
+      const worldX = (e.clientX - rect.left - curPan.x) / curZoom
+      const worldY = (e.clientY - rect.top - curPan.y) / curZoom
 
-      for (const table of tables) {
+      for (const table of curTables) {
         if (table.id === draft.fromTableId) continue
         if (worldX < table.x || worldX > table.x + TABLE_WIDTH) continue
         const fieldAreaTop = table.y + TABLE_HEADER_HEIGHT
@@ -492,8 +546,8 @@ function DBDesignerPage() {
         }
 
         const result = validateRelation(
-          tables,
-          relations,
+          curTables,
+          curRelations,
           draft.fromTableId,
           draft.fromFieldId,
           table.id,
@@ -518,7 +572,7 @@ function DBDesignerPage() {
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [relationDraft, tables, relations, pan, zoom])
+  }, [relationDraft])
 
   const handleDragTable = (tableId, dx, dy) => {
     setTables((prev) => updateTable(prev, tableId, {
@@ -597,7 +651,10 @@ function DBDesignerPage() {
   }
 
   const handleExportJson = () => {
-    downloadJson({ tables, relations })
+    const result = downloadJson({ tables, relations })
+    if (!result.success) {
+      alert('导出 JSON 失败: ' + result.error)
+    }
   }
 
   const handleImportClick = () => {
@@ -617,8 +674,8 @@ function DBDesignerPage() {
       } else {
         alert('导入失败: ' + result.error)
       }
-    } catch {
-      alert('导入失败: 无法解析 JSON 文件')
+    } catch (err) {
+      alert('导入失败: ' + (err?.message || '无法解析 JSON 文件'))
     }
     e.target.value = ''
   }
@@ -631,7 +688,10 @@ function DBDesignerPage() {
     if (confirm('确定要清空所有设计吗？')) {
       setTables([])
       setRelations([])
-      clearStorage()
+      const result = clearStorage()
+      if (!result.success) {
+        console.warn('清除本地存储失败:', result.error)
+      }
     }
   }
 

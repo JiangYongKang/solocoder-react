@@ -1,5 +1,5 @@
-import { GF_EXP, GF_LOG, VERSION_INFORMATION, ALIGNMENT_PATTERN_POSITIONS } from './tables.js'
-import { MODE, MODE_INDICATOR_BITS, ALPHANUMERIC_TABLE, MASK_PATTERNS, FORMAT_INFO_GPOLY, FORMAT_INFO_MASK, VERSION_INFO_GPOLY, PENALTY_RULES, ERROR_CORRECTION_LEVELS } from './constants.js'
+import { ALPHANUMERIC_TABLE, ERROR_CORRECTION_LEVELS, FORMAT_INFO_GPOLY, FORMAT_INFO_MASK, MASK_PATTERNS, MODE, MODE_INDICATOR_BITS, PENALTY_RULES, VERSION_INFO_GPOLY } from './constants.js'
+import { ALIGNMENT_PATTERN_POSITIONS, GF_EXP, GF_LOG, VERSION_INFORMATION } from './tables.js'
 
 function gfMul(a, b) {
   if (a === 0 || b === 0) return 0
@@ -335,7 +335,7 @@ export function copyMatrix(matrix) {
   return matrix.map((row) => row.slice())
 }
 
-export function applyMask(matrix, size, maskIndex, version) {
+export function applyDataMask(matrix, size, maskIndex, version) {
   const result = copyMatrix(matrix)
   const maskFn = MASK_PATTERNS[maskIndex]
   for (let r = 0; r < size; r++) {
@@ -477,7 +477,7 @@ export function findMinVersion(text, ecLevel) {
   const mode = getModeForText(text)
   for (let version = 1; version <= 40; version++) {
     const dataBitsNeeded = 4 + getCharCountBits(mode, version)
-    let contentBits = 0
+    let contentBits
     if (mode === MODE.NUMERIC) {
       contentBits = Math.ceil(text.length / 3) * 10
       if (text.length % 3 === 1) contentBits -= 6

@@ -40,7 +40,6 @@ import {
   setGoals,
   calculateDailyProgress,
   calculateWeeklyProgress,
-  getWeekDates,
 } from '../../fitness-tracker/utils'
 
 const createMockLocalStorage = () => {
@@ -692,22 +691,6 @@ describe('calculateDailyProgress / calculateWeeklyProgress', () => {
     const progress = calculateWeeklyProgress(records, 2)
     expect(progress.isCompleted).toBe(true)
     expect(progress.percent).toBe(100)
-  })
-})
-
-describe('getWeekDates', () => {
-  it('返回指定周的 7 个日期', () => {
-    const weekKey = getWeekKey(new Date(2025, 5, 8).getTime())
-    const dates = getWeekDates(weekKey)
-    expect(dates.length).toBe(7)
-    dates.forEach((d) => {
-      expect(d).toMatch(/^\d{4}-\d{2}-\d{2}$/)
-    })
-  })
-
-  it('无效周 key 返回空数组', () => {
-    expect(getWeekDates('')).toEqual([])
-    expect(getWeekDates('invalid')).toEqual([])
   })
 })
 

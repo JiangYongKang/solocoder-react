@@ -381,41 +381,44 @@ export function generateFullDDL(tables, relations) {
 }
 
 export function loadFromStorage(storage = typeof window !== 'undefined' ? window.localStorage : null) {
-  if (!storage) return { tables: [], relations: [] }
+  if (!storage) return { tables: [], relations: [], error: 'localStorage 不可用' }
   try {
     const raw = storage.getItem(STORAGE_KEY)
-    if (!raw) return { tables: [], relations: [] }
+    if (!raw) return { tables: [], relations: [], error: null }
     const parsed = JSON.parse(raw)
     if (!parsed || !Array.isArray(parsed.tables) || !Array.isArray(parsed.relations)) {
-      return { tables: [], relations: [] }
+      return { tables: [], relations: [], error: '存储数据格式损坏' }
     }
-    return parsed
-  } catch {
-    return { tables: [], relations: [] }
+    return { tables: parsed.tables, relations: parsed.relations, error: null }
+  } catch (e) {
+    const msg = e?.message ? `: ${e.message}` : ''
+    return { tables: [], relations: [], error: `读取存储数据失败${msg}` }
   }
 }
 
 export function saveToStorage(state, storage = typeof window !== 'undefined' ? window.localStorage : null) {
-  if (!storage) return false
+  if (!storage) return { success: false, error: 'localStorage 不可用' }
   try {
     const toSave = {
       tables: state.tables || [],
       relations: state.relations || [],
     }
     storage.setItem(STORAGE_KEY, JSON.stringify(toSave))
-    return true
-  } catch {
-    return false
+    return { success: true, error: null }
+  } catch (e) {
+    const msg = e?.message ? `: ${e.message}` : ''
+    return { success: false, error: `保存数据失败${msg}` }
   }
 }
 
 export function clearStorage(storage = typeof window !== 'undefined' ? window.localStorage : null) {
-  if (!storage) return false
+  if (!storage) return { success: false, error: 'localStorage 不可用' }
   try {
     storage.removeItem(STORAGE_KEY)
-    return true
-  } catch {
-    return false
+    return { success: true, error: null }
+  } catch (e) {
+    const msg = e?.message ? `: ${e.message}` : ''
+    return { success: false, error: `清除存储失败${msg}` }
   }
 }
 
@@ -429,7 +432,9 @@ export function exportToJson(state) {
 }
 
 export function downloadJson(state, filename = 'db-design.json') {
-  if (typeof window === 'undefined' || !window.document) return false
+  if (typeof window === 'undefined' || !window.document) {
+    return { success: false, error: '当前环境不支持文件下载' }
+  }
   try {
     const data = exportToJson(state)
     const jsonStr = JSON.stringify(data, null, 2)
@@ -442,9 +447,10 @@ export function downloadJson(state, filename = 'db-design.json') {
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
-    return true
-  } catch {
-    return false
+    return { success: true, error: null }
+  } catch (e) {
+    const msg = e?.message ? `: ${e.message}` : ''
+    return { success: false, error: `文件下载失败${msg}` }
   }
 }
 
@@ -633,4 +639,35 @@ export function fitToView(tables, containerWidth, containerHeight, padding = 80)
   const panY = containerHeight / 2 - centerY * zoom
 
   return { panX, panY, zoom }
+}
+
+export const DEFAULT_CONTEXT_MENU_WIDTH = 180
+export const DEFAULT_CONTEXT_MENU_HEIGHT = 120
+
+export function adjustContextMenuPosition(x, y, menuWidth, menuHeight, viewportWidth, viewportHeight, padding = 8) {
+  const safeMenuWidth = typeof menuWidth === 'number' && menuWidth > 0 ? menuWidth : DEFAULT_CONTEXT_MENU_WIDTH
+  const safeMenuHeight = typeof menuHeight === 'number' && menuHeight > 0 ? menuHeight : DEFAULT_CONTEXT_MENU_HEIGHT
+  const hasWindow = typeof window !== 'undefined'
+  const safeViewportWidth = typeof viewportWidth === 'number' && viewportWidth > 0 ? viewportWidth : (hasWindow && typeof window.innerWidth === 'number' ? window.innerWidth : 1024)
+  const safeViewportHeight = typeof viewportHeight === 'number' && viewportHeight > 0 ? viewportHeight : (hasWindow && typeof window.innerHeight === 'number' ? window.innerHeight : 768)
+  const safePadding = typeof padding === 'number' && padding >= 0 ? padding : 8
+
+  let adjustedX = typeof x === 'number' ? x : 0
+  let adjustedY = typeof y === 'number' ? y : 0
+
+  if (adjustedX + safeMenuWidth + safePadding > safeViewportWidth) {
+    adjustedX = safeViewportWidth - safeMenuWidth - safePadding
+  }
+  if (adjustedX < safePadding) {
+    adjustedX = safePadding
+  }
+
+  if (adjustedY + safeMenuHeight + safePadding > safeViewportHeight) {
+    adjustedY = safeViewportHeight - safeMenuHeight - safePadding
+  }
+  if (adjustedY < safePadding) {
+    adjustedY = safePadding
+  }
+
+  return { x: adjustedX, y: adjustedY }
 }

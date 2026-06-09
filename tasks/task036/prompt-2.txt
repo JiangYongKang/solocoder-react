@@ -1,0 +1,9 @@
+你实现的二维码工具页面还存在一些问题，需要进行修复：
+
+1. qrcodeDecoder.js 的 decodeData 函数将 QR 码版本硬编码为 version = 1，当解析版本 10 及以上的二维码时，字符计数指示符的位宽计算错误，导致后续字节解码偏移、输出乱码。需要将 decodeQRImage 中已解析出的版本号传入 decodeData。
+2. qrcodeDecoder.js 的 applyMask 函数内部重新写了一份遮罩模式数组，与 constants.js 中已导入的 MASK_PATTERNS 完全重复，应复用已导入的常量而不是重新定义。
+3. qrcodeEncoder.js 和 qrcodeDecoder.js 各有一个名为 applyMask 的导出函数，但两个函数的参数签名和含义完全不同，同名但不同语义容易导致导入错误。需要给它们各自使用不同的函数名。
+4. qrcodeDecoder.test.js 中 decodeData 的测试只覆盖了 Numeric 和 Byte 两种编码模式，缺少 Alphanumeric 模式的往返测试。同时所有测试都只覆盖了低版本 QR 码，需要补充高版本场景的测试。
+5. 项目根目录存在 7 个调试用的临时文件（debug-qr.mjs、debug-version.mjs 等），这些文件不应提交到代码仓库中，需要清理。
+6. 修复后需要补充纯 JS 函数的单元测试，只测和页面渲染无关的逻辑。测试代码放在 src/pages/__tests__/qrcode/ 下。
+7. 重新运行 pnpm run test，需要让所有测试通过。

@@ -1,0 +1,7 @@
+你实现的健身运动追踪页面还存在一些问题，需要进行修复：
+
+1. 趋势图表（热量消耗折线图和运动类型占比饼图）当前使用的是 recharts 第三方图表库，但提示词要求"图表纯前端实现，可以用 Canvas 或 SVG 自绘"。需要移除对 recharts 的依赖，改为自行编写 Canvas 或 SVG 图表渲染逻辑。
+2. utils.js 中定义了 getWeekDates 函数，已导出并被测试覆盖，但 index.jsx 从未导入或调用它，存在死代码，需要清理或集成到页面中。
+3. 修复后需要补充纯 JS 函数的单元测试，只测和页面渲染无关的逻辑。测试代码放在 src/pages/__tests__/fitness-tracker/ 下。
+4. 修复完成后启动 pnpm run dev，手动验证图表展示是否正常（不再依赖 recharts）。
+5. 重新运行 pnpm run test，需要让所有测试通过。

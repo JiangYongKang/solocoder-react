@@ -327,7 +327,7 @@ export function createRepost(posts, originalPostId, repostContent = '') {
 }
 
 function addReplyToComments(comments, parentCommentId, reply, currentDepth) {
-  if (currentDepth > MAX_COMMENT_DEPTH) return null
+  if (currentDepth >= MAX_COMMENT_DEPTH) return null
   for (let i = 0; i < comments.length; i++) {
     if (comments[i].id === parentCommentId) {
       const target = { ...comments[i] }

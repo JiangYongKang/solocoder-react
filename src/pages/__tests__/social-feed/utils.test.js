@@ -681,6 +681,78 @@ describe('addComment', () => {
     addComment(posts, 'post_1', '新评论')
     expect(posts[0].comments.length).toBe(originalCommentCount)
   })
+
+  it('嵌套回复超过 MAX_COMMENT_DEPTH 层时返回错误', () => {
+    const MAX_DEPTH = 3
+    const buildNestedComments = (depth) => {
+      if (depth === 0) return []
+      return [
+        {
+          id: `c_depth_${depth}`,
+          userId: 'u1',
+          userName: 'User',
+          userAvatar: 'a.png',
+          content: `depth ${depth}`,
+          createdAt: Date.now(),
+          replies: buildNestedComments(depth - 1),
+        },
+      ]
+    }
+    const deeplyNestedPost = {
+      id: 'post_deep',
+      userId: 'u1',
+      userName: 'User',
+      userAvatar: 'a.png',
+      content: 'test',
+      images: [],
+      topics: [],
+      createdAt: Date.now(),
+      likeCount: 0,
+      commentCount: MAX_DEPTH,
+      repostCount: 0,
+      comments: buildNestedComments(MAX_DEPTH),
+      repostOf: null,
+    }
+    const posts = [deeplyNestedPost]
+    const result = addComment(posts, 'post_deep', '超限回复', 'c_depth_1')
+    expect(result.success).toBe(false)
+    expect(result.error).toContain('层级')
+  })
+
+  it('第 MAX_COMMENT_DEPTH-1 层仍然可以添加回复', () => {
+    const buildNestedComments = (depth) => {
+      if (depth === 0) return []
+      return [
+        {
+          id: `c_${depth}`,
+          userId: 'u1',
+          userName: 'User',
+          userAvatar: 'a.png',
+          content: `depth ${depth}`,
+          createdAt: Date.now(),
+          replies: buildNestedComments(depth - 1),
+        },
+      ]
+    }
+    const post = {
+      id: 'post_test',
+      userId: 'u1',
+      userName: 'User',
+      userAvatar: 'a.png',
+      content: 'test',
+      images: [],
+      topics: [],
+      createdAt: Date.now(),
+      likeCount: 0,
+      commentCount: 2,
+      repostCount: 0,
+      comments: buildNestedComments(2),
+      repostOf: null,
+    }
+    const posts = [post]
+    const result = addComment(posts, 'post_test', '有效回复', 'c_1')
+    expect(result.success).toBe(true)
+  })
 })
 
 describe('getCommentCount', () => {

@@ -217,6 +217,38 @@ describe('validateCoupon', () => {
     expect(errors.threshold).toBeTruthy()
   })
 
+  it('满减券门槛为0时报错（门槛必须为正数）', () => {
+    const errors = validateCoupon(makeValidCouponData({ type: COUPON_TYPES.FULL_REDUCTION, threshold: 0 }))
+    expect(errors.threshold).toBeTruthy()
+    expect(errors.threshold).toContain('正数')
+  })
+
+  it('折扣券门槛为0时报错（门槛必须为正数）', () => {
+    const errors = validateCoupon(makeValidCouponData({ type: COUPON_TYPES.DISCOUNT, denomination: 8, threshold: 0 }))
+    expect(errors.threshold).toBeTruthy()
+    expect(errors.threshold).toContain('正数')
+  })
+
+  it('满减券门槛为 undefined 时报错', () => {
+    const errors = validateCoupon(makeValidCouponData({ type: COUPON_TYPES.FULL_REDUCTION, threshold: undefined }))
+    expect(errors.threshold).toBeTruthy()
+  })
+
+  it('满减券门槛为 null 时报错', () => {
+    const errors = validateCoupon(makeValidCouponData({ type: COUPON_TYPES.FULL_REDUCTION, threshold: null }))
+    expect(errors.threshold).toBeTruthy()
+  })
+
+  it('满减券门槛为空字符串时报错', () => {
+    const errors = validateCoupon(makeValidCouponData({ type: COUPON_TYPES.FULL_REDUCTION, threshold: '' }))
+    expect(errors.threshold).toBeTruthy()
+  })
+
+  it('门槛为 NaN 时报错', () => {
+    const errors = validateCoupon(makeValidCouponData({ threshold: 'not-a-number' }))
+    expect(errors.threshold).toBeTruthy()
+  })
+
   it('立减券不需要门槛，不报错', () => {
     const errors = validateCoupon(makeValidCouponData({
       type: COUPON_TYPES.FLAT,
@@ -297,6 +329,36 @@ describe('createCoupon', () => {
     const result = createCoupon(existing, makeValidCouponData())
     expect(result.coupons[0].id).toBe(result.coupon.id)
     expect(result.coupons[1].id).toBe('old')
+  })
+
+  it('门槛为0时创建失败（不会被静默转为0）', () => {
+    const result = createCoupon([], makeValidCouponData({ threshold: 0 }))
+    expect(result.success).toBe(false)
+    expect(result.errors.threshold).toBeTruthy()
+  })
+
+  it('门槛为空字符串时创建失败（不会被静默转为0）', () => {
+    const result = createCoupon([], makeValidCouponData({ threshold: '' }))
+    expect(result.success).toBe(false)
+    expect(result.errors.threshold).toBeTruthy()
+  })
+
+  it('门槛为 undefined 时创建失败（不会被静默转为0）', () => {
+    const result = createCoupon([], makeValidCouponData({ type: COUPON_TYPES.FULL_REDUCTION, threshold: undefined }))
+    expect(result.success).toBe(false)
+    expect(result.errors.threshold).toBeTruthy()
+  })
+
+  it('门槛为 null 时创建失败（不会被静默转为0）', () => {
+    const result = createCoupon([], makeValidCouponData({ type: COUPON_TYPES.FULL_REDUCTION, threshold: null }))
+    expect(result.success).toBe(false)
+    expect(result.errors.threshold).toBeTruthy()
+  })
+
+  it('创建成功时 threshold 保留原始正数值（不被默认值覆盖）', () => {
+    const result = createCoupon([], makeValidCouponData({ threshold: 200 }))
+    expect(result.success).toBe(true)
+    expect(result.coupon.threshold).toBe(200)
   })
 })
 

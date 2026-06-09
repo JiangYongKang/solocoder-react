@@ -38,6 +38,9 @@ import CouponPage from '@/pages/coupon/index.jsx'
 import FitnessTrackerPage from '@/pages/fitness-tracker/index.jsx'
 import GitBrowserPage from '@/pages/git-browser/index.jsx'
 import QRCodePage from '@/pages/qrcode/index.jsx'
+import ApiDebuggerPage from '@/pages/api-debugger/index.jsx'
+import WhiteboardPage from '@/pages/whiteboard/index.jsx'
+import SocialFeedPage from '@/pages/social-feed/index.jsx'
 
 const TASKS = [
     { id: 1, title: '用户认证系统', route: 'auth', description: '登录、注册、找回密码、修改密码完整的认证流程，基于 localStorage 存储。' },
@@ -76,7 +79,9 @@ const TASKS = [
     { id: 34, title: '健身运动追踪', route: 'fitness-tracker', description: '记录和追踪日常运动，汇总统计数据，设定健身目标，趋势图表可视化，基于 localStorage 持久化。' },
     { id: 35, title: 'Git 仓库浏览器', route: 'git-browser', description: '模拟 Git 仓库可视化管理工具，文件树、Diff 对比、提交历史时间线、分支切换、Stage/Unstage 暂存面板。' },
     { id: 36, title: '数据库表设计器', route: 'db-designer', description: '可视化数据库表结构设计工具，支持表/字段拖拽编辑、外键关系连线、自动布局、DDL导出、JSON导入导出。' },
-    { id: 37, title: '二维码工具', route: 'qrcode', description: '二维码生成和解析工具，支持自定义尺寸、颜色、Logo 嵌入、PNG 下载、图片解析、历史记录，基于 localStorage 持久化。' },
+    { id: 37, title: '优惠券管理系统', route: 'coupon', description: '模拟电商平台优惠券全生命周期管理，支持商家发券、用户领券、下单用券的完整闭环，基于 localStorage 持久化。' },
+    { id: 38, title: '二维码工具', route: 'qrcode', description: '二维码生成和解析工具，支持自定义尺寸、颜色、Logo 嵌入、PNG 下载、图片解析、历史记录，基于 localStorage 持久化。' },
+    { id: 39, title: '社交动态流', route: 'social-feed', description: '模拟社交平台动态信息流，支持发布内容、图片上传、话题标签、点赞评论转发、嵌套回复、关注、排序筛选、无限滚动，基于 localStorage 持久化。' },
 ]
 
 function HomePage() {
@@ -149,6 +154,8 @@ function App() {
             <Route path="/fitness-tracker" element={<FitnessTrackerPage />} />
             <Route path="/qrcode" element={<QRCodePage />} />
             <Route path="/git-browser" element={<GitBrowserPage />} />
+            <Route path="/whiteboard" element={<WhiteboardPage />} />
+            <Route path="/social-feed" element={<SocialFeedPage />} />
         </Routes>
     )
 }

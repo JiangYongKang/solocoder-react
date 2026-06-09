@@ -293,3 +293,79 @@ export function seekWithinDuration(currentTime, seconds, duration) {
   const d = isFinite(duration) && duration > 0 ? duration : Infinity
   return Math.max(0, Math.min(d, ct + s))
 }
+
+export function calculateProgressPercent(currentTime, duration) {
+  const ct = Number(currentTime) || 0
+  const d = Number(duration) || 0
+  if (d <= 0 || !isFinite(d)) return 0
+  return Math.max(0, Math.min(100, (ct / d) * 100))
+}
+
+export function calculateTimeFromPercent(percent, duration) {
+  const p = Number(percent) || 0
+  const d = Number(duration) || 0
+  if (d <= 0 || !isFinite(d)) return 0
+  return Math.max(0, Math.min(d, (p / 100) * d))
+}
+
+export function mergePlaylistItems(existingPlaylist, newItems) {
+  if (!Array.isArray(existingPlaylist)) existingPlaylist = []
+  if (!Array.isArray(newItems)) newItems = []
+  const existingIds = new Set(existingPlaylist.map((item) => item.id))
+  const merged = [...existingPlaylist]
+  for (const item of newItems) {
+    if (item && typeof item === 'object' && typeof item.id === 'string' && !existingIds.has(item.id)) {
+      merged.push(item)
+      existingIds.add(item.id)
+    }
+  }
+  return merged
+}
+
+export function generateDefaultPlaylistItems() {
+  return DEFAULT_PLAYLIST.map((item) => ({
+    ...item,
+    id: generateMediaId(),
+  }))
+}
+
+export function validateBatchMediaItems(items) {
+  if (!Array.isArray(items)) {
+    return { valid: false, results: [], errors: ['输入必须是数组'] }
+  }
+  const results = items.map((item, idx) => ({
+    index: idx,
+    ...validateMediaItem(item),
+  }))
+  const allValid = results.every((r) => r.valid)
+  return {
+    valid: allValid,
+    results,
+  }
+}
+
+export function createMediaItemsBatch(rawItems) {
+  if (!Array.isArray(rawItems)) return []
+  return rawItems
+    .map((raw) => {
+      const validation = validateMediaItem(raw)
+      if (!validation.valid) return null
+      return createMediaItem(raw.title, raw.url, raw.type)
+    })
+    .filter(Boolean)
+}
+
+export function findBufferedEnd(buffered, duration) {
+  if (!buffered || typeof buffered.length !== 'number' || buffered.length === 0) {
+    return 0
+  }
+  const d = isFinite(duration) && duration > 0 ? duration : 0
+  const end = buffered.end(buffered.length - 1)
+  if (!isFinite(end)) return 0
+  return d > 0 ? Math.min(end, d) : Math.max(0, end)
+}
+
+export function clampPercent(value) {
+  const v = Number(value) || 0
+  return Math.max(0, Math.min(100, v))
+}

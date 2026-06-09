@@ -408,22 +408,3 @@ export function calculateWeeklyProgress(records, goalWeeklySessions) {
   }
 }
 
-export function getWeekDates(weekKey) {
-  if (!weekKey) return []
-  const match = weekKey.match(/^(\d{4})-W(\d{2})$/)
-  if (!match) return []
-  const year = parseInt(match[1], 10)
-  const week = parseInt(match[2], 10)
-  const jan4 = new Date(year, 0, 4)
-  const monday = new Date(jan4)
-  monday.setDate(jan4.getDate() - (jan4.getDay() + 6) % 7)
-  const targetMonday = new Date(monday)
-  targetMonday.setDate(monday.getDate() + (week - 1) * 7)
-  const dates = []
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(targetMonday)
-    d.setDate(targetMonday.getDate() + i)
-    dates.push(formatDate(d))
-  }
-  return dates
-}

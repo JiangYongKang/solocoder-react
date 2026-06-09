@@ -42,9 +42,13 @@ import {
   saveToStorage,
   clearStorage,
   exportToJson,
+  downloadJson,
   importFromJson,
   autoLayout,
   fitToView,
+  adjustContextMenuPosition,
+  DEFAULT_CONTEXT_MENU_WIDTH,
+  DEFAULT_CONTEXT_MENU_HEIGHT,
 } from '../../db-designer/dbDesignerCore'
 
 describe('FIELD_TYPES', () => {
@@ -646,46 +650,83 @@ describe('storage functions', () => {
 
   it('loadFromStorage should return default state when nothing stored', () => {
     const result = loadFromStorage(mockStorage)
-    expect(result).toEqual({ tables: [], relations: [] })
+    expect(result.tables).toEqual([])
+    expect(result.relations).toEqual([])
+    expect(result.error).toBeNull()
   })
 
   it('saveToStorage and loadFromStorage should work together', () => {
     const testState = { tables: [{ id: 'a', name: 'test', x: 0, y: 0, fields: [] }], relations: [] }
     const saved = saveToStorage(testState, mockStorage)
-    expect(saved).toBe(true)
+    expect(saved.success).toBe(true)
+    expect(saved.error).toBeNull()
     const loaded = loadFromStorage(mockStorage)
-    expect(loaded).toEqual(testState)
+    expect(loaded.tables).toEqual(testState.tables)
+    expect(loaded.relations).toEqual(testState.relations)
+    expect(loaded.error).toBeNull()
   })
 
   it('loadFromStorage should return default for invalid JSON', () => {
     mockStorage.setItem('db-designer-state', 'invalid-json')
     const result = loadFromStorage(mockStorage)
-    expect(result).toEqual({ tables: [], relations: [] })
+    expect(result.tables).toEqual([])
+    expect(result.relations).toEqual([])
+    expect(result.error).toBeDefined()
+    expect(typeof result.error).toBe('string')
+  })
+
+  it('loadFromStorage should return error for malformed data structure', () => {
+    mockStorage.setItem('db-designer-state', JSON.stringify({ notTables: 'bad' }))
+    const result = loadFromStorage(mockStorage)
+    expect(result.tables).toEqual([])
+    expect(result.relations).toEqual([])
+    expect(result.error).toBeDefined()
+    expect(result.error).toContain('格式损坏')
   })
 
   it('clearStorage should work', () => {
     saveToStorage({ tables: [{ id: 'a' }], relations: [] }, mockStorage)
     const cleared = clearStorage(mockStorage)
-    expect(cleared).toBe(true)
+    expect(cleared.success).toBe(true)
+    expect(cleared.error).toBeNull()
     const loaded = loadFromStorage(mockStorage)
-    expect(loaded).toEqual({ tables: [], relations: [] })
+    expect(loaded.tables).toEqual([])
+    expect(loaded.relations).toEqual([])
   })
 
-  it('should handle storage throws gracefully', () => {
+  it('should handle storage throws gracefully and return error info', () => {
     const badStorage = {
-      getItem: () => { throw new Error('fail') },
-      setItem: () => { throw new Error('fail') },
-      removeItem: () => { throw new Error('fail') },
+      getItem: () => { throw new Error('read fail') },
+      setItem: () => { throw new Error('write fail') },
+      removeItem: () => { throw new Error('remove fail') },
     }
-    expect(loadFromStorage(badStorage)).toEqual({ tables: [], relations: [] })
-    expect(saveToStorage({ tables: [], relations: [] }, badStorage)).toBe(false)
-    expect(clearStorage(badStorage)).toBe(false)
+    const loadResult = loadFromStorage(badStorage)
+    expect(loadResult.tables).toEqual([])
+    expect(loadResult.relations).toEqual([])
+    expect(loadResult.error).toContain('读取存储数据失败')
+
+    const saveResult = saveToStorage({ tables: [], relations: [] }, badStorage)
+    expect(saveResult.success).toBe(false)
+    expect(saveResult.error).toContain('保存数据失败')
+
+    const clearResult = clearStorage(badStorage)
+    expect(clearResult.success).toBe(false)
+    expect(clearResult.error).toContain('清除存储失败')
   })
 
-  it('should handle no storage', () => {
-    expect(loadFromStorage(null)).toEqual({ tables: [], relations: [] })
-    expect(saveToStorage({ tables: [], relations: [] }, null)).toBe(false)
-    expect(clearStorage(null)).toBe(false)
+  it('should handle no storage and return error info', () => {
+    const loadResult = loadFromStorage(null)
+    expect(loadResult.tables).toEqual([])
+    expect(loadResult.relations).toEqual([])
+    expect(loadResult.error).toContain('localStorage 不可用')
+
+    const saveResult = saveToStorage({ tables: [], relations: [] }, null)
+    expect(saveResult.success).toBe(false)
+    expect(saveResult.error).toContain('localStorage 不可用')
+
+    const clearResult = clearStorage(null)
+    expect(clearResult.success).toBe(false)
+    expect(clearResult.error).toContain('localStorage 不可用')
   })
 })
 
@@ -804,5 +845,117 @@ describe('fitToView', () => {
     expect(result.zoom).toBeGreaterThanOrEqual(MIN_ZOOM)
     expect(typeof result.panX).toBe('number')
     expect(typeof result.panY).toBe('number')
+  })
+})
+
+describe('generateTableDDL with foreign keys', () => {
+  it('should generate single table DDL with foreign key constraints', () => {
+    const users = createTable('users')
+    let posts = createTable('posts')
+    posts = addField(posts, { name: 'user_id', type: FIELD_TYPES.INT })
+    const userFkField = posts.fields.find((f) => f.name === 'user_id')
+    const userPk = users.fields[0]
+    const relations = [createRelation(posts.id, userFkField.id, users.id, userPk.id)]
+
+    const ddl = generateTableDDL(posts, [users, posts], relations)
+    expect(ddl).toContain('CREATE TABLE "posts"')
+    expect(ddl).toContain('FOREIGN KEY')
+    expect(ddl).toContain('REFERENCES "users"')
+    expect(ddl).toContain(`"${userFkField.name}"`)
+    expect(ddl).toContain(`"${userPk.name}"`)
+  })
+
+  it('should generate DDL without FK when allTables is empty', () => {
+    const posts = createTable('posts')
+    const ddl = generateTableDDL(posts, [], [])
+    expect(ddl).toContain('CREATE TABLE "posts"')
+    expect(ddl).not.toContain('FOREIGN KEY')
+  })
+
+  it('should generate DDL and skip invalid FK references', () => {
+    const posts = createTable('posts')
+    const fakeRel = { id: 'r1', fromTableId: posts.id, fromFieldId: 'nonexistent', toTableId: 'ghost', toFieldId: 'ghost' }
+    const ddl = generateTableDDL(posts, [posts], [fakeRel])
+    expect(ddl).toContain('CREATE TABLE "posts"')
+    expect(ddl).not.toContain('FOREIGN KEY')
+  })
+})
+
+describe('downloadJson', () => {
+  it('should return error when window/document is not available', () => {
+    const result = downloadJson({ tables: [], relations: [] })
+    expect(typeof result).toBe('object')
+    expect(result.success).toBe(false)
+    expect(result.error).toBeDefined()
+    expect(typeof result.error).toBe('string')
+  })
+})
+
+describe('context menu constants', () => {
+  it('should export default context menu dimensions', () => {
+    expect(typeof DEFAULT_CONTEXT_MENU_WIDTH).toBe('number')
+    expect(DEFAULT_CONTEXT_MENU_WIDTH).toBeGreaterThan(0)
+    expect(typeof DEFAULT_CONTEXT_MENU_HEIGHT).toBe('number')
+    expect(DEFAULT_CONTEXT_MENU_HEIGHT).toBeGreaterThan(0)
+  })
+})
+
+describe('adjustContextMenuPosition', () => {
+  it('should return original position when menu fits in viewport', () => {
+    const result = adjustContextMenuPosition(100, 100, 150, 100, 1024, 768, 8)
+    expect(result.x).toBe(100)
+    expect(result.y).toBe(100)
+  })
+
+  it('should clamp x when menu exceeds right edge of viewport', () => {
+    const result = adjustContextMenuPosition(950, 100, 150, 100, 1024, 768, 8)
+    expect(result.x + 150 + 8).toBeLessThanOrEqual(1024)
+    expect(result.x).toBeGreaterThanOrEqual(8)
+  })
+
+  it('should clamp x when menu exceeds left edge of viewport', () => {
+    const result = adjustContextMenuPosition(-50, 100, 150, 100, 1024, 768, 8)
+    expect(result.x).toBe(8)
+  })
+
+  it('should clamp y when menu exceeds bottom edge of viewport', () => {
+    const result = adjustContextMenuPosition(100, 700, 150, 100, 1024, 768, 8)
+    expect(result.y + 100 + 8).toBeLessThanOrEqual(768)
+    expect(result.y).toBeGreaterThanOrEqual(8)
+  })
+
+  it('should clamp y when menu exceeds top edge of viewport', () => {
+    const result = adjustContextMenuPosition(100, -30, 150, 100, 1024, 768, 8)
+    expect(result.y).toBe(8)
+  })
+
+  it('should clamp both axes when menu exceeds both edges', () => {
+    const result = adjustContextMenuPosition(1000, 800, 200, 150, 1024, 768, 8)
+    expect(result.x + 200 + 8).toBeLessThanOrEqual(1024)
+    expect(result.y + 150 + 8).toBeLessThanOrEqual(768)
+    expect(result.x).toBeGreaterThanOrEqual(8)
+    expect(result.y).toBeGreaterThanOrEqual(8)
+  })
+
+  it('should handle invalid/non-number input gracefully with defaults', () => {
+    const result = adjustContextMenuPosition(null, undefined, 'bad', NaN, null, undefined, -1)
+    expect(typeof result.x).toBe('number')
+    expect(typeof result.y).toBe('number')
+    expect(result.x).toBeGreaterThanOrEqual(0)
+    expect(result.y).toBeGreaterThanOrEqual(0)
+  })
+
+  it('should use default padding when padding is invalid', () => {
+    const result = adjustContextMenuPosition(100, 100, 150, 100, 1024, 768, -5)
+    expect(result.x).toBe(100)
+    expect(result.y).toBe(100)
+  })
+
+  it('should handle small viewport gracefully', () => {
+    const result = adjustContextMenuPosition(100, 100, 500, 500, 200, 200, 8)
+    expect(typeof result.x).toBe('number')
+    expect(typeof result.y).toBe('number')
+    expect(result.x).toBeGreaterThanOrEqual(8)
+    expect(result.y).toBeGreaterThanOrEqual(8)
   })
 })

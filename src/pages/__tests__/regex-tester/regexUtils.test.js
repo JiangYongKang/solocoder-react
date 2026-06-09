@@ -11,6 +11,10 @@ import {
   buildHighlightSegments,
   escapeRegex,
   truncateText,
+  REGEX_TOKEN_TYPES,
+  tokenizeRegexPattern,
+  debounce,
+  computeDiff,
 } from '../../regex-tester/regexUtils'
 
 describe('DEFAULT_FLAGS', () => {
@@ -375,5 +379,378 @@ describe('truncateText', () => {
     const text = 'a'.repeat(60)
     const result = truncateText(text)
     expect(result.length).toBe(53)
+  })
+})
+
+describe('REGEX_TOKEN_TYPES', () => {
+  it('应该包含所有必需的 token 类型', () => {
+    expect(REGEX_TOKEN_TYPES).toBeDefined()
+    expect(REGEX_TOKEN_TYPES.PLAIN).toBe('plain')
+    expect(REGEX_TOKEN_TYPES.ESCAPE).toBe('escape')
+    expect(REGEX_TOKEN_TYPES.CHAR_CLASS).toBe('charClass')
+    expect(REGEX_TOKEN_TYPES.QUANTIFIER).toBe('quantifier')
+    expect(REGEX_TOKEN_TYPES.GROUP).toBe('group')
+    expect(REGEX_TOKEN_TYPES.NAMED_GROUP).toBe('namedGroup')
+    expect(REGEX_TOKEN_TYPES.ALTERNATION).toBe('alternation')
+    expect(REGEX_TOKEN_TYPES.ANCHOR).toBe('anchor')
+    expect(REGEX_TOKEN_TYPES.SPECIAL).toBe('special')
+  })
+})
+
+describe('tokenizeRegexPattern', () => {
+  it('空字符串或非字符串应该返回空数组', () => {
+    expect(tokenizeRegexPattern('')).toEqual([])
+    expect(tokenizeRegexPattern(null)).toEqual([])
+    expect(tokenizeRegexPattern(undefined)).toEqual([])
+    expect(tokenizeRegexPattern(123)).toEqual([])
+  })
+
+  it('普通字符应该被识别为 plain', () => {
+    const tokens = tokenizeRegexPattern('abc')
+    expect(tokens.length).toBe(3)
+    expect(tokens.every((t) => t.type === 'plain')).toBe(true)
+    expect(tokens[0].value).toBe('a')
+    expect(tokens[1].value).toBe('b')
+    expect(tokens[2].value).toBe('c')
+  })
+
+  it('转义字符 \\d, \\w, \\s 等应该被识别为 escape', () => {
+    const tokens = tokenizeRegexPattern('\\d\\w\\s')
+    expect(tokens.length).toBe(3)
+    expect(tokens.every((t) => t.type === 'escape')).toBe(true)
+    expect(tokens[0].value).toBe('\\d')
+    expect(tokens[1].value).toBe('\\w')
+    expect(tokens[2].value).toBe('\\s')
+  })
+
+  it('普通转义字符也应该识别为 escape', () => {
+    const tokens = tokenizeRegexPattern('\\.\\+\\*')
+    expect(tokens.length).toBe(3)
+    expect(tokens.every((t) => t.type === 'escape')).toBe(true)
+  })
+
+  it('字符类 [...] 应该被识别为 charClass', () => {
+    const tokens = tokenizeRegexPattern('[a-z]')
+    expect(tokens.length).toBe(1)
+    expect(tokens[0].type).toBe('charClass')
+    expect(tokens[0].value).toBe('[a-z]')
+  })
+
+  it('否定字符类 [^...] 应该被识别为 charClass', () => {
+    const tokens = tokenizeRegexPattern('[^0-9]')
+    expect(tokens.length).toBe(1)
+    expect(tokens[0].type).toBe('charClass')
+    expect(tokens[0].value).toBe('[^0-9]')
+  })
+
+  it('字符类中的转义字符应该被正确处理', () => {
+    const tokens = tokenizeRegexPattern('[a\\]z]')
+    expect(tokens.length).toBe(1)
+    expect(tokens[0].type).toBe('charClass')
+    expect(tokens[0].value).toBe('[a\\]z]')
+  })
+
+  it('普通捕获组括号 ( ) 应该被识别为 group', () => {
+    const tokens = tokenizeRegexPattern('(abc)')
+    expect(tokens[0].type).toBe('group')
+    expect(tokens[0].value).toBe('(')
+    expect(tokens[1].type).toBe('plain')
+    expect(tokens[1].value).toBe('a')
+    expect(tokens[2].type).toBe('plain')
+    expect(tokens[3].type).toBe('plain')
+    expect(tokens[4].type).toBe('group')
+    expect(tokens[4].value).toBe(')')
+  })
+
+  it('非捕获组 (?:...) 应该被识别为 group', () => {
+    const tokens = tokenizeRegexPattern('(?:abc)')
+    expect(tokens[0].type).toBe('group')
+    expect(tokens[0].value).toBe('(?:')
+  })
+
+  it('命名捕获组 (?<name>...) 应该被识别为 namedGroup', () => {
+    const tokens = tokenizeRegexPattern('(?<user>\\w+)')
+    expect(tokens[0].type).toBe('namedGroup')
+    expect(tokens[0].value).toBe('(?<user>')
+  })
+
+  it('正向前瞻 (?=...) 应该被识别为 group', () => {
+    const tokens = tokenizeRegexPattern('foo(?=bar)')
+    const groups = tokens.filter((t) => t.type === 'group')
+    expect(groups.length).toBe(2)
+    expect(groups[0].value).toBe('(?=')
+  })
+
+  it('负向前瞻 (?!...) 应该被识别为 group', () => {
+    const tokens = tokenizeRegexPattern('foo(?!bar)')
+    const groups = tokens.filter((t) => t.type === 'group')
+    expect(groups.length).toBe(2)
+    expect(groups[0].value).toBe('(?!')
+  })
+
+  it('量词 *, +, ? 应该被识别为 quantifier', () => {
+    const tokens = tokenizeRegexPattern('a*b+c?')
+    const quants = tokens.filter((t) => t.type === 'quantifier')
+    expect(quants.length).toBe(3)
+    expect(quants.map((q) => q.value)).toEqual(['*', '+', '?'])
+  })
+
+  it('惰性量词 *?, +?, ?? 应该被识别为 quantifier', () => {
+    const tokens = tokenizeRegexPattern('a*?b+?c??')
+    const quants = tokens.filter((t) => t.type === 'quantifier')
+    expect(quants.length).toBe(3)
+    expect(quants.map((q) => q.value)).toEqual(['*?', '+?', '??'])
+  })
+
+  it('范围量词 {n}, {n,m} 应该被识别为 quantifier', () => {
+    const tokens = tokenizeRegexPattern('a{3}b{2,5}c{1,}')
+    const quants = tokens.filter((t) => t.type === 'quantifier')
+    expect(quants.length).toBe(3)
+    expect(quants.map((q) => q.value)).toEqual(['{3}', '{2,5}', '{1,}'])
+  })
+
+  it('锚点 ^ 和 $ 应该被识别为 anchor', () => {
+    const tokens = tokenizeRegexPattern('^abc$')
+    const anchors = tokens.filter((t) => t.type === 'anchor')
+    expect(anchors.length).toBe(2)
+    expect(anchors[0].value).toBe('^')
+    expect(anchors[1].value).toBe('$')
+  })
+
+  it('选择符 | 应该被识别为 alternation', () => {
+    const tokens = tokenizeRegexPattern('a|b')
+    expect(tokens[1].type).toBe('alternation')
+    expect(tokens[1].value).toBe('|')
+  })
+
+  it('点号 . 应该被识别为 special', () => {
+    const tokens = tokenizeRegexPattern('a.b')
+    expect(tokens[1].type).toBe('special')
+    expect(tokens[1].value).toBe('.')
+  })
+
+  it('token 应该包含正确的 start 和 end 位置', () => {
+    const tokens = tokenizeRegexPattern('a\\d[b]')
+    expect(tokens[0].start).toBe(0)
+    expect(tokens[0].end).toBe(1)
+    expect(tokens[1].start).toBe(1)
+    expect(tokens[1].end).toBe(3)
+    expect(tokens[2].start).toBe(3)
+    expect(tokens[2].end).toBe(6)
+  })
+
+  it('复杂正则应该被正确 token 化', () => {
+    const tokens = tokenizeRegexPattern('^(\\w+)@.+(\\w+)$')
+    const types = tokens.map((t) => t.type)
+    expect(types).toContain('anchor')
+    expect(types).toContain('group')
+    expect(types).toContain('escape')
+    expect(types).toContain('plain')
+    expect(types).toContain('special')
+  })
+
+  it('所有 token 的 value 拼接起来应该等于原始正则', () => {
+    const patterns = [
+      '',
+      'abc',
+      '^\\w+@\\w+\\.\\w+$',
+      '(?:a|b)*c{2,3}',
+      '[a-z0-9]+',
+      '(?<name>\\w+)',
+      'foo(?=bar)(?!baz)',
+    ]
+    for (const p of patterns) {
+      const tokens = tokenizeRegexPattern(p)
+      const reconstructed = tokens.map((t) => t.value).join('')
+      expect(reconstructed).toBe(p)
+    }
+  })
+})
+
+describe('debounce', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('应该在等待时间后执行函数', () => {
+    const fn = vi.fn()
+    const debounced = debounce(fn, 100)
+    debounced()
+    expect(fn).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(100)
+    expect(fn).toHaveBeenCalledTimes(1)
+  })
+
+  it('重复调用应该重置计时器', () => {
+    const fn = vi.fn()
+    const debounced = debounce(fn, 100)
+    debounced()
+    vi.advanceTimersByTime(50)
+    debounced()
+    vi.advanceTimersByTime(50)
+    expect(fn).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(50)
+    expect(fn).toHaveBeenCalledTimes(1)
+  })
+
+  it('应该传递参数给被包装函数', () => {
+    const fn = vi.fn()
+    const debounced = debounce(fn, 100)
+    debounced('a', 'b', 'c')
+    vi.advanceTimersByTime(100)
+    expect(fn).toHaveBeenCalledWith('a', 'b', 'c')
+  })
+
+  it('应该保持正确的 this 上下文', () => {
+    const context = { value: 42 }
+    const fn = vi.fn(function () {
+      return this.value
+    })
+    const debounced = debounce(fn, 100)
+    debounced.call(context)
+    vi.advanceTimersByTime(100)
+    expect(fn).toHaveReturnedWith(42)
+  })
+
+  it('cancel 方法应该取消待执行的函数', () => {
+    const fn = vi.fn()
+    const debounced = debounce(fn, 100)
+    debounced()
+    debounced.cancel()
+    vi.advanceTimersByTime(100)
+    expect(fn).not.toHaveBeenCalled()
+  })
+
+  it('flush 方法应该立即清除待执行的计时器', () => {
+    const fn = vi.fn()
+    const debounced = debounce(fn, 100)
+    debounced()
+    debounced.flush()
+    vi.advanceTimersByTime(100)
+    expect(fn).not.toHaveBeenCalled()
+  })
+
+  it('传入非函数参数应该抛出 TypeError', () => {
+    expect(() => debounce(null, 100)).toThrow(TypeError)
+    expect(() => debounce('not a function', 100)).toThrow(TypeError)
+  })
+})
+
+describe('computeDiff', () => {
+  it('相同字符串应该返回单个 equal 操作', () => {
+    const diff = computeDiff('abc', 'abc')
+    expect(diff).toEqual([{ type: 'equal', value: 'abc' }])
+  })
+
+  it('空字符串应该返回正确结果', () => {
+    expect(computeDiff('', '')).toEqual([{ type: 'equal', value: '' }])
+    expect(computeDiff('', 'abc')).toEqual([{ type: 'insert', value: 'abc' }])
+    expect(computeDiff('abc', '')).toEqual([{ type: 'delete', value: 'abc' }])
+  })
+
+  it('应该正确处理完全不同的字符串', () => {
+    const diff = computeDiff('abc', 'xyz')
+    expect(diff.some((op) => op.type === 'delete')).toBe(true)
+    expect(diff.some((op) => op.type === 'insert')).toBe(true)
+    const reconstructed = diff
+      .filter((op) => op.type !== 'delete')
+      .map((op) => op.value)
+      .join('')
+    expect(reconstructed).toBe('xyz')
+  })
+
+  it('应该正确处理共同前缀', () => {
+    const diff = computeDiff('hello world', 'hello there')
+    expect(diff[0].type).toBe('equal')
+    expect(diff[0].value).toBe('hello ')
+  })
+
+  it('应该正确处理共同后缀', () => {
+    const diff = computeDiff('abc_end', 'xyz_end')
+    const last = diff[diff.length - 1]
+    expect(last.type).toBe('equal')
+    expect(last.value).toBe('_end')
+  })
+
+  it('应该正确处理中间的变更', () => {
+    const diff = computeDiff('prefixOLDsuffix', 'prefixNEWsuffix')
+    expect(diff[0].type).toBe('equal')
+    expect(diff[0].value).toBe('prefix')
+    const middleOps = diff.slice(1, -1)
+    expect(middleOps.some((op) => op.type === 'delete')).toBe(true)
+    expect(middleOps.some((op) => op.type === 'insert')).toBe(true)
+    expect(diff[diff.length - 1].type).toBe('equal')
+    expect(diff[diff.length - 1].value).toBe('suffix')
+  })
+
+  it('重建结果应该等于新字符串', () => {
+    const cases = [
+      ['abc', 'abc'],
+      ['', 'abc'],
+      ['abc', ''],
+      ['abc', 'xyz'],
+      ['hello world', 'hello there'],
+      ['a', 'aa'],
+      ['aa', 'a'],
+      ['kitten', 'sitting'],
+      ['saturday', 'sunday'],
+    ]
+    for (const [oldStr, newStr] of cases) {
+      const diff = computeDiff(oldStr, newStr)
+      const reconstructed = diff
+        .filter((op) => op.type !== 'delete')
+        .map((op) => op.value)
+        .join('')
+      expect(reconstructed).toBe(newStr)
+    }
+  })
+
+  it('原始字符串通过 equal 和 delete 重建应该等于旧字符串', () => {
+    const cases = [
+      ['abc', 'xyz'],
+      ['hello world', 'hello there'],
+      ['kitten', 'sitting'],
+      ['saturday', 'sunday'],
+      ['prefixOLDsuffix', 'prefixNEWsuffix'],
+    ]
+    for (const [oldStr, newStr] of cases) {
+      const diff = computeDiff(oldStr, newStr)
+      const reconstructed = diff
+        .filter((op) => op.type !== 'insert')
+        .map((op) => op.value)
+        .join('')
+      expect(reconstructed).toBe(oldStr)
+    }
+  })
+
+  it('非字符串输入应该被当作空字符串', () => {
+    expect(computeDiff(null, undefined)).toEqual([{ type: 'equal', value: '' }])
+    expect(computeDiff(123, 'abc')).toEqual([{ type: 'insert', value: 'abc' }])
+  })
+
+  it('相邻的相同类型操作应该被合并', () => {
+    const diff = computeDiff('aaaa', 'bbbb')
+    let lastType = null
+    for (const op of diff) {
+      if (op.type === lastType && lastType !== 'equal') {
+        throw new Error(`相邻的 ${lastType} 操作应该被合并`)
+      }
+      lastType = op.type
+    }
+  })
+
+  it('应该正确处理 Unicode 字符串', () => {
+    const diff = computeDiff('你好世界', '你好中国')
+    expect(diff[0].type).toBe('equal')
+    expect(diff[0].value).toBe('你好')
+    const reconstructed = diff
+      .filter((op) => op.type !== 'delete')
+      .map((op) => op.value)
+      .join('')
+    expect(reconstructed).toBe('你好中国')
   })
 })

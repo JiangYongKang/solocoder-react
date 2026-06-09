@@ -40,6 +40,7 @@ import {
   extractResponseContentType,
   isJsonContentType,
   tryParseResponseBody,
+  escapeHtml,
 } from '@/pages/api-debugger/apiDebuggerUtils'
 
 function createMockLocalStorage() {
@@ -882,5 +883,38 @@ describe('tryParseResponseBody', () => {
     const result = tryParseResponseBody(badJson, 'application/json')
     expect(result.isJson).toBe(false)
     expect(result.formatted).toBe(badJson)
+  })
+})
+
+describe('escapeHtml', () => {
+  it('转义 & 符号', () => {
+    expect(escapeHtml('a & b')).toBe('a &amp; b')
+  })
+
+  it('转义 < 和 > 符号', () => {
+    expect(escapeHtml('<div>hello</div>')).toBe('&lt;div&gt;hello&lt;/div&gt;')
+  })
+
+  it('同时转义多种特殊字符', () => {
+    expect(escapeHtml('<script>alert("xss&more")</script>')).toBe(
+      '&lt;script&gt;alert("xss&amp;more")&lt;/script&gt;'
+    )
+  })
+
+  it('null/undefined 返回空字符串', () => {
+    expect(escapeHtml(null)).toBe('')
+    expect(escapeHtml(undefined)).toBe('')
+  })
+
+  it('无特殊字符的文本保持不变', () => {
+    expect(escapeHtml('hello world')).toBe('hello world')
+  })
+
+  it('空字符串返回空字符串', () => {
+    expect(escapeHtml('')).toBe('')
+  })
+
+  it('数字被转换为字符串', () => {
+    expect(escapeHtml(123)).toBe('123')
   })
 })

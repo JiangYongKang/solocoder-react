@@ -21,7 +21,15 @@ import {
   getPrevMediaIndex,
   findMediaIndexById,
   seekWithinDuration,
+  calculateProgressPercent,
+  calculateTimeFromPercent,
+  mergePlaylistItems,
+  generateDefaultPlaylistItems,
+  findBufferedEnd,
+  clampPercent,
 } from './mediaPlayerUtils'
+
+const CLICK_DELAY = 250
 
 const MediaPlayerPage = () => {
   const navigate = useNavigate()
@@ -68,6 +76,18 @@ const MediaPlayerPage = () => {
   const pageRef = useRef(null)
   const lyricsContentRef = useRef(null)
   const fullscreenHideTimerRef = useRef(null)
+  const progressTrackRef = useRef(null)
+  const clickTimerRef = useRef(null)
+  const currentTimeRef = useRef(0)
+  const currentMediaIdRef = useRef(null)
+
+  useEffect(() => {
+    currentTimeRef.current = currentTime
+  }, [currentTime])
+
+  useEffect(() => {
+    currentMediaIdRef.current = currentMedia?.id || null
+  }, [currentMedia])
 
   const parsedLyrics = useMemo(() => parseLrc(lrcText), [lrcText])
   const currentLyricIndex = useMemo(
@@ -91,25 +111,16 @@ const MediaPlayerPage = () => {
   }, [lrcText])
 
   useEffect(() => {
-    if (currentMedia) {
-      savePlaybackState({
-        currentMediaId: currentMedia.id,
-        currentTime: Math.floor(currentTime),
-      })
-    }
-  }, [currentMedia, currentTime])
-
-  useEffect(() => {
     const timer = setInterval(() => {
-      if (currentMedia) {
+      if (currentMediaIdRef.current) {
         savePlaybackState({
-          currentMediaId: currentMedia.id,
-          currentTime: Math.floor(currentTime),
+          currentMediaId: currentMediaIdRef.current,
+          currentTime: Math.floor(currentTimeRef.current),
         })
       }
     }, 5000)
     return () => clearInterval(timer)
-  }, [currentMedia, currentTime])
+  }, [])
 
   useEffect(() => {
     if (mediaRef.current && settings.volume !== undefined) {
@@ -125,14 +136,20 @@ const MediaPlayerPage = () => {
 
   useEffect(() => {
     return () => {
-      if (currentMedia) {
+      if (clickTimerRef.current) {
+        clearTimeout(clickTimerRef.current)
+      }
+      if (fullscreenHideTimerRef.current) {
+        clearTimeout(fullscreenHideTimerRef.current)
+      }
+      if (currentMediaIdRef.current) {
         savePlaybackState({
-          currentMediaId: currentMedia.id,
-          currentTime: Math.floor(currentTime),
+          currentMediaId: currentMediaIdRef.current,
+          currentTime: Math.floor(currentTimeRef.current),
         })
       }
     }
-  }, [currentMedia, currentTime])
+  }, [])
 
   useEffect(() => {
     if (currentLyricIndex >= 0 && lyricsContentRef.current) {
@@ -198,8 +215,8 @@ const MediaPlayerPage = () => {
   }
 
   const handleProgress = () => {
-    if (mediaRef.current && mediaRef.current.buffered.length > 0) {
-      const end = mediaRef.current.buffered.end(mediaRef.current.buffered.length - 1)
+    if (mediaRef.current) {
+      const end = findBufferedEnd(mediaRef.current.buffered, duration)
       setBufferedEnd(end)
     }
   }
@@ -236,10 +253,22 @@ const MediaPlayerPage = () => {
   }, [isPlaying, currentMedia])
 
   const handleMediaClick = () => {
-    togglePlay()
+    if (clickTimerRef.current) {
+      clearTimeout(clickTimerRef.current)
+      clickTimerRef.current = null
+      return
+    }
+    clickTimerRef.current = setTimeout(() => {
+      togglePlay()
+      clickTimerRef.current = null
+    }, CLICK_DELAY)
   }
 
   const handleVideoDoubleClick = () => {
+    if (clickTimerRef.current) {
+      clearTimeout(clickTimerRef.current)
+      clickTimerRef.current = null
+    }
     if (isVideo) {
       toggleFullscreen()
     }
@@ -328,6 +357,11 @@ const MediaPlayerPage = () => {
     setAddMediaErrors({})
   }
 
+  const handleAddAllDefaults = () => {
+    const defaults = generateDefaultPlaylistItems()
+    setPlaylist((prev) => mergePlaylistItems(prev, defaults))
+  }
+
   const handleDeleteMedia = (id) => {
     const idx = playlist.findIndex((item) => item.id === id)
     if (idx < 0) return
@@ -390,23 +424,31 @@ const MediaPlayerPage = () => {
     setIsPlaying(false)
   }
 
+  const getPositionFromMouseEvent = useCallback((clientX) => {
+    if (!progressTrackRef.current || duration <= 0) return null
+    const rect = progressTrackRef.current.getBoundingClientRect()
+    const x = Math.max(0, Math.min(rect.width, clientX - rect.left))
+    const percent = clampPercent((x / rect.width) * 100)
+    const time = calculateTimeFromPercent(percent, duration)
+    return { x, percent, time }
+  }, [duration])
+
   const handleProgressMouseDown = (e) => {
     setIsDraggingProgress(true)
-    updateProgressFromMouseEvent(e)
-  }
-
-  const updateProgressFromMouseEvent = (e) => {
-    const track = e.currentTarget.querySelector('.progress-bar-track')
-    if (!track || duration <= 0) return
-    const rect = track.getBoundingClientRect()
-    const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left))
-    const time = (x / rect.width) * duration
-    setDragHoverX(e.clientX - rect.left)
-    setDragHoverTime(time)
+    const pos = getPositionFromMouseEvent(e.clientX)
+    if (pos) {
+      setDragHoverX(pos.x)
+      setDragHoverTime(pos.time)
+    }
   }
 
   const handleProgressMouseMove = (e) => {
-    updateProgressFromMouseEvent(e)
+    if (!isDraggingProgress && dragHoverTime === null) return
+    const pos = getPositionFromMouseEvent(e.clientX)
+    if (pos) {
+      setDragHoverX(pos.x)
+      setDragHoverTime(pos.time)
+    }
   }
 
   const handleProgressMouseUp = () => {
@@ -469,9 +511,9 @@ const MediaPlayerPage = () => {
     setDragOverItemId(null)
   }
 
-  const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0
-  const bufferedPercent = duration > 0 ? (bufferedEnd / duration) * 100 : 0
-  const dragPercent = duration > 0 && dragHoverTime !== null ? (dragHoverTime / duration) * 100 : null
+  const progressPercent = calculateProgressPercent(currentTime, duration)
+  const bufferedPercent = calculateProgressPercent(bufferedEnd, duration)
+  const dragPercent = dragHoverTime !== null ? calculateProgressPercent(dragHoverTime, duration) : null
 
   return (
     <div
@@ -583,6 +625,13 @@ const MediaPlayerPage = () => {
           <div className="playlist-header">
             <h3 className="playlist-title">播放列表 ({playlist.length})</h3>
             <div className="playlist-actions">
+              <button
+                className="playlist-action-btn"
+                onClick={handleAddAllDefaults}
+                title="添加示例媒体到播放列表"
+              >
+                + 添加示例
+              </button>
               <button
                 className="playlist-action-btn danger"
                 onClick={handleClearPlaylist}
@@ -701,7 +750,7 @@ const MediaPlayerPage = () => {
           onMouseUp={handleProgressMouseUp}
           onMouseLeave={handleProgressMouseLeave}
         >
-          <div className="progress-bar-track">
+          <div className="progress-bar-track" ref={progressTrackRef}>
             <div
               className="progress-bar-buffered"
               style={{ width: `${bufferedPercent}%` }}

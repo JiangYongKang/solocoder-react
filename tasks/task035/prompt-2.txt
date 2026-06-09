@@ -1,0 +1,8 @@
+你实现的优惠券管理系统页面还存在一些问题，需要进行修复：
+
+1. 首页没有展示"优惠券管理系统"的任务卡片——App.jsx 中虽然已有 CouponPage 的 import 和路由，但 TASKS 数组中没有优惠券任务条目，需要补全。
+2. couponUtils.js 的 validateCoupon 函数中，满减券和折扣券的门槛校验允许 threshold 等于 0（即"满 0 元减 X 元"可以被创建），不符合"面额和门槛必须为正数"的校验规则。
+3. couponUtils.js 的 createCoupon 函数中使用了 || 0 对门槛做默认值处理，导致空字符串、undefined、null 等无效值被静默地转为 0，不利于前端校验给出清晰的错误提示。
+4. 修复后需要补充纯 JS 函数的单元测试，涵盖上述边界情况。测试代码放在 src/pages/__tests__/coupon/ 下。
+5. 修复完成后启动 pnpm run dev，手动验证首页展示和券创建校验是否正常。
+6. 重新运行 pnpm run test，需要让所有测试通过。

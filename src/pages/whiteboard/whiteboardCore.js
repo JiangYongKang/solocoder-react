@@ -48,6 +48,18 @@ export function worldToScreen(worldX, worldY, panX, panY, zoom) {
   }
 }
 
+export function getTextInputScreenParams(worldX, worldY, worldFontSize, color, panX, panY, zoom) {
+  const screenPos = worldToScreen(worldX, worldY, panX, panY, zoom)
+  const screenFontSize = worldFontSize * zoom
+  const screenTop = screenPos.y - screenFontSize
+  return {
+    left: screenPos.x,
+    top: screenTop,
+    fontSize: screenFontSize,
+    color,
+  }
+}
+
 export function createBrushShape(points = [], color = '#333333', lineWidth = 2) {
   return {
     id: generateId(),
@@ -420,6 +432,74 @@ export function fitToView(shapes, containerWidth, containerHeight, padding = 80)
   const panY = containerHeight / 2 - centerY * zoom
 
   return { panX, panY, zoom }
+}
+
+export const distance = (x1, y1, x2, y2) => Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
+
+export const pointNearRect = (px, py, rx, ry, rw, rh, radius) => {
+  const closestX = Math.max(rx, Math.min(px, rx + rw))
+  const closestY = Math.max(ry, Math.min(py, ry + rh))
+  return distance(px, py, closestX, closestY) <= radius
+}
+
+export const pointNearEllipse = (px, py, cx, cy, rx, ry, radius) => {
+  if (rx === 0 || ry === 0) return distance(px, py, cx, cy) <= radius
+  const nx = (px - cx) / rx
+  const ny = (py - cy) / ry
+  const dist = Math.sqrt(nx * nx + ny * ny)
+  if (dist <= 1) return true
+  const ratio = 1 / dist
+  return distance(px, py, cx + (px - cx) * ratio, cy + (py - cy) * ratio) <= radius
+}
+
+export const pointNearLine = (px, py, x1, y1, x2, y2, radius) => {
+  const A = px - x1
+  const B = py - y1
+  const C = x2 - x1
+  const D = y2 - y1
+  const dot = A * C + B * D
+  const lenSq = C * C + D * D
+  let param = -1
+  if (lenSq !== 0) param = dot / lenSq
+  let xx, yy
+  if (param < 0) {
+    xx = x1
+    yy = y1
+  } else if (param > 1) {
+    xx = x2
+    yy = y2
+  } else {
+    xx = x1 + param * C
+    yy = y1 + param * D
+  }
+  return distance(px, py, xx, yy) <= radius
+}
+
+export function isShapeIntersectingPoint(shape, px, py, radius) {
+  switch (shape.type) {
+    case SHAPE_TYPES.BRUSH:
+      return shape.points?.some((p) => distance(p.x, p.y, px, py) <= radius) || false
+    case SHAPE_TYPES.RECTANGLE: {
+      const r = normalizeRectangle(shape.x, shape.y, shape.width, shape.height)
+      return pointNearRect(px, py, r.x, r.y, r.width, r.height, radius)
+    }
+    case SHAPE_TYPES.CIRCLE: {
+      const c = normalizeCircle(shape.cx, shape.cy, shape.rx, shape.ry)
+      return pointNearEllipse(px, py, c.cx, c.cy, c.rx, c.ry, radius)
+    }
+    case SHAPE_TYPES.LINE:
+      return pointNearLine(px, py, shape.x1, shape.y1, shape.x2, shape.y2, radius)
+    case SHAPE_TYPES.TEXT: {
+      const charCount = shape.text?.length || 1
+      const approxWidth = Math.max(charCount * (shape.fontSize || 16) * 0.6, shape.fontSize || 16)
+      const approxHeight = (shape.fontSize || 16) * 1.2
+      const top = shape.y - approxHeight
+      const left = shape.x
+      return pointNearRect(px, py, left, top, approxWidth, approxHeight, radius)
+    }
+    default:
+      return false
+  }
 }
 
 export function isPointInText(x, y, textShape) {

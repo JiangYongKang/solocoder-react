@@ -334,7 +334,8 @@ export function ensureContentTypeHeader(headersArray, contentType) {
 }
 
 
-function escapeHtml(text) {
+export function escapeHtml(text) {
+  if (text == null) return ''
   return String(text)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')

@@ -1,0 +1,7 @@
+你实现的 API 调试工具页面存在一些问题，需要进行修复：
+
+1. 页面从首页点击任务卡片进入后完全空白，浏览器控制台报错 ReferenceError: ApiDebuggerPage is not defined。需要检查 App.jsx 中是否缺少必要的代码导致组件无法加载。
+2. index.jsx 中定义了一个 escapeHtmlForDisplay 函数，与 apiDebuggerUtils.js 中已有的 escapeHtml 函数功能重复。两处 HTML 转义逻辑应该统一使用 apiDebuggerUtils.js 中的实现。
+3. 修复后需要补充纯 JS 函数的单元测试覆盖，只测和页面渲染无关的逻辑。测试代码放在 src/pages/__tests__/api-debugger/ 下。
+4. 修复完成后启动 pnpm run dev，手动验证从首页点击"API 调试工具"任务卡片能正常进入页面。
+5. 重新运行 pnpm run test，需要让所有测试通过。

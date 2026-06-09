@@ -34,6 +34,7 @@ export function saveHistory(history, storage = typeof window !== 'undefined' ? w
   try {
     storage.setItem(STORAGE_KEY, JSON.stringify(history.slice(0, 50)))
   } catch {
+    // ignore storage errors
   }
 }
 

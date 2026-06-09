@@ -83,8 +83,8 @@ export function validateCoupon(data) {
       errors.threshold = '请填写使用门槛'
     } else {
       const th = Number(data.threshold)
-      if (isNaN(th) || th < 0) {
-        errors.threshold = '门槛必须是非负数'
+      if (isNaN(th) || th <= 0) {
+        errors.threshold = '门槛必须为正数'
       }
     }
   }
@@ -124,7 +124,7 @@ export function createCoupon(coupons, data) {
     name: data.name.trim(),
     type: data.type,
     denomination: Number(data.denomination),
-    threshold: data.type === COUPON_TYPES.FLAT ? 0 : Number(data.threshold || 0),
+    threshold: data.type === COUPON_TYPES.FLAT ? 0 : Number(data.threshold),
     startDate,
     endDate,
     totalCount: Number(data.totalCount),

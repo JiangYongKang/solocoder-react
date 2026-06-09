@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
+  simpleHash,
+  seededRandom,
   getChangeStatusIcon,
   getChangeStatusColor,
   getChangeStatusLabel,
@@ -19,6 +21,8 @@ import {
   sortTreeChildren,
   filterFileTree,
   generateOriginalContent,
+  buildFileTreeFromList,
+  computeCommitFileSnapshot,
 } from '../../git-browser/gitUtils'
 import { FILE_CHANGE_STATUS, FILE_TYPE } from '../../git-browser/constants'
 
@@ -393,5 +397,191 @@ describe('generateOriginalContent', () => {
   it('无内容的文件应返回空字符串', () => {
     expect(generateOriginalContent(null)).toBe('')
     expect(generateOriginalContent({ content: '' })).toBe('')
+  })
+
+  it('MODIFIED 状态对同一文件应生成确定性内容', () => {
+    const file1 = {
+      path: 'src/App.js',
+      status: FILE_CHANGE_STATUS.MODIFIED,
+      content: 'const a = 1\nconst b = 2\nconst c = 3\nconst d = 4\nconst e = 5',
+    }
+    const file2 = {
+      path: 'src/App.js',
+      status: FILE_CHANGE_STATUS.MODIFIED,
+      content: 'const a = 1\nconst b = 2\nconst c = 3\nconst d = 4\nconst e = 5',
+    }
+    const result1 = generateOriginalContent(file1)
+    const result2 = generateOriginalContent(file2)
+    expect(result1).toBe(result2)
+  })
+
+  it('不同文件路径应生成不同内容', () => {
+    const file1 = {
+      path: 'src/App.js',
+      status: FILE_CHANGE_STATUS.MODIFIED,
+      content: 'const a = 1\nconst b = 2\nconst c = 3\nconst d = 4\nconst e = 5',
+    }
+    const file2 = {
+      path: 'src/index.js',
+      status: FILE_CHANGE_STATUS.MODIFIED,
+      content: 'const a = 1\nconst b = 2\nconst c = 3\nconst d = 4\nconst e = 5',
+    }
+    const result1 = generateOriginalContent(file1)
+    const result2 = generateOriginalContent(file2)
+    expect(result1).not.toBe(result2)
+  })
+})
+
+describe('simpleHash', () => {
+  it('应对相同字符串返回相同哈希值', () => {
+    expect(simpleHash('hello')).toBe(simpleHash('hello'))
+    expect(simpleHash('src/App.js')).toBe(simpleHash('src/App.js'))
+  })
+
+  it('应对不同字符串返回不同哈希值', () => {
+    expect(simpleHash('hello')).not.toBe(simpleHash('world'))
+    expect(simpleHash('a')).not.toBe(simpleHash('b'))
+  })
+
+  it('应返回非负整数', () => {
+    const result = simpleHash('test string')
+    expect(Number.isInteger(result)).toBe(true)
+    expect(result).toBeGreaterThanOrEqual(0)
+  })
+
+  it('空字符串或非字符串应返回 0', () => {
+    expect(simpleHash('')).toBe(0)
+    expect(simpleHash(null)).toBe(0)
+    expect(simpleHash(undefined)).toBe(0)
+    expect(simpleHash(123)).toBe(0)
+  })
+})
+
+describe('seededRandom', () => {
+  it('相同 seed 应生成相同的随机序列', () => {
+    const rand1 = seededRandom(42)
+    const rand2 = seededRandom(42)
+    const seq1 = [rand1(), rand1(), rand1()]
+    const seq2 = [rand2(), rand2(), rand2()]
+    expect(seq1).toEqual(seq2)
+  })
+
+  it('不同 seed 应生成不同的随机序列', () => {
+    const rand1 = seededRandom(1)
+    const rand2 = seededRandom(2)
+    const seq1 = [rand1(), rand1(), rand1()]
+    const seq2 = [rand2(), rand2(), rand2()]
+    expect(seq1).not.toEqual(seq2)
+  })
+
+  it('生成的随机数应在 [0, 1) 范围内', () => {
+    const rand = seededRandom(123)
+    for (let i = 0; i < 100; i++) {
+      const val = rand()
+      expect(val).toBeGreaterThanOrEqual(0)
+      expect(val).toBeLessThan(1)
+    }
+  })
+})
+
+describe('buildFileTreeFromList', () => {
+  it('应从文件列表构建正确的树结构', () => {
+    const fileList = [
+      { path: 'package.json', status: FILE_CHANGE_STATUS.UNCHANGED },
+      { path: 'src/index.js', status: FILE_CHANGE_STATUS.MODIFIED },
+      { path: 'src/components/Button.jsx', status: FILE_CHANGE_STATUS.ADDED },
+      { path: 'src/utils/helpers.js', status: FILE_CHANGE_STATUS.UNCHANGED },
+    ]
+    const fileContents = {
+      'package.json': '{"name":"test"}',
+      'src/index.js': 'console.log("index")',
+      'src/components/Button.jsx': 'export default Button',
+      'src/utils/helpers.js': 'export const help = () => {}',
+    }
+
+    const tree = buildFileTreeFromList(fileList, fileContents)
+    expect(tree).not.toBeNull()
+    expect(tree.name).toBe('my-project')
+    expect(tree.type).toBe(FILE_TYPE.FOLDER)
+
+    const rootFiles = tree.children.filter((c) => c.type === FILE_TYPE.FILE)
+    expect(rootFiles.length).toBe(1)
+    expect(rootFiles[0].name).toBe('package.json')
+
+    const srcFolder = tree.children.find((c) => c.name === 'src')
+    expect(srcFolder).not.toBeUndefined()
+    expect(srcFolder.type).toBe(FILE_TYPE.FOLDER)
+
+    const srcFiles = srcFolder.children.filter((c) => c.type === FILE_TYPE.FILE)
+    expect(srcFiles.length).toBe(1)
+    expect(srcFiles[0].name).toBe('index.js')
+    expect(srcFiles[0].status).toBe(FILE_CHANGE_STATUS.MODIFIED)
+
+    const componentsFolder = srcFolder.children.find((c) => c.name === 'components')
+    expect(componentsFolder).not.toBeUndefined()
+    expect(componentsFolder.children[0].name).toBe('Button.jsx')
+    expect(componentsFolder.children[0].status).toBe(FILE_CHANGE_STATUS.ADDED)
+  })
+
+  it('非数组输入应返回 null', () => {
+    expect(buildFileTreeFromList(null, {})).toBeNull()
+    expect(buildFileTreeFromList(undefined, {})).toBeNull()
+  })
+
+  it('空列表应返回只有根节点的树', () => {
+    const tree = buildFileTreeFromList([], {})
+    expect(tree).not.toBeNull()
+    expect(tree.children.length).toBe(0)
+  })
+})
+
+describe('computeCommitFileSnapshot', () => {
+  const baseFileList = [
+    { path: 'package.json', status: FILE_CHANGE_STATUS.UNCHANGED },
+    { path: 'src/index.js', status: FILE_CHANGE_STATUS.UNCHANGED },
+    { path: 'README.md', status: FILE_CHANGE_STATUS.UNCHANGED },
+  ]
+
+  const commitHistory = [
+    { hash: 'c001', files: ['README.md'] },
+    { hash: 'c002', files: ['src/index.js', 'src/utils.js'] },
+    { hash: 'c003', files: ['package.json'] },
+  ]
+
+  it('目标提交不存在应返回 baseFileList', () => {
+    const result = computeCommitFileSnapshot(commitHistory, 'nonexistent', baseFileList)
+    expect(result.length).toBe(baseFileList.length)
+  })
+
+  it('应正确计算第一条提交的快照', () => {
+    const result = computeCommitFileSnapshot(commitHistory, 'c001', baseFileList)
+    const readme = result.find((f) => f.path === 'README.md')
+    expect(readme.status).toBe(FILE_CHANGE_STATUS.MODIFIED)
+    const index = result.find((f) => f.path === 'src/index.js')
+    expect(index.status).toBe(FILE_CHANGE_STATUS.UNCHANGED)
+  })
+
+  it('应正确计算中间提交的快照（包含新增文件）', () => {
+    const result = computeCommitFileSnapshot(commitHistory, 'c002', baseFileList)
+    const utils = result.find((f) => f.path === 'src/utils.js')
+    expect(utils).not.toBeUndefined()
+    expect(utils.status).toBe(FILE_CHANGE_STATUS.ADDED)
+
+    const index = result.find((f) => f.path === 'src/index.js')
+    expect(index.status).toBe(FILE_CHANGE_STATUS.MODIFIED)
+
+    const readme = result.find((f) => f.path === 'README.md')
+    expect(readme.status).toBe(FILE_CHANGE_STATUS.UNCHANGED)
+  })
+
+  it('应正确计算最后一条提交的快照', () => {
+    const result = computeCommitFileSnapshot(commitHistory, 'c003', baseFileList)
+    const pkg = result.find((f) => f.path === 'package.json')
+    expect(pkg.status).toBe(FILE_CHANGE_STATUS.MODIFIED)
+  })
+
+  it('非数组输入应返回空数组', () => {
+    expect(computeCommitFileSnapshot(null, 'c001', baseFileList)).toEqual([])
+    expect(computeCommitFileSnapshot(commitHistory, 'c001', null)).toEqual([])
   })
 })

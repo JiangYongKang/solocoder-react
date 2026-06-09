@@ -10,6 +10,9 @@ import {
   buildHighlightSegments,
   truncateText,
   createRegex,
+  tokenizeRegexPattern,
+  debounce,
+  computeDiff,
 } from './regexUtils'
 import {
   loadHistory,
@@ -47,34 +50,19 @@ const GROUP_COLORS = [
 
 const getGroupColor = (index) => GROUP_COLORS[index % GROUP_COLORS.length]
 
-const renderDiffSegments = (original, modified) => {
-  if (original === modified) {
-    return [<span key="same">{original}</span>]
+const getTokenClassName = (type) => {
+  const map = {
+    plain: 'rt-token-plain',
+    escape: 'rt-token-escape',
+    charClass: 'rt-token-charClass',
+    quantifier: 'rt-token-quantifier',
+    group: 'rt-token-group',
+    namedGroup: 'rt-token-namedGroup',
+    alternation: 'rt-token-alternation',
+    anchor: 'rt-token-anchor',
+    special: 'rt-token-special',
   }
-  const segments = []
-  const minLen = Math.min(original.length, modified.length)
-  let i = 0
-  while (i < minLen && original[i] === modified[i]) {
-    i++
-  }
-  if (i > 0) {
-    segments.push(<span key={`prefix-${i}`}>{original.slice(0, i)}</span>)
-  }
-  if (original.length > i) {
-    segments.push(
-      <span key={`removed-${i}`} className="rt-diff-remove">
-        {original.slice(i)}
-      </span>
-    )
-  }
-  if (modified.length > i) {
-    segments.push(
-      <span key={`added-${i}`} className="rt-diff-add">
-        {modified.slice(i)}
-      </span>
-    )
-  }
-  return segments
+  return map[type] || 'rt-token-plain'
 }
 
 const RegexTesterPage = () => {
@@ -95,6 +83,8 @@ const RegexTesterPage = () => {
 
   const textEditorRef = useRef(null)
   const textareaRef = useRef(null)
+  const regexEditorRef = useRef(null)
+  const regexTextareaRef = useRef(null)
 
   const regexValidation = useMemo(() => {
     if (!pattern) return { valid: true, error: null }
@@ -114,6 +104,37 @@ const RegexTesterPage = () => {
   }, [testText, matches])
 
   const flagString = useMemo(() => buildFlagsString(flags), [flags])
+
+  const regexTokens = useMemo(() => {
+    return tokenizeRegexPattern(pattern)
+  }, [pattern])
+
+  const diffSegments = useMemo(() => {
+    if (!replaceResult?.success) return []
+    return computeDiff(testText, replaceResult.result)
+  }, [testText, replaceResult])
+
+  const debouncedSaveHistoryRef = useRef(null)
+
+  useEffect(() => {
+    debouncedSaveHistoryRef.current = debounce(() => {
+      if (!pattern) return
+      setHistory((prevHistory) => {
+        return addHistoryItem(pattern, flags, testText, prevHistory)
+      })
+    }, 800)
+    return () => {
+      if (debouncedSaveHistoryRef.current?.cancel) {
+        debouncedSaveHistoryRef.current.cancel()
+      }
+    }
+  }, [pattern, flags, testText])
+
+  useEffect(() => {
+    if (pattern && regexValidation.valid) {
+      debouncedSaveHistoryRef.current?.()
+    }
+  }, [pattern, flags, testText, regexValidation.valid])
 
   useEffect(() => {
     if (activeMatchIndex >= 0) {
@@ -154,12 +175,6 @@ const RegexTesterPage = () => {
     },
     [testText]
   )
-
-  const handleSaveHistory = useCallback(() => {
-    if (!pattern) return
-    const newHistory = addHistoryItem(pattern, flags, testText, history)
-    setHistory(newHistory)
-  }, [pattern, flags, testText, history])
 
   const handleRestoreHistory = useCallback((item) => {
     setPattern(item.pattern)
@@ -242,6 +257,21 @@ const RegexTesterPage = () => {
     return list
   }, [history, historyFilter])
 
+  const renderRegexHighlighted = () => {
+    if (pattern === '') {
+      return <div className="rt-regex-editor-highlight" ref={regexEditorRef} aria-hidden="true" />
+    }
+    return (
+      <div className="rt-regex-editor-highlight" ref={regexEditorRef} aria-hidden="true">
+        {regexTokens.map((token, idx) => (
+          <span key={idx} className={getTokenClassName(token.type)}>
+            {token.value}
+          </span>
+        ))}
+      </div>
+    )
+  }
+
   const renderHighlightedText = () => {
     if (testText === '') {
       return <span className="rt-text-highlight" />
@@ -265,6 +295,36 @@ const RegexTesterPage = () => {
         })}
       </div>
     )
+  }
+
+  const renderDiffSegmentsView = () => {
+    if (!replaceResult?.success) return null
+    if (diffSegments.length === 0) {
+      return testText || '(空)'
+    }
+    if (diffSegments.length === 1 && diffSegments[0].type === 'equal') {
+      return diffSegments[0].value || '(空)'
+    }
+    return diffSegments.map((seg, idx) => {
+      if (seg.type === 'equal') {
+        return <span key={idx}>{seg.value}</span>
+      }
+      if (seg.type === 'insert') {
+        return (
+          <span key={idx} className="rt-diff-add">
+            {seg.value}
+          </span>
+        )
+      }
+      if (seg.type === 'delete') {
+        return (
+          <span key={idx} className="rt-diff-remove">
+            {seg.value}
+          </span>
+        )
+      }
+      return null
+    })
   }
 
   return (
@@ -297,16 +357,22 @@ const RegexTesterPage = () => {
               <div className="rt-panel-body">
                 <div className="rt-regex-input-wrap">
                   <span className="rt-regex-delim">/</span>
-                  <input
-                    type="text"
-                    className={`rt-regex-input ${
+                  <div
+                    className={`rt-regex-editor-wrap ${
                       !regexValidation.valid && pattern ? 'error' : ''
                     }`}
-                    value={pattern}
-                    onChange={handlePatternChange}
-                    placeholder="输入正则表达式..."
-                    spellCheck={false}
-                  />
+                  >
+                    {renderRegexHighlighted()}
+                    <textarea
+                      ref={regexTextareaRef}
+                      className="rt-regex-editor-input"
+                      value={pattern}
+                      onChange={handlePatternChange}
+                      placeholder="输入正则表达式..."
+                      spellCheck={false}
+                      rows={1}
+                    />
+                  </div>
                   <span className="rt-regex-delim">/{flagString}</span>
                 </div>
 
@@ -361,9 +427,14 @@ const RegexTesterPage = () => {
             <div className="rt-panel" style={{ flex: 1, minHeight: 0 }}>
               <div className="rt-panel-header">
                 <h3 className="rt-panel-title">测试文本</h3>
-                <button className="rt-btn rt-btn-sm rt-btn-primary" onClick={handleSaveHistory}>
-                  保存到历史
-                </button>
+                <span
+                  style={{
+                    fontSize: '11px',
+                    color: 'var(--rt-text-secondary)',
+                  }}
+                >
+                  自动保存历史
+                </span>
               </div>
               <div className="rt-panel-body" style={{ display: 'flex', flexDirection: 'column' }}>
                 <div className="rt-text-editor-wrap">
@@ -431,13 +502,7 @@ const RegexTesterPage = () => {
                       <div style={{ borderTop: '1px solid var(--rt-border)' }} />
                       <div className="rt-diff-pane">
                         <div className="rt-diff-pane-label">替换结果</div>
-                        <div className="rt-diff-pane-body">
-                          {testText === replaceResult.result ? (
-                            replaceResult.result || '(空)'
-                          ) : (
-                            renderDiffSegments(testText, replaceResult.result)
-                          )}
-                        </div>
+                        <div className="rt-diff-pane-body">{renderDiffSegmentsView()}</div>
                       </div>
                     </div>
                   )}
@@ -606,7 +671,7 @@ const RegexTesterPage = () => {
               </div>
               <div className="rt-panel-body">
                 {filteredHistory.length === 0 ? (
-                  <div className="rt-empty">暂无历史记录</div>
+                  <div className="rt-empty">暂无历史记录，输入正则后将自动保存</div>
                 ) : (
                   <>
                     <div className="rt-history-list">

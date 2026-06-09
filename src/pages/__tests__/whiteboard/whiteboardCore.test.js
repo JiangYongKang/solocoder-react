@@ -35,6 +35,12 @@ import {
   isPointInText,
   findTextAtPoint,
   isValidColor,
+  getTextInputScreenParams,
+  isShapeIntersectingPoint,
+  distance,
+  pointNearRect,
+  pointNearEllipse,
+  pointNearLine,
 } from '../../whiteboard/whiteboardCore.js'
 import {
   MIN_ZOOM,
@@ -689,5 +695,220 @@ describe('isValidColor', () => {
     expect(isValidColor('#ff')).toBe(false)
     expect(isValidColor(123)).toBe(false)
     expect(isValidColor(null)).toBe(false)
+  })
+})
+
+describe('getTextInputScreenParams', () => {
+  it('should calculate screen params at 100% zoom', () => {
+    const result = getTextInputScreenParams(100, 200, 16, '#333333', 0, 0, 1)
+    expect(result.left).toBe(100)
+    expect(result.top).toBe(200 - 16)
+    expect(result.fontSize).toBe(16)
+    expect(result.color).toBe('#333333')
+  })
+
+  it('should scale params at 200% zoom', () => {
+    const result = getTextInputScreenParams(100, 200, 16, '#ff0000', 0, 0, 2)
+    expect(result.left).toBe(200)
+    expect(result.top).toBe(400 - 32)
+    expect(result.fontSize).toBe(32)
+    expect(result.color).toBe('#ff0000')
+  })
+
+  it('should scale params at 50% zoom', () => {
+    const result = getTextInputScreenParams(100, 200, 16, '#0000ff', 0, 0, 0.5)
+    expect(result.left).toBe(50)
+    expect(result.top).toBe(100 - 8)
+    expect(result.fontSize).toBe(8)
+    expect(result.color).toBe('#0000ff')
+  })
+
+  it('should apply pan offset', () => {
+    const result = getTextInputScreenParams(100, 200, 16, '#333', 50, 100, 1)
+    expect(result.left).toBe(150)
+    expect(result.top).toBe(300 - 16)
+    expect(result.fontSize).toBe(16)
+  })
+
+  it('should apply both zoom and pan', () => {
+    const result = getTextInputScreenParams(100, 200, 16, '#333', 50, 100, 2)
+    expect(result.left).toBe(250)
+    expect(result.top).toBe(500 - 32)
+    expect(result.fontSize).toBe(32)
+  })
+
+  it('should handle different font sizes', () => {
+    const result = getTextInputScreenParams(0, 0, 32, '#000', 0, 0, 1.5)
+    expect(result.fontSize).toBe(48)
+    expect(result.top).toBe(-48)
+  })
+})
+
+describe('snapLineToAngle edge cases', () => {
+  it('should handle 180 degree horizontal line', () => {
+    const result = snapLineToAngle(100, 50, 0, 52)
+    expect(Math.abs(result.y2 - result.y1)).toBeLessThan(1)
+    expect(result.x2).toBeLessThan(result.x1)
+  })
+
+  it('should handle -90 degree vertical line', () => {
+    const result = snapLineToAngle(50, 100, 52, 0)
+    expect(Math.abs(result.x2 - result.x1)).toBeLessThan(1)
+    expect(result.y2).toBeLessThan(result.y1)
+  })
+
+  it('should handle 135 degree diagonal', () => {
+    const result = snapLineToAngle(100, 0, 0, 95)
+    const dx = result.x2 - result.x1
+    const dy = result.y2 - result.y1
+    expect(Math.abs(Math.abs(dx) - Math.abs(dy))).toBeLessThan(1)
+    expect(dx).toBeLessThan(0)
+    expect(dy).toBeGreaterThan(0)
+  })
+
+  it('should handle -135 degree diagonal', () => {
+    const result = snapLineToAngle(100, 100, 0, 5)
+    const dx = result.x2 - result.x1
+    const dy = result.y2 - result.y1
+    expect(Math.abs(Math.abs(dx) - Math.abs(dy))).toBeLessThan(1)
+    expect(dx).toBeLessThan(0)
+    expect(dy).toBeLessThan(0)
+  })
+})
+
+describe('shape operations edge cases', () => {
+  it('removeShape should handle non-existent id', () => {
+    const shape = createRectangleShape(0, 0, 10, 10)
+    const result = removeShape([shape], 'non-existent')
+    expect(result).toHaveLength(1)
+  })
+
+  it('updateShape should handle non-existent id', () => {
+    const shape = createRectangleShape(0, 0, 10, 10)
+    const result = updateShape([shape], 'non-existent', { width: 100 })
+    expect(result).toHaveLength(1)
+    expect(result[0].width).toBe(10)
+  })
+
+  it('addBrushPoint should handle null shape', () => {
+    expect(addBrushPoint(null, { x: 0, y: 0 })).toBeNull()
+  })
+
+  it('addBrushPoint should handle undefined shape', () => {
+    expect(addBrushPoint(undefined, { x: 0, y: 0 })).toBeUndefined()
+  })
+
+  it('isShapeIntersectingPoint - unknown type should return false', () => {
+    const fakeShape = { id: 'x', type: 'unknown' }
+    expect(isShapeIntersectingPoint(fakeShape, 0, 0, 10)).toBe(false)
+  })
+})
+
+describe('history operations edge cases', () => {
+  it('pushHistory should truncate future history', () => {
+    const shape1 = createRectangleShape(0, 0, 10, 10)
+    const shape2 = createCircleShape(50, 50, 10, 10)
+    const shape3 = createLineShape(0, 0, 10, 10)
+    const history = [[shape1], [shape1, shape2]]
+    const result = pushHistory(history, 1, [shape1, shape3])
+    expect(result.history).toHaveLength(2)
+    expect(result.historyIndex).toBe(2)
+    expect(result.history[1]).toContainEqual(shape3)
+  })
+})
+
+describe('getShapesBounds with negative circle radii', () => {
+  it('should handle negative circle radii correctly', () => {
+    const circle = createCircleShape(50, 50, -30, -20)
+    const result = getShapesBounds([circle])
+    expect(result.minX).toBe(20)
+    expect(result.minY).toBe(30)
+    expect(result.maxX).toBe(80)
+    expect(result.maxY).toBe(70)
+  })
+})
+
+describe('geometry helper functions', () => {
+  it('distance should calculate Euclidean distance', () => {
+    expect(distance(0, 0, 3, 4)).toBe(5)
+    expect(distance(0, 0, 0, 0)).toBe(0)
+    expect(distance(10, 10, 13, 14)).toBe(5)
+  })
+
+  it('pointNearRect should detect point near rectangle edges', () => {
+    expect(pointNearRect(5, 5, 10, 10, 20, 20, 10)).toBe(true)
+    expect(pointNearRect(15, 15, 10, 10, 20, 20, 0)).toBe(true)
+    expect(pointNearRect(0, 0, 10, 10, 20, 20, 1)).toBe(false)
+  })
+
+  it('pointNearRect should detect point inside rectangle', () => {
+    expect(pointNearRect(15, 15, 10, 10, 20, 20, 0)).toBe(true)
+  })
+
+  it('pointNearEllipse should detect point inside ellipse', () => {
+    expect(pointNearEllipse(0, 0, 0, 0, 10, 10, 0)).toBe(true)
+    expect(pointNearEllipse(5, 0, 0, 0, 10, 10, 0)).toBe(true)
+  })
+
+  it('pointNearEllipse should handle zero radii', () => {
+    expect(pointNearEllipse(0, 0, 0, 0, 0, 0, 5)).toBe(true)
+    expect(pointNearEllipse(10, 0, 0, 0, 0, 0, 5)).toBe(false)
+  })
+
+  it('pointNearEllipse should detect point outside with radius', () => {
+    expect(pointNearEllipse(15, 0, 0, 0, 10, 10, 10)).toBe(true)
+  })
+
+  it('pointNearLine should detect point near line segment', () => {
+    expect(pointNearLine(50, 50, 0, 0, 100, 100, 5)).toBe(true)
+    expect(pointNearLine(0, 0, 0, 0, 100, 100, 0)).toBe(true)
+    expect(pointNearLine(100, 100, 0, 0, 100, 100, 0)).toBe(true)
+  })
+
+  it('pointNearLine should detect point near line endpoint', () => {
+    expect(pointNearLine(10, 0, 0, 0, 100, 0, 1)).toBe(true)
+  })
+
+  it('pointNearLine should detect point far from line', () => {
+    expect(pointNearLine(0, 50, 0, 0, 100, 0, 10)).toBe(false)
+    expect(pointNearLine(0, 50, 0, 0, 100, 0, 50)).toBe(true)
+  })
+})
+
+describe('isShapeIntersectingPoint', () => {
+  it('should detect intersection with brush points', () => {
+    const brush = createBrushShape([{ x: 0, y: 0 }, { x: 10, y: 10 }, { x: 20, y: 20 }])
+    expect(isShapeIntersectingPoint(brush, 0, 0, 5)).toBe(true)
+    expect(isShapeIntersectingPoint(brush, 5, 5, 10)).toBe(true)
+    expect(isShapeIntersectingPoint(brush, 100, 100, 1)).toBe(false)
+  })
+
+  it('should handle brush with missing points', () => {
+    const brush = { id: 'x', type: SHAPE_TYPES.BRUSH }
+    expect(isShapeIntersectingPoint(brush, 0, 0, 10)).toBe(false)
+  })
+
+  it('should detect intersection with rectangle', () => {
+    const rect = createRectangleShape(10, 10, 50, 50)
+    expect(isShapeIntersectingPoint(rect, 15, 15, 0)).toBe(true)
+    expect(isShapeIntersectingPoint(rect, 0, 0, 5)).toBe(false)
+  })
+
+  it('should detect intersection with circle', () => {
+    const circle = createCircleShape(50, 50, 20, 20)
+    expect(isShapeIntersectingPoint(circle, 50, 50, 0)).toBe(true)
+    expect(isShapeIntersectingPoint(circle, 100, 100, 5)).toBe(false)
+  })
+
+  it('should detect intersection with line', () => {
+    const line = createLineShape(0, 0, 100, 100)
+    expect(isShapeIntersectingPoint(line, 50, 50, 5)).toBe(true)
+    expect(isShapeIntersectingPoint(line, 100, 0, 5)).toBe(false)
+  })
+
+  it('should detect intersection with text', () => {
+    const text = createTextShape(50, 100, 'Hello', '#000', 16)
+    expect(isShapeIntersectingPoint(text, 55, 95, 0)).toBe(true)
+    expect(isShapeIntersectingPoint(text, 1000, 1000, 0)).toBe(false)
   })
 })

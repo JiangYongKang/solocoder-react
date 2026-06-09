@@ -34,7 +34,7 @@ export const ALPHANUMERIC_TABLE =
 
 export const MASK_PATTERNS = [
   (r, c) => (r + c) % 2 === 0,
-  (r, c) => r % 2 === 0,
+  (r) => r % 2 === 0,
   (r, c) => c % 3 === 0,
   (r, c) => (r + c) % 3 === 0,
   (r, c) => (Math.floor(r / 2) + Math.floor(c / 3)) % 2 === 0,

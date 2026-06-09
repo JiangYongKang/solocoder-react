@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { formatDateTime } from './utils'
+import { MAX_COMMENT_DEPTH } from './constants'
 
 export default function CommentItem({ comment, depth = 1, onReply }) {
   const [showReplyInput, setShowReplyInput] = useState(false)
@@ -22,7 +23,7 @@ export default function CommentItem({ comment, depth = 1, onReply }) {
           <span className="sf-comment-time">{formatDateTime(comment.createdAt)}</span>
         </div>
         <div className="sf-comment-content">{comment.content}</div>
-        {depth < 3 && (
+        {depth < MAX_COMMENT_DEPTH && (
           <div className="sf-comment-actions">
             <button
               type="button"

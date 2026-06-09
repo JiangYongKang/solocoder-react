@@ -35,6 +35,7 @@ import {
   extractResponseContentType,
   tryParseResponseBody,
   generateId,
+  escapeHtml,
 } from './apiDebuggerUtils'
 import './api-debugger.css'
 
@@ -808,7 +809,7 @@ function ApiDebuggerPage() {
                     dangerouslySetInnerHTML={{
                       __html: response.isJson
                         ? highlightJson(response.body)
-                        : escapeHtmlForDisplay(response.body),
+                        : escapeHtml(response.body),
                     }}
                   />
                 )}
@@ -845,14 +846,6 @@ function ApiDebuggerPage() {
       <Toast message={toast?.message} type={toast?.type} />
     </div>
   )
-}
-
-function escapeHtmlForDisplay(text) {
-  if (text == null) return ''
-  return String(text)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
 }
 
 export default ApiDebuggerPage

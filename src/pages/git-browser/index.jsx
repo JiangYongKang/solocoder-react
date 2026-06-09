@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import './git-browser.css'
 import { BRANCHES, FILE_CHANGE_STATUS, FILE_TYPE, VIEW_MODE, DIFF_VIEW_MODE } from './constants'
-import { getFileTreeForBranch, getCommitHistoryForBranch } from './mockData'
+import { getFileTreeForBranch, getCommitHistoryForBranch, getBaseFileContents, getBaseFileList } from './mockData'
 import {
   getChangeStatusIcon,
   getChangeStatusColor,
@@ -20,12 +20,14 @@ import {
   sortTreeChildren,
   filterFileTree,
   generateOriginalContent,
+  buildFileTreeFromList,
+  computeCommitFileSnapshot,
 } from './gitUtils'
 import {
   DIFF_TYPE,
   buildSideBySideDiff,
   splitLines,
-} from '../text-diff/diffUtils'
+} from './diffUtils'
 
 const renderCharDiff = (charDiff) => {
   if (!charDiff || charDiff.length === 0) return null
@@ -121,13 +123,13 @@ const TreeNode = ({ node, level, selectedFile, onSelect, expanded, onToggle, sea
   )
 }
 
-const StageFileItem = ({ file, onAction, actionLabel, onDragStart, onDragEnd, isDragging, isDragOver, onDragOver, onDrop }) => {
+const StageFileItem = ({ file, onAction, actionLabel, onDragStart, onDragEnd, isDragging, onDragOver, onDrop }) => {
   const statusIcon = getChangeStatusIcon(file.status)
   const statusColor = getChangeStatusColor(file.status)
 
   return (
     <div
-      className={`gb-stage-file ${isDragging ? 'dragging' : ''} ${isDragOver ? 'drag-over' : ''}`}
+      className={`gb-stage-file ${isDragging ? 'dragging' : ''}`}
       draggable
       onDragStart={(e) => onDragStart(e, file)}
       onDragEnd={onDragEnd}
@@ -166,10 +168,23 @@ const GitBrowserPage = () => {
   const [selectedCommit, setSelectedCommit] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [draggedFile, setDraggedFile] = useState(null)
-  const [dragOverTarget, setDragOverTarget] = useState(null)
 
-  const fileTree = useMemo(() => getFileTreeForBranch(currentBranch), [currentBranch])
+  const baseFileTree = useMemo(() => getFileTreeForBranch(currentBranch), [currentBranch])
   const commitHistory = useMemo(() => getCommitHistoryForBranch(currentBranch), [currentBranch])
+  const baseFileContents = useMemo(() => getBaseFileContents(), [])
+  const baseFileList = useMemo(() => getBaseFileList(currentBranch), [currentBranch])
+
+  const commitFileList = useMemo(() => {
+    if (!selectedCommit) return null
+    return computeCommitFileSnapshot(commitHistory, selectedCommit.hash, baseFileList)
+  }, [commitHistory, selectedCommit, baseFileList])
+
+  const commitFileTree = useMemo(() => {
+    if (!commitFileList) return null
+    return buildFileTreeFromList(commitFileList, baseFileContents)
+  }, [commitFileList, baseFileContents])
+
+  const fileTree = useMemo(() => commitFileTree || baseFileTree, [commitFileTree, baseFileTree])
 
   const allFiles = useMemo(() => getAllFilesFromTree(fileTree), [fileTree])
   const changedFiles = useMemo(
@@ -236,7 +251,11 @@ const GitBrowserPage = () => {
   }, [])
 
   const handleSelectCommit = useCallback((commit) => {
-    setSelectedCommit((prev) => (prev?.hash === commit.hash ? null : commit))
+    setSelectedCommit((prev) => {
+      const next = prev?.hash === commit.hash ? null : commit
+      return next
+    })
+    setSelectedFile(null)
   }, [])
 
   const handleSwitchBranch = useCallback((branchName) => {
@@ -263,13 +282,11 @@ const GitBrowserPage = () => {
 
   const handleDragEnd = useCallback(() => {
     setDraggedFile(null)
-    setDragOverTarget(null)
   }, [])
 
-  const handleDragOver = useCallback((e, target) => {
+  const handleDragOver = useCallback((e) => {
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
-    setDragOverTarget(target)
   }, [])
 
   const handleDropStaged = useCallback(
@@ -279,7 +296,6 @@ const GitBrowserPage = () => {
         handleStageFile(draggedFile)
       }
       setDraggedFile(null)
-      setDragOverTarget(null)
     },
     [draggedFile, stagedFiles, handleStageFile]
   )
@@ -291,7 +307,6 @@ const GitBrowserPage = () => {
         handleUnstageFile(draggedFile)
       }
       setDraggedFile(null)
-      setDragOverTarget(null)
     },
     [draggedFile, stagedFiles, handleUnstageFile]
   )
@@ -420,7 +435,24 @@ const GitBrowserPage = () => {
       <div className="gb-container">
         <header className="gb-header">
           <Link to="/" className="gb-back-btn">← 返回首页</Link>
-          <h1 className="gb-title">Git 仓库浏览器</h1>
+          <h1 className="gb-title">
+            Git 仓库浏览器
+            {selectedCommit && (
+              <span
+                style={{
+                  marginLeft: 8,
+                  padding: '2px 10px',
+                  borderRadius: 4,
+                  fontSize: 12,
+                  fontWeight: 500,
+                  background: 'rgba(37, 99, 235, 0.12)',
+                  color: '#2563eb',
+                }}
+              >
+                查看提交 {shortHash(selectedCommit.hash)}
+              </span>
+            )}
+          </h1>
           <div className="gb-stats">
             {fileStats.added > 0 && (
               <span className="gb-stat-badge added">+{fileStats.added}</span>
@@ -619,7 +651,7 @@ const GitBrowserPage = () => {
             <div className="gb-stage-panel">
               <div
                 className="gb-stage-section"
-                onDragOver={(e) => handleDragOver(e, 'unstaged')}
+                onDragOver={handleDragOver}
                 onDrop={handleDropUnstaged}
               >
                 <div className="gb-stage-header">
@@ -639,8 +671,7 @@ const GitBrowserPage = () => {
                         onDragStart={handleDragStart}
                         onDragEnd={handleDragEnd}
                         isDragging={draggedFile?.path === file.path}
-                        isDragOver={dragOverTarget === 'unstaged' && draggedFile?.path === file.path}
-                        onDragOver={(e) => handleDragOver(e, 'unstaged')}
+                        onDragOver={handleDragOver}
                         onDrop={() => {}}
                       />
                     ))
@@ -650,7 +681,7 @@ const GitBrowserPage = () => {
 
               <div
                 className="gb-stage-section"
-                onDragOver={(e) => handleDragOver(e, 'staged')}
+                onDragOver={handleDragOver}
                 onDrop={handleDropStaged}
               >
                 <div className="gb-stage-header">
@@ -670,8 +701,7 @@ const GitBrowserPage = () => {
                         onDragStart={handleDragStart}
                         onDragEnd={handleDragEnd}
                         isDragging={draggedFile?.path === file.path}
-                        isDragOver={dragOverTarget === 'staged' && draggedFile?.path === file.path}
-                        onDragOver={(e) => handleDragOver(e, 'staged')}
+                        onDragOver={handleDragOver}
                         onDrop={() => {}}
                       />
                     ))

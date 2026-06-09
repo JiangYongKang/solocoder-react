@@ -4,14 +4,24 @@ import {
   binarize,
   getVersionSize,
   readFormatInfo,
-  applyMask,
+  unmaskGrid,
   readDataCodewords,
   rsDecode,
   extractDataBlocks,
   decodeData,
 } from '@/pages/qrcode/qrcodeDecoder.js';
-import { generateQRCode } from '@/pages/qrcode/qrcodeEncoder.js';
-import { ERROR_CORRECTION_LEVELS } from '@/pages/qrcode/constants.js';
+import { generateQRCode, getModeForText } from '@/pages/qrcode/qrcodeEncoder.js';
+import { ERROR_CORRECTION_LEVELS, MODE } from '@/pages/qrcode/constants.js';
+
+function decodeQRFromGenerated(qr) {
+  const formatInfo = readFormatInfo(qr.matrix);
+  expect(formatInfo).not.toBeNull();
+  const unmasked = unmaskGrid(qr.matrix, formatInfo.maskIndex, qr.version);
+  const codewords = readDataCodewords(unmasked, qr.version);
+  const dataBytes = extractDataBlocks(codewords, qr.version, formatInfo.ecLevel);
+  expect(dataBytes).not.toBeNull();
+  return decodeData(dataBytes, qr.version);
+}
 
 describe('QR Code Decoder', () => {
   describe('imageToGrayscale', () => {
@@ -88,38 +98,161 @@ describe('QR Code Decoder', () => {
     });
   });
 
-  describe('decodeData', () => {
-    it('should decode numeric data', () => {
+  describe('decodeData - Numeric mode (low version)', () => {
+    it('should decode short numeric data (version 1)', () => {
       const testText = '12345';
       const qr = generateQRCode(testText, ERROR_CORRECTION_LEVELS.L);
-
-      const formatInfo = readFormatInfo(qr.matrix);
-      expect(formatInfo).not.toBeNull();
-
-      const unmasked = applyMask(qr.matrix, formatInfo.maskIndex, qr.version);
-      const codewords = readDataCodewords(unmasked, qr.version);
-      const dataBytes = extractDataBlocks(codewords, qr.version, formatInfo.ecLevel);
-
-      expect(dataBytes).not.toBeNull();
-
-      const decoded = decodeData(dataBytes);
+      expect(qr.version).toBeLessThanOrEqual(9);
+      expect(getModeForText(testText)).toBe(MODE.NUMERIC);
+      const decoded = decodeQRFromGenerated(qr);
       expect(decoded).toBe(testText);
     });
 
+    it('should decode longer numeric data', () => {
+      const testText = '123456789012345';
+      const qr = generateQRCode(testText, ERROR_CORRECTION_LEVELS.L);
+      expect(getModeForText(testText)).toBe(MODE.NUMERIC);
+      const decoded = decodeQRFromGenerated(qr);
+      expect(decoded).toBe(testText);
+    });
+  });
+
+  describe('decodeData - Alphanumeric mode', () => {
+    it('should decode alphanumeric data (short, low version)', () => {
+      const testText = 'HELLO';
+      const qr = generateQRCode(testText, ERROR_CORRECTION_LEVELS.L);
+      expect(qr.version).toBeLessThanOrEqual(9);
+      expect(getModeForText(testText)).toBe(MODE.ALPHANUMERIC);
+      const decoded = decodeQRFromGenerated(qr);
+      expect(decoded).toBe(testText);
+    });
+
+    it('should decode alphanumeric with URL-like format', () => {
+      const testText = 'HTTPS://EXAMPLE.COM';
+      const qr = generateQRCode(testText, ERROR_CORRECTION_LEVELS.M);
+      expect(getModeForText(testText)).toBe(MODE.ALPHANUMERIC);
+      const decoded = decodeQRFromGenerated(qr);
+      expect(decoded).toBe(testText);
+    });
+
+    it('should decode alphanumeric with special characters', () => {
+      const testText = 'ABC123$%*+-./:';
+      const qr = generateQRCode(testText, ERROR_CORRECTION_LEVELS.Q);
+      expect(getModeForText(testText)).toBe(MODE.ALPHANUMERIC);
+      const decoded = decodeQRFromGenerated(qr);
+      expect(decoded).toBe(testText);
+    });
+
+    it('should decode longer alphanumeric data (medium version)', () => {
+      const testText = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+      const qr = generateQRCode(testText, ERROR_CORRECTION_LEVELS.M);
+      expect(getModeForText(testText)).toBe(MODE.ALPHANUMERIC);
+      const decoded = decodeQRFromGenerated(qr);
+      expect(decoded).toBe(testText);
+    });
+
+    it('should decode odd-length alphanumeric strings', () => {
+      const testText = 'ABC';
+      const qr = generateQRCode(testText, ERROR_CORRECTION_LEVELS.L);
+      expect(getModeForText(testText)).toBe(MODE.ALPHANUMERIC);
+      const decoded = decodeQRFromGenerated(qr);
+      expect(decoded).toBe(testText);
+    });
+  });
+
+  describe('decodeData - Byte mode (low version)', () => {
     it('should decode simple byte data', () => {
       const testText = 'Hi';
       const qr = generateQRCode(testText, ERROR_CORRECTION_LEVELS.L);
+      expect(qr.version).toBeLessThanOrEqual(9);
+      const decoded = decodeQRFromGenerated(qr);
+      expect(decoded).toBe(testText);
+    });
 
-      const formatInfo = readFormatInfo(qr.matrix);
-      expect(formatInfo).not.toBeNull();
+    it('should decode mixed case text (byte mode)', () => {
+      const testText = 'Hello World';
+      const qr = generateQRCode(testText, ERROR_CORRECTION_LEVELS.L);
+      expect(getModeForText(testText)).toBe(MODE.BYTE);
+      const decoded = decodeQRFromGenerated(qr);
+      expect(decoded).toBe(testText);
+    });
+  });
 
-      const unmasked = applyMask(qr.matrix, formatInfo.maskIndex, qr.version);
-      const codewords = readDataCodewords(unmasked, qr.version);
-      const dataBytes = extractDataBlocks(codewords, qr.version, formatInfo.ecLevel);
+  describe('decodeData - High version QR codes', () => {
+    it('should decode high version numeric data (version >= 10)', () => {
+      const testText = '1'.repeat(800);
+      const qr = generateQRCode(testText, ERROR_CORRECTION_LEVELS.M);
+      expect(qr.version).toBeGreaterThanOrEqual(10);
+      expect(getModeForText(testText)).toBe(MODE.NUMERIC);
+      const decoded = decodeQRFromGenerated(qr);
+      expect(decoded).toBe(testText);
+    });
 
-      expect(dataBytes).not.toBeNull();
+    it('should decode high version alphanumeric data (version >= 10)', () => {
+      const testText = 'ABCDEFGHIJ'.repeat(60);
+      const qr = generateQRCode(testText, ERROR_CORRECTION_LEVELS.M);
+      expect(qr.version).toBeGreaterThanOrEqual(10);
+      expect(getModeForText(testText)).toBe(MODE.ALPHANUMERIC);
+      const decoded = decodeQRFromGenerated(qr);
+      expect(decoded).toBe(testText);
+    });
 
-      const decoded = decodeData(dataBytes);
+    it('should decode high version byte data (version >= 10)', () => {
+      const testText = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. '.repeat(15);
+      const qr = generateQRCode(testText, ERROR_CORRECTION_LEVELS.M);
+      expect(qr.version).toBeGreaterThanOrEqual(10);
+      expect(getModeForText(testText)).toBe(MODE.BYTE);
+      const decoded = decodeQRFromGenerated(qr);
+      expect(decoded).toBe(testText);
+    });
+
+    it('should decode high version byte data with high EC level', () => {
+      const testText = 'x'.repeat(200);
+      const qr = generateQRCode(testText, ERROR_CORRECTION_LEVELS.H);
+      expect(qr.version).toBeGreaterThanOrEqual(5);
+      const decoded = decodeQRFromGenerated(qr);
+      expect(decoded).toBe(testText);
+    });
+
+    it('should decode version 10+ byte data with correct char count bits', () => {
+      const base = 'Test';
+      const testText = base.repeat(100);
+      const qr = generateQRCode(testText, ERROR_CORRECTION_LEVELS.L);
+      expect(qr.version).toBeGreaterThanOrEqual(10);
+      const decoded = decodeQRFromGenerated(qr);
+      expect(decoded).toBe(testText);
+      expect(decoded.length).toBe(testText.length);
+    });
+  });
+
+  describe('decodeData - version boundary tests', () => {
+    it('should correctly handle version 9 (char count bits change boundary)', () => {
+      let testText = 'A';
+      let qr;
+      do {
+        testText += 'BCDEFGHIJ';
+        qr = generateQRCode(testText, ERROR_CORRECTION_LEVELS.L);
+      } while (qr.version < 9);
+      while (qr.version === 9) {
+        testText += 'X';
+        qr = generateQRCode(testText, ERROR_CORRECTION_LEVELS.L);
+      }
+      testText = testText.slice(0, -1);
+      qr = generateQRCode(testText, ERROR_CORRECTION_LEVELS.L);
+      expect(qr.version).toBe(9);
+      const decoded = decodeQRFromGenerated(qr);
+      expect(decoded).toBe(testText);
+    });
+
+    it('should correctly handle version 10 (first version with 16-bit byte char count)', () => {
+      let testText = 'A';
+      let qr = generateQRCode(testText, ERROR_CORRECTION_LEVELS.L);
+      while (qr.version < 10) {
+        testText += 'BCDEFGHIJKLMNOPQRSTUVWXYZ';
+        qr = generateQRCode(testText, ERROR_CORRECTION_LEVELS.L);
+      }
+      expect(qr.version).toBeGreaterThanOrEqual(10);
+      const decoded = decodeQRFromGenerated(qr);
       expect(decoded).toBe(testText);
     });
   });
@@ -137,12 +270,12 @@ describe('QR Code Decoder', () => {
       const qr = generateQRCode(testText, ERROR_CORRECTION_LEVELS.H);
 
       const formatInfo = readFormatInfo(qr.matrix);
-      const unmasked = applyMask(qr.matrix, formatInfo.maskIndex, qr.version);
+      const unmasked = unmaskGrid(qr.matrix, formatInfo.maskIndex, qr.version);
       const codewords = readDataCodewords(unmasked, qr.version);
       const dataBytes = extractDataBlocks(codewords, qr.version, formatInfo.ecLevel);
 
       expect(dataBytes).not.toBeNull();
-      const decoded = decodeData(dataBytes);
+      const decoded = decodeData(dataBytes, qr.version);
       expect(decoded).toBe(testText);
     });
   });
@@ -168,16 +301,26 @@ describe('QR Code Decoder', () => {
     });
   });
 
-  describe('applyMask', () => {
+  describe('unmaskGrid', () => {
     it('should correctly unmask QR code', () => {
       const qr = generateQRCode('test', ERROR_CORRECTION_LEVELS.L);
       const formatInfo = readFormatInfo(qr.matrix);
       expect(formatInfo).not.toBeNull();
 
-      const unmasked = applyMask(qr.matrix, formatInfo.maskIndex, qr.version);
+      const unmasked = unmaskGrid(qr.matrix, formatInfo.maskIndex, qr.version);
 
       expect(unmasked.length).toBe(qr.matrix.length);
       expect(unmasked[0].length).toBe(qr.matrix[0].length);
+    });
+
+    it('should unmask correctly for all mask patterns', () => {
+      for (let maskIdx = 0; maskIdx < 8; maskIdx++) {
+        const qr = generateQRCode('test' + maskIdx, ERROR_CORRECTION_LEVELS.L);
+        const formatInfo = readFormatInfo(qr.matrix);
+        expect(formatInfo).not.toBeNull();
+        const unmasked = unmaskGrid(qr.matrix, formatInfo.maskIndex, qr.version);
+        expect(unmasked.length).toBe(qr.matrix.length);
+      }
     });
   });
 });

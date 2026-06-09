@@ -1,0 +1,4 @@
+你实现的 Git 仓库浏览器页面上轮修复中 isSafeLineForDeletion 函数的规则有问题：
+
+1. isSafeLineForDeletion 使用 `/['"`]/.test(trimmed)` 排除了所有包含引号字符的行。这条规则过于宽泛——普通的变量赋值行如 `const name = "hello"` 或 `const path = base + '/api'` 在真实代码中完全可以被删除，但当前规则将它们全部标记为不可删除。结果就是 original 模式下 diff 中几乎只有不含任何引号的纯表达式行才会被删除，diff 的多样性和真实感不足。需要放松这条规则，允许包含引号但语义不是纯字符串字面量的行也可被删除。
+2. 修复后重新运行 pnpm run test，需要让所有测试通过。

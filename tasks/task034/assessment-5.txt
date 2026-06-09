@@ -1,0 +1,5 @@
+产物满意，无不满意的产物问题。模型正确地将 handleDeleteMedia 和 handlePlaylistItemClick 中的 stale closure 问题修复：handleDeleteMedia 改为在 setQueue 的函数式更新器内部计算 newQueue.length 做索引判断，handlePlaylistItemClick 改为在函数式更新器内部用 prevQueue.length 获取追加后的准确索引。修复方案在 React 18 自动批处理环境下行为正确。所有测试通过。
+
+过程不满意：
+1. 模型的第一版修改引入了两个自创的 BUG：一是 handlePlaylistItemClick 中漏掉了非附加场景的 already-in-queue 切换播放判断（修改后 togglePlay 分支缺少 `!needsAppend` 条件，会导致刚追加到队列的项也走 togglePlay 而非直接播放），二是在自动播放的 if 语句中留下了缺少右括号的语法错误。模型在提交第一版修改后才意识到这两个问题，追加了第二版修改修复。根本原因是第一版代码写完后没有做任何形式的自检（哪怕是肉眼扫一遍关键逻辑分支），直接提交。正确做法是修改完成后逐分支走查关键逻辑路径，确认每个分支条件完整、语法正确。
+2. 模型在 Dev Server 启动后又遇到 social-feed 模块的控制台报错，再次以"与我们的音视频播放器无关"直接忽略。这已经是第三轮对同一个控制台报错的漠视。根本原因是完全没有关注全局终端输出质量的意识。正确做法是至少做一次快速确认该报错非本次修改引入。

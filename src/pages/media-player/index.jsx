@@ -384,28 +384,48 @@ const MediaPlayerPage = () => {
     const playlistIdx = playlist.findIndex((item) => item.id === id)
     if (playlistIdx < 0) return
     setPlaylist((prev) => prev.filter((item) => item.id !== id))
-    const queueIdx = queue.findIndex((item) => item.id === id)
-    if (queueIdx >= 0) {
-      setQueue((prev) => prev.filter((item) => item.id !== id))
-      if (queueIdx === currentIndex) {
-        setIsPlaying(false)
-        if (queue.length > 1) {
-          setCurrentIndex(queueIdx === queue.length - 1 ? queueIdx - 1 : queueIdx)
+
+    const oldQueueIdx = queue.findIndex((item) => item.id === id)
+    if (oldQueueIdx >= 0) {
+      let newIndexAfterDelete = currentIndex
+      let shouldStop = false
+      let shouldResetTime = false
+
+      setQueue((prevQueue) => {
+        const newQueue = prevQueue.filter((item) => item.id !== id)
+        if (oldQueueIdx === currentIndex) {
+          shouldStop = true
+          shouldResetTime = true
+          if (newQueue.length > 0) {
+            newIndexAfterDelete = oldQueueIdx === newQueue.length ? oldQueueIdx - 1 : oldQueueIdx
+          }
+        } else if (oldQueueIdx < currentIndex) {
+          newIndexAfterDelete = currentIndex - 1
         }
-        setCurrentTime(0)
-      } else if (queueIdx < currentIndex) {
-        setCurrentIndex((prev) => prev - 1)
+        return newQueue
+      })
+
+      if (shouldStop) {
+        setIsPlaying(false)
       }
+      if (shouldResetTime) {
+        setCurrentTime(0)
+      }
+      setCurrentIndex(newIndexAfterDelete)
     }
   }
 
   const handlePlaylistItemClick = (item) => {
     let targetQueueIndex = queue.findIndex((q) => q.id === item.id)
-    if (targetQueueIndex < 0) {
-      setQueue((prev) => [...prev, item])
-      targetQueueIndex = queue.length
+    let needsAppend = targetQueueIndex < 0
+    if (needsAppend) {
+      setQueue((prevQueue) => {
+        targetQueueIndex = prevQueue.length
+        return [...prevQueue, item]
+      })
     }
-    if (targetQueueIndex === currentIndex) {
+
+    if (targetQueueIndex === currentIndex && !needsAppend) {
       togglePlay()
     } else {
       setCurrentIndex(targetQueueIndex)

@@ -1,0 +1,6 @@
+你实现的音视频播放器页面上轮引入的播放队列功能还存在 stale closure 问题：
+
+1. handleDeleteMedia 函数在处理当前播放项被删除的索引调整时，使用了闭包中旧的 queue.length 做条件判断。当用户正在播放队列中唯一的项目并删除它时，旧 queue.length 值为 1，queue.length > 1 条件为 false，导致跳过索引修正分支。正确做法应该使用函数式 setState（setQueue(prev => ...)）更新队列，并在更新器内部用过滤后的新数组做索引判断，而非依赖闭包中的旧值。
+2. handlePlaylistItemClick 函数中当点击的项不在播放队列时，用 `targetQueueIndex = queue.length` 获取新索引，假定了旧 queue.length 正好等于追加后的位置索引。虽然当前自动批处理下能工作，但正确的做法是使用函数式 setState 追加元素时返回新索引。同样的模式也请检查 handleDeleteMedia 中的 setQueue 调用，一并改为函数式更新。
+3. 修复完成后启动 pnpm run dev，手动验证删除队列中唯一播放项和点击不在队列中的播放列表项的行为。
+4. 重新运行 pnpm run test，需要让所有测试通过。

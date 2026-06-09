@@ -264,6 +264,8 @@ const isSafeLineForReplacement = (line) => {
   return true
 }
 
+const PURE_STRING_LINE = /^\s*(const|let|var)\s+\w+\s*=\s*['"`][^'"`]*['"`]\s*;?\s*$/
+
 const isSafeLineForDeletion = (line) => {
   if (!line || typeof line !== 'string') return false
   const trimmed = line.trim()
@@ -274,7 +276,13 @@ const isSafeLineForDeletion = (line) => {
   if (trimmed.startsWith('function ') || trimmed.startsWith('class ')) return false
   if (trimmed.startsWith('return ')) return false
   if (trimmed.startsWith('console.')) return false
-  if (/['"`]/.test(trimmed)) return false
+  if (trimmed.startsWith('if (') || trimmed.startsWith('if(')) return false
+  if (trimmed.startsWith('for (') || trimmed.startsWith('for(')) return false
+  if (trimmed.startsWith('while (') || trimmed.startsWith('while(')) return false
+  if (trimmed.startsWith('try {') || trimmed.startsWith('try{')) return false
+  if (trimmed.startsWith('catch ') || trimmed.startsWith('catch(')) return false
+  if (trimmed === '}' || trimmed === '{' || trimmed === ');') return false
+  if (PURE_STRING_LINE.test(line)) return false
   return true
 }
 

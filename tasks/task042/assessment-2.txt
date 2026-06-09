@@ -1,9 +1,9 @@
 产物不满意：
-1. 模型在 handleFilterChange 中引入了 filterDebounceRef 的 setTimeout 定时器（index.jsx 第 335 行），但组件卸载时没有在 useEffect 的清理函数中执行 clearTimeout。如果用户调节滤镜滑块后 500ms 内离开页面，定时器仍会触发 saveHistory()，在已卸载组件上调用 setHistory，造成无意义的状态更新和定时器泄漏。根本原因是添加 debounce 逻辑时只考虑了正常使用路径，未考虑组件卸载的边界情况。正确做法是在组件中添加 useEffect 返回函数，卸载时清理 filterDebounceRef.current。
+1. handleFilterChange 中 filterDebounceRef 定时器（index.jsx 第335行），组件卸载时未 clearTimeout。500ms 内离开页面会导致定时器泄漏并在已卸载组件上调用 setHistory 引发内存错误。模型在组件卸载清理逻辑中遗漏了定时器清除，应在 useEffect 返回的清理函数中执行 clearTimeout(filterDebounceRef.current)，确保组件销毁时清除所有挂起的定时器。
 
 过程不满意：
-1. 模型收到提示词后的第一个操作就是创建 TodoList，没有先分析问题、阅读代码理解现状再规划。正确的流程是先读取相关文件了解当前实现，识别每个问题涉及的代码位置，然后再制定修复计划。直接创建任务清单表现出急于动手、缺乏先分析后规划的工程习惯。
-2. 模型在启动 dev 服务器后发现 social-feed 模块的 extractTopics 导出缺失和 App.jsx 中 WeatherPage 未导入，这些错误与图片编辑器任务完全无关，但模型仍然动手修改了 src/pages/social-feed/utils.js（添加 export { extractTopics }）和 src/App.jsx（添加 WeatherPage import）。这两处修改超出了 src/pages/image-editor/ 和 src/pages/__tests__/image-editor/ 的任务范围，违反了项目严格的包隔离原则。根本原因是模型缺乏任务边界意识，看到报错就习惯性去修，没有评估修改是否属于当前任务范围。正确做法是只关注 image-editor 目录下的代码，不应触碰其他任务的包。
-3. 提示词第 6 条明确要求"重新运行 pnpm run test 和 pnpm run lint，确保测试通过且无 ESLint 报错"，但模型从未执行 pnpm run lint 命令。模型在 COT 中声称"所有文件都没有 lint 错误"，实际使用的是 IDE 内置的 GetDiagnostics 工具而非项目配置的 pnpm run lint。实际运行 pnpm run lint 后，src/pages/image-editor/index.jsx 中存在 4 个 lint 错误（normalizeCropRect、isValidColor 未使用的导入，editingTextId 未使用的变量，snapshot 未使用的变量），src/pages/__tests__/image-editor/imageEditorCore.test.js 中存在 2 个 lint 错误（beforeEach 未使用的导入，EXPORT_FORMAT_NAMES 未使用的导入）。虽然这些 lint 错误大部分是第一轮遗留的预存问题，但模型未实际运行 lint 命令就声称无错误，构成了对校验结果的虚假声明。根本原因是模型依赖 IDE 开发工具的即时反馈替代了项目约定的命令行校验流程。正确做法是严格按提示词要求执行 pnpm run lint 命令，并如实汇报结果。
-4. 模型在运行测试时使用了 npm test 命令而非提示词要求的 pnpm run test。虽然本次执行结果等效（测试全部通过），但未严格遵循提示词中指定的命令，是执行规范性的疏忽。
-5. 模型为验证页面而启动 dev 服务器后，被 social-feed 模块报错和 App.jsx 缺失导入的错误分心，花费约三分之一的思考步骤（COT 第 651 行至第 907 行）在排查和修复与图片编辑器无关的问题上，调试方向严重偏离任务目标。根本原因是模型看到报错后没有先判断错误是否来自自己修改的文件，而是盲目介入修复。正确做法是先确认报错来源是否属于当前任务目录，如果是外部问题则记录在 COT 中但不插手修改。
+1. 收到提示词后立即创建 TodoList，未先读取代码分析现状再规划。应先了解当前实现、识别问题涉及的代码位置和依赖关系，再制定有针对性的修复计划。
+2. 启动 dev 后被 social-feed 和 WeatherPage 等无关错误分心，动手修改了 src/pages/social-feed/utils.js 和 App.jsx，超出 image-editor 包范围。应只看当前任务所在的 image-editor 目录，严格不触碰其他任务包的文件。
+3. 从未执行 pnpm run lint，用 GetDiagnostics IDE 工具替代命令行校验并声称无错误。实际存在多个未使用导入/变量 lint 错误。应严格按提示词执行 pnpm run lint 命令，并根据终端实际输出如实汇报结果。
+4. 使用 npm test 而非提示词要求的 pnpm run test。应严格按提示词原文中指定的包管理器命令执行测试，不自行替换命令。
+5. 调试时约三分之一步骤用于排查与任务无关的外部模块报错。应先通过错误堆栈确认报错来源是否属于当前 image-editor 目录，确认不属于当前任务范围就不应插手修改。

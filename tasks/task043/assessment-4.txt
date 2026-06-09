@@ -1,11 +1,8 @@
 产物不满意：
-1. 模型在 i18nUtils.test.js 的"row operations for both view modes"测试组中删除了 7 条重复用例（与第三轮仅清理 1 条相比有显著进步），但仍保留了第 630 行 "addTranslationKey should support adding nested keys with dot notation"。该测试将 addTranslationKey 和 getTopLevelKeys 组合调用：addTranslationKey 仅做字典键值赋值（{[key]: defaultValue}），getTopLevelKeys 仅做字符串 split('.') 取首段取集合，两个函数都是操作扁平字典的纯函数，key 字符串中是否含点号不改变任何代码分支。addTranslationKey 传入含点号的 key（如 'greeting.hello'）已在独立测试的第 189 行覆盖，getTopLevelKeys 解析含点号的 key 已在独立测试的第 560 行覆盖，该组合用例与已有独立测试完全等价，不构成提示词第 3 条要求的"真正有增量覆盖价值"。根本原因是模型将纯函数组合误判为有意义的集成测试，未分析到无共享状态的纯函数组合不会产生涌现行为。正确做法是确认被测试函数体内是否对 key 字符串格式有不同的处理分支，若两个函数都视 key 为不透明字符串且各自的独立测试已覆盖含点号 key 的输入，则该组合不产生增量覆盖，应一并删除。
+1. i18nUtils.test.js 第 630 行保留了含点号 key 的组合测试用例，但 addTranslationKey 和 getTopLevelKeys 都是操作扁平字典的纯函数，各自的点号 key 输入早已在独立测试中分别覆盖。两个纯函数之间不存在组合涌现行为，该冗余用例应一并删除。
 
 过程不满意：
-1. 模型在收到任务后的第一个工具调用就是 todo_write 创建 TodoList（session-cot-4.md 第 1 行），没有先读取提示词中直接指定的代码位置（index.jsx 第 118-120 行 KeyEditCell 和第 307-308 行 ComparePanel）了解当前代码状态。这是连续第四轮复现的同一过程问题——assessment-1、assessment-2、assessment-3 均指出"不能在刚收到任务时直接创建 TodoList，应先分析问题再规划"。模型在第四轮依然先建列表再读文件，说明前三轮的标注反馈完全没有被内化。根本原因是模型缺乏先探索后规划的工作习惯，对已有标注的改进要求缺乏学习能力。正确做法是先读取提示词中提到的所有目标文件和代码行号，确认问题的具体表现和范围后，再制定包含精确修改点的 TodoList。
-
-2. 模型在验证阶段仅使用了 GetDiagnostics 工具（session-cot-4.md 第 284、292 行）检查 ESLint 状态，未执行提示词第 5 条明确要求的 pnpm run lint。这是连续第三轮复现的同一过程问题——assessment-2 过程不满意第 4 条和 assessment-3 过程不满意第 2 条已明确指出 GetDiagnostics 的 IDE 语言服务器规则集与项目 .eslintrc 配置不完全一致，不能替代终端 eslint 命令，且 assessment-3 明确指出上一轮就因为这个原因漏掉了 index.jsx 中的 3 条 ESLint 报错。模型在本轮仍然以 IDE 诊断替代提示词要求的命令行验证，说明对标注反馈缺乏有效吸收。根本原因是模型无视提示词中显式命令 pnpm run lint 和过往标注中的明确警告，固化了用 IDE 工具替代命令行验证的坏习惯。正确做法是严格按提示词要求运行 pnpm run lint，将终端输出作为 ESLint 合规的权威依据，再将 IDE 诊断作为交叉验证。
-
-3. 模型运行测试的输出显示 4018 个测试全部通过（session-cot-4.md 第 263 行），但命令参数已指定 scope 为 src/pages/__tests__/i18n-manager/。i18n-manager 目录仅包含 1 个测试文件（i18nUtils.test.js），约 99 个 describe/it 调用，不可能包含 4018 个测试用例。4018 是项目中所有约 57 个测试文件的汇总数字，说明 scope 过滤未生效（可能与命令末尾附带的 "undefined" 参数有关），模型实际运行了全量测试但未意识到 scope 失效。模型在没有确认 i18n-manager 具体测试数量和通过率的情况下，直接接受了 4018 这个数字作为目标包的验证结果。根本原因是模型未对测试输出做合理性校验，未将输出数字与预期 scope 内的测试规模做对比。正确做法是确认 scope 过滤生效后，明确记录 i18n-manager 目录的具体测试文件数和通过率，或至少检查 4018 是否合理——只用一个测试文件不可能包含这么多测试。
-
-4. 模型启动了 pnpm run dev 并调用了 open_preview（session-cot-4.md 第 327-355 行），open_preview 仅返回"预览"二字，没有任何证据表明模型导航到了 /i18n-manager 路径或检查了浏览器控制台是否有报错。模型在总结中直接声称"页面访问: ✅ http://localhost:5173/i18n-manager 可正常访问，浏览器无报错"（第 407 行），但没有对应的实际验证操作记录支撑。这是连续第二轮复现的同一过程问题——assessment-3 过程不满意第 4 条已指出"模型从 open_preview 的空白返回直接跳跃到了可正常访问且无报错的结论"。根本原因是模型将"启动预览工具"等同于"验证通过"，跳过了实际的页面访问和交互验证步骤。正确做法是打开预览后明确导航到目标页面路径、检查页面元素是否正确渲染、控制台是否有报错，并将这些实际观察作为验证结论的依据。
+1. 模型收到任务后第一个工具调用就是 todo_write 创建 TodoList，连续第四轮复现同一问题，前三轮标注反复强调应先读文件后规划但模型完全未内化。正确做法是先读取提示词指定的代码行号了解当前状态，再制定修改方案。
+2. 模型再次使用 GetDiagnostics 替代 pnpm run lint，连续第三轮复现，assessment-2 和 assessment-3 已明确指出 IDE 诊断规则与项目 .eslintrc 不一致，不能替代终端命令。正确做法是严格按提示词要求运行 pnpm run lint。
+3. 模型测试输出 4018 passed 但 scope 指定为 i18n-manager 目录，该目录仅 1 个文件约 99 个用例，绝无可能有 4018 个测试。scope 过滤未生效而模型毫无察觉，未将输出数字与目录规模做合理性对比。正确做法是先确认 scope 是否生效再记录具体通过率。
+4. 模型从 open_preview 空白返回却直接声称"页面可正常访问且浏览器无报错"，连续第二轮复现，assessment-3 刚指出过却再次无视。正确做法是明确导航到目标页面路径、逐一检查元素渲染和控制台报错后再下结论。

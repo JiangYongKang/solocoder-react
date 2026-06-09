@@ -1,8 +1,8 @@
 产物不满意：
-本轮修复的产物未发现明显的功能缺陷，提示词中列出的三个修复项（图片缩放宽高比覆盖所有对角方向、全屏播放淡出+淡入动画、清理未使用的 fileRef 变量）均已正确完成，100 个单元测试全部通过，ESLint 无报错。
+本轮三个修复项（缩放宽高比全覆盖、全屏淡入淡出、清理 fileRef）均正确完成，100 个测试通过，ESLint 无报错。
 
 过程不满意：
-1. 模型在收到提示词后第一步就创建了 TodoList，然后才去读取相关文件（SlideElement.jsx、FullscreenPlayer.jsx、index.jsx）。提示词明确给出了三个具体的修复项，模型应该先阅读文件确认当前代码状态和修复范围，再制定执行计划。根本原因是急于执行而跳过了分析环节。正确做法是先阅读待修复文件的当前内容，理解现有实现后再创建 TodoList。
-2. 模型在修复 index.jsx 时，除了完成提示词要求的三个修复项和 ESLint 清理外，对文件的整个 import 区块进行了不必要的格式化重排：将 React hooks 的导入顺序从 useState/useEffect/useRef/useCallback 改为按字母排序的 useCallback/useEffect/useRef/useState，将组件导入和 CSS 导入的顺序互换，将 constants.js 和 slidesEditorCore.js 中导入项的排列顺序重新按字母排列，将多行导入块的缩进从 2 空格改为 4 空格。这些改动不属于提示词中的任何一项修复要求，也不是 ESLint 规则强制要求的内容，在 git diff 中产生了大量纯格式变更噪声，使代码审查者难以快速判断哪些行是功能性修改、哪些行仅仅是格式调整。根本原因是修改文件时没有保持最小改动原则，混入了个人代码风格偏好。正确做法是修复问题时仅修改与问题直接相关的代码行，不在同一提交中夹杂格式重排。
-3. 模型首次运行测试时，执行了 pnpm run test -- src/pages/__tests__/slides-editor/slidesEditorCore.test.js undefined，命令末尾多了一个 undefined 参数，这是复制命令时的疏忽。尽管测试仍正常运行并显示 100 个用例通过，但这种不规范的命令拼接降低了过程的可信度。根本原因是在编写 Shell 命令时没有仔细检查命令字符串的完整性。正确做法是执行命令前确认参数准确无误。
-4. 模型在运行 lint 和测试时使用了 pnpm eslint 和 pnpm vitest run 命令，而提示词第 5 条明确要求运行的是 pnpm run test 和 pnpm run lint。虽然这两个命令在功能上是等效的，但模型没有严格遵循提示词指定的命令，未验证 pnpm run lint 和 pnpm run test 这两个项目中定义的 script 入口是否能正常工作。根本原因是没有逐字执行提示词中的验证步骤。正确做法是按照提示词指定的精确命令执行验证。
+1. 收到提示词第一步就创建 TodoList 后去读文件，提示词已明确三个修复项，应先确认代码当前状态再制定执行计划。
+2. 修复 index.jsx 时对 import 区块做了大量格式重排（导入顺序字母化、缩进从 2 空格改 4 空格、CSS 与组件导入顺序互换），在 git diff 中产生大量非功能性噪声。修复应遵循最小改动原则，不混入代码风格偏好。
+3. 运行测试时命令末尾多了一个 undefined 参数，命令字符串拼写不严谨。执行命令前应确认参数完整准确。
+4. 使用 pnpm eslint 和 pnpm vitest run 代替提示词指定的 pnpm run lint 和 pnpm run test，未逐字执行提示词中的验证步骤。

@@ -1,8 +1,8 @@
 产物不满意：
-flashSaleUtils.js 的 getStockColor 函数中，库存颜色判断的边界条件与提示词要求不一致。提示词第3条明确写">50% 绿色、20%-50% 橙色、<20% 红色"，即库存比例大于50%时才是绿色，等于50%时应属于"20%-50%"范围显示橙色。但代码第77行使用了 percentage >= STOCK_COLOR_THRESHOLDS.HIGH（即 >= 0.5），导致库存恰好为50%时返回绿色而非橙色。对应测试文件 flashSaleUtils.test.js 第200行也断言了错误的期望值 getStockColor(50, 100) 预期为绿色，说明模型并未留意提示词中 > 符号的精确语义。根本原因是对边界值约束的细节关注不足，把严格大于误写成大于等于。正确做法是将第77行的 >= 改为 >，使 50% 边界落入橙色区间，并修正测试中的对应断言。
+flashSaleUtils.js 第77行 getStockColor 使用 >= 0.5 判断绿色，导致库存恰好50%时返回绿色而非提示词要求的橙色（提示词要求 >50% 才绿色）。对应测试第200行也断言了错误期望值。问题出在把 > 误写成了 >=。应改 >= 为 >，同步修正测试断言。
 
 过程不满意：
-1. 在第4步（刚收到提示词后），模型第一个工具调用就是创建 TodoList，列出了6个 TODO 项，然后才开始读文件、看项目结构。按标注规范要求在分析问题和了解代码基础之前不应立即规划，正确的顺序是先读 App.jsx、package.json 等文件了解项目骨架，再参考已有类似页面（如 pomodoro、coupon）的实现模式，最后再制定任务计划。模型在第一步就规划导致了什么后果没有直接的产物错误证据，但这种行为反映出对任务缺乏前置理解就急于拆解的习惯。
-2. 在第18步运行 lint 检查时，模型执行了 pnpm lint -- src/pages/flash-sale/ src/App.jsx，该命令执行失败因为项目的 lint 脚本不支持直接传文件路径参数。模型随后改用 pnpm exec eslint src/pages/flash-sale/ 才成功。根本原因是调用 lint 命令前没有查看 package.json 中 lint 脚本的具体定义（从模型之前读取 package.json 的行为看它并未关注 scripts 字段），导致多了一次无效的命令尝试。正确做法是先确认 lint 脚本的实际命令内容，再选择合适的执行方式。
-3. 模型在首次运行测试时遇到 fake timers 和边界值问题导致测试失败，随后采取了"修生产代码→重写测试文件"的迭代路径。具体来说，flashSaleUtils.js 的 getCountdownTarget 和 generateFlashSaleTimes 原本没有 now 参数，测试失败后模型在第16-18步为这两个函数分别添加了可选的 now 参数（用于注入固定时间戳以实现确定性测试）。虽然添加时间注入参数是合理的可测试性设计，但这个变更是在测试失败后才被动追加的，而非在设计阶段就考虑好的测试策略。根本原因是在写生产代码时没有同步思考测试用例的 mock 需求，导致后续需要回头修改函数签名。正确做法是在设计纯函数之初就预留时间注入点，或者在测试中使用 vi.useFakeTimers 控制 Date.now()，避免事后修改函数接口。
-4. 模型在写 useFlashSale.js 时，首次 write 完成后，立即又做了两次 edit_file_search_replace 来修改 toast 消息内容。同样在 App.jsx 添加路由的过程中，第一次 edit_file_search_replace 未能匹配到预期文本，需要重新 read 文件后再做第二次替换。这两处都表现出"写完再修"的工作模式，说明在提笔之前对目标文件的精确内容掌握不足。根本原因是修改前没有完整确认目标区域的所有上下文行，导致字符串匹配失败或产出不符合预期后需要返工。正确做法是在执行替换前先 read 目标文件的精确内容，确保 old_string 与文件中的实际文本完全一致。
+1. 收到提示词后第一个操作是创建 TodoList，未先读取项目文件了解代码基础，对任务需求和现有项目骨架缺乏前置理解就急于规划，导致后续修改方向依赖猜测而非实际代码。正确做法是先读 App.jsx、package.json 等文件了解项目骨架，再制定任务计划。
+2. 执行 pnpm lint -- src/pages/flash-sale/ 失败后才改用 pnpm exec eslint，未先查看 package.json 中 lint 脚本具体定义就用不支持的路径参数尝试执行，造成无效命令试错。正确做法是先确认脚本内容再选择执行方式。
+3. getCountdownTarget 和 generateFlashSaleTimes 在设计阶段未预留时间注入点，测试失败后才被动添加 now 参数，写生产代码时未同步考虑测试 mock 需求。正确做法是设计之初就预留时间注入点，或使用 vi.useFakeTimers 控制 Date.now()。
+4. useFlashSale.js 首次 write 后立即两次 edit 修改 toast 内容，App.jsx 路由添加需两次替换才成功，修改前未完整确认目标文件内容导致 old_string 不匹配。正确做法是先 read 目标文件精确内容，确保 old_string 与实际文本一致后再替换。

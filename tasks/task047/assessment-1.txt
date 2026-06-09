@@ -1,9 +1,9 @@
 产物不满意：
-1. App.jsx 中路由配置使用了 <Route path="/weather" element={<WeatherPage />} /> 但文件顶部缺少 WeatherPage 的 import 语句，导致页面运行时抛出 ReferenceError: WeatherPage is not defined，整个天气查询页面白屏无法访问。根本原因是模型在 App.jsx 中添加路由时只插入了 Route 标签，但遗漏了对应的 import 声明，属于不完整的代码修改。正确做法是同时在文件顶部的 import 区域添加 import WeatherPage from '@/pages/weather/index.jsx'。
-2. TemperatureChart.jsx 第 67-77 行的高温折线 <path> 元素存在重复和无效的 SVG 属性：strokeLinecap="round" 在第 72 行和第 75 行重复出现，strokeLinejoin="round" 在第 73 行和第 76 行重复出现，此外第 77 行存在一个无效属性 round="round"，该属性不是合法的 SVG 属性，会在 DOM 中残留无意义标记。根本原因是编写组件时代码粘贴后未清理冗余内容，缺乏最终产物自检。正确做法是删除重复和无效的属性，各保留一次即可。
-3. index.jsx 第 228 行温度显示带了 °C 单位，但第 239 行体感温度只显示 ° 缺少 C 字符，呈现为 23° 而非 23°C，与温度的 25°C 格式不一致。根本原因是两处温度值使用了不同的单位拼接方式，缺少统一性检查。正确做法是统一温度显示的单位格式，要么都带 °C，要么都只用 °。
+1. App.jsx 添加了 <Route path="/weather" element={<WeatherPage />} /> 但顶部缺少 WeatherPage 的 import 声明，导致页面运行时抛出 ReferenceError: WeatherPage is not defined，页面白屏。模型只插入了 Route 标签却遗漏了 import，应在文件顶部补充 import WeatherPage from '@/pages/weather/index.jsx'。
+2. TemperatureChart.jsx 高温折线 SVG 存在重复属性：strokeLinecap="round" 出现两次，strokeLinejoin="round" 出现两次，且第 77 行有无效属性 round="round"。原因是代码粘贴后没清理冗余内容，应删除重复和无效属性。
+3. index.jsx 主页温度显示带 °C 但体感温度只显示了 °，两处温度相邻却单位不统一，用户看到会很困惑。问题出在两处使用了不同的单位拼接方式，应统一温度单位格式，让主页所有温度均显示为 °C。
 
 过程不满意：
-1. 在 App.jsx 中新增路由和任务卡片的步骤，模型分三次编辑了 App.jsx，最终成功添加了任务卡片数据（第 96 行）和路由配置（第 176 行），但遗漏了顶部的 import 声明。三处修改是一个完整闭环，模型完成了其中两处却漏掉了第三处，说明编辑完成后没有从 App.jsx 整体的角度验证 import-usage 的一致性。根本原因是增量编辑时视野局限在局部修改目标上，没有全局检查。正确做法是完成多步编辑后读取一次完整文件，确认所有 import 引用均有效。
-2. 模型执行测试命令时，终端命令变为了 npm test -- src/pages/__tests__/weather/weatherUtils.test.js undefined，末尾多出了一个 undefined 字符串，说明命令拼接时存在变量未初始化的问题。虽然测试仍成功运行（因为 npm 只接收了前面的正常参数），但暴露了模型在构造命令字符串时的松懈和不严谨。根本原因是命令生成过程中某处变量值为 undefined 被直接拼接到命令末尾。正确的做法是在生成命令前对所有参数做非空校验。
-3. 模型在完成测试后直接声明"天气查询应用已全部实现完成"并做了功能总结，但从未启动 dev server 验证页面能不能正常渲染。如果启动了 pnpm run dev 并访问天气页面，浏览器控制台会立即报 WeatherPage is not defined 的 ReferenceError，这个严重问题在测试阶段本应被发现。根本原因是对"测试通过即完成"的过度依赖，忽略了运行时验证环节。正确做法是代码交付前至少做一次 dev server 启动加关键页面手动验证。
+1. 模型分三次编辑 App.jsx，完成了任务卡片和路由配置，却遗漏了顶部 import。增量编辑时视野局限在局部修改上，未做全局检查。多步编辑后应读取完整文件确认所有 import 引用有效。
+2. 执行测试时命令末尾出现 undefined：npm test -- src/pages/__tests__/weather/weatherUtils.test.js undefined。命令拼接时变量未初始化被直接拼入。应在生成命令前对所有参数做非空校验。
+3. 测试通过后直接声明"全部实现完成"，未启动 dev server 验证页面能否正常渲染。若启动并访问天气页面，控制台会立即报 WeatherPage is not defined。不应过度依赖测试通过，交付前必须做 dev server 启动加关键页面手动验证。

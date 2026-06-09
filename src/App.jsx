@@ -1,15 +1,23 @@
 import '@/App.css'
 import { Route, Routes, useNavigate } from 'react-router-dom'
 
+import ApiDebuggerPage from '@/pages/api-debugger/index.jsx'
 import AuthPage from '@/pages/auth/index.jsx'
 import CalendarPage from '@/pages/calendar/index.jsx'
 import ChatPage from '@/pages/chat/index.jsx'
+import CouponPage from '@/pages/coupon/index.jsx'
 import Dashboard from '@/pages/dashboard/Dashboard.jsx'
+import DBDesignerPage from '@/pages/db-designer/index.jsx'
 import ExamPage from '@/pages/exam/index.jsx'
 import FileManager from '@/pages/file-manager/FileManager.jsx'
 import FinancePage from '@/pages/finance/index.jsx'
+import FitnessTrackerPage from '@/pages/fitness-tracker/index.jsx'
+import FlashSalePage from '@/pages/flash-sale/index.jsx'
 import FormBuilder from '@/pages/form-builder/FormBuilder.jsx'
 import GanttChartPage from '@/pages/gantt-chart/index.jsx'
+import GeometryBoardPage from '@/pages/geometry-board/index.jsx'
+import GitBrowserPage from '@/pages/git-browser/index.jsx'
+import I18nManagerPage from '@/pages/i18n-manager/index.jsx'
 import InfiniteListPage from '@/pages/infinite-list/index.jsx'
 import KanbanPage from '@/pages/kanban/KanbanPage.jsx'
 import KnowledgeBasePage from '@/pages/knowledge-base/index.jsx'
@@ -24,23 +32,20 @@ import PermissionsPage from '@/pages/permissions/index.jsx'
 import PomodoroPage from '@/pages/pomodoro/index.jsx'
 import ProductReviewPage from '@/pages/product-review/index.jsx'
 import ProductsPage from '@/pages/products/index.jsx'
+import QRCodePage from '@/pages/qrcode/index.jsx'
 import RegexTesterPage from '@/pages/regex-tester/index.jsx'
 import RichEditorPage from '@/pages/rich-editor/index.jsx'
+import SkuSelectorPage from '@/pages/sku-selector/index.jsx'
 import SnippetsPage from '@/pages/snippets/index.jsx'
+import SocialFeedPage from '@/pages/social-feed/index.jsx'
 import SpreadsheetPage from '@/pages/spreadsheet/index.jsx'
 import SurveyPage from '@/pages/survey/index.jsx'
+import TetrisPage from '@/pages/tetris/index.jsx'
 import TextDiffPage from '@/pages/text-diff/index.jsx'
 import ThemeEditorPage from '@/pages/theme-editor/index.jsx'
+import WhiteboardPage from '@/pages/whiteboard/index.jsx'
 import Wizard from '@/pages/wizard/Wizard.jsx'
 import WorkflowPage from '@/pages/workflow/index.jsx'
-import DBDesignerPage from '@/pages/db-designer/index.jsx'
-import CouponPage from '@/pages/coupon/index.jsx'
-import FitnessTrackerPage from '@/pages/fitness-tracker/index.jsx'
-import GitBrowserPage from '@/pages/git-browser/index.jsx'
-import QRCodePage from '@/pages/qrcode/index.jsx'
-import ApiDebuggerPage from '@/pages/api-debugger/index.jsx'
-import WhiteboardPage from '@/pages/whiteboard/index.jsx'
-import SocialFeedPage from '@/pages/social-feed/index.jsx'
 
 const TASKS = [
     { id: 1, title: '用户认证系统', route: 'auth', description: '登录、注册、找回密码、修改密码完整的认证流程，基于 localStorage 存储。' },
@@ -83,6 +88,12 @@ const TASKS = [
     { id: 38, title: '二维码工具', route: 'qrcode', description: '二维码生成和解析工具，支持自定义尺寸、颜色、Logo 嵌入、PNG 下载、图片解析、历史记录，基于 localStorage 持久化。' },
     { id: 39, title: '社交动态流', route: 'social-feed', description: '模拟社交平台动态信息流，支持发布内容、图片上传、话题标签、点赞评论转发、嵌套回复、关注、排序筛选、无限滚动，基于 localStorage 持久化。' },
     { id: 40, title: '协作白板', route: 'whiteboard', description: '在线协作白板画布，支持画笔/形状/文本/橡皮擦绘图工具、撤销重做、缩放平移、JSON 导入导出、PNG 导出。' },
+    { id: 41, title: 'SKU 规格选择器', route: 'sku-selector', description: '电商商品规格选择组件，支持动态配置规格组、SKU 列表生成管理、规格选择交互联动禁用、库存价格实时计算与图片联动切换。' },
+    { id: 42, title: '俄罗斯方块', route: 'tetris', description: '经典俄罗斯方块游戏，基于 Canvas 绘制，支持键盘控制、消行计分、等级递增、暂停重开、最高分 localStorage 持久化。' },
+    { id: 43, title: '秒杀抢购页面', route: 'flash-sale', description: '模拟电商秒杀抢购场景，包含活动倒计时、库存展示进度条、抢购交互与防重复点击、模拟延迟与概率性抢购结果。' },
+    { id: 44, title: '几何画板', route: 'geometry-board', description: '交互式几何图形绘制工具，在坐标系网格上绘制点、线、圆，支持图形编辑、角度与长度测量、SVG 导出。' },
+    { id: 45, title: '多语言国际化管理', route: 'i18n-manager', description: '管理应用多语言翻译键值对的工具，支持多语言并行编辑、嵌套 key 树形视图、翻译对比、导入导出和覆盖率统计。' },
+    { id: 46, title: '天气查询应用', route: 'weather', description: '城市天气查询工具，支持搜索、收藏、历史记录、一周预报、温度趋势图和天气主题背景，基于 localStorage 持久化。' },
 ]
 
 function HomePage() {
@@ -157,6 +168,12 @@ function App() {
             <Route path="/git-browser" element={<GitBrowserPage />} />
             <Route path="/whiteboard" element={<WhiteboardPage />} />
             <Route path="/social-feed" element={<SocialFeedPage />} />
+            <Route path="/sku-selector" element={<SkuSelectorPage />} />
+            <Route path="/tetris" element={<TetrisPage />} />
+            <Route path="/geometry-board" element={<GeometryBoardPage />} />
+            <Route path="/flash-sale" element={<FlashSalePage />} />
+            <Route path="/i18n-manager" element={<I18nManagerPage />} />
+            <Route path="/weather" element={<WeatherPage />} />
         </Routes>
     )
 }

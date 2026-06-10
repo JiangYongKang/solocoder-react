@@ -481,6 +481,19 @@ describe('minesweeperCore', () => {
       expect(loaded.custom[1].time).toBe(100)
     })
 
+    it('addToLeaderboard custom entries should have consistent field structure even without config', () => {
+      const result = addToLeaderboard(DIFFICULTY.CUSTOM, 60, storage, null)
+      expect(result.rank).toBe(1)
+      const loaded = loadLeaderboard(storage)
+      expect(loaded.custom.length).toBe(1)
+      expect(loaded.custom[0]).toHaveProperty('rows')
+      expect(loaded.custom[0]).toHaveProperty('cols')
+      expect(loaded.custom[0]).toHaveProperty('mines')
+      expect(loaded.custom[0].rows).toBeNull()
+      expect(loaded.custom[0].cols).toBeNull()
+      expect(loaded.custom[0].mines).toBeNull()
+    })
+
     it('loadLeaderboard should handle invalid data gracefully', () => {
       storage.setItem('minesweeper_leaderboard', 'not-json')
       expect(() => loadLeaderboard(storage)).not.toThrow()

@@ -241,6 +241,58 @@ describe('logisticsUtils - data parsing signer extraction', () => {
       expect(result.nodes[0].isException).toBe(true)
       expect(result.nodes[1].status).toBe(STATUS_TYPES.PICKED_UP)
     })
+
+    it('should map non-standard opcode to EXCEPTION when order hasException=true (default branch coverage)', () => {
+      const order = {
+        trackingNo: 'TEST002',
+        isSigned: false,
+        hasException: true,
+        exceptionCode: 'DELAYED',
+        origin: '广州',
+        destination: '深圳',
+        routes: [
+          {
+            acceptTime: '2026-06-09 10:00:00',
+            acceptAddress: '广州市天河区',
+            remark: '正常运输描述，无异常字样',
+            opcode: '999',
+          },
+          {
+            acceptTime: '2026-06-09 08:00:00',
+            acceptAddress: '广州转运中心',
+            remark: '快件已揽收',
+            opcode: '10',
+          },
+        ],
+      }
+      const result = parseSfOrder(order)
+      expect(result.hasException).toBe(true)
+      expect(result.nodes[0].status).toBe(STATUS_TYPES.EXCEPTION)
+      expect(result.nodes[0].isException).toBe(true)
+      expect(result.nodes[0].exceptionReason).not.toBeNull()
+    })
+
+    it('should map non-standard opcode to IN_TRANSIT when order hasException=false (default branch)', () => {
+      const order = {
+        trackingNo: 'TEST003',
+        isSigned: false,
+        hasException: false,
+        origin: '广州',
+        destination: '深圳',
+        routes: [
+          {
+            acceptTime: '2026-06-09 10:00:00',
+            acceptAddress: '广州市天河区',
+            remark: '异常（但标志位为false，应判定为运输中）',
+            opcode: '999',
+          },
+        ],
+      }
+      const result = parseSfOrder(order)
+      expect(result.hasException).toBe(false)
+      expect(result.nodes[0].status).toBe(STATUS_TYPES.IN_TRANSIT)
+      expect(result.nodes[0].isException).toBe(false)
+    })
   })
 
   describe('parseYtOrder', () => {
@@ -254,6 +306,35 @@ describe('logisticsUtils - data parsing signer extraction', () => {
       expect(result.isSigned).toBe(true)
       expect(result.signer).toBe('前台代收')
       expect(result.signTime).toBe('2026-06-07 14:20:00')
+    })
+
+    it('should return null signer when YT order statusCode is not SIGNED (unsigned boundary)', () => {
+      const unsignedOrder = {
+        number: 'YT9999999999999',
+        status: '运输中',
+        statusCode: 'IN_TRANSIT',
+        senderCity: '广州',
+        receiverCity: '杭州',
+        data: [
+          {
+            time: '2026-06-07 06:30:00',
+            location: '杭州转运中心',
+            status: '到达',
+            details: '快件已到达杭州转运中心',
+          },
+          {
+            time: '2026-06-06 10:00:00',
+            location: '广州市天河区营业点',
+            status: '揽收',
+            details: '圆通速递已揽收',
+          },
+        ],
+      }
+      const result = parseYtOrder(unsignedOrder)
+      expect(result).not.toBeNull()
+      expect(result.isSigned).toBe(false)
+      expect(result.signer).toBeNull()
+      expect(result.signTime).toBeNull()
     })
   })
 
@@ -294,6 +375,34 @@ describe('logisticsUtils - data parsing signer extraction', () => {
       expect(result.signer).toBe('本人')
       expect(result.signTime).toBe('2026-06-05 16:00:00')
     })
+
+    it('should return null signer when YD order signStatus is not 1 (unsigned boundary)', () => {
+      const unsignedOrder = {
+        mailNo: 'YD0000000000',
+        signStatus: '0',
+        originationName: '厦门',
+        destinationName: '沈阳',
+        result: [
+          {
+            time: '2026-06-05 03:00:00',
+            location: '沈阳转运中心',
+            context: '到达沈阳转运中心',
+            state: '到达',
+          },
+          {
+            time: '2026-06-03 10:00:00',
+            location: '厦门市思明区网点',
+            context: '韵达快递 已揽收',
+            state: '揽收',
+          },
+        ],
+      }
+      const result = parseYdOrder(unsignedOrder)
+      expect(result).not.toBeNull()
+      expect(result.isSigned).toBe(false)
+      expect(result.signer).toBeNull()
+      expect(result.signTime).toBeNull()
+    })
   })
 
   describe('parseJdOrder', () => {
@@ -307,6 +416,34 @@ describe('logisticsUtils - data parsing signer extraction', () => {
       expect(result.isSigned).toBe(true)
       expect(result.signer).toBe('本人')
       expect(result.signTime).toBe('2026-06-04 11:00:00')
+    })
+
+    it('should return null signer when JD order finished=false (unsigned boundary)', () => {
+      const unsignedOrder = {
+        waybillCode: 'JD999999999999',
+        finished: false,
+        startProvince: '天津',
+        endProvince: '重庆',
+        detailList: [
+          {
+            operatorTime: '2026-06-04 02:00:00',
+            operatorContact: '重庆分拨中心',
+            content: '货物已到达重庆分拨中心',
+            statusCode: 30,
+          },
+          {
+            operatorTime: '2026-06-03 08:00:00',
+            operatorContact: '天津市和平区营业部',
+            content: '京东快递已收取快件',
+            statusCode: 10,
+          },
+        ],
+      }
+      const result = parseJdOrder(unsignedOrder)
+      expect(result).not.toBeNull()
+      expect(result.isSigned).toBe(false)
+      expect(result.signer).toBeNull()
+      expect(result.signTime).toBeNull()
     })
   })
 
@@ -332,6 +469,37 @@ describe('logisticsUtils - data parsing signer extraction', () => {
       expect(result.hasException).toBe(true)
       expect(result.nodes[0].isException).toBe(true)
       expect(result.nodes[0].status).toBe(STATUS_TYPES.EXCEPTION)
+    })
+
+    it('should return null signer when EMS deliveryStatus is not delivered (unsigned boundary)', () => {
+      const unsignedOrder = {
+        trackingNumber: 'EMS7777777777',
+        deliveryStatus: 'in_transit',
+        originCity: '郑州',
+        destCity: '长沙',
+        steps: [
+          {
+            occurTime: '2026-06-06 05:00:00',
+            city: '长沙邮区中心局',
+            orignist: 'EMS',
+            description: '到达长沙邮区中心局邮件处理中心',
+            type: 'arrival',
+          },
+          {
+            occurTime: '2026-06-05 11:00:00',
+            city: '郑州市二七区',
+            orignist: 'EMS',
+            description: 'EMS已揽收',
+            type: 'pickup',
+          },
+        ],
+      }
+      const result = parseEmsOrder(unsignedOrder)
+      expect(result).not.toBeNull()
+      expect(result.isSigned).toBe(false)
+      expect(result.hasException).toBe(false)
+      expect(result.signer).toBeNull()
+      expect(result.signTime).toBeNull()
     })
   })
 
@@ -454,15 +622,35 @@ describe('logisticsUtils - query and helpers', () => {
       expect(points[1].type).toBe('destination')
     })
 
-    it('should not add duplicate cities when origin equals destination', () => {
+    it('should produce both origin and destination points when same city to avoid type override', () => {
       const data = {
         origin: '北京',
         destination: '北京',
         nodes: [],
       }
       const points = extractRoutePoints(data)
-      expect(points.length).toBe(1)
-      expect(points[0].type).toBe('destination')
+      expect(points.length).toBe(2)
+      expect(points[0].city).toBe('北京')
+      expect(points[0].type).toBe('origin')
+      expect(points[1].city).toBe('北京')
+      expect(points[1].type).toBe('destination')
+    })
+
+    it('should preserve both origin and destination types for same city even with nodes', () => {
+      const data = {
+        origin: '北京',
+        destination: '北京',
+        nodes: [
+          { location: '北京市朝阳区营业点', time: '2026-06-08 15:30:00' },
+        ],
+      }
+      const points = extractRoutePoints(data)
+      const originPoint = points.find(p => p.type === 'origin')
+      const destPoint = points.find(p => p.type === 'destination')
+      expect(originPoint).not.toBeUndefined()
+      expect(originPoint.city).toBe('北京')
+      expect(destPoint).not.toBeUndefined()
+      expect(destPoint.city).toBe('北京')
     })
 
     it('should extract intermediate cities from nodes', () => {

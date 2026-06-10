@@ -311,10 +311,10 @@ export function addToLeaderboard(difficulty, time, storage = typeof window !== '
     date: new Date().toISOString(),
   }
 
-  if (difficulty === DIFFICULTY.CUSTOM && customConfig) {
-    entry.rows = customConfig.rows
-    entry.cols = customConfig.cols
-    entry.mines = customConfig.mines
+  if (difficulty === DIFFICULTY.CUSTOM) {
+    entry.rows = customConfig ? customConfig.rows : null
+    entry.cols = customConfig ? customConfig.cols : null
+    entry.mines = customConfig ? customConfig.mines : null
   }
 
   const list = leaderboard[difficulty] || []

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useId } from 'react'
 import { useNavigate } from 'react-router-dom'
 import './points-mall.css'
 import {
@@ -404,6 +404,7 @@ function TrendChart({ history }) {
   const trendData = useMemo(() => buildTrendData(history, 30), [history])
   const monthlyStats = useMemo(() => calculateMonthlyStats(history), [history])
   const [hoverIndex, setHoverIndex] = useState(null)
+  const gradientId = useId()
 
   const { yMin, yMax, yTicks, xStep } = useMemo(() => {
     const balances = trendData.map((d) => d.balance)
@@ -497,7 +498,7 @@ function TrendChart({ history }) {
             onMouseLeave={handleMouseLeave}
           >
             <defs>
-              <linearGradient id="lineGradient" x1="0" y1="0" x2="0" y2="1">
+              <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#6366f1" stopOpacity="0.3" />
                 <stop offset="100%" stopColor="#6366f1" stopOpacity="0" />
               </linearGradient>
@@ -535,7 +536,7 @@ function TrendChart({ history }) {
                 {trendData[idx].label}
               </text>
             ))}
-            <path d={areaPath} fill="url(#lineGradient)" />
+            <path d={areaPath} fill={`url(#${gradientId})`} />
             <path d={linePath} fill="none" stroke="#6366f1" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
             {trendData.map((d, i) => (
               <circle

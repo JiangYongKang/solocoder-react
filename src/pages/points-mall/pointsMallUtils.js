@@ -289,24 +289,9 @@ export function adjustPoints(points, history, amount, description = '', now = Da
   if (numAmount === 0) {
     return { success: true, points, history }
   }
-  const tx = createTransaction(TRANSACTION_TYPES.ADJUST, Math.abs(numAmount), description, now)
-  if (numAmount > 0) {
-    const result = addTransaction(history, tx, points)
-    return { success: true, points: result.balance, history: result.history }
-  } else {
-    const expireTx = {
-      ...tx,
-      type: TRANSACTION_TYPES.ADJUST,
-      amount: Math.abs(numAmount),
-    }
-    const newBalance = Math.max(0, points - Math.abs(numAmount))
-    const txWithBalance = { ...expireTx, balanceAfter: newBalance }
-    return {
-      success: true,
-      points: newBalance,
-      history: [txWithBalance, ...history],
-    }
-  }
+  const tx = createTransaction(TRANSACTION_TYPES.ADJUST, numAmount, description, now)
+  const result = addTransaction(history, tx, points)
+  return { success: true, points: result.balance, history: result.history }
 }
 
 export function processExpiredPoints(points, history, now = Date.now()) {

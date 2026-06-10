@@ -425,8 +425,9 @@ export function extractRoutePoints(parsedData) {
   if (!parsedData) return []
 
   const pointMap = new Map()
+  const isSameCity = parsedData.origin && parsedData.destination && parsedData.origin === parsedData.destination
 
-  if (parsedData.origin) {
+  if (parsedData.origin && !isSameCity) {
     const coord = CITY_COORDINATES[parsedData.origin]
     if (coord) {
       pointMap.set(parsedData.origin, { city: parsedData.origin, x: coord.x, y: coord.y, type: 'origin' })
@@ -437,7 +438,7 @@ export function extractRoutePoints(parsedData) {
     for (let i = parsedData.nodes.length - 1; i >= 0; i--) {
       const node = parsedData.nodes[i]
       const city = extractCityName(node.location)
-      if (city && !pointMap.has(city)) {
+      if (city && !pointMap.has(city) && !(isSameCity && city === parsedData.origin)) {
         const coord = CITY_COORDINATES[city]
         if (coord) {
           pointMap.set(city, { city, x: coord.x, y: coord.y, type: 'route' })
@@ -446,7 +447,7 @@ export function extractRoutePoints(parsedData) {
     }
   }
 
-  if (parsedData.destination) {
+  if (parsedData.destination && !isSameCity) {
     const coord = CITY_COORDINATES[parsedData.destination]
     if (coord) {
       pointMap.set(parsedData.destination, { city: parsedData.destination, x: coord.x, y: coord.y, type: 'destination' })
@@ -454,6 +455,16 @@ export function extractRoutePoints(parsedData) {
   }
 
   const result = []
+
+  if (isSameCity) {
+    const coord = CITY_COORDINATES[parsedData.origin]
+    if (coord) {
+      result.push({ city: parsedData.origin, x: coord.x, y: coord.y, type: 'origin' })
+      result.push({ city: parsedData.destination, x: coord.x, y: coord.y, type: 'destination' })
+      return result
+    }
+  }
+
   if (parsedData.origin && pointMap.has(parsedData.origin)) {
     result.push(pointMap.get(parsedData.origin))
     pointMap.delete(parsedData.origin)

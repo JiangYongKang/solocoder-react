@@ -1,0 +1,6 @@
+你实现的积分商城页面还存在一些问题，需要进行修复：
+
+1. ADJUST 交易方向判断的修复不彻底：第 2 轮修复将 calculateMonthlyStats 和 PointsHistory 的判断逻辑从 balanceAfter > 0 改为 amount > 0，但 adjustPoints 函数在第 292 行将交易金额统一存为 Math.abs(numAmount)。这导致 amount 始终为正数，amount > 0 永远为 true，扣减积分的交易仍被错误计入"本月获取积分"而非"消费积分"，符号显示也仍是 +200 而非 -200。需要从数据源层面保留增减方向信息，确保整个数据链路的修复闭环。
+2. TrendChart SVG 渐变 ID 第 500 行使用了硬编码的 id="lineGradient"。如果同一页面未来存在多个 TrendChart 实例，SVG 渐变 ID 会互相冲突导致渲染异常。需要为渐变 ID 添加组件实例作用域隔离。
+3. adjustPoints 函数在负数扣减分支（第 296-308 行）直接手动计算 newBalance 和 txWithBalance，没有复用 addTransaction 函数。而正数增加分支（第 293-295 行）则通过 addTransaction 统一处理。两条路径走不同的余额计算逻辑，增加了不一致风险。所有交易类型应统一通过 addTransaction 处理余额变化。
+4. 重新运行 pnpm run test，确保所有测试通过。

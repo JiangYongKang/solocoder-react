@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { FONT_COLORS, FONT_SIZES, PRESET_COLORS } from './constants.js'
+import { FONT_COLORS, FONT_SIZES, GRID_SIZE, PRESET_COLORS } from './constants.js'
 import './sticky-wall.css'
 import {
     addNote,

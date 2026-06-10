@@ -1,0 +1,6 @@
+你实现的物流轨迹追踪页面还存在一些问题，需要进行修复：
+
+1. extractRoutePoints 函数存在同城覆盖 BUG：当物流数据的起点和终点为同一城市时，第 452 行 destination 的 pointMap.set 会覆盖第 432 行的 origin，导致该城市在输出结果中 type 被错误标记为 'destination' 而非 'origin'。地图上将只显示终点标记而缺少起点标记。需要修复同城场景下的类型覆盖问题，确保起点和终点标记能正确共存。
+2. mapSfOpcode 函数的 default 分支（第 72-76 行）虽然已改为基于 hasOrderException 标志判断异常，但测试文件中该分支从未被实际覆盖执行——所有异常测试均使用 opcode='99' 直接命中显式 case 分支。需要补充使用非标准 opcode（如 '999'）搭配 hasException=true 的测试用例。
+3. 测试文件缺少四种快递的未签收边界场景验证：parseYtOrder 缺少 statusCode 非 SIGNED 时的验证，parseYdOrder 缺少 signStatus 非 '1' 时的验证，parseJdOrder 缺少 finished=false 的验证，parseEmsOrder 缺少 deliveryStatus 非 'delivered' 的验证。这些场景下 signer 应为 null 的边界行为未经测试保障。需要补全这四种未签收的边界用例。
+4. 重新运行 pnpm run test，确保所有测试通过。

@@ -481,12 +481,17 @@ describe('adjustPoints', () => {
     expect(result.success).toBe(true)
     expect(result.points).toBe(800)
     expect(result.history[0].type).toBe(TRANSACTION_TYPES.ADJUST)
+    expect(result.history[0].amount).toBe(300)
+    expect(result.history[0].balanceAfter).toBe(800)
   })
 
   it('负数调整扣减积分', () => {
     const result = adjustPoints(500, [], -200, '测试扣减')
     expect(result.success).toBe(true)
     expect(result.points).toBe(300)
+    expect(result.history[0].type).toBe(TRANSACTION_TYPES.ADJUST)
+    expect(result.history[0].amount).toBe(-200)
+    expect(result.history[0].balanceAfter).toBe(300)
   })
 
   it('调整为 0 不改变', () => {
@@ -500,10 +505,20 @@ describe('adjustPoints', () => {
     const result = adjustPoints(100, [], -500)
     expect(result.success).toBe(true)
     expect(result.points).toBe(0)
+    expect(result.history[0].balanceAfter).toBe(0)
   })
 
   it('非数字调整失败', () => {
     expect(adjustPoints(500, [], 'abc').success).toBe(false)
+  })
+
+  it('正负分支都通过 addTransaction 统一处理余额', () => {
+    const pos = adjustPoints(100, [], 50)
+    const neg = adjustPoints(100, [], -50)
+    expect(pos.history[0]).toHaveProperty('balanceAfter')
+    expect(neg.history[0]).toHaveProperty('balanceAfter')
+    expect(pos.history[0].balanceAfter).toBe(150)
+    expect(neg.history[0].balanceAfter).toBe(50)
   })
 })
 
@@ -804,6 +819,17 @@ describe('calculateMonthlyStats', () => {
     expect(result.earned).toBe(500)
     expect(result.spent).toBe(250)
     expect(result.net).toBe(250)
+  })
+
+  it('ADJUST 正数计入获取，负数计入消费', () => {
+    const history = [
+      { id: '1', type: TRANSACTION_TYPES.ADJUST, amount: 300, createdAt: new Date('2024-06-01').getTime() },
+      { id: '2', type: TRANSACTION_TYPES.ADJUST, amount: -200, createdAt: new Date('2024-06-10').getTime() },
+    ]
+    const result = calculateMonthlyStats(history, now)
+    expect(result.earned).toBe(300)
+    expect(result.spent).toBe(200)
+    expect(result.net).toBe(100)
   })
 
   it('无数据时返回 0', () => {

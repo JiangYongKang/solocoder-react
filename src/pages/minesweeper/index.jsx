@@ -320,8 +320,7 @@ function MinesweeperPage() {
                   再来一局
                 </button>
               </div>
-              )}
-            )
+            )}
 
             {game.status === GAME_STATUS.LOST && (
               <div className="ms-overlay">

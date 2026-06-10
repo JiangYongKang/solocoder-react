@@ -1,9 +1,9 @@
 产物不满意：
 1. App.jsx 缺 logistics-tracker 的 import、Route 和 TASKS 卡片，页面不可达。模型 edit_file_search_replace 返回 success 但文件未实际修改，属于幻觉。提示词第 1 条「首页任务卡片点击进入」完全未实现。应编辑后回读文件确认变更。
-2. parseYtOrder 函数 signer 字段硬编码为 null，YT 签收节点 operator（如「前台代收」）丢失。parseZtOrder、parseYdOrder、parseJdOrder 同样未提取签收人，只有顺丰可显示。提示词第 4 条「签收节点显示签收人」在圆通等场景失效。
-3. extractRoutePoints 目的地类型被覆盖：城市名出现于节点 location 时（如北京在「北京市朝阳区营业点」），先被标记为 route 后 added.has 拦截 destination 写入，终点图标降级为途径点。提示词第 3 条「终点标记」失效。
-4. mapSfOpcode 的 default 分支用 remark.includes('异常') 判断异常状态，依赖文案而非结构化字段。若快递公司改措辞但 opcode 不变，会被误判为 IN_TRANSIT。应依赖 hasException 字段或为每个 opcode 建完整映射。
+2. parseYtOrder 函数 signer 字段硬编码为 null，YT 签收节点 operator（如「前台代收」）被丢弃。parseZtOrder、parseYdOrder、parseJdOrder 同样未提取签收人，只有顺丰可正常显示签收人信息。提示词第 4 条「签收节点显示签收人」在圆通等快递场景中完全失效。
+3. extractRoutePoints 目的地类型被覆盖：城市名出现于节点 location 时（如北京出现在「北京市朝阳区营业点」中），先被标记为 route 途经点后 added.has 拦截了 destination 的写入，导致终点图标被错误降级为普通途径点。提示词第 3 条「终点标记」功能在此类场景下完全失效。
+4. mapSfOpcode 的 default 分支用 remark.includes('异常') 判断异常状态，依赖文案关键词而非结构化的状态字段。若快递公司改措辞但底层 opcode 不变，会被错误误判为 IN_TRANSIT 正常运输中。应依赖 hasException 字段或为每一个 opcode 建立完整的状态映射表。
 
 过程不满意：
-1. session-cot-1 第 260-367 行，模型 edit_file_search_replace 修改 App.jsx 返回 success 但未实际写入。后续流程中从未回读 App.jsx 验证内容，也未启动项目确认，直接进入测试和总结。这是虚假完成——修改关键文件后应回读交叉验证。
-2. 模型因 addQueryRecord 使用 window.localStorage 致测试无法运行，选择修改生产代码函数签名添加 storage 参数来适配测试。这是「生产代码向测试妥协」——不应为测试便利改变工具函数接口。正确做法是 mock window.localStorage。
+1. session-cot-1 第 260-367 行，模型 edit_file_search_replace 修改 App.jsx 返回 success 但未实际写入文件。后续流程中从未回读 App.jsx 验证内容，也未启动项目确认页面是否可达，直接进入测试和总结。这是典型的虚假完成行为——修改关键文件后必须回读文件交叉验证变更是否落地。
+2. 模型因 addQueryRecord 使用 window.localStorage 致测试无法运行，选择修改生产代码函数签名添加 storage 参数来适配测试环境。这是「生产代码向测试妥协」——不应为测试便利改变工具函数的公共接口。正确做法是在测试中 mock window.localStorage 而非调整生产代码的架构设计。

@@ -1,8 +1,8 @@
 产物不满意：
-1. App.jsx 缺 resume-editor 的 import、Route 和 TASKS 条目，页面不可达。模型多次 edit_file_search_replace 致文件损坏，虽尝试修复但最终未写入三项注册。页面完全无法从首页访问。
+1. App.jsx 缺 resume-editor 的 import、Route 和 TASKS 条目，页面完全不可达。模型多次使用 edit_file_search_replace 编辑 App.jsx 导致文件内容损坏，虽后续尝试修复了损坏部分，但三项注册均未实际写入文件。提示词第 1 条要求「首页任务卡片点击进入对应二级页面」，入口缺失导致功能完全无法被访问。
 2. ModernTemplate 中 CUSTOM 渲染缺陷：sidebarMods 过滤不含 CUSTOM 故归 mainMods，但 mainMods 循环缺 CUSTOM 分支。Modern 模板下自定义模块只显标题无内容。Classic 和 Minimal 已含 CUSTOM 分支，仅 Modern 遗漏。
 
 过程不满意：
-1. App.jsx 编辑多次 edit_file_search_replace 致文件损坏，修复中未确认是否含三项注册就跳去测试 lint。总结声称「7 功能全部实现完成」，虚假完成。
-2. 测试文件导入路径写错，解析到不存在路径，constants 同错。直到 pnpm test 报错才返工修复。应先确认目录层级确保路径正确。
-3. 初始代码含多处遗留废弃代码：未使用导入、废弃变量、多余 prop。ESLint 检查后才逐一清理，编写阶段缺自检，存在「先写后修」试错模式。
+1. 模型在编辑 App.jsx 添加路由入口时多次使用 edit_file_search_replace 导致文件内容被损坏，修复过程中未通过回读文件确认 import、Route 和 TASKS 三项注册是否完整保留，就直接跳去运行测试和 lint 检查。最终总结时声称「7 个功能全部实现完成」，但用 grep 验证 App.jsx 内容发现三项注册为空，属于典型的幻觉式虚假完成行为。
+2. 模型在编写测试文件时导入路径写错，解析到了一个不存在的路径，constants 文件的导入同样存在路径错误。直到运行 pnpm test 终端直接报错后才被动返工修复导入路径。正确的做法是在编写 import 语句前先确认当前文件所在目录层级与目标文件的相对路径关系，确保导入路径准确无误再继续编写测试逻辑。
+3. 模型初始提交的代码包含多处遗留的废弃代码：未使用的 import 导入、已声明但从未引用的变量、组件定义中多余的 prop 属性。这些问题直到运行 ESLint 检查后才被逐一发现并被动清理，编写阶段完全缺乏主动自检意识。这种「先写完再靠 lint 修」的行为模式属于典型的试错式开发，应在写完每个文件后立即自查语法和导入确保产物干净。

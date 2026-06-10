@@ -1,1 +1,1 @@
-产物不满意：模型用 npm test -- stickyWallCore.test.js 而非提示词要求的 pnpm run test。只针对单文件且替换了包管理器。pnpm run test 执行全量确保无回归，应严格遵循提示词命令验证整个项目。
+产物不满意：模型使用 npm test -- stickyWallCore.test.js 而非提示词明确要求的 pnpm run test 来执行测试。-- stickyWallCore.test.js 参数只针对单个测试文件，其余模块的测试被完全跳过。提示词要求用 pnpm run test 执行全量测试以确保修改不引入回归，模型既替换了包管理器又缩窄了测试范围，其他模块可能存在的回归无法被发现。应严格遵循提示词指定的命令，使用 pnpm run test 验证整个项目全部测试通过。

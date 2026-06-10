@@ -1,6 +1,9 @@
-产物不满意：App.jsx 缺 sticky-wall 的 import、Route 和 TASKS 条目，页面不可达。模型总结声称「已添加首页任务卡片和路由」，但 grep sticky-wall 结果为空。提示词第 1 条「首页任务卡片点击进入」未实现。应补全三项注册。
-产物不满意：zoom 滑块百分比/比率单位混淆。handleZoomChange 将滑块百分比值（如 120）直接赋值 settings.zoom 而非 /100 转 1.2，被 clampZoom 钳位到 2.0，滑块仅在 50% 和 200% 两点跳变。prompt 要求全范围缩放无法实现。应 Number(e.target.value) / 100。
-产物不满意：网格背景 backgroundSize 用 ${20 * zoom}px 乘 zoom，但 canvas 已 transform: scale(zoom) 整体缩放，导致双倍。zoom=2 间距变 80px 而非 20px。应 20/zoom 或固定 20px。
-产物不满意：handleExitEdit 接收 noteId 仅用 void 消除 lint，参数完全忽略。StickyNote 传入 note.id 但被无视，模型用 void 绕过 lint 而非理解参数意图，敷衍处理。
-过程不满意：编辑 App.jsx 经历多次失败，重复读同一文件 5 次仍失败。总结声称「已添加首页卡片和路由」，grep 证实虚假。多次失败后未验证最终状态就声称完成，幻觉式虚假完成。
-过程不满意：仅运行单元测试和 lint，从未 pnpm run dev 手动验证。导致缩放单位混淆、网格双倍缩放等渲染级 BUG 未被发现。缩放、拖拽等须实际肉眼验证，单元测试无法覆盖 DOM 和 CSS 渲染。应启动项目按需验证。
+产物不满意：
+1. App.jsx 缺 sticky-wall 的 import、Route 和 TASKS 数组条目，页面完全不可达。模型在总结中声称「已添加首页任务卡片和路由配置」，但用 grep sticky-wall 搜索 App.jsx 内容结果为空，三项注册均未实际写入文件。提示词第 1 条要求「首页任务卡片点击进入对应二级页面」，入口缺失导致功能无法被访问。应补全 import StickyWallPage、Route path="/sticky-wall" 和 TASKS 数组条目三项注册。
+2. zoom 滑块百分比与比率单位混淆，导致缩放功能完全失效。handleZoomChange 将滑块百分比值（如 120）直接赋值给 settings.zoom，未除以 100 转换为比率 1.2，数值被 clampZoom 钳位到最大值 2.0，滑块实际只在 50% 和 200% 两个离散点之间跳变。提示词要求的全范围连续缩放无法实现。应在 handleZoomChange 中使用 Number(e.target.value) / 100 将百分比转为比率。
+3. 网格背景 backgroundSize 使用 ${20 * zoom}px 将间距与 zoom 相乘，但 canvas 容器已通过 transform: scale(zoom) 整体缩放，导致网格间距被双重放大。当 zoom=2 时实际网格间距变为 80px 而非预期的 20px，视觉上网格线极度稀疏。根本原因是模型未考虑 CSS transform scale 与元素尺寸的叠加效应。应改为固定 20px 或使用 20/zoom 消除双重缩放。
+4. handleExitEdit 接收 noteId 参数后仅用 void noteId 消除 ESLint no-unused-vars 警告，参数被完全忽略。StickyNote 组件明确传入 note.id 作为编辑退出的目标标识，但模型未理解参数的设计意图，用 void 语法绕过 lint 规则而非正确处理参数逻辑。这种敷衍处理方式违背了代码本意，应保留并使用 noteId 参数完成编辑退出的业务逻辑。
+
+过程不满意：
+1. 模型在编辑 App.jsx 添加路由入口时经历了多次 edit 操作失败，且重复读取同一文件达 5 次仍未成功完成写入。最终在总结中声称「已添加首页任务卡片和路由配置」，但 grep sticky-wall 验证 App.jsx 内容发现三项注册均为空，证实此声称属于虚假完成。多次失败后模型未通过回读文件内容或 grep 搜索验证最终状态就草率下结论，这是典型的幻觉式虚假完成行为。
+2. 模型在整个开发过程中仅运行了单元测试和 lint 检查，从未执行 pnpm run dev 启动项目进行手动验证。导致缩放单位混淆、网格双重缩放等渲染级 BUG 完全未被发现，因为这些问题是纯 CSS 和 DOM 渲染层面的，单元测试无法覆盖 Canvas 的 transform 缩放与 backgroundSize 的交互效果。缩放与拖拽等交互功能必须通过实际浏览器渲染肉眼验证，应启动项目按需验证关键交互行为。

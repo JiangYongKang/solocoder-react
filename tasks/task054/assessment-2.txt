@@ -1,11 +1,11 @@
 产物不满意：
 1. calculateMonthlyStats 修复不完整：改 balanceAfter > 0 为 amount > 0，但 adjustPoints 存 Math.abs 使 amount 始终为正，if(amount > 0) 永远 true，扣减仍错误计入 earned。模型改判断目标未检查上游数据是否携带方向。应在 adjustPoints 保留符号或加 direction 字段。
-2. PointsHistory ADJUST 符号同错：改判断 tx.amount > 0 但 adjustPoints 存绝对值丢失方向，扣减仍显示 +。本质相同——存储环节丢失增减方向，下游基于 amount 正负的判断都失效。
-3. TrendChart SVG 渐变 ID hardcode "lineGradient"，未做作用域隔离。当前仅一个实例无冲突，未来多个图表 ID 会相互覆盖。应在 ID 中加入实例标识或随机后缀。
-4. adjustPoints 扣减分支直接手动计算余额，未复用 addTransaction 和 calculateBalanceAfterTransaction。ADJUST 与 EARN/EXCHANGE 走不同计算路径，增大逻辑不一致风险。应统一通过 addTransaction 处理余额变化。
+2. PointsHistory 组件中 ADJUST 交易的符号显示与 calculateMonthlyStats 存在相同问题：将判断条件改为 tx.amount > 0 来判定显示 + 或 - 号，但 adjustPoints 将扣减金额存储为 Math.abs 绝对值，amount 字段永远为正数。扣减操作在 PointsHistory 中仍错误显示为 + 而非 -。本质原因是 adjustPoints 存储环节丢失了金额增减方向，下游基于 amount > 0 判断全因缺少符号而失效。
+3. TrendChart 组件中 SVG 线性渐变的 ID 被硬编码为固定字符串 "lineGradient"，没有做任何实例级别的隔离处理。当前页面仅渲染一个图表实例所以暂未暴露冲突，但如果未来需要在同一页面渲染多个 TrendChart 实例（如对比不同时间段的趋势数据），所有实例共享同一个渐变 ID 会导致渐变效果相互覆盖、渲染异常。应在渐变 ID 中加入实例唯一标识（如 useId 或递增计数器），确保每个图表实例的渐变定义互不干扰。
+4. adjustPoints 函数在扣减分支中直接计算 newBalance = balance - Math.abs(amount)，未复用已有的 addTransaction 和 calculateBalanceAfterTransaction 标准函数。ADJUST 类型交易与 EARN、EXCHANGE 走了不同的余额计算路径，若未来修改余额计算规则（如四舍五入或最小余额限制），ADJUST 分支易成遗漏点，增大不一致风险。应统一通过 addTransaction 处理所有交易的余额变化。
 
 过程不满意：
-1. 收到提示词后立即创建 TodoList，未先读代码就规划。规范要求先分析问题再制定计划。导致 ADJUST 方向修复浮于表面——只改 amount > 0 替换，未追溯 adjustPoints 存储逻辑验证修复生效性。
-2. 对 index.jsx 至少 6 次重复读取（第 79/130/335/397/435/445 步），范围相近。修改 TrendChart 边改边读而非一次理解完整依赖后集中改。应先规划改动区域、一次读足范围集中执行。
-3. 修复 ESLint Hooks 依赖警告经历 3 轮反复（第 307/527/571 步）：先移除 getX/getY、再移入 useMemo、最后内联，始终未理解根因。getX/getY 依赖 yMin 等 useMemo 输出值，应移入 useMemo 或纳入依赖数组。
-4. 总结声称修复逻辑为「amount > 0 计 earned，< 0 计 spent」，但 adjustPoints 存 Math.abs 使 amount < 0 永不会触发。未追踪完整数据流就断言修复效果，应追踪完整链路验证而非局部语法替换即下结论。
+1. 模型收到本轮提示词后立即创建了 TodoList 开始规划修复步骤，未按规范要求先阅读 adjustPoints 和 calculateMonthlyStats 等关键代码分析问题现状。由于跳过代码分析环节，ADJUST 方向修复浮于表面——仅将 balanceAfter > 0 机械替换为 amount > 0，没有向上追溯 adjustPoints 中 Math.abs 存储逻辑来验证修复后判断条件是否真正生效。应先通读涉及的全部函数理解完整数据流再制定修复方案。
+2. 模型对 index.jsx 至少进行了 6 次重复读取（分别在步骤 79、130、335、397、435、445），每次读取范围相近，反复回看同一片区域。修改 TrendChart 组件时采用边读边改的碎片化模式，而非先一次性读完文件理解完整依赖关系后集中修改。这种低效重复读取说明模型对代码结构的记忆和规划不足。应先规划全部改动区域，一次性读取足够范围理解上下文后集中执行修改。
+3. 模型修复 ESLint Hooks 依赖警告时经历了 3 轮反复试错（步骤 307、527、571）：第一轮移除 getX/getY 函数报缺少引用，第二轮移入 useMemo 后 lint 警告仍存在，第三轮改为内联表达式才消除。根因是 getX 和 getY 函数内部使用了 yMin 等 useMemo 输出值，应移入同一 useMemo 或将依赖项纳入依赖数组，而非在外部和内联之间盲目切换三轮才偶然解决。
+4. 模型在总结中声称修复 ADJUST 统计逻辑为「amount > 0 计入 earned，amount < 0 计入 spent」，但 adjustPoints 中 Math.abs 使扣减金额 amount 永远为正，amount < 0 分支永远不会触发。模型未从 adjustPoints 存储到 calculateMonthlyStats 判断走通完整数据链路就断言修复效果，仅做了局部语法替换就下结论。应追踪完整数据流逐一验证每个消费点的修复是否真正生效。

@@ -1,13 +1,10 @@
-产物不满意：index.jsx 使用 ${GRID_SIZE}px 修复网格背景但未从 constants.js 导入，eslint 报 2 个 no-undef 错误。页面渲染抛 ReferenceError，网格背景完全失效。修改使用处忘同步更新导入。应在 import 中加 GRID_SIZE。
+产物不满意：
+1. index.jsx 使用 ${GRID_SIZE}px 修复网格背景间距但未从 constants.js 导入 GRID_SIZE 常量，ESLint 报 2 个 no-undef 错误，页面渲染时抛出 ReferenceError 导致网格背景完全失效。模型修改了 JSX 模板中的使用处却忘记同步更新文件顶部的 import 声明，修改不完整。应在 import { ... } from './constants' 中加入 GRID_SIZE，确保引用与导入一一对应。
+2. App.jsx 添加了 TASKS 数组的 sticky-wall 条目，但 Routes 配置中缺少 /sticky-wall 路由和对应的 import StickyWallPage 语句。用户点击首页任务卡片后无法实现页面跳转，URL 导航完全失效。模型只处理了 TASKS 数组而忘记同步补充 Routes 和 import，三项入口注册缺少两项属于典型的修改不完整问题。应同时添加 import、Route path 和 TASKS 数组条目三项。
+3. App.jsx 第 102 和 103 行出现重复的 id: 54，分别对应物流轨迹追踪和便签墙两个完全不同的任务卡片。React 中重复 key 会在控制台产生 warning，且可能导致列表渲染结果不确定，两个卡片可能互相覆盖。模型在批量添加三条新 TASKS 条目时未逐一校验 id 的唯一性。应确保每个 TASKS 条目使用全局唯一的 id 值，添加新条目前先检查已有最大 id。
+4. App.jsx 新增了 import BudgetTrackerPage 导入语句，但整个文件中没有任何地方实际使用该组件。模型在编辑过程中带入了与当前修复任务无关的遗留代码，修改完成后缺少自检清理环节。编辑操作应保持精确聚焦，不引入无关变更。应在每次编辑完成后用 grep 搜索确认所有 import 语句都有对应的使用处，及时删除未使用的导入语句。
 
-产物不满意：App.jsx 添加 TASKS 条目但 Routes 缺 /sticky-wall 路由和 import。用户点击卡片后无法跳转，URL 导航失效。模型只管 TASKS 不顾 Routes 和导入，修改不完整。
-
-产物不满意：App.jsx 第 102/103 行出现重复 id=54，对应物流轨迹追踪和便签墙。React key 冲突产生 warning，UI 行为不确定。批量添加三条 TASKS 条目未逐一校验 id 唯一性。
-
-产物不满意：App.jsx 新增 import BudgetTrackerPage 但全文件未使用，修改带入无用遗留代码。编辑时缺自检，未 grep 确认所有 import 都有对应使用处。
-
-过程不满意：首次查看文件后立即创建 TodoList，规范要求先分析再规划。粗略浏览 index.jsx 后未深入理解就规划，导致遗漏 GRID_SIZE 导入等低级错误。应先充分分析 BUG 上下文再制定方案。
-
-过程不满意：用 npm run lint | grep sticky-wall || echo "✅" 检查 lint，grep 过滤掩盖 2 个 GRID_SIZE no-undef 错误。模型看到 ✅ 就声称无错误，与事实不符。应用 npx eslint 直查目录看完整输出。
-
-过程不满意：先声称「浏览器无错误」后又跑测试 lint。若页面正常 GRID_SIZE 未导入必在控制台报错。模型仅 open_preview 查看页面存在，未开控制台、未滑动缩放验证全范围。prompt 要求手动验证交互功能，仅看页面加载远不够。
+过程不满意：
+1. 模型首次查看文件内容后立即创建了 TodoList 开始规划修复方案，未按规范要求先充分分析问题再制定计划。粗略浏览 index.jsx 后就匆匆规划修复步骤，导致遗漏 GRID_SIZE 导入这种基础性低级错误。规范明确要求「不能刚收到任务就直接创建 TodoList，应先分析问题再规划」，应先通读涉及的所有文件、理解 BUG 上下文后再制定修复方案。
+2. 模型使用 npm run lint | grep sticky-wall || echo "✅" 检查 lint 结果，grep 管道过滤将 2 个 GRID_SIZE 的 no-undef 错误完全过滤掉了，最终只看到 ✅ 就声称 lint 检查无错误，与实际情况完全相反。这种带输出过滤的检查方式只会掩盖真实问题而非发现问题。应直接使用 npx eslint src/pages/sticky-wall/ 查看该目录的完整 lint 输出，不加任何管道过滤。
+3. 模型在过程日志中先声称「浏览器预览无错误」，之后又继续运行测试和 lint 检查。如果页面真的正常渲染，GRID_SIZE 未导入必然在浏览器控制台产生 ReferenceError 报错。模型仅使用 open_preview 查看了页面是否存在，既没有打开浏览器开发者工具控制台检查错误输出，也没有实际滑动缩放控件验证全范围缩放是否可用。提示词明确要求手动验证交互功能，仅看页面加载状态远远不够。

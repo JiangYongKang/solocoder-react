@@ -1,1 +1,1 @@
-产物不满意：calculateBalanceAfterTransaction ADJUST 测试只覆盖 amount: 50 正数路径，缺 amount: -50 负数扣减。本轮修复核心是保留符号穿透给 balance + amount 公式决定方向。若后续迭代破坏负数处理，缺直接调用的回归测试无法检测。应补充 ADJUST 负数扣减用例，确保正负两个方向都有直接覆盖。
+产物不满意：calculateBalanceAfterTransaction ADJUST 测试只覆盖 amount: 50 正数扣减路径，缺少 amount: -50 的负数扣减用例。本轮修复的核心是将符号保留后穿透给 balance + amount 公式决定增减方向。若后续迭代不小心破坏负数处理逻辑，缺少直接调用的回归测试无法检测到退化。应补充 ADJUST 负数扣减的测试用例，确保正负两个方向的增减计算都有直接测试覆盖。

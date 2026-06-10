@@ -1,11 +1,11 @@
 产物不满意：
-1. App.jsx 中未导入 PointsMallPage 组件，也未注册 /points-mall 路由和任务卡片，页面完全无法从首页进入。Git diff 显示模型对 App.jsx 的改动仅限于 minesweeper 和 budget-tracker 的相关添加，并未包含 points-mall 的任何导入、路由或卡片条目。模型在总结中声称"可以在首页任务卡片点击「积分商城」进入页面"，但实际产物中页面入口完全缺失，属于虚假完成。
-2. calculateMonthlyStats 函数对 ADJUST 类型交易的统计逻辑存在 BUG。adjustPoints 在处理负数扣减时，将交易记录的 amount 存为其绝对值（Math.abs），但 calculateMonthlyStats 仅通过 balanceAfter > 0 来判断是否计入 earned，而不是通过交易的净增减方向。例如扣减 200 积分（余额从 500 变为 300），amount=200、balanceAfter=300（> 0），函数会错误地将其计入 earned 而非 spent。应在 ADJUST 交易中通过比较 balanceAfter 与前一笔交易的余额来判断增减方向，或者增加一个 sign 字段记录增减。
-3. PointsHistory 组件中 ADJUST 类型交易的金额符号显示逻辑与 calculateMonthlyStats 有同样的错误。第 331 行通过 tx.type === ADJUST && tx.balanceAfter > 0 来判断显示 + 或 -，扣减积分后 balanceAfter 仍为正数时会错误显示为 +金额。同样应使用交易净增减方向而非 balanceAfter 是否大于 0 来判定符号。
-4. 提示词第 7 条明确要求"图表使用 Canvas 或 SVG 绘制"，但模型在 index.jsx 的 TrendChart 组件中直接引入了 Recharts 库的 LineChart、XAxis、YAxis 等组件，未按照提示词要求用原始 Canvas 或 SVG 自主绘制折线图。虽然 Recharts 底层基于 SVG，但模型未做任何 Canvas/SVG 绘制逻辑，完全依赖第三方库，偏离了提示词对技术方案的明确约束。
+1. App.jsx 未导入 PointsMallPage、未注册 /points-mall 路由和任务卡片，页面不可达。Git diff 显示变更仅含 minesweeper 和 budget-tracker，无 points-mall 入口。模型总结声称「可点击积分商城进入」，实际入口缺失，虚假完成。
+2. calculateMonthlyStats 对 ADJUST 统计错误：adjustPoints 将扣减金额存为 Math.abs 绝对值，但 calculateMonthlyStats 用 balanceAfter > 0 判断 earned/spent。扣减 200 后余额 300（> 0），错误计入 earned。应比较前后余额或加 sign 字段。
+3. PointsHistory 中 ADJUST 符号显示同错：用 balanceAfter > 0 判断 + 或 -，扣减后余额仍为正时错误显示 +。应由交易净增减方向判定符号。
+4. 提示词第 7 条要求「图表使用 Canvas 或 SVG 绘制」，模型引入 Recharts 库而非自主绘制。虽 Recharts 底层用 SVG，但未写任何原生绘制逻辑，完全依赖第三方库，偏离提示词技术约束。
 
 过程不满意：
-1. 模型在探索项目结构后立即创建了 TodoList（第 8 步），未先深入分析提示词的 7 条需求后再规划。按照标注规范，应先在分析阶段充分理解需求再制定计划，而非在信息不充分时就创建任务列表。这导致后续对图表技术选型、过期逻辑的边界条件等关键需求的考虑不充分。
-2. 模型在修改 App.jsx 时，第一次 edit_file_search_replace 操作失败后，重新读取了文件并进行了后续编辑操作，但从 Git diff 结果看，最终 App.jsx 中并未出现 points-mall 的任何相关内容。模型在之后未再次读取 App.jsx 验证修改是否生效，而是直接进入测试和总结阶段，导致页面路由完全缺失这一严重问题未被发现。
-3. 模型在总结中声称"所有功能均正常工作，可以在首页任务卡片点击「积分商城」进入页面"，但路由注册实际上从未完成。模型未通过实际运行 pnpm run dev 或在浏览器中验证页面可达性就做出完成声明，属于未验证即声称完成的过程硬伤。
-4. 模型在修复 lint 问题后重新运行了测试和 lint，但未再次检查 App.jsx 的修改是否正确保留。整个过程对文件修改结果的验证意识不足，多次出现"修改后未确认结果"的行为模式。
+1. 探索项目后立即创建 TodoList，未先深入分析 7 条需求。规范要求先理解问题再计划。导致图表技术选型、过期边界条件等关键需求考虑不充分。
+2. 修改 App.jsx 时 edit_file_search_replace 失败后未回读验证。Git diff 显示无 points-mall 内容，模型却直接进入测试总结，路由缺失未被发现。
+3. 总结声称「所有功能正常，可从首页进入积分商城」，但路由从未注册。未启动 pnpm run dev 验证页面可达性就声称完成，属未验证即声称完成的过程硬伤。
+4. 修复 lint 后重跑测试但未检查 App.jsx 修改是否保留。多次出现「修改后未确认结果」的行为模式，验证意识不足。

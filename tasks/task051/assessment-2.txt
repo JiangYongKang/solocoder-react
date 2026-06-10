@@ -1,10 +1,10 @@
 产物不满意：
-1. mapSfOpcode 函数（logisticsUtils.js 第 65-77 行）已移除了 default 分支中 remark.includes('异常') 的文本匹配，改为基于 hasOrderException 标志判断，但测试用例中 opcode='99' 直接命中显式的 case 分支，default 分支的 hasOrderException 判断逻辑从未被实际覆盖执行。如果未来出现未知 opcode 且 hasException=true 的场景，default 分支的正确性未经测试验证。应增加一个使用非标准 opcode（如 '999'）+ hasException=true 的测试用例。
-2. 测试文件 logisticsUtils.test.js 中 YT、YD、JD、EMS 的签收解析测试只覆盖了 isSigned=true 的已签收场景，缺少未签收场景下 signer 应为 null 的边界用例。parseYtOrder 缺少 statusCode 非 SIGNED 时的验证，parseYdOrder 缺少 signStatus 非 '1' 的验证，parseJdOrder 缺少 finished=false 的验证，parseEmsOrder 缺少 deliveryStatus 非 'delivered' 的验证。这四种未签收场景的 signer 为 null 的边界行为未经测试保障。
-3. extractRoutePoints 函数（logisticsUtils.js 第 424-472 行）中当 parsedData.origin 和 parsedData.destination 为同一城市时，第 452 行的 pointMap.set(destination, type:'destination') 会覆盖第 432 行的 pointMap.set(origin, type:'origin')。导致输出结果中该城市 type 为 'destination' 而非 'origin'。虽然其测试用例接受了 type:'destination' 的结果，但在同城物流场景下地图上将缺少起点标记，只显示终点标记，用户体验上有问题。
+1. mapSfOpcode 的 default 分支改为 hasOrderException 判断后，测试仅覆盖 opcode='99' 的显式 case，default 逻辑从未执行。若出现未知 opcode 且 hasException=true，正确性未验证。应增加非标准 opcode（如 '999'）+ hasException=true 的用例。
+2. YT、YD、JD、EMS 签收测试只覆盖已签收路径，缺未签收场景 signer 为 null 的边界用例。YT 缺 statusCode 非 SIGNED、YD 缺 signStatus 非 '1'、JD 缺 finished=false、EMS 缺 deliveryStatus 非 'delivered' 的验证。
+3. extractRoutePoints 中 origin 与 destination 同城时，destination 写入覆盖了 origin，输出 type 为 'destination' 而非 'origin'。同城场景地图缺起点标记只剩终点，用户体验受损。
 
 过程不满意：
-1. 模型在 session-cot-2 第 3 行收到提示词后立即调用 todo_write 创建了 5 项粗粒度待办，未先分析现有 mockData 中各快递公司的数据结构差异和解析函数的当前实现细节。这违反了标注规范中"应先分析问题再规划"的要求。正确的做法是先阅读 mockData 中各订单的字段组成（YT 的 operator、YD 的 context、JD 的 content 等），评估是否可以从现有字段提取签收人信息，再制定修改计划。
-2. 模型对 mockData.js（447 行）、logisticsUtils.js（501 行）和测试文件（566 行）三个文件使用 Write 工具进行了全量重写，合计约 1500 行代码被整体替换，而非针对每个问题做精准的部分编辑。这种"整体重写"策略让代码变更难以审查：git diff 失真，标注人员无法区分哪些行是真正的修复、哪些行只是格式调整。对于仅 5 条修复需求的第二轮迭代，应采用精准的 Replace 编辑。
-3. 模型通过向 mockData.js 添加新字段（signerName、signedBy、receiver、signTimestamp 等）来让解析函数直接读取，而非从已有数据字段中提取签收人信息。YD 数据的 context 字段已包含"签收人是:【本人签收】"文本，JD 的 content 字段包含"签收人：本人"，这些文本中本可以解析出签收人，模型却选择在 mockData 中新增独立字段来绕过文本解析逻辑，属于"修改数据源适应简单解析器"的错误方向。
-4. 模型在测试 localStorage mock 时经历了两次迭代（session-cot-2 第 199-233 行）：第一次用 global.localStorage 不工作，第二次改为 globalThis.window.localStorage 才通过。说明模型在动手编码前未先阅读生产成本代码中 getStorage() 函数（使用 window.localStorage）的实现路径，导致 mock 方案选错层级。正确的做法是先理解代码中的引用链（window → localStorage），再决定 mock 在 globalThis.window 这一层。
+1. session-cot-2 第 3 行收到提示词后立即创建 TodoList，未分析 mockData 中 YT operator、YD context 等字段差异和解析函数现状。违反「先分析问题再规划」。应先评估能否从已有字段提取签收人再制定计划。
+2. 模型用 Write 全量重写 mockData.js（447 行）、logisticsUtils.js（501 行）、测试文件（566 行），约 1500 行整体替换。git diff 失真，无法区分真正修复与格式调整。仅 5 条修复需求，应用精准 Replace。
+3. 模型向 mockData 新增 signerName、signedBy 等字段供解析器直接读取，而非从已有字段提取。YD context 含「签收人是:【本人签收】」、JD content 含「签收人：本人」，本可文本解析却新增字段绕过。
+4. 模型因未先阅读 getStorage() 使用 window.localStorage 的引用链，mock localStorage 经历两轮试错：global.localStorage 失败后改 globalThis.window.localStorage 才通过。应先理解引用链再决定 mock 层级。

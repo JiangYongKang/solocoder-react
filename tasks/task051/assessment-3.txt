@@ -1,5 +1,5 @@
-产物不满意：extractRoutePoints 同城场景测试用例"same city even with nodes"只验证了 origin 和 destination 两个点的存在性和 type 正确性，未断言 points 数组的总长度。若未来有人误删节点遍历中的 isSameCity 过滤条件后回归测试仍会通过，因为测试未校验 points.length，同城场景下中间节点混入的回归缺陷无法被捕获。应补充 expect(points.length).toBe(2) 断言来增强回归保护。
+产物不满意：extractRoutePoints 同城测试只验证起终点存在性和 type，未断言 points.length。若有人误删 isSameCity 过滤，回归测试仍通过，中间节点混入无法被捕获。应补充 expect(points.length).toBe(2) 增强回归保护。
 
-过程不满意：模型在 session-cot-3 第 4 行收到提示词后立即调用 todo_write 创建 4 项待办，未先读取 logisticsUtils.js 和测试文件的当前版本就制定了修复计划。这与第 2 轮 assessment-2 中已指出的同类问题一脉相承——模型未从上一轮标注中吸取"先分析代码再规划"的教训，重复了同一行为模式。正确的做法是先阅读修改目标文件的当前内容，确认代码上下文，再制定 TodoList。
+过程不满意：session-cot-3 第 4 行收到提示词后立即创建 TodoList，未先读 logisticsUtils.js 和测试文件当前版本。与 assessment-2 已指出的同类问题一脉相承——未吸取「先分析代码再规划」教训，重复同一行为模式。应先读目标文件再规划。
 
-过程不满意：模型在整个修复过程中分三次读取同一个测试文件 logisticsUtils.test.js（第 33 行初始读取、第 84 行修改同城测试前重读、第 139 行添加 YT 边界测试前再重读），每次读取后只做 1-2 处编辑就切回。模型应在第一次完整阅读时就梳理出测试文件中所有需要修改的位置——同城测试修正、SF default 分支、四种快递未签收边界——一次性规划出 7 个编辑点，然后集中执行修改，避免"读一段、改一段、再读一段"的碎片化操作模式。
+过程不满意：模型分三次重复读取 logisticsUtils.test.js（第 33/84/139 行），每次读后只做 1-2 处编辑。应第一次完整阅读就梳理全部修改点（同城修正、SF default、四种未签收边界），集中规划后一次改完，避免「读一段改一段」的碎片化模式。

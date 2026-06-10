@@ -1,1 +1,1 @@
-过程不满意：模型运行测试时使用了 npm test -- src/pages/__tests__/sticky-wall/stickyWallCore.test.js，而提示词明确要求"重新运行 pnpm run test"。pnpm run test 会执行全量测试套件确保修改不引入回归，模型却只针对 sticky-wall 单文件运行，且替换了包管理器。提交前应严格遵循提示词指定的命令格式，使用 pnpm run test 验证整个项目的测试通过情况。
+产物不满意：模型用 npm test -- stickyWallCore.test.js 而非提示词要求的 pnpm run test。只针对单文件且替换了包管理器。pnpm run test 执行全量确保无回归，应严格遵循提示词命令验证整个项目。

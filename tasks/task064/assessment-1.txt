@@ -1,0 +1,9 @@
+产物不满意：
+1. createTicket 函数将附件数组直接存入工单对象的 attachments 字段，index.jsx 中的 useEffect 在 tickets 变化时调用 saveTickets 将整个工单列表（含附件）通过 JSON.stringify 写入 localStorage，loadTickets 恢复时附件数据也随之恢复。这违反了提示词第 1 条中"附件数据仅在内存中模拟，不持久化到 localStorage"的明确要求。原因是模型未在持久化环节对附件做剥离处理。正确做法是在 saveTickets 中保存前对每个工单的 attachments 字段置空或移除，loadTickets 加载后重新初始化为空数组。
+2. transitionStatus 函数未对传入的 newStatus 做合法性校验，调用方传入任意状态值都会被直接应用，包括从待处理直接跳到已关闭这种非法流转。虽然 UI 层通过 getAvailableTransitions 限制了按钮展示，但作为纯工具函数缺乏输入防御。原因是没有在工具函数层做参数校验。正确做法是在函数开头调用 getAvailableTransitions 检查 newStatus 是否在允许列表中，不在则直接返回原数组或抛出错误。
+3. Dashboard.jsx 的 BarChart 组件在渲染分类标签时使用了 slice(0, 2)，将所有分类名强行截断为前两个字符。"投诉建议"被截成"投诉"丢失了"建议"语义，虽然 6 个分类中大部分两字可读，但这种硬编码截断没有语义基础。原因是为了适配柱状图下方有限的标签空间，牺牲了标签的完整性。正确做法是使用完整标签名配合旋转文字或省略号处理，或在 constants 中为每个分类定义缩略名。
+
+过程不满意：
+1. 模型在创建 FilterBar.jsx、Dashboard.jsx、TicketForm.jsx 三个子组件时分别启动独立子代理并行执行，每个子代理都独立读取了 constants.js 和 ticketUtils.js 来了解项目约定，constants.js 在整个会话中被反复读取了至少 5 次。這種重复探索同一组文件的行为浪费了推理资源，子代理之间没有共享上下文。正确做法是由主代理先一次性读取共享依赖文件，然后将关键常量、函数签名作为上下文注入给每个子代理，避免每个子代理从零开始探索。
+2. 模型采用"先写完全部文件再批量 lint"的策略，写完所有 6 个源码文件后才运行 ESLint，结果暴露出 Dashboard.jsx 中 no-param-reassign、TicketForm.jsx 中 unused imports、index.jsx 中 Date.now 非纯函数等多个 lint 错误，随后又进行了多轮修复。如果采用增量策略（每写完一个文件立即 lint），这些问题可以在早期就被发现，而不会在最后集中爆发。原因是没有将代码质量检查融入开发流程。正确做法是在创建每个文件后立即运行针对性 lint 检查，减少后期修复的轮次。
+3. 模型在编写 generateTicketNumber 的测试用例时直接硬编码期望值为 TK-20240601-001，但该函数根据当前日期动态生成编号前缀，测试运行后立即失败。模型随后才意识到需要动态计算今天的日期来构造期望值，并修改了测试。这说明模型在写测试时没有先阅读函数的实现逻辑，导致写出了与实际行为不匹配的断言。正确的是在写测试之前先理解被测试函数的日期依赖行为，用程序化方式构造期望值而非写死某个固定日期。

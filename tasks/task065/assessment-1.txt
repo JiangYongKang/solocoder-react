@@ -1,0 +1,12 @@
+产物不满意：
+1. index.jsx 中缩放控件使用了 `<select>` 下拉框（第379-389行），而提示词明确要求"时间轴上方有一个缩放滑块"。需求描述的是可拖拽的滑块控件，模型用下拉选择器替代，产品形态与需求描述不符。应改为 range 类型的 `<input type="range">` 滑块控件。
+2. index.jsx 中 zoom 缩放功能没有实现真正的缩放效果。提示词要求"缩放级别为'年'时时间轴被压缩显示范围更广，缩放级别为'周'时时间轴被展开显示更详细的时间间隔"，但实际实现中 zoomLevel 只改变了 timeline.css 第264-272行的 CSS padding（week: 40/60px, year: 8/16px），`getDateRangeFromZoom` 计算的范围仅用于顶部标签展示（第432-436行），没有根据缩放级别过滤时间轴上的事件，也没有调整时间刻度粒度和分组密度。各缩放级别下显示的事件完全相同。应将 zoomLevel 用于过滤事件的时间范围、调整刻度密度和节点间距。
+3. timeline.css 第665行卡片视图使用了 `grid-template-columns: repeat(auto-fill, minmax(300px, 1fr))` 标准 CSS Grid 布局，而提示词要求卡片的"瀑布流布局"。Grid 所有行严格对齐，不同高度的卡片在同行底部留下空白，无法实现瀑布流（Masonry）的紧凑堆叠效果。应使用 CSS `column-count` 多列布局或 JavaScript 实现的 Masonry 库来实现真正的瀑布流。
+4. index.jsx 第86-89行 `listViewEvents` 用 `sortEvents(filteredEvents).reverse()` 先升序再反转得到降序，而第81-84行 `cardViewEvents` 用 `getSortForCardView` 直接降序排列。两条计算路径产生完全相同的结果，却维护了两套排序逻辑，代码冗余。应将列表视图也复用 `getSortForCardView` 函数消除冗余。
+5. 按月份分组时，timeline.css 的 `.et-day-label` 只显示日期数字（如"1日"），index.jsx 第237行 `getDayNumber` 调用只提取 `slice(8,10)` 的天数部分，缺少月份上下文。当跨月浏览时，用户无法从左侧时间刻度判断当前属于哪个月份，必须回看分组标题。时间刻度信息不完整，应在日标签旁补充月份标注。
+
+过程不满意：
+1. 模型在 COT 第1步就创建了 TodoList 规划全部工作步骤，然后从第2步才开始查看项目文件结构和代码规范。这是"先规划后分析"的顺序错误——在未充分了解项目骨架、路由注册方式、已有页面代码风格的情况下就制定了完整计划。应先通读项目结构、已有页面代码和测试规范，理解约定后再制定 TodoList。
+2. 模型首次运行测试出现3个失败后，对 timelineUtils.js 和测试文件连续进行了5次 edit_file_search_replace 操作，每次改一处就重新运行测试看效果。这是试错式调试，正确做法是先分析测试失败的具体原因（比如比较实际输出和期望值的差异），缩小问题范围后一次性修正所有相关代码。
+3. 模型在修改 App.jsx 添加路由和任务卡片时，因为发现文件中已有 CurrencyConverterPage 的导入而多次回读文件（COT 第10-13步共3次 view_files 操作）。这显示模型在修改之前没有一次性完整阅读目标文件。正确做法是先完整阅读 App.jsx 的全部内容，理清现有 imports、TASKS 数组、Routes 结构，再一次性添加路由、卡片和 import。
+4. 模型在总结中声称缩放实现了"Ctrl+滚轮调节"的完整缩放功能，但实际代码中 Ctrl+滚轮仅切换 zoomLevel 状态值，时间轴上显示的事件完全不受影响，缩放只是 CSS padding 的微调。模型的总结描述与实际功能严重不符，属于虚假完成。总结必须基于实际代码内容而非意图。

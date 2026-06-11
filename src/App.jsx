@@ -7,8 +7,10 @@ import BudgetTrackerPage from '@/pages/budget-tracker/index.jsx'
 import CalendarPage from '@/pages/calendar/index.jsx'
 import ChatPage from '@/pages/chat/index.jsx'
 import CouponPage from '@/pages/coupon/index.jsx'
+import CurrencyConverterPage from '@/pages/currency-converter/index.jsx'
 import Dashboard from '@/pages/dashboard/Dashboard.jsx'
 import DBDesignerPage from '@/pages/db-designer/index.jsx'
+import EventTimelinePage from '@/pages/event-timeline/index.jsx'
 import ExamPage from '@/pages/exam/index.jsx'
 import FileManager from '@/pages/file-manager/FileManager.jsx'
 import FinancePage from '@/pages/finance/index.jsx'
@@ -18,6 +20,7 @@ import FormBuilder from '@/pages/form-builder/FormBuilder.jsx'
 import GanttChartPage from '@/pages/gantt-chart/index.jsx'
 import GeometryBoardPage from '@/pages/geometry-board/index.jsx'
 import GitBrowserPage from '@/pages/git-browser/index.jsx'
+import HabitTrackerPage from '@/pages/habit-tracker/index.jsx'
 import I18nManagerPage from '@/pages/i18n-manager/index.jsx'
 import InfiniteListPage from '@/pages/infinite-list/index.jsx'
 import KanbanPage from '@/pages/kanban/KanbanPage.jsx'
@@ -37,15 +40,21 @@ import ProductsPage from '@/pages/products/index.jsx'
 import QRCodePage from '@/pages/qrcode/index.jsx'
 import RegexTesterPage from '@/pages/regex-tester/index.jsx'
 import RichEditorPage from '@/pages/rich-editor/index.jsx'
+import SchedulePlannerPage from '@/pages/schedule-planner/index.jsx'
 import SkuSelectorPage from '@/pages/sku-selector/index.jsx'
 import SnippetsPage from '@/pages/snippets/index.jsx'
 import SocialFeedPage from '@/pages/social-feed/index.jsx'
 import SpreadsheetPage from '@/pages/spreadsheet/index.jsx'
+import SudokuPage from '@/pages/sudoku/index.jsx'
 import SurveyPage from '@/pages/survey/index.jsx'
 import TetrisPage from '@/pages/tetris/index.jsx'
 import TextDiffPage from '@/pages/text-diff/index.jsx'
 import ThemeEditorPage from '@/pages/theme-editor/index.jsx'
+import TicketSystemPage from '@/pages/ticket-system/index.jsx'
+import UnionFindPage from '@/pages/union-find/index.jsx'
+import VotingApp from '@/pages/voting-app/index.jsx'
 import WeatherPage from '@/pages/weather/index.jsx'
+import WsDebuggerPage from '@/pages/websocket-debugger/index.jsx'
 import WhiteboardPage from '@/pages/whiteboard/index.jsx'
 import Wizard from '@/pages/wizard/Wizard.jsx'
 import WorkflowPage from '@/pages/workflow/index.jsx'
@@ -101,7 +110,16 @@ const TASKS = [
     { id: 50, title: '扫雷游戏', route: 'minesweeper', description: '经典 Windows 扫雷游戏复刻，支持三种难度和自定义难度，左键翻开/右键插旗、泛洪自动展开、计时与雷数计数、胜负判定、localStorage 排行榜持久化。' },
     { id: 54, title: '物流轨迹追踪', route: 'logistics-tracker', description: '快递物流轨迹查询工具，输入快递单号查看包裹运输轨迹、物流节点时间线和Canvas地图轨迹动画。' },
     { id: 54, title: '便签墙', route: 'sticky-wall', description: '自由排列的数字便签墙，支持彩色便签创建、自由拖拽定位、层级管理、富文本编辑、归档与删除、画布缩放与网格吸附，数据本地持久化。' },
+    { id: 55, title: '习惯养成追踪', route: 'habit-tracker', description: '个人习惯养成追踪工具，创建习惯、每日打卡、热力图和统计图表可视化追踪进度，支持连胜记录、打卡提醒和归档管理，基于 localStorage 持久化。' },
     { id: 51, title: '积分商城', route: 'points-mall', description: '用户积分兑换商城，积分规则展示、商品兑换、积分流水管理、过期倒计时、订单查询、积分趋势图，基于 localStorage 持久化。' },
+    { id: 55, title: 'WebSocket 调试工具', route: 'websocket-debugger', description: 'WebSocket 协议联调和测试工具，支持连接管理、JSON 消息收发、实时日志、心跳检测、自动重连，基于 localStorage 持久化。' },
+    { id: 55, title: '实时汇率换算器', route: 'currency-converter', description: '多货币汇率换算工具，支持双向联动换算、汇率走势图、汇率表格排序、收藏货币对，基于模拟汇率数据和 localStorage 持久化。' },
+    { id: 56, title: '数独游戏', route: 'sudoku', description: '完整数独益智游戏，四难度题库生成、笔记辅助推理、冲突高亮、计时暂停、撤销重做、提示功能，基于 localStorage 保存进度。' },
+    { id: 57, title: '客服工单系统', route: 'ticket-system', description: '客服团队工单管理系统，支持创建工单、状态流转、多维筛选、SLA超时警示、处理时间线和统计仪表盘，基于 localStorage 持久化。' },
+    { id: 58, title: '多人实时投票', route: 'voting-app', description: '实时投票系统，支持创建投票、分享链接、单选/多选投票、实时进度条、倒计时、模拟多人投票、历史投票列表与筛选，基于 localStorage 持久化。' },
+    { id: 59, title: '课程表排课', route: 'schedule-planner', description: '高校课程表制作工具，周视图网格排课、拖拽课程到时间格、教室/教师冲突检测、JSON导入导出、打印友好视图，基于 localStorage 持久化。' },
+    { id: 60, title: '事件时间线', route: 'event-timeline', description: '时间线可视化工具，事件按时间排列，年代/月份分组浏览，增删改查与缩放滚动，搜索标签筛选，多视图切换，localStorage 持久化。' },
+    { id: 61, title: '数据导入向导', route: 'data-importer', description: '多步骤数据导入向导，支持 CSV/Excel 文件解析、字段映射自动匹配、数据校验修正、逐行导入进度追踪、失败原因分析与CSV导出。' },
 ]
 
 function HomePage() {
@@ -171,6 +189,7 @@ function App() {
             <Route path="/regex-tester" element={<RegexTesterPage />} />
             <Route path="/db-designer" element={<DBDesignerPage />} />
             <Route path="/coupon" element={<CouponPage />} />
+            <Route path="/currency-converter" element={<CurrencyConverterPage />} />
             <Route path="/fitness-tracker" element={<FitnessTrackerPage />} />
             <Route path="/qrcode" element={<QRCodePage />} />
             <Route path="/git-browser" element={<GitBrowserPage />} />
@@ -184,6 +203,15 @@ function App() {
             <Route path="/i18n-manager" element={<I18nManagerPage />} />
             <Route path="/weather" element={<WeatherPage />} />
             <Route path="/budget-tracker" element={<BudgetTrackerPage />} />
+            <Route path="/habit-tracker" element={<HabitTrackerPage />} />
+            <Route path="/ticket-system" element={<TicketSystemPage />} />
+            <Route path="/sudoku" element={<SudokuPage />} />
+            <Route path="/union-find" element={<UnionFindPage />} />
+            <Route path="/voting-app" element={<VotingApp />} />
+            <Route path="/websocket-debugger" element={<WsDebuggerPage />} />
+            <Route path="/schedule-planner" element={<SchedulePlannerPage />} />
+            <Route path="/event-timeline" element={<EventTimelinePage />} />
+            <Route path="/data-importer" element={<DataImporterPage />} />
         </Routes>
     )
 }

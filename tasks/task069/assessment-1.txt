@@ -1,0 +1,10 @@
+产物不满意：
+1. ws.onclose 非主动断开分支中 status 设为 DISCONNECTED 而非 ERROR，但状态栏 errorReason 显示条件为 `status === CONNECTION_STATUS.ERROR`，导致连接意外断开时的失败原因（如"服务器关闭连接"）在 UI 上永远不可见。同时 ws.onerror 设置的 ERROR 状态在随后的 onclose 回调中被覆写为 DISCONNECTED，灰色错误指示灯需求完全失效，用户无法看到任何连接失败的视觉反馈。
+2. 提示词要求搜索框"匹配的行高亮显示"，但 filterLogs 函数只做内容过滤不生成高亮标记，LogEntry 组件未接收 keyword prop，无法在渲染时包裹匹配文本。websocket-debugger.css 中定义了 .ws-log-highlight 样式类但 index.jsx 中从未引用，搜索功能只有过滤没有高亮，需求未完成。
+3. doConnect 函数在 ws.onopen 中无条件调用 startHeartbeat()，提示词明确要求"如果连接的是真实 echo 服务器则不适用心跳，此处针对模拟连接场景"，模型未实现任何真实服务器检测或跳过心跳的逻辑，导致连接到 echo.websocket.org 等真实服务器时也会持续发送 ping 消息，与需求矛盾。
+4. ws.onmessage 中清除心跳超时的条件仅判断 `lastHeartbeatResult === 'pending'` 即清空 failCount 和超时计时器，未区分收到的消息是否为 pong 回包。任意服务器推送或回显消息都会错误重置心跳失败计数，连续心跳超时检测机制形同虚设。
+
+过程不满意：
+1. 模型写完整个 index.jsx 后首次运行 ESLint 才发现 doConnect 和 attemptReconnect 之间循环依赖，用 ref 模式重写后又触发 "ref updated during render" 的新 lint 错误，被迫再用 useEffect 包裹修正。同一架构问题导致两轮重写，根本原因是写复杂的状态流转逻辑前缺少对函数调用依赖图的预先分析，应先理清连接/心跳/重连的调用链再编码。
+2. 模型在最终总结中声称"搜索过滤"功能完整实现，仅凭 lint 和测试通过就认为全部完成，但关键词高亮从未被实现——.ws-log-highlight CSS 类已定义却在 JSX 中零引用，filterLogs 只过滤不高亮，LogEntry 未接收 keyword 参数。模型未打开浏览器实际验证交互行为就得出"功能完整"的结论，存在虚假完成问题。
+3. 模型写完 LogEntry 组件并跑通 75 个测试后，才发现组件的 onClick prop 只在函数签名中声明但未绑定到返回的 div 元素上，导致长消息点击展开功能不生效，被迫追加一个修复回合。编写可交互组件时应在组件写完后就立即验证 onClick 是否正确绑定到 DOM，而非等全部写完再用 lint 和单测间接发现。

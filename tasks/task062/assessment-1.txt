@@ -1,0 +1,8 @@
+产物不满意：
+1. habitUtils.js 的 calculateWeekCompletion 和 calculateMonthCompletion 函数在统计已完成次数时使用了 days.filter(d => habitCheckins[d] && habitCheckins[d] > 0).length，只计算不同日期的去重天数，而不是加总每天的打卡次数。对于"每周X次"频率类型的习惯，用户在周一连续打卡3次后，completedDays 只计为1天，完成率显示1/3而非3/3。提示词明确要求"已完成次数 / 目标次数 = 完成率"，应该累加所有打卡次数而非仅数天数。测试用例仅覆盖 daily 频率类型，未对 weekly 和 monthly 场景编写用例，导致该逻辑缺陷未被发现。
+2. buildHeatmapGrid 函数在计算日期范围时使用 yearOffset * 365 作为偏移量，没有考虑闰年影响。用户切换到第4年或第5年时，因闰年累积导致 endDate 和 startDate 的计算结果与完整日历年边界产生偏差，热力图实际跨度与年份不对齐。函数应按实际日历年计算偏移而非用固定365天推进，yearLabel 展示的年份才与数据范围一致。
+3. 测试文件 habitUtils.test.js 对 calculateWeekCompletion 和 calculateMonthCompletion 只编写了 daily 频率类型的测试用例，未覆盖"每周X次"和"每月X天"频率类型。提示词需求包含三种频率的完成率计算，weekly 的 getWeekTarget 返回 frequencyCount，monthly 的周目标使用 Math.round(frequencyCount * 7 / getDaysInCurrentMonth()) 折算，但测试中完全没有验证非 daily 频率的目标值计算结果以及边界值（如每月1天折算后周目标接近0）是否正确。
+
+过程不满意：
+1. 模型在接收到任务后的第一个工具调用就立即创建了包含12项的 TodoList，然后才开始查看项目目录结构和参考页面代码。标注规范明确要求应先分析问题再规划，不应在信息不足时制定计划。由于缺乏对项目结构和现有页面模式的理解，初始的12项规划后续被缩减为8项，说明模型在未充分了解上下文的情况下就做出了粗略规划，浪费了第一步的规划步骤。
+2. 模型在编写热力图测试时硬编码了 2025-06-08 等历史日期，但 buildHeatmapGrid 基于当前日期（2026年6月）计算动态365天范围，导致该日期超出可查范围，测试运行时报8个失败。根本原因是模型分别独立编写了工具函数和测试文件，未在编写阶段交叉验证两者的日期范围兼容性。虽然后续通过改为相对日期修复了问题，但"写完所有文件后运行测试才发现兼容性问题"的工作流程反映出对时间敏感函数缺乏前置边界意识。

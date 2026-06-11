@@ -1,0 +1,9 @@
+产物不满意：
+1. 互换按钮未同步调换换算金额。index.jsx 的 handleSwap 函数只调用了 setBaseCode 和 setTargetCode 交换货币代码，但 ConversionPanel 组件内部的 baseAmount 和 targetAmount 是本地 state，互换后没有发生任何变动。提示词第 2 条明确要求"换算金额同步调换"，当前结果是在 1 USD = 7.2456 CNY 的情况下点击互换后，页面仍显示 1 CNY → 7.2456 USD，而不是将之前的换算结果 7.2456 作为基准金额重新计算。正确做法是在 swap 时通过回调或 key 重置让 ConversionPanel 内部的金额也同步交换，或增加 useEffect 监听 baseCode 和 targetCode 变化时根据当前汇率重新计算目标金额。
+2. 走势折线图切换时间范围时缺少动画过渡。TrendChart.jsx 中 7 天 / 30 天 / 90 天的切换仅通过 setRangeIdx 触发 useMemo 重新计算 trendData 和 layout，SVG 的 path 和坐标直接突变，没有任何 CSS transition、SVG animate 或 opacity 渐变效果。提示词第 4 条明确要求"切换时间范围时图表动画过渡"，当前实现完全忽略了这一需求。正确做法是给 SVG path 的 d 属性添加 transition，或在数据切换时加入 opacity 渐变动画。
+3. searchCurrencies 函数中对 nameEnLower 变量重复调用 toLowerCase。在 currencyUtils.js 中第 45 行已将 nameEnLower 设为 c.nameEn.toLowerCase()，但第 54、55、61 行又写了 nameEnLower.toLowerCase()，对已小写的字符串再次执行 toLowerCase 虽是空操作不会导致功能错误，但代码冗余且反映编写时不够仔细。同时 formatDateTick 函数中 if 和 else 两个分支返回的格式字符串完全相同，else 分支多余。
+
+过程不满意：
+1. 模型在收到任务后，第一个工具调用就是 todo_write 创建 TodoList，在此之前只执行了 view_folder 和两次 file_search 查看项目根目录和文件结构，完全没有对提示词的 7 条需求做逐条分析拆解。这导致对"换算金额同步调换"和"图表动画过渡"两条关键需求的遗漏——后续代码实现中互换金额和走势图动画均未满足要求。正确做法是先阅读理解每条需求的技术要点（双向联动换算、走势图动画、搜索匹配度排序等），逐条确认理解到位后再做任务规划。
+2. 模型启动预览页面后只观察到 App.jsx 中已有的 console 警告，接着就声称"汇率换算器页面已成功加载"，随后停止开发服务器并结束会话。整个过程中没有对页面的任何功能做交互验证——没有测试互换按钮后金额是否正确、没有测试搜索筛选的匹配度排序、没有点击走势图的时间范围切换验证动画、没有测试收藏增删的持久化。在未实际验证功能正确性的情况下就声称全部完成，属于过程完成度不充分。
+3. 模型写完所有组件后首次运行 ESLint，发现 ConversionPanel.jsx 中 removeFavorite 未使用和 FavoritesSidebar.jsx 中 Math.random 违规，修复后又运行 ESLint，仍报 seededRandom 未使用，需要再修一轮才通过。一轮修复未覆盖所有报错说明修复前的排查不够全面，应一次性读完所有报错信息再做集中修复。

@@ -1,0 +1,9 @@
+产物不满意：
+1. ValidationStep.jsx 中在 useMemo 回调内部调用了 onValidatedDataChange(result)，useMemo 是 React 的纯计算 Hook，官方文档明确要求不应在其中执行副作用。将父组件状态更新放在 useMemo 内会导致渲染阶段触发额外状态变更，React 在严格模式下可能因此产生两次渲染或抛出警告。正确做法是将 onValidatedDataChange 调用移到 useEffect 中，useMemo 仅负责计算和返回验证结果。
+2. ValidationStep.jsx 中 localData 的初始化使用了 useState(mappedData)，但 mappedData 只有首次渲染时被用作 initialState，后续 mappedData prop 更新时 localData 并不会同步刷新。当用户回到第一步重新上传文件或回到第二步修改映射后再次进入第三步时，ValidationStep 展示的仍是旧数据，而非最新的映射结果。根本原因是 useState 参数仅初始化时生效一次，正确做法是增加 useEffect 监听 mappedData 变化并调用 setLocalData(mappedData) 做同步。
+3. ValidationStep.jsx 中从 utils.js 导入了 validateRow 和 findDuplicateRows，但这两个函数在组件内部完全未被调用，实际只使用了 validateAllRows。ESLint 未报 no-unused-vars 是因为它们被解构导入后的常量声明模式可能被忽略，但产物不干净，存在无意义依赖。应该删除未使用的导入。
+
+过程不满意：
+1. 模型在收到提示词后几乎立即创建了包含 10 个步骤的 TodoList，没有先通读提示词的 6 条需求做整体分析和任务拆解。这导致后续规划流于形式：TodoList 的步骤名如"创建常量文件""创建工具函数"是机械的按文件类型划分，而非按照导入向导的四个步骤（文件上传→字段映射→数据校验→执行导入）做功能粒度的拆解。正确做法是先理解需求全貌，再按业务模块而非文件类型规划任务列表。
+2. 模型在首次编写 utils.js 时出现了两处语法错误——一处缺少模板字符串的闭合反引号，一处 return 语句缺少闭合括号——导致首次运行测试直接编译失败。模型用 view_files 重新查看文件内容定位到第 251 行后修复了括号问题，但反引号问题需要第二次 test run 和再次查看文件才修复完成。两次语法错误都是纯书写疏忽，模型在写完代码后没有做任何自检就直接运行测试，增加了无效的调试轮次。正确做法是写完每个函数后快速扫一遍括号配对和字符串闭合，再提交测试。
+3. 模型在最终总结中声称"92 个测试用例全部通过""所有文件无 lint/type 错误"，但从未执行 pnpm run dev 启动开发服务器做页面级的手动验证。数据导入向导是一个交互密集的多步骤页面，纯 JS 单元测试无法覆盖拖拽上传区域是否正常渲染、字段映射下拉选择是否可用、双击单元格编辑是否功能完整、导入暂停/继续控制是否响应等关键交互路径。正确做法是完成单元测试后启动开发服务器，逐一验证四个步骤的交互流程。

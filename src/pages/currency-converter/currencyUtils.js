@@ -51,14 +51,14 @@ export function searchCurrencies(keyword) {
     else if (codeLower.includes(lower)) score = 80
     else if (nameLower === lower) score = 70
     else if (nameLower.startsWith(lower)) score = 60
-    else if (nameEnLower.toLowerCase() === lower) score = 55
-    else if (nameEnLower.toLowerCase().startsWith(lower)) score = 50
+    else if (nameEnLower === lower) score = 55
+    else if (nameEnLower.startsWith(lower)) score = 50
     else if (countryLower === lower) score = 45
     else if (countryLower.startsWith(lower)) score = 40
     else if (countryEnLower === lower) score = 35
     else if (countryEnLower.startsWith(lower)) score = 30
     else if (nameLower.includes(lower)) score = 20
-    else if (nameEnLower.toLowerCase().includes(lower)) score = 15
+    else if (nameEnLower.includes(lower)) score = 15
     else if (countryLower.includes(lower)) score = 10
     else if (countryEnLower.includes(lower)) score = 5
 

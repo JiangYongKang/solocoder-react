@@ -5,6 +5,7 @@ import {
   DEFAULT_TAGS,
   GROUP_MODE,
   ZOOM_LEVEL,
+  ZOOM_LEVEL_ORDER,
   VIEW_MODE,
 } from './constants.js';
 
@@ -374,4 +375,168 @@ export function getMonthNumber(dateStr) {
 
 export function getDayNumber(dateStr) {
   return parseInt(dateStr.slice(8, 10), 10);
+}
+
+export function getQuarter(dateStr) {
+  const month = getMonthNumber(dateStr);
+  return Math.ceil(month / 3);
+}
+
+export function getZoomIndex(zoomLevel, order = ZOOM_LEVEL_ORDER) {
+  const idx = order.indexOf(zoomLevel);
+  return idx === -1 ? 2 : idx;
+}
+
+export function getZoomLevelFromIndex(index, order = ZOOM_LEVEL_ORDER) {
+  const safeIndex = Math.max(0, Math.min(index, order.length - 1));
+  return order[safeIndex];
+}
+
+export function formatDayLabelWithMonth(dateStr) {
+  const [, m, d] = dateStr.split('-');
+  return `${parseInt(m, 10)}月${parseInt(d, 10)}日`;
+}
+
+export function groupByQuarter(events) {
+  const sorted = sortEvents(events);
+  const groups = {};
+
+  for (const evt of sorted) {
+    const year = evt.date.slice(0, 4);
+    const quarter = getQuarter(evt.date);
+    const key = `${year}-Q${quarter}`;
+    if (!groups[key]) {
+      groups[key] = {
+        key,
+        label: `${year}年 Q${quarter}`,
+        year: parseInt(year, 10),
+        quarter,
+        events: [],
+        monthGroups: {},
+      };
+    }
+    const month = evt.date.slice(5, 7);
+    if (!groups[key].monthGroups[month]) {
+      groups[key].monthGroups[month] = [];
+    }
+    groups[key].monthGroups[month].push(evt);
+    groups[key].events.push(evt);
+  }
+
+  const keys = Object.keys(groups).sort((a, b) => b.localeCompare(a));
+  return keys.map((k) => groups[k]);
+}
+
+export function groupByWeek(events) {
+  const sorted = sortEvents(events);
+  const groups = {};
+
+  for (const evt of sorted) {
+    const d = new Date(evt.date.slice(0, 4), parseInt(evt.date.slice(5, 7), 10) - 1, parseInt(evt.date.slice(8, 10), 10));
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    d.setDate(diff);
+    const weekStart = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    if (!groups[weekStart]) {
+      groups[weekStart] = {
+        key: weekStart,
+        label: `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 周`,
+        weekStart,
+        events: [],
+        dayGroups: {},
+      };
+    }
+    const dayKey = evt.date.slice(8, 10);
+    if (!groups[weekStart].dayGroups[dayKey]) {
+      groups[weekStart].dayGroups[dayKey] = [];
+    }
+    groups[weekStart].dayGroups[dayKey].push(evt);
+    groups[weekStart].events.push(evt);
+  }
+
+  const keys = Object.keys(groups).sort((a, b) => b.localeCompare(a));
+  return keys.map((k) => groups[k]);
+}
+
+export function getGroupingForZoom(groupMode, zoomLevel) {
+  if (groupMode === GROUP_MODE.DECADE) {
+    if (zoomLevel === ZOOM_LEVEL.YEAR) return 'decade';
+    if (zoomLevel === ZOOM_LEVEL.QUARTER) return 'decade';
+    if (zoomLevel === ZOOM_LEVEL.MONTH) return 'decade';
+    return 'decade';
+  }
+  if (zoomLevel === ZOOM_LEVEL.YEAR) return 'year';
+  if (zoomLevel === ZOOM_LEVEL.QUARTER) return 'quarter';
+  if (zoomLevel === ZOOM_LEVEL.MONTH) return 'month';
+  return 'week';
+}
+
+export function groupEventsByZoom(events, groupMode, zoomLevel) {
+  const grouping = getGroupingForZoom(groupMode, zoomLevel);
+
+  if (grouping === 'decade') {
+    return groupByDecade(events).map((g) => ({
+      ...g,
+      level: 'decade',
+      subLevel: 'year',
+    }));
+  }
+
+  if (grouping === 'year') {
+    const yearGroups = {};
+    const sorted = sortEvents(events);
+    for (const evt of sorted) {
+      const year = evt.date.slice(0, 4);
+      if (!yearGroups[year]) {
+        yearGroups[year] = {
+          key: year,
+          label: `${year}年`,
+          year: parseInt(year, 10),
+          events: [],
+          monthGroups: {},
+          level: 'year',
+          subLevel: 'month',
+        };
+      }
+      const month = evt.date.slice(5, 7);
+      if (!yearGroups[year].monthGroups[month]) {
+        yearGroups[year].monthGroups[month] = [];
+      }
+      yearGroups[year].monthGroups[month].push(evt);
+      yearGroups[year].events.push(evt);
+    }
+    return Object.keys(yearGroups).sort((a, b) => b.localeCompare(a)).map((k) => yearGroups[k]);
+  }
+
+  if (grouping === 'quarter') {
+    return groupByQuarter(events).map((g) => ({
+      ...g,
+      level: 'quarter',
+      subLevel: 'month',
+    }));
+  }
+
+  if (grouping === 'week') {
+    return groupByWeek(events).map((g) => ({
+      ...g,
+      level: 'week',
+      subLevel: 'day',
+    }));
+  }
+
+  return groupByMonth(events).map((g) => ({
+    ...g,
+    level: 'month',
+    subLevel: 'day',
+  }));
+}
+
+export function getZoomDensity(zoomLevel) {
+  const densities = {
+    [ZOOM_LEVEL.YEAR]: { spacing: 'compact', detail: 'low', yearGap: 8, dayGap: 4 },
+    [ZOOM_LEVEL.QUARTER]: { spacing: 'semi-compact', detail: 'medium-low', yearGap: 16, dayGap: 8 },
+    [ZOOM_LEVEL.MONTH]: { spacing: 'normal', detail: 'medium', yearGap: 28, dayGap: 14 },
+    [ZOOM_LEVEL.WEEK]: { spacing: 'expanded', detail: 'high', yearGap: 48, dayGap: 24 },
+  };
+  return densities[zoomLevel] || densities[ZOOM_LEVEL.MONTH];
 }

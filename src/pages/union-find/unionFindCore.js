@@ -66,7 +66,7 @@ export function addNode(state, customName = null) {
   newState.parent.set(id, id)
   newState.rank.set(id, 1)
 
-  const pos = findNonOverlappingPosition(newState)
+  const pos = findNewNodePosition(newState)
   newState.positions.set(id, pos)
   newState.nextId += 1
 
@@ -77,37 +77,20 @@ export function addNode(state, customName = null) {
   }
 }
 
-function findNonOverlappingPosition(state) {
-  const existingPositions = Array.from(state.positions.values())
-  const radius = NODE_RADIUS
-  const padding = 20
+function findNewNodePosition(state) {
+  if (state.positions.size === 0) {
+    return { x: NODE_RADIUS + 50, y: NODE_RADIUS + 50 }
+  }
 
-  let x = NODE_DIAMETER + padding + Math.random() * 100
-  let y = NODE_DIAMETER + padding + Math.random() * 100
-
-  const maxAttempts = 500
-  let attempts = 0
-  let found = false
-
-  while (!found && attempts < maxAttempts) {
-    found = true
-    for (const pos of existingPositions) {
-      const dx = (pos.x + radius) - (x + radius)
-      const dy = (pos.y + radius) - (y + radius)
-      const dist = Math.sqrt(dx * dx + dy * dy)
-      if (dist < NODE_DIAMETER + padding) {
-        found = false
-        break
-      }
-    }
-    if (!found) {
-      attempts++
-      x = NODE_DIAMETER + padding + Math.random() * (300 + attempts * 20)
-      y = NODE_DIAMETER + padding + Math.random() * (300 + attempts * 20)
+  let maxX = -Infinity
+  for (const [, pos] of state.positions) {
+    const right = pos.x + NODE_DIAMETER
+    if (right > maxX) {
+      maxX = right
     }
   }
 
-  return { x, y }
+  return { x: maxX + TREE_HORIZONTAL_GAP, y: NODE_RADIUS + 50 }
 }
 
 export function find(state, nodeId, enablePathCompression = true) {

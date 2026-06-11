@@ -20,6 +20,8 @@ import {
   applyRedo,
   getHintCell,
   findFirstEmptyCell,
+  serializeHintedCells,
+  deserializeHintedCells,
 } from '@/pages/sudoku/sudokuCore.js'
 import { DIFFICULTY, MAX_HINTS, STORAGE_KEY } from '@/pages/sudoku/constants.js'
 
@@ -246,7 +248,10 @@ describe('sudokuCore', () => {
         }
       }
       const board = Array.from({ length: 9 }, () => Array(9).fill(0))
-      const updated = autoRemoveNotes(notes, board, 0, 0, 5)
+      const result = autoRemoveNotes(notes, board, 0, 0, 5)
+      expect(result).toHaveProperty('notes')
+      expect(result).toHaveProperty('autoRemoved')
+      const updated = result.notes
       expect(updated[0][0].size).toBe(0)
       for (let c = 1; c < 9; c++) {
         expect(updated[0][c].has(5)).toBe(false)
@@ -262,6 +267,25 @@ describe('sudokuCore', () => {
       expect(updated[3][3].has(5)).toBe(true)
     })
 
+    it('should return list of auto-removed note entries with row, col, num', () => {
+      const notes = createInitialNotes()
+      notes[0][2] = new Set([3, 5, 7])
+      notes[2][0] = new Set([5, 8])
+      notes[4][0] = new Set([5, 9])
+      notes[0][4] = new Set([2, 5])
+      notes[3][3] = new Set([5, 6])
+      const board = Array.from({ length: 9 }, () => Array(9).fill(0))
+      const { autoRemoved } = autoRemoveNotes(notes, board, 0, 0, 5)
+      const removedKeys = new Set(autoRemoved.map((i) => `${i.row}-${i.col}:${i.num}`))
+      expect(autoRemoved.length).toBeGreaterThanOrEqual(4)
+      expect(removedKeys.has('0-2:5')).toBe(true)
+      expect(removedKeys.has('2-0:5')).toBe(true)
+      expect(removedKeys.has('4-0:5')).toBe(true)
+      expect(removedKeys.has('0-4:5')).toBe(true)
+      expect(removedKeys.has('3-3:5')).toBe(false)
+      expect(autoRemoved.every((i) => i.num === 5)).toBe(true)
+    })
+
     it('should not mutate original notes', () => {
       const notes = createInitialNotes()
       notes[0][0] = new Set([1, 2, 3])
@@ -269,6 +293,31 @@ describe('sudokuCore', () => {
       const board = Array.from({ length: 9 }, () => Array(9).fill(0))
       autoRemoveNotes(notes, board, 0, 0, 1)
       expect(notes[0][1].has(1)).toBe(true)
+    })
+  })
+
+  describe('serializeHintedCells / deserializeHintedCells', () => {
+    it('should round-trip correctly', () => {
+      const set = new Set(['0-0', '3-4', '8-8'])
+      const serialized = serializeHintedCells(set)
+      const deserialized = deserializeHintedCells(serialized)
+      expect(deserialized instanceof Set).toBe(true)
+      expect(deserialized.has('0-0')).toBe(true)
+      expect(deserialized.has('3-4')).toBe(true)
+      expect(deserialized.has('8-8')).toBe(true)
+      expect(deserialized.size).toBe(3)
+    })
+
+    it('should handle empty Set', () => {
+      const serialized = serializeHintedCells(new Set())
+      expect(serialized).toEqual([])
+      const deserialized = deserializeHintedCells(serialized)
+      expect(deserialized.size).toBe(0)
+    })
+
+    it('should handle undefined/falsy input', () => {
+      const deserialized = deserializeHintedCells(undefined)
+      expect(deserialized.size).toBe(0)
     })
   })
 
@@ -446,11 +495,13 @@ describe('sudokuCore', () => {
     it('saveGameState and loadGameState should round-trip', () => {
       const notes = createInitialNotes()
       notes[0][0] = new Set([1, 2])
+      const hintedCells = new Set(['2-2', '5-5'])
       const state = {
         puzzle: Array.from({ length: 9 }, () => Array(9).fill(0)),
         solution: generateFullBoard(),
         board: Array.from({ length: 9 }, () => Array(9).fill(0)),
         notes,
+        hintedCells,
         elapsedTime: 120,
         difficulty: DIFFICULTY.EASY,
         hintsRemaining: 2,
@@ -466,6 +517,25 @@ describe('sudokuCore', () => {
       expect(loaded.hintsRemaining).toBe(2)
       expect(loaded.autoRemoveEnabled).toBe(true)
       expect(loaded.notes[0][0]).toEqual(new Set([1, 2]))
+      expect(loaded.hintedCells instanceof Set).toBe(true)
+      expect(loaded.hintedCells.has('2-2')).toBe(true)
+      expect(loaded.hintedCells.has('5-5')).toBe(true)
+      expect(loaded.hintedCells.size).toBe(2)
+    })
+
+    it('should handle missing hintedCells gracefully (old save format)', () => {
+      const raw = JSON.stringify({
+        puzzle: Array.from({ length: 9 }, () => Array(9).fill(0)),
+        solution: generateFullBoard(),
+        board: Array.from({ length: 9 }, () => Array(9).fill(0)),
+        notes: serializeNotes(createInitialNotes()),
+        elapsedTime: 10,
+      })
+      storage.setItem(STORAGE_KEY, raw)
+      const loaded = loadGameState(storage)
+      expect(loaded).not.toBeNull()
+      expect(loaded.hintedCells instanceof Set).toBe(true)
+      expect(loaded.hintedCells.size).toBe(0)
     })
 
     it('clearSavedGame should remove saved data', () => {

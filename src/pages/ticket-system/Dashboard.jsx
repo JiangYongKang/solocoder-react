@@ -132,10 +132,10 @@ function BarChart({ counts }) {
 
   return (
     <div className="ts-chart-container">
-      <svg viewBox="0 0 300 180" width="100%" height="100%" preserveAspectRatio="xMidYMid meet">
+      <svg viewBox="0 0 360 195" width="100%" height="100%" preserveAspectRatio="xMidYMid meet">
         {bars.map((bar, i) => {
-          const barWidth = 30
-          const gap = (300 - CATEGORY_ORDER.length * barWidth) / (CATEGORY_ORDER.length + 1)
+          const barWidth = 28
+          const gap = (360 - CATEGORY_ORDER.length * barWidth) / (CATEGORY_ORDER.length + 1)
           const x = gap + i * (barWidth + gap)
           const chartHeight = 130
           const barH = (bar.count / maxValue) * chartHeight
@@ -170,7 +170,7 @@ function BarChart({ counts }) {
                 fill="var(--text)"
                 fontSize="9"
               >
-                {CATEGORY_LABELS[bar.category].slice(0, 2)}
+                {CATEGORY_LABELS[bar.category]}
               </text>
             </g>
           )
@@ -178,7 +178,7 @@ function BarChart({ counts }) {
         <line
           x1={0}
           y1={140}
-          x2={300}
+          x2={360}
           y2={140}
           stroke="var(--border)"
           strokeWidth="1"

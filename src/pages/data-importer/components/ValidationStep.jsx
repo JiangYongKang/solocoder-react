@@ -1,17 +1,23 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { TARGET_FIELDS, VALIDATION_STATUS } from '../constants.js'
-import { validateAllRows, validateRow, findDuplicateRows } from '../utils.js'
+import { validateAllRows } from '../utils.js'
 
 export default function ValidationStep({ mappedData, onValidatedDataChange }) {
   const [editingCell, setEditingCell] = useState(null)
   const [editValue, setEditValue] = useState('')
   const [localData, setLocalData] = useState(mappedData)
 
+  useEffect(() => {
+    setLocalData(mappedData)
+  }, [mappedData])
+
   const validationResult = useMemo(() => {
-    const result = validateAllRows(localData, TARGET_FIELDS)
-    onValidatedDataChange(result)
-    return result
-  }, [localData, onValidatedDataChange])
+    return validateAllRows(localData, TARGET_FIELDS)
+  }, [localData])
+
+  useEffect(() => {
+    onValidatedDataChange(validationResult)
+  }, [validationResult, onValidatedDataChange])
 
   const handleDoubleClick = (rowIdx, fieldKey) => {
     setEditingCell({ rowIdx, fieldKey })

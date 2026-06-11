@@ -107,30 +107,91 @@
 .et-zoom-control {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
 }
 
 .et-zoom-label {
   font-size: 13px;
   color: var(--text);
   font-weight: 500;
+  flex-shrink: 0;
 }
 
-.et-zoom-select {
-  padding: 8px 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg);
-  color: var(--text-h);
-  font-size: 13px;
-  font-family: inherit;
-  cursor: pointer;
+.et-zoom-slider-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 200px;
+}
+
+.et-zoom-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
   outline: none;
-  transition: border-color 0.2s;
+  cursor: pointer;
+  transition: background 0.2s;
 }
 
-.et-zoom-select:focus {
-  border-color: var(--accent);
+.et-zoom-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(99, 102, 241, 0.4);
+  transition: all 0.2s;
+  border: 2px solid #fff;
+}
+
+.et-zoom-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 3px 10px rgba(99, 102, 241, 0.5);
+}
+
+.et-zoom-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: 2px solid #fff;
+  box-shadow: 0 2px 6px rgba(99, 102, 241, 0.4);
+}
+
+.et-zoom-ticks {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 2px;
+}
+
+.et-zoom-tick-label {
+  font-size: 12px;
+  color: var(--text);
+  background: none;
+  border: none;
+  padding: 2px 6px;
+  cursor: pointer;
+  border-radius: 6px;
+  font-weight: 500;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.et-zoom-tick-label:hover {
+  color: var(--accent);
+  background: var(--accent-bg);
+}
+
+.et-zoom-tick-active {
+  color: var(--accent) !important;
+  font-weight: 600 !important;
 }
 
 .et-search-wrap {
@@ -323,12 +384,12 @@
   border-radius: 2px;
 }
 
-.et-year-block,
-.et-day-block {
+.et-sub-block {
   display: flex;
   position: relative;
-  margin-bottom: 28px;
+  margin-bottom: 24px;
   animation: et-fade-in 0.4s ease;
+  transition: margin-bottom 0.4s ease;
 }
 
 @keyframes et-fade-in {
@@ -336,8 +397,7 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
-.et-year-marker,
-.et-day-marker {
+.et-sub-marker {
   position: absolute;
   left: -100px;
   display: flex;
@@ -347,21 +407,24 @@
   width: 90px;
 }
 
-.et-year-label,
-.et-day-label {
-  font-size: 16px;
+.et-sub-label {
+  font-size: 15px;
   font-weight: 600;
   color: var(--accent);
   padding-right: 16px;
   flex-shrink: 0;
+  white-space: nowrap;
 }
 
-.et-day-label {
+.et-sub-block[data-level="year"] .et-sub-label {
+  font-size: 17px;
+}
+
+.et-sub-block[data-level="day"] .et-sub-label {
   font-size: 14px;
 }
 
-.et-year-tick,
-.et-day-tick {
+.et-sub-tick {
   position: absolute;
   left: 86px;
   top: 28px;
@@ -371,14 +434,108 @@
   border-radius: 2px;
 }
 
-.et-year-events,
-.et-day-events {
+.et-sub-events {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
   padding-top: 4px;
   padding-left: 36px;
+  transition: gap 0.4s ease;
+}
+
+/* Density / Zoom spacing */
+.et-density-compact .et-sub-block {
+  margin-bottom: 10px;
+}
+
+.et-density-compact .et-sub-events {
+  gap: 6px;
+}
+
+.et-density-compact .et-sub-marker {
+  padding-top: 10px;
+}
+
+.et-density-compact .et-sub-tick {
+  top: 18px;
+}
+
+.et-density-compact .et-sub-label {
+  font-size: 13px;
+}
+
+.et-density-semi-compact .et-sub-block {
+  margin-bottom: 16px;
+}
+
+.et-density-semi-compact .et-sub-events {
+  gap: 9px;
+}
+
+.et-density-semi-compact .et-sub-marker {
+  padding-top: 14px;
+}
+
+.et-density-semi-compact .et-sub-tick {
+  top: 22px;
+}
+
+.et-density-normal .et-sub-block {
+  margin-bottom: 24px;
+}
+
+.et-density-normal .et-sub-events {
+  gap: 12px;
+}
+
+.et-density-expanded .et-sub-block {
+  margin-bottom: 36px;
+}
+
+.et-density-expanded .et-sub-events {
+  gap: 18px;
+}
+
+.et-density-expanded .et-sub-marker {
+  padding-top: 26px;
+}
+
+.et-density-expanded .et-sub-tick {
+  top: 34px;
+}
+
+.et-density-expanded .et-sub-label {
+  font-size: 16px;
+}
+
+.et-timeline-inner[data-density="compact"] {
+  padding: 8px 12px;
+}
+
+.et-timeline-inner[data-density="expanded"] {
+  padding: 40px 12px 60px;
+}
+
+/* Group level density */
+.et-density-compact .et-group {
+  margin-bottom: 20px;
+}
+
+.et-density-compact .et-group-label {
+  font-size: 22px;
+}
+
+.et-density-compact .et-group-header {
+  margin-bottom: 10px;
+}
+
+.et-density-expanded .et-group {
+  margin-bottom: 48px;
+}
+
+.et-density-expanded .et-group-label {
+  font-size: 32px;
 }
 
 .et-timeline-node {
@@ -660,17 +817,18 @@
   color: var(--text-h);
 }
 
-/* Card view */
-.et-card-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 18px;
-  align-items: start;
+/* Card view - masonry */
+.et-card-masonry {
+  column-count: 3;
+  column-gap: 18px;
   padding: 8px 4px 24px;
 }
 
-.et-card-card {
+.et-masonry-item {
   break-inside: avoid;
+  margin-bottom: 18px;
+  display: inline-block;
+  width: 100%;
 }
 
 .et-card-card .et-card-tags {
@@ -1107,29 +1265,21 @@
     left: 66px;
   }
 
-  .et-year-marker,
-  .et-day-marker {
+  .et-sub-marker {
     left: -76px;
     width: 66px;
   }
 
-  .et-year-label {
+  .et-sub-label {
     font-size: 13px;
     padding-right: 10px;
   }
 
-  .et-day-label {
-    font-size: 12px;
-    padding-right: 10px;
-  }
-
-  .et-year-tick,
-  .et-day-tick {
+  .et-sub-tick {
     left: 62px;
   }
 
-  .et-year-events,
-  .et-day-events {
+  .et-sub-events {
     padding-left: 24px;
   }
 
@@ -1137,8 +1287,8 @@
     left: -24px;
   }
 
-  .et-card-grid {
-    grid-template-columns: 1fr;
+  .et-card-masonry {
+    column-count: 1;
   }
 
   .et-form-row {
@@ -1215,8 +1365,12 @@
     font-size: 38px;
   }
 
-  .et-card-grid {
-    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-    gap: 22px;
+  .et-card-masonry {
+    column-count: 4;
+    column-gap: 22px;
+  }
+
+  .et-masonry-item {
+    margin-bottom: 22px;
   }
 }

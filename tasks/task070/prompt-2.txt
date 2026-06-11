@@ -1,0 +1,8 @@
+你实现的多人实时投票页面还存在一些问题，需要进行修复：
+
+1. generateShareUrl 生成的分享链接在 HashRouter 下格式错误。hash 非空时应保留 #/ 前缀，但当前生成的结果缺少 #/，导致分享给他人后无法加载投票页面。例如应该生成 http://localhost:5173/#/voting-app?vote=xxx 而不是 http://localhost:5173/voting-app?vote=xxx。
+2. VoteDetail 组件用 useMemo 一次性计算 isEnded，不随时间推移重新计算。当截止时间到达时，Countdown 组件已显示"已结束"，但 VoteDetail 的 isEnded 仍为 false，导致"投票已结束"标记不出现，选项也仍可点击。截止到期后应自动关闭投票。
+3. Countdown 组件的计时器 setInterval 在投票到期后没有被清除，持续每秒更新状态浪费性能。到期后应停止计时。
+4. copyToClipboard 函数调用了异步 API navigator.clipboard.writeText() 但没有 await 返回值，无法向调用方反馈复制的真实结果。函数在测试中也完全没有覆盖。
+5. 测试文件缺少 getUrlVoteParam 和 formatDateTimeLocal 两个工具函数的测试用例。getUrlVoteParam 是链接分享功能的关键路径，需要补充测试覆盖。
+6. 修复后重新运行 pnpm run test，需要让所有测试通过。

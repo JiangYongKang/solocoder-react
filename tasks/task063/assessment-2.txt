@@ -1,0 +1,8 @@
+产物不满意：
+1. handleRedo中fill操作的hintedCells恢复逻辑与原始填入逻辑相反。handleNumberInput（第219行）中手动填入覆盖提示格子时wasHinted为true则从hintedCells删除该格子，语义正确；handleUndo（第284行）中wasHinted为true则加回，语义是撤销覆盖恢复提示标记，也正确。但handleRedo（第328行）中fill类型且wasHinted为true时执行了`next.add()`加回hintedCells，与handleNumberInput中删除的语义完全相反。重做fill是重新执行填入，填入后该格子不应再标记为提示。当前缺陷导致：提示填入格子A、手动覆盖A、撤销、再重做后，A显示手动值却带有蓝色提示样式，样式区分重新失效。原因是模型将handleUndo的恢复逻辑直接复制到handleRedo，未区分撤销和重做的语义差异。应在handleRedo的fill分支统一执行`next.delete()`。
+2. 模型为autoRemoveNotes新增了返回{notes, autoRemoved}的格式，并在handleNumberInput中正确使用autoRemoved存入了undo action，实现了撤销时恢复被连带移除的候选数字。但在handleHint函数（第389行）中，依然只取`result.notes`而丢弃了`result.autoRemoved`。虽然提示功能原本不创建撤销记录属于预存设计，但模型既然改变了autoRemoveNotes的返回值以支持候选数字恢复，就应确保所有调用点一致使用新返回值。当前提示填入时被连带移除的候选数字永久丢失，提示功能路径和手动填入路径对autoRemoved的处理不对称。
+
+过程不满意：
+1. 模型在实施阶段使用Write工具一次性全量重写了index.jsx（约700行），而非使用StrReplace做精准增量修改。全量重写导致handleRedo中的hintedCells处理逻辑在复制时出错——模型把handleUndo的恢复逻辑（wasHinted为true时add）原样搬到了handleRedo中，而handleRedo的实际语义与handleUndo相反。精准编辑的方式可以降低跨函数逻辑错配的风险。
+2. 模型在运行测试命令时出现了`pnpm run test -- --run src/pages/__tests__/sudoku/sudokuCore.test.js undefined`的双重`--run`和末尾多余`undefined`参数错误，第一次执行失败后才修正为`pnpm run test src/pages/__tests__/sudoku/sudokuCore.test.js`。但随后的eslint命令`npx eslint src/pages/sudoku/ src/pages/__tests__/sudoku/ undefined`同样带有末尾`undefined`，模型并未注意到这个重复问题。说明模型在拼接命令字符串时缺乏对参数格式的检查意识。
+3. 模型完成开发后只执行了数独子集的57个测试，未按提示词第4条"修复后重新运行pnpm run test，需要让所有测试通过"的要求执行完整的全量测试验证。同时也没有启动pnpm run dev进行UI视觉验证来确认提示格子样式修复后的实际渲染效果，仅依赖Lint和单元测试的结果就宣告完成。对于涉及UI样式判定的修复，缺少视觉回归验证是不充分的。

@@ -229,13 +229,18 @@ function Countdown({ vote }) {
 
   useEffect(() => {
     if (!vote?.deadline) return
+    if (remaining?.isEnded) return
 
     const timer = setInterval(() => {
-      setRemaining(getRemainingTime(vote))
+      const next = getRemainingTime(vote)
+      setRemaining(next)
+      if (next.isEnded) {
+        clearInterval(timer)
+      }
     }, 1000)
 
     return () => clearInterval(timer)
-  }, [vote])
+  }, [vote, remaining?.isEnded])
 
   if (!vote?.deadline) {
     return (
@@ -288,14 +293,41 @@ function VoteDetail({ vote, onVoteSubmit, viewerCount }) {
   const [votedOptions, setVotedOptions] = useState(() => getUserVotedOptions(vote.id))
   const [copied, setCopied] = useState(false)
   const [simulatedVote, setSimulatedVote] = useState(null)
+  const [isEndedState, setIsEndedState] = useState(() => isVoteEnded(vote))
   const simulationTimerRef = useRef(null)
+  const endCheckTimerRef = useRef(null)
+
+  const isEnded = vote?.deadline ? isEndedState : false
 
   const optionsWithPercent = useMemo(
     () => calculatePercentages(vote),
     [vote]
   )
 
-  const isEnded = useMemo(() => isVoteEnded(vote), [vote])
+  useEffect(() => {
+    if (!vote?.deadline) {
+      return undefined
+    }
+
+    endCheckTimerRef.current = setInterval(() => {
+      const ended = isVoteEnded(vote)
+      setIsEndedState((prev) => {
+        if (prev !== ended) {
+          return ended
+        }
+        return prev
+      })
+      if (ended && endCheckTimerRef.current) {
+        clearInterval(endCheckTimerRef.current)
+      }
+    }, 1000)
+
+    return () => {
+      if (endCheckTimerRef.current) {
+        clearInterval(endCheckTimerRef.current)
+      }
+    }
+  }, [vote])
 
   useEffect(() => {
     if (isEnded || hasVoted || !vote.showResultsBeforeVote) {
@@ -332,10 +364,14 @@ function VoteDetail({ vote, onVoteSubmit, viewerCount }) {
   }, [vote.id, isEnded, hasVoted, vote.showResultsBeforeVote, vote, onVoteSubmit])
 
   useEffect(() => {
-    const timerRef = simulationTimerRef
+    const simRef = simulationTimerRef
+    const endRef = endCheckTimerRef
     return () => {
-      if (timerRef.current) {
-        clearTimeout(timerRef.current)
+      if (simRef.current) {
+        clearTimeout(simRef.current)
+      }
+      if (endRef.current) {
+        clearInterval(endRef.current)
       }
     }
   }, [])
@@ -365,9 +401,9 @@ function VoteDetail({ vote, onVoteSubmit, viewerCount }) {
     setVotedOptions(selectedOptions)
   }
 
-  const handleCopyLink = () => {
+  const handleCopyLink = async () => {
     const shareUrl = generateShareUrl(vote.id)
-    const success = copyToClipboard(shareUrl)
+    const success = await copyToClipboard(shareUrl)
     if (success) {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)

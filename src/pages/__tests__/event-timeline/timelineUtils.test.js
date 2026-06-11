@@ -34,6 +34,15 @@ import {
   getYearFromDate,
   getMonthNumber,
   getDayNumber,
+  getQuarter,
+  getZoomIndex,
+  getZoomLevelFromIndex,
+  formatDayLabelWithMonth,
+  groupByQuarter,
+  groupByWeek,
+  getGroupingForZoom,
+  groupEventsByZoom,
+  getZoomDensity,
 } from '@/pages/event-timeline/timelineUtils.js';
 import {
   STORAGE_KEY,
@@ -555,6 +564,164 @@ describe('timelineUtils', () => {
     it('getDayNumber', () => {
       expect(getDayNumber('2024-05-01')).toBe(1);
       expect(getDayNumber('2024-05-31')).toBe(31);
+    });
+  });
+
+  describe('getQuarter', () => {
+    it('should return correct quarter for each month', () => {
+      expect(getQuarter('2024-01-15')).toBe(1);
+      expect(getQuarter('2024-03-31')).toBe(1);
+      expect(getQuarter('2024-04-01')).toBe(2);
+      expect(getQuarter('2024-06-30')).toBe(2);
+      expect(getQuarter('2024-07-01')).toBe(3);
+      expect(getQuarter('2024-09-30')).toBe(3);
+      expect(getQuarter('2024-10-01')).toBe(4);
+      expect(getQuarter('2024-12-31')).toBe(4);
+    });
+  });
+
+  describe('zoom index helpers', () => {
+    it('getZoomIndex should return correct index for each level', () => {
+      expect(getZoomIndex(ZOOM_LEVEL.YEAR)).toBe(0);
+      expect(getZoomIndex(ZOOM_LEVEL.QUARTER)).toBe(1);
+      expect(getZoomIndex(ZOOM_LEVEL.MONTH)).toBe(2);
+      expect(getZoomIndex(ZOOM_LEVEL.WEEK)).toBe(3);
+    });
+
+    it('getZoomIndex should return default for invalid level', () => {
+      expect(getZoomIndex('invalid')).toBe(2);
+    });
+
+    it('getZoomLevelFromIndex should return correct level', () => {
+      expect(getZoomLevelFromIndex(0)).toBe(ZOOM_LEVEL.YEAR);
+      expect(getZoomLevelFromIndex(1)).toBe(ZOOM_LEVEL.QUARTER);
+      expect(getZoomLevelFromIndex(2)).toBe(ZOOM_LEVEL.MONTH);
+      expect(getZoomLevelFromIndex(3)).toBe(ZOOM_LEVEL.WEEK);
+    });
+
+    it('getZoomLevelFromIndex should clamp to valid range', () => {
+      expect(getZoomLevelFromIndex(-5)).toBe(ZOOM_LEVEL.YEAR);
+      expect(getZoomLevelFromIndex(100)).toBe(ZOOM_LEVEL.WEEK);
+    });
+  });
+
+  describe('formatDayLabelWithMonth', () => {
+    it('should format date with month and day in Chinese', () => {
+      expect(formatDayLabelWithMonth('2024-05-01')).toBe('5月1日');
+      expect(formatDayLabelWithMonth('2024-12-31')).toBe('12月31日');
+    });
+  });
+
+  describe('groupByQuarter', () => {
+    it('should group events by quarter', () => {
+      const evts = [
+        { id: '1', date: '2024-01-15', title: 'Q1' },
+        { id: '2', date: '2024-05-01', title: 'Q2' },
+        { id: '3', date: '2024-09-10', title: 'Q3' },
+        { id: '4', date: '2024-12-25', title: 'Q4' },
+      ];
+      const groups = groupByQuarter(evts);
+      expect(groups.length).toBe(4);
+      expect(groups[0].label).toBe('2024年 Q4');
+      expect(groups[3].label).toBe('2024年 Q1');
+    });
+
+    it('should include monthGroups with events', () => {
+      const evts = [
+        { id: '1', date: '2024-04-10' },
+        { id: '2', date: '2024-05-20' },
+      ];
+      const groups = groupByQuarter(evts);
+      expect(groups[0].monthGroups).toBeDefined();
+      expect(Object.keys(groups[0].monthGroups).length).toBe(2);
+    });
+  });
+
+  describe('groupByWeek', () => {
+    it('should group events by week', () => {
+      const evts = [
+        { id: '1', date: '2024-06-03' },
+        { id: '2', date: '2024-06-05' },
+        { id: '3', date: '2024-06-10' },
+      ];
+      const groups = groupByWeek(evts);
+      expect(groups.length).toBe(2);
+      expect(groups[0].events.length).toBe(1);
+      expect(groups[1].events.length).toBe(2);
+    });
+  });
+
+  describe('getGroupingForZoom', () => {
+    it('decade mode always returns decade', () => {
+      expect(getGroupingForZoom(GROUP_MODE.DECADE, ZOOM_LEVEL.YEAR)).toBe('decade');
+      expect(getGroupingForZoom(GROUP_MODE.DECADE, ZOOM_LEVEL.WEEK)).toBe('decade');
+    });
+
+    it('month mode returns different groupings by zoom', () => {
+      expect(getGroupingForZoom(GROUP_MODE.MONTH, ZOOM_LEVEL.YEAR)).toBe('year');
+      expect(getGroupingForZoom(GROUP_MODE.MONTH, ZOOM_LEVEL.QUARTER)).toBe('quarter');
+      expect(getGroupingForZoom(GROUP_MODE.MONTH, ZOOM_LEVEL.MONTH)).toBe('month');
+      expect(getGroupingForZoom(GROUP_MODE.MONTH, ZOOM_LEVEL.WEEK)).toBe('week');
+    });
+  });
+
+  describe('groupEventsByZoom', () => {
+    it('decade mode returns decade groups', () => {
+      const result = groupEventsByZoom(sampleEvents, GROUP_MODE.DECADE, ZOOM_LEVEL.MONTH);
+      expect(result.length).toBe(2);
+      expect(result[0].level).toBe('decade');
+      expect(result[0].subLevel).toBe('year');
+      expect(result[0].yearGroups).toBeDefined();
+    });
+
+    it('month mode + year zoom returns year groups', () => {
+      const result = groupEventsByZoom(sampleEvents, GROUP_MODE.MONTH, ZOOM_LEVEL.YEAR);
+      expect(result[0].level).toBe('year');
+      expect(result[0].subLevel).toBe('month');
+      expect(result[0].monthGroups).toBeDefined();
+    });
+
+    it('month mode + quarter zoom returns quarter groups', () => {
+      const result = groupEventsByZoom(sampleEvents, GROUP_MODE.MONTH, ZOOM_LEVEL.QUARTER);
+      expect(result[0].level).toBe('quarter');
+      expect(result[0].subLevel).toBe('month');
+      expect(result[0].monthGroups).toBeDefined();
+    });
+
+    it('month mode + month zoom returns month groups', () => {
+      const result = groupEventsByZoom(sampleEvents, GROUP_MODE.MONTH, ZOOM_LEVEL.MONTH);
+      expect(result[0].level).toBe('month');
+      expect(result[0].subLevel).toBe('day');
+      expect(result[0].dayGroups).toBeDefined();
+    });
+
+    it('month mode + week zoom returns week groups', () => {
+      const result = groupEventsByZoom(sampleEvents, GROUP_MODE.MONTH, ZOOM_LEVEL.WEEK);
+      expect(result[0].level).toBe('week');
+      expect(result[0].subLevel).toBe('day');
+      expect(result[0].dayGroups).toBeDefined();
+    });
+  });
+
+  describe('getZoomDensity', () => {
+    it('should return density settings for each zoom level', () => {
+      const d = getZoomDensity(ZOOM_LEVEL.YEAR);
+      expect(d.spacing).toBe('compact');
+      expect(d.detail).toBe('low');
+      expect(typeof d.yearGap).toBe('number');
+      expect(typeof d.dayGap).toBe('number');
+    });
+
+    it('year gaps should increase from compact to expanded', () => {
+      const yearDensity = getZoomDensity(ZOOM_LEVEL.YEAR);
+      const weekDensity = getZoomDensity(ZOOM_LEVEL.WEEK);
+      expect(yearDensity.yearGap).toBeLessThan(weekDensity.yearGap);
+      expect(yearDensity.dayGap).toBeLessThan(weekDensity.dayGap);
+    });
+
+    it('should default to month density for invalid level', () => {
+      const d = getZoomDensity('invalid');
+      expect(d.spacing).toBe('normal');
     });
   });
 });

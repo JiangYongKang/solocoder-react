@@ -3,7 +3,6 @@ import {
   TICKET_STATUSES,
   CATEGORIES,
   PRIORITIES,
-  SLA_HOURS,
   STORAGE_KEY,
   TIMELINE_TYPES,
 } from '../../ticket-system/constants'
@@ -188,6 +187,32 @@ describe('loadTickets / saveTickets', () => {
     storage.setItem(STORAGE_KEY, JSON.stringify([{ title: 'bad' }, null, 42]))
     expect(loadTickets(storage)).toEqual([])
   })
+
+  it('保存时剥离附件字段，不持久化到存储', () => {
+    const tickets = [makeTicket({ attachments: [{ name: 'test.pdf', type: 'application/pdf' }] })]
+    saveTickets(tickets, storage)
+    const raw = storage.getItem(STORAGE_KEY)
+    const parsed = JSON.parse(raw)
+    expect(parsed[0].attachments).toBeUndefined()
+    expect(parsed[0].id).toBe(tickets[0].id)
+    expect(parsed[0].title).toBe(tickets[0].title)
+  })
+
+  it('加载时附件字段初始化为空数组', () => {
+    const tickets = [makeTicket({ id: 'tk_1' })]
+    saveTickets(tickets, storage)
+    const loaded = loadTickets(storage)
+    expect(loaded[0].attachments).toEqual([])
+    expect(loaded[0].id).toBe('tk_1')
+  })
+
+  it('加载时即使存储中有附件也重置为空', () => {
+    storage.setItem(STORAGE_KEY, JSON.stringify([
+      { id: 'tk_1', ticketNumber: 'TK-123', status: 'pending', attachments: [{ name: 'old.pdf' }] }
+    ]))
+    const loaded = loadTickets(storage)
+    expect(loaded[0].attachments).toEqual([])
+  })
 })
 
 describe('addTicket', () => {
@@ -233,6 +258,43 @@ describe('transitionStatus', () => {
   it('不匹配的工单不变', () => {
     const ticket = makeTicket({ id: 'tk_1', status: TICKET_STATUSES.PENDING })
     const result = transitionStatus([ticket], 'tk_2', TICKET_STATUSES.IN_PROGRESS)
+    expect(result[0].status).toBe(TICKET_STATUSES.PENDING)
+  })
+
+  it('不允许非法状态转换 - 待处理不能直接跳到已解决', () => {
+    const ticket = makeTicket({ id: 'tk_1', status: TICKET_STATUSES.PENDING })
+    const result = transitionStatus([ticket], 'tk_1', TICKET_STATUSES.RESOLVED)
+    expect(result[0].status).toBe(TICKET_STATUSES.PENDING)
+    expect(result[0].timeline.length).toBe(1)
+  })
+
+  it('不允许非法状态转换 - 待处理不能直接跳到已关闭', () => {
+    const ticket = makeTicket({ id: 'tk_1', status: TICKET_STATUSES.PENDING })
+    const result = transitionStatus([ticket], 'tk_1', TICKET_STATUSES.CLOSED)
+    expect(result[0].status).toBe(TICKET_STATUSES.PENDING)
+  })
+
+  it('不允许非法状态转换 - 处理中不能直接跳到已关闭', () => {
+    const ticket = makeTicket({ id: 'tk_1', status: TICKET_STATUSES.IN_PROGRESS })
+    const result = transitionStatus([ticket], 'tk_1', TICKET_STATUSES.CLOSED)
+    expect(result[0].status).toBe(TICKET_STATUSES.IN_PROGRESS)
+  })
+
+  it('不允许非法状态转换 - 已解决不能直接跳到待处理', () => {
+    const ticket = makeTicket({ id: 'tk_1', status: TICKET_STATUSES.RESOLVED })
+    const result = transitionStatus([ticket], 'tk_1', TICKET_STATUSES.PENDING)
+    expect(result[0].status).toBe(TICKET_STATUSES.RESOLVED)
+  })
+
+  it('不允许非法状态转换 - 已关闭不能直接跳到待处理', () => {
+    const ticket = makeTicket({ id: 'tk_1', status: TICKET_STATUSES.CLOSED })
+    const result = transitionStatus([ticket], 'tk_1', TICKET_STATUSES.PENDING)
+    expect(result[0].status).toBe(TICKET_STATUSES.CLOSED)
+  })
+
+  it('不允许转换为未知状态', () => {
+    const ticket = makeTicket({ id: 'tk_1', status: TICKET_STATUSES.PENDING })
+    const result = transitionStatus([ticket], 'tk_1', 'some_unknown_status')
     expect(result[0].status).toBe(TICKET_STATUSES.PENDING)
   })
 })

@@ -69,7 +69,10 @@ export function loadTickets(storage) {
         typeof t.id === 'string' &&
         typeof t.ticketNumber === 'string' &&
         typeof t.status === 'string'
-    )
+    ).map((t) => ({
+      ...t,
+      attachments: [],
+    }))
   } catch {
     return []
   }
@@ -79,7 +82,12 @@ export function saveTickets(tickets, storage) {
   const s = typeof window !== 'undefined' && !storage ? window.localStorage : storage
   if (!s) return
   try {
-    s.setItem(STORAGE_KEY, JSON.stringify(tickets))
+    const stripped = tickets.map((t) =>
+      Object.fromEntries(
+        Object.entries(t).filter(([k]) => k !== 'attachments')
+      )
+    )
+    s.setItem(STORAGE_KEY, JSON.stringify(stripped))
   } catch {
     // ignore
   }
@@ -100,6 +108,8 @@ export function updateTicketInList(tickets, ticketId, updates) {
 export function transitionStatus(tickets, ticketId, newStatus) {
   return tickets.map((t) => {
     if (t.id !== ticketId) return t
+    const allowed = getAvailableTransitions(t.status).map((trans) => trans.target)
+    if (!allowed.includes(newStatus)) return t
     const now = Date.now()
     const timelineEntry = {
       id: 'tl_' + now.toString(36) + Math.random().toString(36).slice(2, 8),

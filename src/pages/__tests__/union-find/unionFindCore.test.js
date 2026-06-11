@@ -33,6 +33,7 @@ import {
   OPERATION_TYPE,
   MIN_ZOOM,
   MAX_ZOOM,
+  NODE_RADIUS,
 } from '../../union-find/constants.js'
 
 describe('createInitialState', () => {
@@ -110,22 +111,28 @@ describe('addNode', () => {
     expect(getNodeCount(s)).toBe(3)
   })
 
-  it('should not overlap existing nodes positions', () => {
+  it('should place new nodes to the right of existing nodes', () => {
     let s = state
     const positions = []
     for (let i = 0; i < 10; i++) {
       const r = addNode(s)
       s = r.state
       const pos = s.positions.get(r.nodeId)
-      for (const existing of positions) {
-        const dx = pos.x - existing.x
-        const dy = pos.y - existing.y
-        const dist = Math.sqrt(dx * dx + dy * dy)
-        expect(dist).toBeGreaterThan(0)
+      expect(pos.x).toBeGreaterThanOrEqual(0)
+      expect(pos.y).toBeGreaterThanOrEqual(0)
+      if (i > 0) {
+        expect(pos.x).toBeGreaterThan(positions[positions.length - 1].x)
       }
       positions.push(pos)
     }
     expect(getNodeCount(s)).toBe(10)
+  })
+
+  it('should place first node at default position', () => {
+    const result = addNode(state)
+    const pos = result.state.positions.get(result.nodeId)
+    expect(pos.x).toBe(NODE_RADIUS + 50)
+    expect(pos.y).toBe(NODE_RADIUS + 50)
   })
 })
 

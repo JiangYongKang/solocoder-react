@@ -1,54 +1,38 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { EMOJI_OPTIONS } from './constants.js';
 import { validateEvent } from './timelineUtils.js';
 
 export default function EventFormModal({
-  isOpen,
   initialData,
   availableTags,
   onClose,
   onSubmit,
 }) {
-  const [form, setForm] = useState({
-    title: '',
-    date: '',
-    endDate: '',
-    description: '',
-    tags: [],
-    icon: '📅',
-    customTag: '',
+  const today = new Date().toISOString().slice(0, 10);
+
+  const [form, setForm] = useState(() => {
+    if (initialData) {
+      return {
+        title: initialData.title || '',
+        date: initialData.date || '',
+        endDate: initialData.endDate || '',
+        description: initialData.description || '',
+        tags: [...(initialData.tags || [])],
+        icon: initialData.icon || '📅',
+        customTag: '',
+      };
+    }
+    return {
+      title: '',
+      date: today,
+      endDate: '',
+      description: '',
+      tags: [],
+      icon: '📅',
+      customTag: '',
+    };
   });
   const [errors, setErrors] = useState({});
-
-  useEffect(() => {
-    if (isOpen) {
-      if (initialData) {
-        setForm({
-          title: initialData.title || '',
-          date: initialData.date || '',
-          endDate: initialData.endDate || '',
-          description: initialData.description || '',
-          tags: [...(initialData.tags || [])],
-          icon: initialData.icon || '📅',
-          customTag: '',
-        });
-      } else {
-        const today = new Date().toISOString().slice(0, 10);
-        setForm({
-          title: '',
-          date: today,
-          endDate: '',
-          description: '',
-          tags: [],
-          icon: '📅',
-          customTag: '',
-        });
-      }
-      setErrors({});
-    }
-  }, [isOpen, initialData]);
-
-  if (!isOpen) return null;
 
   const handleChange = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));

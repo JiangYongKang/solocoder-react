@@ -25,9 +25,50 @@ export const MESSAGE_TEMPLATES = [
 
 export const DEFAULT_HEARTBEAT_INTERVAL = 10
 export const DEFAULT_HEARTBEAT_TIMEOUT_THRESHOLD = 3
+export const DEFAULT_HEARTBEAT_ENABLED = true
 export const DEFAULT_RECONNECT_ENABLED = true
 export const DEFAULT_RECONNECT_MAX_RETRIES = 5
 export const DEFAULT_RECONNECT_INTERVAL = 3
+
+const ECHO_SERVER_PATTERNS = [
+  /echo\.websocket\.org/i,
+  /ws\.ifelse\.io/i,
+  /echo-server/i,
+  /websocket\.org/i,
+]
+
+export function isEchoServer(url) {
+  if (!url || typeof url !== 'string') return false
+  return ECHO_SERVER_PATTERNS.some((pattern) => pattern.test(url))
+}
+
+export function isPongResponse(content) {
+  if (!content || typeof content !== 'string') return false
+  try {
+    const parsed = JSON.parse(content)
+    return parsed && parsed.type === 'pong'
+  } catch {
+    return content.trim().toLowerCase() === 'pong'
+  }
+}
+
+export function highlightKeyword(text, keyword) {
+  if (!text || !keyword || keyword.trim() === '') return escapeHtml(text)
+  const lowerText = text.toLowerCase()
+  const lowerKeyword = keyword.trim().toLowerCase()
+  const index = lowerText.indexOf(lowerKeyword)
+  if (index === -1) return escapeHtml(text)
+
+  const before = text.slice(0, index)
+  const match = text.slice(index, index + keyword.trim().length)
+  const after = text.slice(index + keyword.trim().length)
+
+  return (
+    escapeHtml(before) +
+    `<span class="ws-log-highlight">${escapeHtml(match)}</span>` +
+    highlightKeyword(after, keyword)
+  )
+}
 
 export function generateId() {
   return `ws-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
@@ -145,6 +186,7 @@ export function saveHistory(history) {
 
 export function createDefaultSettings() {
   return {
+    heartbeatEnabled: DEFAULT_HEARTBEAT_ENABLED,
     heartbeatInterval: DEFAULT_HEARTBEAT_INTERVAL,
     heartbeatTimeoutThreshold: DEFAULT_HEARTBEAT_TIMEOUT_THRESHOLD,
     reconnectEnabled: DEFAULT_RECONNECT_ENABLED,
@@ -223,7 +265,7 @@ export function escapeHtml(text) {
     .replace(/>/g, '&gt;')
 }
 
-export function highlightJson(jsonString) {
+export function highlightJson(jsonString, keyword = '') {
   if (jsonString == null || jsonString === '') return ''
   const escaped = escapeHtml(jsonString)
   let result = escaped
@@ -235,7 +277,45 @@ export function highlightJson(jsonString) {
   })
   result = result.replace(/\b(-?\d+\.?\d*)\b/g, '<span class="ws-hl-number">$1</span>')
   result = result.replace(/\b(true|false|null)\b/g, '<span class="ws-hl-keyword">$1</span>')
+  if (keyword && keyword.trim()) {
+    result = applyKeywordHighlight(result, keyword)
+  }
   return result
+}
+
+function applyKeywordHighlight(html, keyword) {
+  const kw = keyword.trim()
+  if (!kw) return html
+  const lowerKw = kw.toLowerCase()
+  return html.replace(/>([^<]+)</g, (match, text) => {
+    const lowerText = text.toLowerCase()
+    if (lowerText.includes(lowerKw)) {
+      const highlighted = text.replace(
+        new RegExp(`(${kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi'),
+        '<span class="ws-log-highlight">$1</span>'
+      )
+      return `>${highlighted}<`
+    }
+    return match
+  })
+}
+
+export function formatMessageForDisplay(content, expanded, keyword = '') {
+  if (content == null) return ''
+  const isLong = String(content).length > 100
+  if (!expanded && isLong) {
+    const truncated = truncateMessage(content, 100)
+    return keyword && keyword.trim()
+      ? highlightKeyword(truncated, keyword)
+      : escapeHtml(truncated)
+  }
+  const formatted = tryFormatMessage(content)
+  if (isValidJson(formatted)) {
+    return highlightJson(formatted, keyword)
+  }
+  return keyword && keyword.trim()
+    ? highlightKeyword(formatted, keyword)
+    : escapeHtml(formatted)
 }
 
 export function filterLogs(logs, keyword) {

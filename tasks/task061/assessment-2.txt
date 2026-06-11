@@ -1,0 +1,13 @@
+产物不满意：
+1. TrendChart.jsx 的 interpolateLayout 函数在动画过渡时会产生 NaN 坐标，导致切换时间范围时图表折线消失。当用户从 7 天切换到 30 天或 90 天时，resampleData 函数只从 fromLayout.points 中拷贝了 date 和 value 两个属性，丢弃了原始数据点中的 y 坐标。resampleData 返回的 fromPoints 数组里的每个元素只有 {date, value, x} 三个字段，缺少 y 属性。而 interpolateLayout 在计算动画中间帧的点坐标时使用表达式 fromPt.y + (to.y - fromPt.y) * p，此时 fromPt.y 为 undefined，计算结果为 NaN。NaN 值传入 SVG path 的 d 属性后，整个折线路径渲染失败，图表在 500ms 动画期间呈现空白。需求明确要求切换时间范围时图表应有动画过渡，当前实现因 NaN 问题无法展示有效动画，属于功能未正确实现。正确做法是在 resampleData 中同步插值 y 坐标，即 result.push 时也计算 curr.y + (next.y - curr.y) * frac，确保 fromPoints 包含 y 属性供 interpolateLayout 使用。
+
+2. index.jsx 的 handleSwap 函数在互换货币代码和金额时，仅将旧的 targetAmount 直接赋值给 baseAmount，将旧的 baseAmount 直接赋值给 targetAmount，没有调用 convertCurrency 对目标金额做真正的重新换算。提示词第 1 条明确描述需求场景为"1 USD = 7.2456 CNY 时点击互换，页面应该将原来的目标金额 7.2456 作为基准金额重新换算"，其中"重新换算"四字强调需要基于新的基准金额和新的货币对重新计算目标值。虽然当基准金额和目标金额完全通过固定汇率自动推导时，直接交换旧值的结果与重新换算结果巧合一致，但语义上与需求不符。如果用户之前手动修改过目标金额为非自动推导值，交换旧值会导致显示不正确。正确做法是在设置基准金额后调用 convertCurrency 计算新的目标金额。
+
+3. currencyUtils.js 的 formatDateTick 函数中存在无效果的 if 分支死代码。函数接收 totalDays 参数并判断 totalDays <= 7，但两个分支返回完全相同的格式字符串 M/D，if 判断没有产生任何实际差异，equals 分支毫无意义。虽然这个函数并非本轮修复的范围，但模型在编辑同文件的 searchCurrencies 函数时有机会注意到这个冗余分支却忽略未处理，遗漏了清理死代码的机会。
+
+过程不满意：
+1. 模型在实现 TrendChart.jsx 动画时，因为 lint 错误（useEffect 中同步 setState、ref 在渲染期间访问、animate 自引用等）对 TrendChart.jsx 进行了六次完整重写。第一次写入动画逻辑后跑 lint 发现未使用变量和 ref 渲染访问问题，重写一次；第二次重写后又出现 useEffect 中 setState 的 lint 错误，再重写；第三次遇到困难后竟然跨任务去查看 src/pages/weather/TemperatureChart.jsx 组件（该组件根本没有动画实现），找不到参考后又重写；第四次重写后出现 class 字符串拼接 bug 和 animate 依赖问题，再次重写。这种遇到一个 lint 错就全量重写的模式是典型的试错式调试，没有在第一次 lint 报错后一次性列出所有错误、分析其根因、然后做最小化修正。正确做法是先收集全部 lint 错误清单，理解每个错误的规则含义，制定一次性的集中修复方案，用 targeted edit 而非全量重写。
+
+2. 模型跨任务查看了 TemperatureChart.jsx（src/pages/weather/ 目录下的组件）试图寻找动画实现参考，但 TemperatureChart 组件中没有任何动画逻辑，查看这个组件完全是无效操作，浪费了时间和 token。不同任务之间有严格的包隔离要求，模型不应在解决当前任务的问题时去参考其他任务的组件实现。
+
+3. 模型在首次运行测试时执行了 pnpm run test --run 命令，因为 package.json 中 test 脚本已定义为 vitest --run，再次追加 --run 导致命令出错，需要重新执行正确的 pnpm run test 命令。模型没有先检查 test 脚本的实际定义就盲目追加参数，属于测试执行环节的粗心操作。正确做法是在运行测试命令前先确认 scripts 中的实际定义，确保参数组合正确。

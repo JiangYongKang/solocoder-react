@@ -10,6 +10,7 @@ import {
   addFavorite,
   removeFavorite,
   isFavorite,
+  convertCurrency,
 } from './currencyUtils.js'
 
 import './currency-converter.css'
@@ -18,6 +19,11 @@ const CurrencyConverterPage = () => {
   const navigate = useNavigate()
   const [baseCode, setBaseCode] = useState('USD')
   const [targetCode, setTargetCode] = useState('CNY')
+  const [baseAmount, setBaseAmount] = useState('1')
+  const [targetAmount, setTargetAmount] = useState(() => {
+    const rate = convertCurrency(1, 'USD', 'CNY')
+    return rate !== null ? String(rate) : ''
+  })
   const [favorites, setFavorites] = useState(() => loadFavorites())
 
   useEffect(() => {
@@ -25,12 +31,17 @@ const CurrencyConverterPage = () => {
   }, [favorites])
 
   const handleSwap = useCallback(() => {
-    setBaseCode((prev) => {
+    setBaseCode((prevBase) => {
       const newBase = targetCode
-      setTargetCode(prev)
+      setTargetCode(prevBase)
       return newBase
     })
-  }, [targetCode])
+    setBaseAmount((prevBaseAmt) => {
+      const newBaseAmt = targetAmount
+      setTargetAmount(prevBaseAmt)
+      return newBaseAmt
+    })
+  }, [targetCode, targetAmount])
 
   const handleToggleFavorite = useCallback((base, target) => {
     setFavorites((prev) => {
@@ -48,7 +59,12 @@ const CurrencyConverterPage = () => {
   const handleSelectFavorite = useCallback((base, target) => {
     setBaseCode(base)
     setTargetCode(target)
-  }, [])
+    const num = parseFloat(baseAmount) || 0
+    if (num > 0) {
+      const converted = convertCurrency(num, base, target)
+      setTargetAmount(converted !== null ? String(converted) : '')
+    }
+  }, [baseAmount])
 
   return (
     <div className="cc-page">
@@ -74,8 +90,12 @@ const CurrencyConverterPage = () => {
               <ConversionPanel
                 baseCode={baseCode}
                 targetCode={targetCode}
+                baseAmount={baseAmount}
+                targetAmount={targetAmount}
                 onBaseChange={setBaseCode}
                 onTargetChange={setTargetCode}
+                onBaseAmountChange={setBaseAmount}
+                onTargetAmountChange={setTargetAmount}
                 onSwap={handleSwap}
               />
             </div>

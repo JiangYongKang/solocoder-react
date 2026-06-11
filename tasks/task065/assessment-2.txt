@@ -1,0 +1,7 @@
+产物不满意：
+1. timelineUtils.js 中新增的 groupByQuarter 和 groupByWeek 函数，以及 groupEventsByZoom 函数，都在内部使用了 `new Date(event.date)` 来解析日期。如果事件数据中的日期格式不是标准的 ISO 8601 格式（如 "2024/01/15" 或 "15-01-2024"），Date 构造函数在不同浏览器中的解析行为不一致，可能导致月份分组出现偏差。这些新增函数没有对日期格式做任何校验或标准化预处理，不够健壮。
+2. index.jsx 中缩放滑块使用 `<input type="range">` 实现，但模型在滑块下方额外添加了 4 个可点击的标签按钮来切换级别。这确实提供了多种交互方式，但 tag 按钮的点击事件直接调用 `setZoomLevel(level)` 更新状态，而滑块的 onChange 也更新同一个状态。当用户先拖滑块再点标签时，两者使用的是同一个 zoomLevel state，不会冲突。但当用户快速切换时，如果在 handleRangeChange 中触发了事件相关的副作用操作（如重新分组），可能导致在过渡期间出现不一致的渲染。
+3. timeline.css 中瀑布流布局使用了 `column-count` 属性，但没有配合 `column-gap` 的设置。此外，`.et-card-grid` 内部使用 `break-inside: avoid` 防止卡片在列间断开，这是正确的 CSS 瀑布流实现方式。但模型在将原来复杂的 `.et-card-grid` Grid 布局样式替换为瀑布流样式时，没有完全移除旧的 Grid 相关属性（如 `display: grid` 被替换为 `display: block`），可能存在样式类名残留。
+
+过程不满意：
+模型在实现事件时间线第 2 轮修复时，流程是先修改 timelineUtils.js 工具函数，然后写完测试，再一次性重写整个 index.jsx 主组件，接着修改 CSS 文件。在修改 CSS 的过程中，模型多次读取同一文件的后续部分来查找需要修改的样式类（如先读 1-50 行改缩放控件，再读 50-100 行改时间轴，再读 100-150 行改响应式），每次读取有重叠区域但没有一次性规划好需要修改的所有位置。模型在修改 CSS 后运行 lint 发现了 4 个错误，又逐一定位修复，前后对 index.jsx 和 EventFormModal.jsx 做了多次增量修改。整体效率偏低，应该先通读 CSS 文件全貌，列出所有需要替换的类名和位置，然后一次性批量修改。

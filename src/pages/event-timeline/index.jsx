@@ -6,7 +6,6 @@ import ConfirmDialog from './ConfirmDialog.jsx';
 import {
   GROUP_MODE,
   GROUP_MODE_LABELS,
-  ZOOM_LEVEL,
   ZOOM_LEVEL_LABELS,
   ZOOM_LEVEL_ORDER,
   VIEW_MODE,
@@ -22,13 +21,17 @@ import {
   updateEvent,
   deleteEvent,
   applyFilters,
-  groupEvents,
+  groupEventsByZoom,
   collectAllTagsWithDefaults,
   getSortForCardView,
   sortEvents,
   matchSearchHighlight,
   getDateRangeFromZoom,
   formatRangeLabel,
+  getZoomIndex,
+  getZoomLevelFromIndex,
+  formatDayLabelWithMonth,
+  getZoomDensity,
 } from './timelineUtils.js';
 import './timeline.css';
 
@@ -74,8 +77,8 @@ export default function EventTimelinePage() {
   );
 
   const timelineGroups = useMemo(
-    () => groupEvents(filteredEvents, groupMode),
-    [filteredEvents, groupMode],
+    () => groupEventsByZoom(filteredEvents, groupMode, zoomLevel),
+    [filteredEvents, groupMode, zoomLevel],
   );
 
   const cardViewEvents = useMemo(
@@ -92,6 +95,16 @@ export default function EventTimelinePage() {
     () => formatRangeLabel(getDateRangeFromZoom(events, zoomLevel)),
     [events, zoomLevel],
   );
+
+  const zoomDensity = useMemo(() => getZoomDensity(zoomLevel), [zoomLevel]);
+
+  const zoomIndex = getZoomIndex(zoomLevel);
+
+  const handleZoomSliderChange = (e) => {
+    const idx = parseInt(e.target.value, 10);
+    const level = getZoomLevelFromIndex(idx);
+    setZoomLevel(level);
+  };
 
   const toggleTag = (tag) => {
     setSelectedTags((prev) => (
@@ -180,10 +193,71 @@ export default function EventTimelinePage() {
     setIsDragging(false);
   };
 
+  const getSubGroupLabel = (group, subKey) => {
+    const { subLevel, level } = group;
+    if (subLevel === 'year') {
+      return `${subKey}年`;
+    }
+    if (subLevel === 'month') {
+      const month = parseInt(subKey, 10);
+      return `${month}月`;
+    }
+    if (subLevel === 'day') {
+      const day = parseInt(subKey, 10);
+      if (level === 'month') {
+        const monthStr = group.key ? group.key.slice(5, 7) : '01';
+        const month = parseInt(monthStr, 10);
+        return `${month}月${day}日`;
+      }
+      if (level === 'week') {
+        const weekStartDate = new Date(
+          group.weekStart.slice(0, 4),
+          parseInt(group.weekStart.slice(5, 7), 10) - 1,
+          parseInt(group.weekStart.slice(8, 10), 10),
+        );
+        weekStartDate.setDate(weekStartDate.getDate() + day - 1);
+        const m = weekStartDate.getMonth() + 1;
+        return `${m}月${day}日`;
+      }
+      return formatDayLabelWithMonth(`${group.key}-${subKey}`);
+    }
+    return subKey;
+  };
+
+  const renderTimelineNode = (evt) => (
+    <div key={evt.id} className="et-timeline-node">
+      <div className="et-node-dot" aria-hidden="true" />
+      <div className="et-node-card">
+        <EventCard
+          event={evt}
+          isExpanded={expandedId === evt.id}
+          isHighlighted={searchQuery && matchSearchHighlight(evt, searchQuery)}
+          isDimmed={!!(searchQuery && !matchSearchHighlight(evt, searchQuery))}
+          onToggleExpand={handleToggleExpand}
+          onEdit={handleEditClick}
+          onDelete={handleDeleteClick}
+          viewMode="timeline"
+        />
+      </div>
+    </div>
+  );
+
+  const renderSubGroup = (group, subKey, events) => (
+    <div key={subKey} className="et-sub-block" data-level={group.subLevel}>
+      <div className="et-sub-marker">
+        <div className="et-sub-label">{getSubGroupLabel(group, subKey)}</div>
+        <div className="et-sub-tick" />
+      </div>
+      <div className="et-sub-events">
+        {events.map(renderTimelineNode)}
+      </div>
+    </div>
+  );
+
   const renderTimelineView = () => (
     <div
       ref={timelineRef}
-      className={`et-timeline-scroll ${isDragging ? 'et-dragging' : ''}`}
+      className={`et-timeline-scroll ${isDragging ? 'et-dragging' : ''} et-density-${zoomDensity.spacing}`}
       onWheel={handleWheel}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
@@ -191,9 +265,9 @@ export default function EventTimelinePage() {
       onMouseLeave={handleMouseUp}
       style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
     >
-      <div className="et-timeline-inner" data-zoom={zoomLevel}>
+      <div className="et-timeline-inner" data-zoom={zoomLevel} data-density={zoomDensity.spacing}>
         {timelineGroups.map((group) => (
-          <div key={group.key} className="et-group">
+          <div key={group.key} className="et-group" data-level={group.level}>
             <div className="et-group-header">
               <h2 className="et-group-title">
                 <span className="et-group-label">{group.label}</span>
@@ -202,62 +276,17 @@ export default function EventTimelinePage() {
             </div>
             <div className="et-timeline-track">
               <div className="et-timeline-line" aria-hidden="true" />
-              {groupMode === GROUP_MODE.DECADE ? (
-                Object.keys(group.yearGroups || {}).sort().reverse().map((year) => (
-                  <div key={year} className="et-year-block">
-                    <div className="et-year-marker">
-                      <div className="et-year-label">{year}</div>
-                      <div className="et-year-tick" />
-                    </div>
-                    <div className="et-year-events">
-                      {group.yearGroups[year].map((evt) => (
-                        <div key={evt.id} className="et-timeline-node">
-                          <div className="et-node-dot" aria-hidden="true" />
-                          <div className="et-node-card">
-                            <EventCard
-                              event={evt}
-                              isExpanded={expandedId === evt.id}
-                              isHighlighted={searchQuery && matchSearchHighlight(evt, searchQuery)}
-                              isDimmed={!!(searchQuery && !matchSearchHighlight(evt, searchQuery))}
-                              onToggleExpand={handleToggleExpand}
-                              onEdit={handleEditClick}
-                              onDelete={handleDeleteClick}
-                              viewMode="timeline"
-                            />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))
-              ) : (
-                Object.keys(group.dayGroups || {}).sort().reverse().map((day) => (
-                  <div key={day} className="et-day-block">
-                    <div className="et-day-marker">
-                      <div className="et-day-label">{parseInt(day, 10)}日</div>
-                      <div className="et-day-tick" />
-                    </div>
-                    <div className="et-day-events">
-                      {group.dayGroups[day].map((evt) => (
-                        <div key={evt.id} className="et-timeline-node">
-                          <div className="et-node-dot" aria-hidden="true" />
-                          <div className="et-node-card">
-                            <EventCard
-                              event={evt}
-                              isExpanded={expandedId === evt.id}
-                              isHighlighted={searchQuery && matchSearchHighlight(evt, searchQuery)}
-                              isDimmed={!!(searchQuery && !matchSearchHighlight(evt, searchQuery))}
-                              onToggleExpand={handleToggleExpand}
-                              onEdit={handleEditClick}
-                              onDelete={handleDeleteClick}
-                              viewMode="timeline"
-                            />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))
+              {group.subLevel === 'year' && (
+                Object.keys(group.yearGroups || {}).sort().reverse().map((year) =>
+                  renderSubGroup(group, year, group.yearGroups[year]))
+              )}
+              {group.subLevel === 'month' && (
+                Object.keys(group.monthGroups || {}).sort().reverse().map((month) =>
+                  renderSubGroup(group, month, group.monthGroups[month]))
+              )}
+              {group.subLevel === 'day' && (
+                Object.keys(group.dayGroups || {}).sort().reverse().map((day) =>
+                  renderSubGroup(group, day, group.dayGroups[day]))
               )}
             </div>
           </div>
@@ -267,19 +296,20 @@ export default function EventTimelinePage() {
   );
 
   const renderCardView = () => (
-    <div className="et-card-grid">
+    <div className="et-card-masonry">
       {cardViewEvents.map((evt) => (
-        <EventCard
-          key={evt.id}
-          event={evt}
-          isExpanded={expandedId === evt.id}
-          isHighlighted={searchQuery && matchSearchHighlight(evt, searchQuery)}
-          isDimmed={!!(searchQuery && !matchSearchHighlight(evt, searchQuery))}
-          onToggleExpand={handleToggleExpand}
-          onEdit={handleEditClick}
-          onDelete={handleDeleteClick}
-          viewMode="card"
-        />
+        <div key={evt.id} className="et-masonry-item">
+          <EventCard
+            event={evt}
+            isExpanded={expandedId === evt.id}
+            isHighlighted={searchQuery && matchSearchHighlight(evt, searchQuery)}
+            isDimmed={!!(searchQuery && !matchSearchHighlight(evt, searchQuery))}
+            onToggleExpand={handleToggleExpand}
+            onEdit={handleEditClick}
+            onDelete={handleDeleteClick}
+            viewMode="card"
+          />
+        </div>
       ))}
     </div>
   );
@@ -375,17 +405,38 @@ export default function EventTimelinePage() {
 
           {viewMode === VIEW_MODE.TIMELINE && (
             <div className="et-zoom-control">
-              <label htmlFor="et-zoom" className="et-zoom-label">缩放：</label>
-              <select
-                id="et-zoom"
-                className="et-zoom-select"
-                value={zoomLevel}
-                onChange={(e) => setZoomLevel(e.target.value)}
-              >
-                {ZOOM_LEVEL_ORDER.map((level) => (
-                  <option key={level} value={level}>{ZOOM_LEVEL_LABELS[level]}</option>
-                ))}
-              </select>
+              <span className="et-zoom-label">缩放：</span>
+              <div className="et-zoom-slider-wrap">
+                <input
+                  type="range"
+                  className="et-zoom-slider"
+                  min="0"
+                  max="3"
+                  step="1"
+                  value={zoomIndex}
+                  onChange={handleZoomSliderChange}
+                  aria-label="缩放级别滑块"
+                  list="zoom-levels"
+                />
+                <datalist id="zoom-levels">
+                  {ZOOM_LEVEL_ORDER.map((_, idx) => (
+                    <option key={idx} value={idx} />
+                  ))}
+                </datalist>
+                <div className="et-zoom-ticks">
+                  {ZOOM_LEVEL_ORDER.map((level) => (
+                    <button
+                      key={level}
+                      type="button"
+                      className={`et-zoom-tick-label ${zoomLevel === level ? 'et-zoom-tick-active' : ''}`}
+                      onClick={() => setZoomLevel(level)}
+                      aria-pressed={zoomLevel === level}
+                    >
+                      {ZOOM_LEVEL_LABELS[level]}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -470,13 +521,15 @@ export default function EventTimelinePage() {
         {hasEvents && hasFilteredEvents && viewMode === VIEW_MODE.LIST && renderListView()}
       </div>
 
-      <EventFormModal
-        isOpen={formOpen}
-        initialData={editingEvent}
-        availableTags={allTags}
-        onClose={() => { setFormOpen(false); setEditingEvent(null); }}
-        onSubmit={handleFormSubmit}
-      />
+      {formOpen && (
+        <EventFormModal
+          key={editingEvent?.id || 'new'}
+          initialData={editingEvent}
+          availableTags={allTags}
+          onClose={() => { setFormOpen(false); setEditingEvent(null); }}
+          onSubmit={handleFormSubmit}
+        />
+      )}
 
       <ConfirmDialog
         isOpen={confirmOpen}

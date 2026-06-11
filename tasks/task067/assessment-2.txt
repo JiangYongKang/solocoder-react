@@ -1,0 +1,7 @@
+产物不满意：
+1. PrintView.jsx 在修复 rowSpan 跳过逻辑时，模型在课程卡片渲染中额外引入了 SUBJECT_COLORS 学科颜色映射（borderLeft 和 background 样式）、WEEK_TYPE_LABELS 周次标签展示，以及教师和教室字段前的 👤 📍 emoji 图标。这三个改动属于视觉增强而非 BUG 修复，超出了提示词要求的四项修复范围。尤其是 emoji 图标属于无明确需求的新功能扩展（原文"张老师"变为"👤 张老师"），缺陷修复轮次明确要求"任务是纯修复，不做新功能扩展"，模型未严格遵守这一约束。正确的做法是只修复 rowSpan 列错位和删除底部课程列表，不在 print 视图中附带无关的视觉改动。
+2. 模型为 ScheduleGrid.jsx 的 corner header 元素同时应用了 schedule-corner-header 和 schedule-grid-header-sticky 两个 CSS 类。schedule-corner-header 定义了 z-index: 20，但 schedule-grid-header-sticky 定义在 CSS 文件更靠后的位置且也声明了 z-index: 15，根据 CSS 层叠规则后者覆盖了前者，导致 corner header 的 z-index 从 20 降为 15，与 day header 同级。虽然当前布局下不会立即产生视觉异常，但破坏了原始设计中对角格始终位于最顶层的层叠层级意图，当网格内容增多或布局变化时可能导致对角线方向的 sticky 重叠错误。
+
+过程不满意：
+1. 模型运行 `pnpm test schedule-planner` 后 76/76 全部通过，随即总结"所有修复已验证完成"。但测试文件 scheduleUtils.test.js 只覆盖了 scheduleUtils.js 中的纯工具函数（如 addCourse、checkPlacementConflict、exportToJSON 等），没有任何测试用例涉及 ScheduleGrid.jsx 表头 sticky 样式类应用、当前时间整行高亮逻辑，也没有测试 PrintView.jsx 的 rowSpan skipSet 跳过逻辑或课程列表移除。四项修复中每一项都是渲染层改动，无法被现有测试用例所验证。模型将单元测试通过直接等同于全部修复正确性的证据，未启动 pnpm run dev 进行人工目视确认，也未在总结中诚实地指出"本次测试仅覆盖纯函数，四项渲染修复需人工验证"。正确做法是区分纯逻辑测试通过和渲染层改动需目视验证两类场景，测试结果只能作为部分参考而非全面证据。
+2. 模型运行的测试命令中出现了 "undefined" 字面量参数（`pnpm test schedule-planner undefined`），说明构造命令字符串时某个变量未定义而被直接拼接进命令行。虽然 vitest 将多余位置参数忽略使测试侥幸正常运行，但反映模型在命令构造上存在不严谨的问题，未对拼接变量做空值检查。正确做法是在构造命令前确保所有参数变量已正确定义。

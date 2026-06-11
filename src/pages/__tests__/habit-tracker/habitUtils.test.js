@@ -458,7 +458,7 @@ describe('getWeekTarget / getMonthTarget', () => {
 })
 
 describe('calculateWeekCompletion', () => {
-  it('本周打卡数据正确计算', () => {
+  it('本周打卡数据正确计算（daily）', () => {
     const today = getTodayKey()
     const checkins = { hb_1: { [today]: 1 } }
     const result = calculateWeekCompletion(checkins, 'hb_1', 'daily', 1)
@@ -467,20 +467,115 @@ describe('calculateWeekCompletion', () => {
     expect(result.rate).toBeCloseTo((1 / 7) * 100)
   })
 
-  it('无打卡时完成0', () => {
+  it('无打卡时完成0（daily）', () => {
     const result = calculateWeekCompletion({}, 'hb_1', 'daily', 1)
     expect(result.completed).toBe(0)
+  })
+
+  it('同一天多次打卡会累加（weekly）', () => {
+    const today = getTodayKey()
+    const yesterday = addDays(today, -1)
+    const checkins = {
+      hb_1: {
+        [today]: 3,
+        [yesterday]: 2,
+      },
+    }
+    const result = calculateWeekCompletion(checkins, 'hb_1', 'weekly', 5)
+    expect(result.completed).toBe(5)
+    expect(result.target).toBe(5)
+    expect(result.rate).toBeCloseTo(100)
+  })
+
+  it('累加打卡次数超过目标时，完成率超过100%（weekly）', () => {
+    const today = getTodayKey()
+    const checkins = { hb_1: { [today]: 5 } }
+    const result = calculateWeekCompletion(checkins, 'hb_1', 'weekly', 3)
+    expect(result.completed).toBe(5)
+    expect(result.target).toBe(3)
+    expect(result.rate).toBeCloseTo((5 / 3) * 100)
+  })
+
+  it('monthly 频率按周目标和累加次数计算', () => {
+    const today = getTodayKey()
+    const yesterday = addDays(today, -1)
+    const checkins = {
+      hb_1: {
+        [today]: 2,
+        [yesterday]: 1,
+      },
+    }
+    const result = calculateWeekCompletion(checkins, 'hb_1', 'monthly', 20)
+    expect(result.completed).toBe(3)
+    expect(typeof result.target).toBe('number')
+    expect(result.target).toBeGreaterThan(0)
+  })
+
+  it('daily 同一天多次打卡也会累加（daily 按次数算）', () => {
+    const today = getTodayKey()
+    const checkins = { hb_1: { [today]: 2 } }
+    const result = calculateWeekCompletion(checkins, 'hb_1', 'daily', 1)
+    expect(result.completed).toBe(2)
+    expect(result.target).toBe(7)
+    expect(result.rate).toBeCloseTo((2 / 7) * 100)
   })
 })
 
 describe('calculateMonthCompletion', () => {
-  it('本月打卡数据正确计算', () => {
+  it('本月打卡数据正确计算（daily）', () => {
     const today = getTodayKey()
     const yesterday = addDays(today, -1)
     const checkins = { hb_1: { [today]: 1, [yesterday]: 1 } }
     const result = calculateMonthCompletion(checkins, 'hb_1', 'daily', 1)
     expect(result.completed).toBe(2)
     expect(result.target).toBe(getDaysInCurrentMonth())
+  })
+
+  it('同一天多次打卡会累加（weekly）', () => {
+    const today = getTodayKey()
+    const yesterday = addDays(today, -1)
+    const dayBefore = addDays(today, -2)
+    const checkins = {
+      hb_1: {
+        [today]: 2,
+        [yesterday]: 3,
+        [dayBefore]: 1,
+      },
+    }
+    const result = calculateMonthCompletion(checkins, 'hb_1', 'weekly', 3)
+    expect(result.completed).toBe(6)
+    expect(typeof result.target).toBe('number')
+    expect(result.target).toBeGreaterThan(0)
+  })
+
+  it('同一天多次打卡累加（monthly）', () => {
+    const today = getTodayKey()
+    const yesterday = addDays(today, -1)
+    const checkins = {
+      hb_1: {
+        [today]: 4,
+        [yesterday]: 3,
+      },
+    }
+    const result = calculateMonthCompletion(checkins, 'hb_1', 'monthly', 15)
+    expect(result.completed).toBe(7)
+    expect(result.target).toBe(15)
+    expect(result.rate).toBeCloseTo((7 / 15) * 100)
+  })
+
+  it('累加超过目标时完成率超100%（monthly）', () => {
+    const today = getTodayKey()
+    const checkins = { hb_1: { [today]: 20 } }
+    const result = calculateMonthCompletion(checkins, 'hb_1', 'monthly', 10)
+    expect(result.completed).toBe(20)
+    expect(result.target).toBe(10)
+    expect(result.rate).toBe(200)
+  })
+
+  it('无打卡时完成0', () => {
+    const result = calculateMonthCompletion({}, 'hb_1', 'monthly', 20)
+    expect(result.completed).toBe(0)
+    expect(result.rate).toBe(0)
   })
 })
 

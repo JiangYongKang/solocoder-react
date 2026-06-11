@@ -302,18 +302,31 @@ export function getRandomInterval(minSeconds = 3, maxSeconds = 8) {
 export function generateShareUrl(voteId) {
   if (!voteId) return ''
   const baseUrl = typeof window !== 'undefined' ? window.location.origin + window.location.pathname : ''
-  const hash = typeof window !== 'undefined' ? window.location.hash : ''
-  const separator = hash ? '' : '#/'
-  return `${baseUrl}${separator}voting-app?vote=${voteId}`
+  return `${baseUrl}#/voting-app?vote=${voteId}`
 }
 
-export function copyToClipboard(text) {
-  if (typeof window === 'undefined' || !navigator?.clipboard) {
-    return false
+export async function copyToClipboard(text) {
+  if (typeof window === 'undefined') return false
+
+  if (navigator?.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text)
+      return true
+    } catch {
+      // fall through to fallback
+    }
   }
+
   try {
-    navigator.clipboard.writeText(text)
-    return true
+    const textarea = document.createElement('textarea')
+    textarea.value = text
+    textarea.style.position = 'fixed'
+    textarea.style.opacity = '0'
+    document.body.appendChild(textarea)
+    textarea.select()
+    const success = document.execCommand('copy')
+    document.body.removeChild(textarea)
+    return success
   } catch {
     return false
   }

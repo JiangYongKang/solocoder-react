@@ -183,11 +183,10 @@
   min-width: 800px;
 }
 
-.schedule-grid-header {
-  display: contents;
+.schedule-grid-header-sticky {
   position: sticky;
   top: 0;
-  z-index: 10;
+  z-index: 15;
 }
 
 .schedule-corner-header {

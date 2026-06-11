@@ -203,6 +203,11 @@ function UnionFindCanvas({
     }
   })
 
+  if (animatingEdge && !edgeMap.has(`${animatingEdge.from}-${animatingEdge.to}`)) {
+    edges.push({ from: animatingEdge.from, to: animatingEdge.to, isOverlay: true })
+    edgeMap.set(`${animatingEdge.from}-${animatingEdge.to}`, true)
+  }
+
   const highlightSet = useMemo(() => {
     const result = new Set()
     if (highlighting?.size > 0) {
@@ -239,6 +244,7 @@ function UnionFindCanvas({
     const isFindPath = findPathSet.has(edge.from) && findPathSet.has(edge.to)
     const isCompress = pathCompressSet.has(`${edge.from}-${edge.to}`)
     const isAnimating = animatingEdge && animatingEdge.from === edge.from && animatingEdge.to === edge.to
+    const isOverlay = edge.isOverlay
 
     let edgeClass = 'uf-edge'
     let arrowClass = 'uf-arrow'
@@ -257,7 +263,7 @@ function UnionFindCanvas({
       strokeColor = COLORS.pathCompress
       arrowFill = COLORS.pathCompress
     }
-    if (isAnimating) {
+    if (isOverlay || isAnimating) {
       edgeClass += ' uf-edge-animate'
     }
 
@@ -438,14 +444,14 @@ export default function UnionFindPage() {
     }
   }, [])
 
-  const commitState = useCallback((newState, operation, logEntry) => {
-    const laidOutState = calculateForestLayout(newState)
+  const commitState = useCallback((newState, operation, logEntry, skipLayout = false) => {
+    const finalState = skipLayout ? newState : calculateForestLayout(newState)
 
     setHistory((prev) => [...prev.slice(0, currentStep + 1), operation])
-    setHistoryStates((prev) => [...prev.slice(0, currentStep + 1), cloneState(laidOutState)])
+    setHistoryStates((prev) => [...prev.slice(0, currentStep + 1), cloneState(finalState)])
     setCurrentStep((prev) => prev + 1)
     setLogs((prev) => [...prev.slice(0, currentStep + 1), logEntry])
-    setUfState(laidOutState)
+    setUfState(finalState)
   }, [currentStep])
 
   const handleAddNode = useCallback(() => {
@@ -519,6 +525,9 @@ export default function UnionFindPage() {
       showMessage(result.message, 'warning')
       return
     }
+
+    const laidOutState = calculateForestLayout(result.state)
+    setUfState(laidOutState)
 
     setAnimatingEdge({ from: result.childRoot, to: result.parentRoot })
     await new Promise((r) => setTimeout(r, ANIMATION_DURATION.union))
@@ -605,7 +614,7 @@ export default function UnionFindPage() {
       timestamp: log.timestamp,
     }
 
-    commitState(finalState, operation, log)
+    commitState(finalState, operation, log, true)
 
     setTimeout(() => {
       setFindPath([])

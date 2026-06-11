@@ -161,20 +161,35 @@ export function getUsedNumbers(board, row, col) {
 export function autoRemoveNotes(notes, board, row, col, num) {
   const updated = notes.map((r) => r.map((c) => new Set(c)))
   updated[row][col] = new Set()
+  const autoRemoved = []
   for (let c = 0; c < 9; c++) {
-    updated[row][c].delete(num)
+    if (c !== col && updated[row][c].has(num)) {
+      autoRemoved.push({ row, col: c, num })
+      updated[row][c].delete(num)
+    }
   }
   for (let r = 0; r < 9; r++) {
-    updated[r][col].delete(num)
+    if (r !== row && updated[r][col].has(num)) {
+      autoRemoved.push({ row: r, col, num })
+      updated[r][col].delete(num)
+    }
   }
   const boxRow = Math.floor(row / 3) * 3
   const boxCol = Math.floor(col / 3) * 3
   for (let r = boxRow; r < boxRow + 3; r++) {
     for (let c = boxCol; c < boxCol + 3; c++) {
-      updated[r][c].delete(num)
+      if ((r !== row || c !== col) && updated[r][c].has(num)) {
+        const alreadyRecorded = autoRemoved.some(
+          (item) => item.row === r && item.col === c
+        )
+        if (!alreadyRecorded) {
+          autoRemoved.push({ row: r, col: c, num })
+        }
+        updated[r][c].delete(num)
+      }
     }
   }
-  return updated
+  return { notes: updated, autoRemoved }
 }
 
 export function formatTime(seconds) {
@@ -213,6 +228,14 @@ export function deserializeNotes(serialized) {
   )
 }
 
+export function serializeHintedCells(set) {
+  return [...set]
+}
+
+export function deserializeHintedCells(arr) {
+  return new Set(arr || [])
+}
+
 export function saveGameState(state, storage) {
   try {
     const s = storage || (typeof localStorage !== 'undefined' ? localStorage : null)
@@ -222,6 +245,7 @@ export function saveGameState(state, storage) {
       solution: state.solution,
       board: state.board,
       notes: serializeNotes(state.notes),
+      hintedCells: serializeHintedCells(state.hintedCells || new Set()),
       elapsedTime: state.elapsedTime,
       difficulty: state.difficulty,
       hintsRemaining: state.hintsRemaining,
@@ -245,6 +269,7 @@ export function loadGameState(storage) {
       solution: data.solution,
       board: data.board,
       notes: deserializeNotes(data.notes),
+      hintedCells: deserializeHintedCells(data.hintedCells),
       elapsedTime: data.elapsedTime || 0,
       difficulty: data.difficulty || DIFFICULTY.EASY,
       hintsRemaining: data.hintsRemaining ?? MAX_HINTS,

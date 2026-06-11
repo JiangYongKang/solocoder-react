@@ -278,10 +278,10 @@ export function calculateWeekCompletion(checkins, habitId, frequencyType, freque
   const weekStart = getWeekMonday(todayKey)
   const days = getDaysInRange(weekStart, todayKey)
   const habitCheckins = checkins[habitId] || {}
-  const completedDays = days.filter(d => habitCheckins[d] && habitCheckins[d] > 0).length
+  const completedCount = days.reduce((sum, d) => sum + (habitCheckins[d] || 0), 0)
   const target = getWeekTarget(frequencyType, frequencyCount)
-  const rate = target > 0 ? (completedDays / target) * 100 : 0
-  return { completed: completedDays, target, rate }
+  const rate = target > 0 ? (completedCount / target) * 100 : 0
+  return { completed: completedCount, target, rate }
 }
 
 export function calculateMonthCompletion(checkins, habitId, frequencyType, frequencyCount) {
@@ -292,10 +292,10 @@ export function calculateMonthCompletion(checkins, habitId, frequencyType, frequ
   const todayKey = formatDate(today)
   const days = getDaysInRange(monthStart, todayKey)
   const habitCheckins = checkins[habitId] || {}
-  const completedDays = days.filter(d => habitCheckins[d] && habitCheckins[d] > 0).length
+  const completedCount = days.reduce((sum, d) => sum + (habitCheckins[d] || 0), 0)
   const target = getMonthTarget(frequencyType, frequencyCount)
-  const rate = target > 0 ? (completedDays / target) * 100 : 0
-  return { completed: completedDays, target, rate }
+  const rate = target > 0 ? (completedCount / target) * 100 : 0
+  return { completed: completedCount, target, rate }
 }
 
 export function calculateOverallCompletion(habits, checkins) {
@@ -315,7 +315,7 @@ export function calculateOverallCompletion(habits, checkins) {
 export function buildHeatmapGrid(checkins, habitId, yearOffset = 0) {
   const today = new Date()
   const endDate = new Date(today)
-  endDate.setDate(endDate.getDate() - yearOffset * 365)
+  endDate.setFullYear(today.getFullYear() - yearOffset)
   const startDate = new Date(endDate)
   startDate.setDate(startDate.getDate() - 364)
 

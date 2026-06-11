@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   DIFFICULTY,
@@ -32,6 +32,7 @@ function SudokuPage() {
   const [solution, setSolution] = useState(null)
   const [board, setBoard] = useState(null)
   const [notes, setNotes] = useState(createInitialNotes)
+  const [hintedCells, setHintedCells] = useState(() => new Set())
   const [selectedCell, setSelectedCell] = useState(null)
   const [noteMode, setNoteMode] = useState(false)
   const [gameStatus, setGameStatus] = useState(GAME_STATUS.IDLE)
@@ -75,6 +76,7 @@ function SudokuPage() {
         solution,
         board,
         notes,
+        hintedCells,
         elapsedTime,
         difficulty,
         hintsRemaining,
@@ -83,7 +85,7 @@ function SudokuPage() {
         autoRemoveEnabled,
       })
     }
-  }, [board, notes, elapsedTime, difficulty, hintsRemaining, undoStack, redoStack, autoRemoveEnabled, puzzle, solution, gameStatus])
+  }, [board, notes, hintedCells, elapsedTime, difficulty, hintsRemaining, undoStack, redoStack, autoRemoveEnabled, puzzle, solution, gameStatus])
 
   const startNewGame = useCallback(
     (diff) => {
@@ -94,6 +96,7 @@ function SudokuPage() {
       setSolution(s)
       setBoard(p.map((row) => [...row]))
       setNotes(createInitialNotes())
+      setHintedCells(new Set())
       setSelectedCell(null)
       setNoteMode(false)
       setGameStatus(GAME_STATUS.PLAYING)
@@ -112,6 +115,7 @@ function SudokuPage() {
     setSolution(savedState.solution)
     setBoard(savedState.board.map((row) => [...row]))
     setNotes(savedState.notes)
+    setHintedCells(savedState.hintedCells || new Set())
     setElapsedTime(savedState.elapsedTime)
     setHintsRemaining(savedState.hintsRemaining)
     setUndoStack(savedState.undoStack)
@@ -174,6 +178,7 @@ function SudokuPage() {
           board[row][col],
           [...prevNoteSet]
         )
+        action.autoRemovedNotes = []
         setUndoStack((prev) => [...prev, action])
         setRedoStack([])
         setNotes(newNotes)
@@ -182,6 +187,18 @@ function SudokuPage() {
         const newBoard = board.map((r) => [...r])
         newBoard[row][col] = num
         const prevNoteSet = new Set(notes[row][col])
+        const wasHinted = hintedCells.has(`${row}-${col}`)
+
+        let newNotes = notes.map((r) => r.map((c) => new Set(c)))
+        newNotes[row][col] = new Set()
+        let autoRemovedNotes = []
+
+        if (autoRemoveEnabled) {
+          const result = autoRemoveNotes(newNotes, newBoard, row, col, num)
+          newNotes = result.notes
+          autoRemovedNotes = result.autoRemoved
+        }
+
         const action = createUndoAction(
           'fill',
           row,
@@ -190,18 +207,22 @@ function SudokuPage() {
           num,
           [...prevNoteSet]
         )
+        action.autoRemovedNotes = autoRemovedNotes
+        action.wasHinted = wasHinted
+
         setUndoStack((prev) => [...prev, action])
         setRedoStack([])
 
-        let newNotes = notes.map((r) => r.map((c) => new Set(c)))
-        newNotes[row][col] = new Set()
-
-        if (autoRemoveEnabled) {
-          newNotes = autoRemoveNotes(newNotes, newBoard, row, col, num)
-        }
-
         setBoard(newBoard)
         setNotes(newNotes)
+
+        if (wasHinted) {
+          setHintedCells((prev) => {
+            const next = new Set(prev)
+            next.delete(`${row}-${col}`)
+            return next
+          })
+        }
 
         if (isGameComplete(newBoard, solution)) {
           setGameStatus(GAME_STATUS.COMPLETE)
@@ -209,7 +230,7 @@ function SudokuPage() {
         }
       }
     },
-    [selectedCell, gameStatus, puzzle, noteMode, notes, board, solution, autoRemoveEnabled]
+    [selectedCell, gameStatus, puzzle, noteMode, notes, board, solution, autoRemoveEnabled, hintedCells]
   )
 
   const handleErase = useCallback(() => {
@@ -220,16 +241,26 @@ function SudokuPage() {
 
     const prevValue = board[row][col]
     const prevNoteSet = new Set(notes[row][col])
+    const wasHinted = hintedCells.has(`${row}-${col}`)
     const newBoard = board.map((r) => [...r])
     newBoard[row][col] = 0
     const newNotes = notes.map((r) => r.map((c) => new Set(c)))
     newNotes[row][col] = new Set()
     const action = createUndoAction('erase', row, col, prevValue, 0, [...prevNoteSet])
+    action.autoRemovedNotes = []
+    action.wasHinted = wasHinted
     setUndoStack((prev) => [...prev, action])
     setRedoStack([])
     setBoard(newBoard)
     setNotes(newNotes)
-  }, [selectedCell, gameStatus, puzzle, board, notes])
+    if (wasHinted) {
+      setHintedCells((prev) => {
+        const next = new Set(prev)
+        next.delete(`${row}-${col}`)
+        return next
+      })
+    }
+  }, [selectedCell, gameStatus, puzzle, board, notes, hintedCells])
 
   const handleUndo = useCallback(() => {
     if (undoStack.length === 0 || gameStatus !== GAME_STATUS.PLAYING) return
@@ -239,10 +270,37 @@ function SudokuPage() {
     if (action.prevNotes) {
       newNotes[action.row][action.col] = new Set(action.prevNotes)
     }
+    if (action.autoRemovedNotes && action.autoRemovedNotes.length > 0) {
+      for (const item of action.autoRemovedNotes) {
+        newNotes[item.row][item.col].add(item.num)
+      }
+    }
     setBoard(newBoard)
     setNotes(newNotes)
     setUndoStack((prev) => prev.slice(0, -1))
     setRedoStack((prev) => [...prev, action])
+
+    if (action.type === 'fill') {
+      if (action.wasHinted) {
+        setHintedCells((prev) => {
+          const next = new Set(prev)
+          next.add(`${action.row}-${action.col}`)
+          return next
+        })
+      } else {
+        setHintedCells((prev) => {
+          const next = new Set(prev)
+          next.delete(`${action.row}-${action.col}`)
+          return next
+        })
+      }
+    } else if (action.type === 'erase' && action.wasHinted) {
+      setHintedCells((prev) => {
+        const next = new Set(prev)
+        next.add(`${action.row}-${action.col}`)
+        return next
+      })
+    }
 
     if (isGameComplete(newBoard, solution)) {
       setGameStatus(GAME_STATUS.COMPLETE)
@@ -255,23 +313,47 @@ function SudokuPage() {
     const action = redoStack[redoStack.length - 1]
     const newBoard = applyRedo(board, action)
     const newNotes = notes.map((r) => r.map((c) => new Set(c)))
+    let newAction = { ...action }
+
     if (action.type === 'fill') {
       newNotes[action.row][action.col] = new Set()
       if (autoRemoveEnabled) {
-        const updatedNotes = autoRemoveNotes(newNotes, newBoard, action.row, action.col, action.newValue)
-        setNotes(updatedNotes)
+        const result = autoRemoveNotes(newNotes, newBoard, action.row, action.col, action.newValue)
+        result.notes[action.row][action.col] = new Set()
+        setNotes(result.notes)
+        newAction = { ...newAction, autoRemovedNotes: result.autoRemoved }
       } else {
         setNotes(newNotes)
+      }
+      if (action.wasHinted) {
+        setHintedCells((prev) => {
+          const next = new Set(prev)
+          next.add(`${action.row}-${action.col}`)
+          return next
+        })
+      } else {
+        setHintedCells((prev) => {
+          const next = new Set(prev)
+          next.delete(`${action.row}-${action.col}`)
+          return next
+        })
       }
     } else if (action.type === 'note') {
       setNotes(newNotes)
     } else {
       newNotes[action.row][action.col] = new Set()
       setNotes(newNotes)
+      if (action.wasHinted) {
+        setHintedCells((prev) => {
+          const next = new Set(prev)
+          next.delete(`${action.row}-${action.col}`)
+          return next
+        })
+      }
     }
     setBoard(newBoard)
     setRedoStack((prev) => prev.slice(0, -1))
-    setUndoStack((prev) => [...prev, action])
+    setUndoStack((prev) => [...prev, newAction])
 
     if (isGameComplete(newBoard, solution)) {
       setGameStatus(GAME_STATUS.COMPLETE)
@@ -302,15 +384,19 @@ function SudokuPage() {
 
     const newBoard = board.map((r) => [...r])
     newBoard[row][col] = hintValue
-    const newNotes = notes.map((r) => r.map((c) => new Set(c)))
+    let newNotes = notes.map((r) => r.map((c) => new Set(c)))
     newNotes[row][col] = new Set()
     if (autoRemoveEnabled) {
-      const updatedNotes = autoRemoveNotes(newNotes, newBoard, row, col, hintValue)
-      setNotes(updatedNotes)
-    } else {
-      setNotes(newNotes)
+      const result = autoRemoveNotes(newNotes, newBoard, row, col, hintValue)
+      newNotes = result.notes
     }
+    setNotes(newNotes)
     setBoard(newBoard)
+    setHintedCells((prev) => {
+      const next = new Set(prev)
+      next.add(`${row}-${col}`)
+      return next
+    })
     setHintsRemaining((prev) => prev - 1)
     setSelectedCell([row, col])
 
@@ -332,6 +418,11 @@ function SudokuPage() {
     }
   }, [gameStatus])
 
+  const conflictSet = useMemo(
+    () => (board ? getAllConflicts(board) : new Set()),
+    [board]
+  )
+
   const renderCell = (row, col) => {
     if (!board) return null
     const value = board[row][col]
@@ -339,6 +430,8 @@ function SudokuPage() {
     const isSelected =
       selectedCell && selectedCell[0] === row && selectedCell[1] === col
     const cellNotes = notes[row][col]
+    const cellKey = `${row}-${col}`
+    const isHinted = hintedCells.has(cellKey)
 
     let className = 'sudoku-cell'
     if (isSelected) className += ' selected'
@@ -361,21 +454,14 @@ function SudokuPage() {
     if (isGiven) {
       className += ' given'
     } else if (value !== 0) {
-      if (
-        hintsRemaining < MAX_HINTS &&
-        value === solution[row][col]
-      ) {
-        const hadUndoForThisCell = undoStack.some(
-          (a) => a.row === row && a.col === col
-        )
-        className += hadUndoForThisCell ? ' user-filled' : ' hint-filled'
+      if (isHinted) {
+        className += ' hint-filled'
       } else {
         className += ' user-filled'
       }
     }
 
-    const conflictSet = board ? getAllConflicts(board) : new Set()
-    if (conflictSet.has(`${row}-${col}`) && !isGiven) {
+    if (conflictSet.has(cellKey) && !isGiven) {
       className += ' conflict'
     }
 
@@ -384,7 +470,7 @@ function SudokuPage() {
 
     return (
       <div
-        key={`${row}-${col}`}
+        key={cellKey}
         className={className}
         onClick={() => handleCellClick(row, col)}
       >

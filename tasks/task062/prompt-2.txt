@@ -1,0 +1,6 @@
+你实现的习惯养成追踪页面还存在一些问题，需要进行修复：
+
+1. calculateWeekCompletion 和 calculateMonthCompletion 函数在统计已完成次数时，只按不同日期做了去重计数，对"每周X次"这类频率类型的习惯，同一日多次打卡只算1次，导致完成率显示不准确。需求的公式是"已完成次数 / 目标次数 = 完成率"，应该累加所有的打卡次数而非只数天数。
+2. buildHeatmapGrid 函数在切换年份时使用 yearOffset * 365 计算日期偏移，没有考虑闰年。当用户切换到第4年或第5年查看时，因闰年累积导致热力图实际跨度与日历年边界不对齐。
+3. 测试文件中对 calculateWeekCompletion 和 calculateMonthCompletion 只覆盖了 daily 频率类型，需要补充"每周X次"和"每月X天"频率类型的测试用例。
+4. 修复后重新运行 pnpm run test，需要让所有测试通过。

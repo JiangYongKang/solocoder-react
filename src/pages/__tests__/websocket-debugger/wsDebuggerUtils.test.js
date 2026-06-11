@@ -6,6 +6,7 @@ import {
   MESSAGE_TEMPLATES,
   DEFAULT_HEARTBEAT_INTERVAL,
   DEFAULT_HEARTBEAT_TIMEOUT_THRESHOLD,
+  DEFAULT_HEARTBEAT_ENABLED,
   DEFAULT_RECONNECT_ENABLED,
   DEFAULT_RECONNECT_MAX_RETRIES,
   DEFAULT_RECONNECT_INTERVAL,
@@ -34,6 +35,10 @@ import {
   highlightJson,
   filterLogs,
   shouldAutoScroll,
+  isEchoServer,
+  isPongResponse,
+  highlightKeyword,
+  formatMessageForDisplay,
 } from '@/pages/websocket-debugger/wsDebuggerUtils'
 
 function createMockLocalStorage() {
@@ -93,6 +98,7 @@ describe('常量', () => {
   })
 
   it('默认设置常量在合理范围内', () => {
+    expect(DEFAULT_HEARTBEAT_ENABLED).toBe(true)
     expect(DEFAULT_HEARTBEAT_INTERVAL).toBeGreaterThanOrEqual(5)
     expect(DEFAULT_HEARTBEAT_INTERVAL).toBeLessThanOrEqual(60)
     expect(DEFAULT_HEARTBEAT_TIMEOUT_THRESHOLD).toBeGreaterThanOrEqual(1)
@@ -358,6 +364,7 @@ describe('连接历史管理', () => {
 describe('设置管理', () => {
   it('createDefaultSettings 创建默认设置', () => {
     const settings = createDefaultSettings()
+    expect(settings.heartbeatEnabled).toBe(DEFAULT_HEARTBEAT_ENABLED)
     expect(settings.heartbeatInterval).toBe(DEFAULT_HEARTBEAT_INTERVAL)
     expect(settings.heartbeatTimeoutThreshold).toBe(DEFAULT_HEARTBEAT_TIMEOUT_THRESHOLD)
     expect(settings.reconnectEnabled).toBe(DEFAULT_RECONNECT_ENABLED)
@@ -369,11 +376,13 @@ describe('设置管理', () => {
     const settings = {
       ...createDefaultSettings(),
       heartbeatInterval: 30,
+      heartbeatEnabled: false,
       reconnectEnabled: false,
     }
     saveSettings(settings)
     const loaded = loadSettings()
     expect(loaded.heartbeatInterval).toBe(30)
+    expect(loaded.heartbeatEnabled).toBe(false)
     expect(loaded.reconnectEnabled).toBe(false)
   })
 
@@ -381,6 +390,7 @@ describe('设置管理', () => {
     localStorage.setItem('ws-debugger-settings', JSON.stringify({ heartbeatInterval: 20 }))
     const loaded = loadSettings()
     expect(loaded.heartbeatInterval).toBe(20)
+    expect(loaded.heartbeatEnabled).toBe(DEFAULT_HEARTBEAT_ENABLED)
     expect(loaded.heartbeatTimeoutThreshold).toBe(DEFAULT_HEARTBEAT_TIMEOUT_THRESHOLD)
     expect(loaded.reconnectEnabled).toBe(DEFAULT_RECONNECT_ENABLED)
   })
@@ -505,6 +515,163 @@ describe('highlightJson', () => {
     const result = highlightJson('{"html": "<script>"}')
     expect(result).toContain('&lt;')
     expect(result).not.toContain('<script>')
+  })
+
+  it('支持关键词高亮', () => {
+    const result = highlightJson('{"type": "ping"}', 'ping')
+    expect(result).toContain('ws-log-highlight')
+    expect(result).toContain('ping')
+  })
+})
+
+describe('highlightKeyword', () => {
+  it('空关键词返回转义后的原文', () => {
+    expect(highlightKeyword('hello', '')).toBe('hello')
+    expect(highlightKeyword('hello', null)).toBe('hello')
+    expect(highlightKeyword('hello', undefined)).toBe('hello')
+    expect(highlightKeyword('hello', '  ')).toBe('hello')
+  })
+
+  it('空文本返回空', () => {
+    expect(highlightKeyword('', 'test')).toBe('')
+    expect(highlightKeyword(null, 'test')).toBe('')
+    expect(highlightKeyword(undefined, 'test')).toBe('')
+  })
+
+  it('高亮单个匹配', () => {
+    const result = highlightKeyword('hello world', 'world')
+    expect(result).toContain('<span class="ws-log-highlight">world</span>')
+    expect(result).toContain('hello')
+  })
+
+  it('高亮多个匹配', () => {
+    const result = highlightKeyword('ping ping ping', 'ping')
+    const matches = result.match(/ws-log-highlight/g) || []
+    expect(matches.length).toBe(3)
+  })
+
+  it('不区分大小写查找', () => {
+    const result = highlightKeyword('Hello WORLD', 'world')
+    expect(result).toContain('ws-log-highlight')
+    expect(result).toContain('WORLD')
+  })
+
+  it('无匹配返回转义后的原文', () => {
+    const result = highlightKeyword('hello world', 'test')
+    expect(result).toBe('hello world')
+  })
+
+  it('转义 HTML 特殊字符', () => {
+    const result = highlightKeyword('<script>test</script>', 'test')
+    expect(result).toContain('&lt;')
+    expect(result).toContain('&gt;')
+    expect(result).not.toContain('<script>')
+    expect(result).toContain('ws-log-highlight')
+  })
+})
+
+describe('formatMessageForDisplay', () => {
+  it('null/undefined 返回空字符串', () => {
+    expect(formatMessageForDisplay(null, true)).toBe('')
+    expect(formatMessageForDisplay(undefined, true)).toBe('')
+  })
+
+  it('短 JSON 消息展开显示', () => {
+    const result = formatMessageForDisplay('{"type":"ping"}', true)
+    expect(result).toContain('\n')
+    expect(result).toContain('  ')
+  })
+
+  it('长消息不展开时截断', () => {
+    const long = 'a'.repeat(200)
+    const result = formatMessageForDisplay(long, false)
+    expect(result.length).toBeLessThan(long.length)
+    expect(result).toContain('...')
+  })
+
+  it('长消息展开时显示完整内容', () => {
+    const long = 'a'.repeat(200)
+    const result = formatMessageForDisplay(long, true)
+    expect(result).not.toContain('...')
+  })
+
+  it('纯文本消息原样显示', () => {
+    const result = formatMessageForDisplay('hello world', true)
+    expect(result).toBe('hello world')
+  })
+
+  it('支持关键词高亮', () => {
+    const result = formatMessageForDisplay('hello world', true, 'world')
+    expect(result).toContain('ws-log-highlight')
+  })
+
+  it('JSON 消息支持关键词高亮', () => {
+    const result = formatMessageForDisplay('{"type":"ping"}', true, 'ping')
+    expect(result).toContain('ws-hl-property')
+    expect(result).toContain('ws-log-highlight')
+  })
+
+  it('截断消息也支持关键词高亮', () => {
+    const long = 'test ' + 'a'.repeat(200)
+    const result = formatMessageForDisplay(long, false, 'test')
+    expect(result).toContain('ws-log-highlight')
+  })
+})
+
+describe('isEchoServer', () => {
+  it('识别 echo.websocket.org', () => {
+    expect(isEchoServer('wss://echo.websocket.org')).toBe(true)
+    expect(isEchoServer('ws://echo.websocket.org')).toBe(true)
+    expect(isEchoServer('wss://ECHO.WEBSOCKET.ORG')).toBe(true)
+  })
+
+  it('识别 ws.ifelse.io', () => {
+    expect(isEchoServer('wss://ws.ifelse.io')).toBe(true)
+    expect(isEchoServer('ws://ws.ifelse.io')).toBe(true)
+  })
+
+  it('识别包含 echo-server 的 URL', () => {
+    expect(isEchoServer('wss://example.com/echo-server')).toBe(true)
+  })
+
+  it('普通 WebSocket URL 返回 false', () => {
+    expect(isEchoServer('wss://example.com/ws')).toBe(false)
+    expect(isEchoServer('ws://localhost:8080')).toBe(false)
+  })
+
+  it('空值或非字符串返回 false', () => {
+    expect(isEchoServer('')).toBe(false)
+    expect(isEchoServer(null)).toBe(false)
+    expect(isEchoServer(undefined)).toBe(false)
+  })
+})
+
+describe('isPongResponse', () => {
+  it('识别 JSON 格式的 pong 响应', () => {
+    expect(isPongResponse('{"type":"pong"}')).toBe(true)
+    expect(isPongResponse('{"type": "pong", "timestamp": 123}')).toBe(true)
+  })
+
+  it('识别纯文本 pong 响应', () => {
+    expect(isPongResponse('pong')).toBe(true)
+    expect(isPongResponse('  PONG  ')).toBe(true)
+  })
+
+  it('非 pong 消息返回 false', () => {
+    expect(isPongResponse('{"type":"ping"}')).toBe(false)
+    expect(isPongResponse('hello')).toBe(false)
+    expect(isPongResponse('{"message":"pong"}')).toBe(false)
+  })
+
+  it('空值或非字符串返回 false', () => {
+    expect(isPongResponse('')).toBe(false)
+    expect(isPongResponse(null)).toBe(false)
+    expect(isPongResponse(undefined)).toBe(false)
+    expect(isPongResponse(123)).toBe(false)
+  })
+
+  it('无效 JSON 返回 false', () => {
+    expect(isPongResponse('{invalid}')).toBe(false)
   })
 })
 

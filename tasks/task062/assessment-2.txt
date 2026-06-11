@@ -1,0 +1,6 @@
+产物不满意：
+1. habitUtils.test.js 文件顶部导入了 `STORAGE_KEY_REMINDERS` 但在整个测试文件中从未使用，ESLint 报 `no-unused-vars` 错误。这是上一轮就已存在的废弃导入，本轮修复没有清理。模型只关注了新增测试用例，忽略了整个文件已有的 lint 问题。正确做法是在修改文件后运行完整的 lint 检查，确认新引入的代码和旧有代码都没有 warning 残留。
+2. buildHeatmapGrid 函数使用了 `endDate.setFullYear(today.getFullYear() - yearOffset)` 修复闰年问题，但只替换了日期计算起点，没有同步修改后续的 `startDate` 计算逻辑。原始代码中 startDate 是通过 `new Date(endDate)` 然后减去 yearOffset * 365 天来计算的。如果 endDate 的年份被正确偏移了，而 startDate 仍使用固定 365 天偏移，当 viewYears > 1 且跨越闰年时，startDate 和 endDate 之间的实际天数会与 (viewYears * 365) 不一致。虽然 setFullYear 修正了 endDate 的年份偏移，但 startDate 的计算方式也应改为基于 endDate 用 setFullYear 反向偏移 viewYears 年来保持一致。
+
+过程不满意：
+模型在修复过程中只运行了单包测试 `pnpm test src/pages/__tests__/habit-tracker/habitUtils.test.js` 确认 95 个测试通过后，又运行了全量测试 `pnpm test` 确认 5539 个通过。这是一个好的做法。但模型在运行全量测试后没有执行 lint 检查就直接声称完成，导致测试文件中的 `STORAGE_KEY_REMINDERS` 未使用变量问题被遗漏。根据标注规范，测试通过后应该再通读一遍完整终端输出和 lint 结果，确保无 console.warn 和 lint 残留。模型在总结中只提了测试通过，完全没有提及 lint 状态。

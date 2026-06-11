@@ -1,0 +1,6 @@
+你实现的数据导入向导页面还存在一些问题，需要进行修复：
+
+1. ValidationStep 组件在 useMemo 回调内部调用了 onValidatedDataChange 更新父组件状态。React 的 useMemo 是纯计算 Hook，不应在其中执行副作用，可能导致渲染阶段触发额外状态变更。副作用应移至 useEffect 中执行。
+2. ValidationStep 中本地编辑数据的 localData 使用了 useState(mappedData) 初始化，但 mappedData prop 更新时 localData 不会同步刷新。当用户回到之前的步骤修改映射后重新进入校验步骤时，表格展示的仍是旧数据。需要确保 prop 更新时本地状态同步。
+3. ValidationStep 中从 utils.js 导入了 validateRow 和 findDuplicateRows 但组件内从未使用。清理这些未使用的导入，保持产物干净。
+4. 修复后重新运行 pnpm run test，需要让所有测试通过。

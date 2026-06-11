@@ -4,6 +4,8 @@ import {
   TOTAL_SLOTS,
   WEEK_DAYS,
   WEEKEND_INDICES,
+  SUBJECT_COLORS,
+  WEEK_TYPE_LABELS,
 } from './constants.js';
 import { getScheduledCourses, getCurrentDayIndex } from './scheduleUtils.js';
 
@@ -11,15 +13,19 @@ export default function PrintView({ state, onBack }) {
   const scheduled = useMemo(() => getScheduledCourses(state), [state]);
   const currentDay = useMemo(() => getCurrentDayIndex(), []);
 
-  const courseGrid = useMemo(() => {
-    const grid = Array.from({ length: 7 }, () => Array.from({ length: TOTAL_SLOTS }, () => []));
+  const { courseStarts, skipSet } = useMemo(() => {
+    const starts = Array.from({ length: 7 }, () => Array.from({ length: TOTAL_SLOTS }, () => []));
+    const skip = new Set();
     for (const course of scheduled) {
       const { dayIndex, slotIndex } = course.scheduled;
-      if (slotIndex < TOTAL_SLOTS) {
-        grid[dayIndex][slotIndex].push(course);
+      if (slotIndex >= TOTAL_SLOTS) continue;
+      starts[dayIndex][slotIndex].push(course);
+      const spanDuration = Math.min(course.duration, TOTAL_SLOTS - slotIndex);
+      for (let i = 1; i < spanDuration; i++) {
+        skip.add(`${dayIndex}-${slotIndex + i}`);
       }
     }
-    return grid;
+    return { courseStarts: starts, skipSet: skip };
   }, [scheduled]);
 
   const handlePrint = () => {
@@ -64,29 +70,43 @@ export default function PrintView({ state, onBack }) {
                 <div style={{ fontSize: 10, color: '#94a3b8' }}>{slot.endTime}</div>
               </td>
               {WEEK_DAYS.map((_, dayIdx) => {
-                const courses = courseGrid[dayIdx][slotIdx];
+                const key = `${dayIdx}-${slotIdx}`;
+                if (skipSet.has(key)) return null;
+                const courses = courseStarts[dayIdx][slotIdx];
                 const weekend = WEEKEND_INDICES.includes(dayIdx);
+                const firstCourse = courses[0];
+                const spanDuration = firstCourse
+                  ? Math.min(firstCourse.duration, TOTAL_SLOTS - slotIdx)
+                  : 1;
+                const hasRowSpan = courses.length > 0 && spanDuration > 1;
                 return (
                   <td
                     key={dayIdx}
                     className={weekend ? 'weekend' : ''}
                     style={{ minHeight: 40 }}
+                    rowSpan={hasRowSpan ? spanDuration : undefined}
                   >
                     {courses.map((course) => {
-                      const spanDuration = Math.min(course.duration, TOTAL_SLOTS - slotIdx);
+                      const colorCfg =
+                        SUBJECT_COLORS.find((c) => c.id === course.subjectColorId) || SUBJECT_COLORS[0];
                       return (
                         <div
                           key={course.id}
                           className="schedule-print-course"
                           style={{
-                            rowSpan: spanDuration,
-                            display: spanDuration > 1 ? 'block' : undefined,
+                            borderLeft: `3px solid ${colorCfg.color}`,
+                            background: colorCfg.bgColor,
                           }}
                         >
+                          {course.scheduled.weekType !== 'all' && (
+                            <div style={{ fontSize: 8, color: '#64748b', marginBottom: 1 }}>
+                              {WEEK_TYPE_LABELS[course.scheduled.weekType]}
+                            </div>
+                          )}
                           <div className="schedule-print-course-name">{course.name}</div>
                           <div className="schedule-print-course-info">
-                            {course.teacher && <div>{course.teacher}</div>}
-                            {course.classroom && <div>{course.classroom}</div>}
+                            {course.teacher && <div>👤 {course.teacher}</div>}
+                            {course.classroom && <div>📍 {course.classroom}</div>}
                           </div>
                         </div>
                       );
@@ -98,38 +118,6 @@ export default function PrintView({ state, onBack }) {
           ))}
         </tbody>
       </table>
-
-      <div style={{ marginTop: 24, padding: 16, background: '#f8fafc', borderRadius: 8 }}>
-        <h3 style={{ fontSize: 14, fontWeight: 600, color: '#1e293b', margin: '0 0 12px 0' }}>
-          课程列表（共 {state.courses.length} 门）
-        </h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
-          {state.courses.map((course) => (
-            <div
-              key={course.id}
-              style={{
-                padding: 8,
-                background: '#fff',
-                border: '1px solid #e2e8f0',
-                borderRadius: 6,
-                fontSize: 11,
-              }}
-            >
-              <div style={{ fontWeight: 600, color: '#1e293b', marginBottom: 2 }}>
-                {course.name}
-                {course.scheduled?.weekType && course.scheduled.weekType !== 'all' && (
-                  <span style={{ fontSize: 9, color: '#64748b', marginLeft: 6 }}>
-                    ({course.scheduled.weekType === 'odd' ? '单周' : '双周'})
-                  </span>
-                )}
-              </div>
-              <div style={{ color: '#475569' }}>
-                {course.teacher || '-'} · {course.classroom || '-'} · {course.duration}节 · {course.credits}学分
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
     </div>
   );
 }

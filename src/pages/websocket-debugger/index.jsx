@@ -13,8 +13,6 @@ import {
   formatConnectionDuration,
   isValidJson,
   formatJson,
-  tryFormatMessage,
-  truncateMessage,
   createLogEntry,
   createSystemLog,
   createHistoryEntry,
@@ -27,10 +25,11 @@ import {
   saveSettings,
   clampValue,
   getStatusText,
-  highlightJson,
-  escapeHtml,
   filterLogs,
   shouldAutoScroll,
+  isEchoServer,
+  isPongResponse,
+  formatMessageForDisplay,
 } from './wsDebuggerUtils'
 import './websocket-debugger.css'
 
@@ -79,7 +78,7 @@ function HistoryPanel({ history, currentUrl, onSelect, onDelete, onClear }) {
   )
 }
 
-function SettingsPanel({ settings, onChange }) {
+function SettingsPanel({ settings, url, onChange }) {
   const handleToggle = (field) => {
     onChange({ ...settings, [field]: !settings[field] })
   }
@@ -98,6 +97,15 @@ function SettingsPanel({ settings, onChange }) {
         <div className="ws-settings-group">
           <span className="ws-settings-label">心跳检测</span>
           <div className="ws-settings-row">
+            <span className="ws-settings-row-label">启用</span>
+            <button
+              className={`ws-settings-toggle ${settings.heartbeatEnabled ? 'is-active' : ''}`}
+              onClick={() => handleToggle('heartbeatEnabled')}
+            >
+              <span className="ws-settings-toggle-knob" />
+            </button>
+          </div>
+          <div className="ws-settings-row" style={{ opacity: settings.heartbeatEnabled ? 1 : 0.5 }}>
             <span className="ws-settings-row-label">间隔（秒）</span>
             <input
               className="ws-settings-input"
@@ -106,9 +114,10 @@ function SettingsPanel({ settings, onChange }) {
               max={60}
               value={settings.heartbeatInterval}
               onChange={(e) => handleNumberChange('heartbeatInterval', e.target.value, 5, 60, DEFAULT_HEARTBEAT_INTERVAL)}
+              disabled={!settings.heartbeatEnabled}
             />
           </div>
-          <div className="ws-settings-row">
+          <div className="ws-settings-row" style={{ opacity: settings.heartbeatEnabled ? 1 : 0.5 }}>
             <span className="ws-settings-row-label">超时阈值（次）</span>
             <input
               className="ws-settings-input"
@@ -117,8 +126,14 @@ function SettingsPanel({ settings, onChange }) {
               max={10}
               value={settings.heartbeatTimeoutThreshold}
               onChange={(e) => handleNumberChange('heartbeatTimeoutThreshold', e.target.value, 1, 10, DEFAULT_HEARTBEAT_TIMEOUT_THRESHOLD)}
+              disabled={!settings.heartbeatEnabled}
             />
           </div>
+          {isEchoServer(url) && (
+            <div style={{ fontSize: 11, color: 'var(--text)', marginTop: 8 }}>
+              检测到 Echo 服务器，心跳已自动禁用
+            </div>
+          )}
         </div>
 
         <div className="ws-settings-group">
@@ -162,20 +177,13 @@ function SettingsPanel({ settings, onChange }) {
   )
 }
 
-function LogEntry({ log, onClick }) {
+function LogEntry({ log, searchKeyword, onClick }) {
   const isSystem = log.direction === DIRECTION.SYSTEM
   const isSent = log.direction === DIRECTION.SENT
   const isLong = log.content && String(log.content).length > 100
   const displayContent = useMemo(() => {
-    if (!log.expanded && isLong) {
-      return escapeHtml(truncateMessage(log.content, 100))
-    }
-    const formatted = tryFormatMessage(log.content)
-    if (isValidJson(formatted)) {
-      return highlightJson(formatted)
-    }
-    return escapeHtml(formatted)
-  }, [log.content, log.expanded, isLong])
+    return formatMessageForDisplay(log.content, log.expanded, searchKeyword)
+  }, [log.content, log.expanded, searchKeyword])
 
   const directionLabel = isSystem ? '[系统]' : isSent ? '↑' : '↓'
   const directionClass = isSystem
@@ -393,7 +401,13 @@ function WsDebuggerPage() {
         setReconnectAttempt(0)
         addSystemLog('连接成功')
         startDurationTimer()
-        startHeartbeat()
+
+        const shouldUseHeartbeat = settings.heartbeatEnabled && !isEchoServer(url)
+        if (shouldUseHeartbeat) {
+          startHeartbeat()
+        } else if (isEchoServer(url)) {
+          addSystemLog('检测到 Echo 服务器，心跳检测已自动禁用')
+        }
 
         const entry = createHistoryEntry(url)
         setHistory((prev) => addHistory(prev, entry))
@@ -404,7 +418,7 @@ function WsDebuggerPage() {
         addLog(createLogEntry(DIRECTION.RECEIVED, content))
 
         setLastHeartbeatResult((prev) => {
-          if (prev === 'pending') {
+          if (prev === 'pending' && isPongResponse(content)) {
             setHeartbeatFailCount(0)
             if (heartbeatTimeoutRef.current) {
               clearTimeout(heartbeatTimeoutRef.current)
@@ -422,15 +436,14 @@ function WsDebuggerPage() {
 
         if (intentionalDisconnectRef.current) {
           setStatus(CONNECTION_STATUS.DISCONNECTED)
+          setErrorReason('')
           addSystemLog('已断开连接')
           intentionalDisconnectRef.current = false
         } else {
-          setStatus(CONNECTION_STATUS.DISCONNECTED)
-          if (event.code !== 1000) {
-            const reason = event.reason || '服务器关闭连接'
-            setErrorReason(reason)
-            addSystemLog(`连接断开：${reason}`)
-          }
+          setStatus(CONNECTION_STATUS.ERROR)
+          const reason = event.reason || (event.code === 1000 ? '服务器正常关闭' : '服务器关闭连接')
+          setErrorReason(reason)
+          addSystemLog(`连接断开：${reason}`)
           attemptReconnect()
         }
       }
@@ -445,7 +458,7 @@ function WsDebuggerPage() {
       setErrorReason(err.message || '无法建立连接')
       addSystemLog(`连接错误：${err.message || '无法建立连接'}`)
     }
-  }, [url, addLog, addSystemLog, startDurationTimer, startHeartbeat, stopHeartbeat, stopDurationTimer, attemptReconnect])
+  }, [url, addLog, addSystemLog, startDurationTimer, startHeartbeat, stopHeartbeat, stopDurationTimer, attemptReconnect, settings.heartbeatEnabled])
 
   useEffect(() => {
     doConnectRef.current = doConnect
@@ -599,7 +612,7 @@ function WsDebuggerPage() {
                   {formatConnectionDuration(connectionDuration)}
                 </span>
               )}
-              {errorReason && status === CONNECTION_STATUS.ERROR && (
+              {errorReason && (
                 <span className="ws-error-reason">{errorReason}</span>
               )}
               {isConnected && lastHeartbeatTime && (
@@ -687,6 +700,7 @@ function WsDebuggerPage() {
                   <LogEntry
                     key={log.id}
                     log={log}
+                    searchKeyword={searchKeyword}
                     onClick={() => handleToggleExpand(log.id)}
                   />
                 ))
@@ -702,6 +716,7 @@ function WsDebuggerPage() {
 
         <SettingsPanel
           settings={settings}
+          url={url}
           onChange={handleSettingsChange}
         />
       </div>

@@ -1,34 +1,59 @@
-import { useState, useCallback } from 'react'
+import { useCallback } from 'react'
 import CurrencySelector from './CurrencySelector.jsx'
 import { convertCurrency, formatRate } from './currencyUtils.js'
 
-const ConversionPanel = ({ baseCode, targetCode, onBaseChange, onTargetChange, onSwap }) => {
-  const [baseAmount, setBaseAmount] = useState('1')
-  const [targetAmount, setTargetAmount] = useState('')
-
+const ConversionPanel = ({
+  baseCode,
+  targetCode,
+  baseAmount,
+  targetAmount,
+  onBaseChange,
+  onTargetChange,
+  onBaseAmountChange,
+  onTargetAmountChange,
+  onSwap,
+}) => {
   const handleBaseAmountChange = useCallback((e) => {
     const val = e.target.value
-    setBaseAmount(val)
+    onBaseAmountChange(val)
     const num = parseFloat(val)
     if (!isNaN(num) && num >= 0) {
       const converted = convertCurrency(num, baseCode, targetCode)
-      setTargetAmount(converted !== null ? String(converted) : '')
+      onTargetAmountChange(converted !== null ? String(converted) : '')
     } else {
-      setTargetAmount('')
+      onTargetAmountChange('')
     }
-  }, [baseCode, targetCode])
+  }, [baseCode, targetCode, onBaseAmountChange, onTargetAmountChange])
 
   const handleTargetAmountChange = useCallback((e) => {
     const val = e.target.value
-    setTargetAmount(val)
+    onTargetAmountChange(val)
     const num = parseFloat(val)
     if (!isNaN(num) && num >= 0) {
       const converted = convertCurrency(num, targetCode, baseCode)
-      setBaseAmount(converted !== null ? String(converted) : '')
+      onBaseAmountChange(converted !== null ? String(converted) : '')
     } else {
-      setBaseAmount('')
+      onBaseAmountChange('')
     }
-  }, [baseCode, targetCode])
+  }, [baseCode, targetCode, onBaseAmountChange, onTargetAmountChange])
+
+  const handleBaseCurrencyChange = useCallback((code) => {
+    onBaseChange(code)
+    const num = parseFloat(baseAmount) || 0
+    if (num > 0) {
+      const converted = convertCurrency(num, code, targetCode)
+      onTargetAmountChange(converted !== null ? String(converted) : '')
+    }
+  }, [baseAmount, targetCode, onBaseChange, onTargetAmountChange])
+
+  const handleTargetCurrencyChange = useCallback((code) => {
+    onTargetChange(code)
+    const num = parseFloat(baseAmount) || 0
+    if (num > 0) {
+      const converted = convertCurrency(num, baseCode, code)
+      onTargetAmountChange(converted !== null ? String(converted) : '')
+    }
+  }, [baseAmount, baseCode, onTargetChange, onTargetAmountChange])
 
   const rate = convertCurrency(1, baseCode, targetCode)
   const rateDisplay = rate !== null ? formatRate(rate) : '--'
@@ -39,14 +64,7 @@ const ConversionPanel = ({ baseCode, targetCode, onBaseChange, onTargetChange, o
         <div className="cc-conversion-side">
           <CurrencySelector
             value={baseCode}
-            onChange={(code) => {
-              onBaseChange(code)
-              const num = parseFloat(baseAmount) || 0
-              if (num > 0) {
-                const converted = convertCurrency(num, code, targetCode)
-                setTargetAmount(converted !== null ? String(converted) : '')
-              }
-            }}
+            onChange={handleBaseCurrencyChange}
             label="基准货币"
           />
           <div className="cc-amount-input-wrap">
@@ -69,14 +87,7 @@ const ConversionPanel = ({ baseCode, targetCode, onBaseChange, onTargetChange, o
         <div className="cc-conversion-side">
           <CurrencySelector
             value={targetCode}
-            onChange={(code) => {
-              onTargetChange(code)
-              const num = parseFloat(baseAmount) || 0
-              if (num > 0) {
-                const converted = convertCurrency(num, baseCode, code)
-                setTargetAmount(converted !== null ? String(converted) : '')
-              }
-            }}
+            onChange={handleTargetCurrencyChange}
             label="目标货币"
           />
           <div className="cc-amount-input-wrap">

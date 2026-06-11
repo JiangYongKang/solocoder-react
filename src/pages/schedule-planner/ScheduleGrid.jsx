@@ -55,13 +55,13 @@ export default function ScheduleGrid({
     const elements = [];
 
     elements.push(
-      <div key="corner" className="schedule-corner-header" style={{ gridColumn: 1, gridRow: 1 }}>
+      <div key="corner" className="schedule-corner-header schedule-grid-header-sticky" style={{ gridColumn: 1, gridRow: 1 }}>
         时间 \ 星期
       </div>
     );
 
     for (let dayIdx = 0; dayIdx < 7; dayIdx++) {
-      const classes = ['schedule-day-header'];
+      const classes = ['schedule-day-header', 'schedule-grid-header-sticky'];
       if (WEEKEND_INDICES.includes(dayIdx)) classes.push('weekend');
       if (dayIdx === currentDay) classes.push('today');
       elements.push(
@@ -98,11 +98,11 @@ export default function ScheduleGrid({
       for (let dayIdx = 0; dayIdx < 7; dayIdx++) {
         const key = `${dayIdx}-${slotIdx}`;
         const weekend = isWeekend(dayIdx);
-        const isCurrentTime = slotIdx === currentSlot && dayIdx === currentDay;
+        const isCurrentRow = slotIdx === currentSlot;
 
         const cellClasses = ['schedule-grid-cell'];
         if (weekend) cellClasses.push('weekend');
-        if (isCurrentTime) cellClasses.push('current');
+        if (isCurrentRow) cellClasses.push('current');
         if (isDropPreviewCell(dayIdx, slotIdx)) cellClasses.push('drop-preview');
         if (isInvalidCell(dayIdx, slotIdx)) cellClasses.push('drop-invalid');
 

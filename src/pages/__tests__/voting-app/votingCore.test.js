@@ -28,7 +28,10 @@ import {
   getRandomOption,
   getRandomInterval,
   generateShareUrl,
+  copyToClipboard,
+  getUrlVoteParam,
   formatDate,
+  formatDateTimeLocal,
   simulateViewerCount,
 } from '../../voting-app/votingCore'
 
@@ -771,6 +774,187 @@ describe('generateShareUrl', () => {
     expect(generateShareUrl('')).toBe('')
     expect(generateShareUrl(null)).toBe('')
   })
+
+  it('should use HashRouter format with #/ prefix', () => {
+    const url = generateShareUrl('vote_test')
+    expect(url).toBe('http://localhost:5173/#/voting-app?vote=vote_test')
+  })
+
+  it('should include origin and pathname correctly', () => {
+    vi.stubGlobal('window', {
+      location: {
+        origin: 'https://example.com',
+        pathname: '/app/',
+        hash: '',
+      },
+    })
+    const url = generateShareUrl('vote_xyz')
+    expect(url).toBe('https://example.com/app/#/voting-app?vote=vote_xyz')
+  })
+})
+
+describe('copyToClipboard', () => {
+  beforeEach(() => {
+    vi.stubGlobal('navigator', undefined)
+    vi.stubGlobal('document', undefined)
+  })
+
+  it('should return false when window is undefined', async () => {
+    const originalWindow = globalThis.window
+    delete globalThis.window
+    const result = await copyToClipboard('test')
+    globalThis.window = originalWindow
+    expect(result).toBe(false)
+  })
+
+  it('should return true when navigator.clipboard.writeText succeeds', async () => {
+    const mockWriteText = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('navigator', {
+      clipboard: { writeText: mockWriteText },
+    })
+    vi.stubGlobal('document', undefined)
+    const result = await copyToClipboard('hello world')
+    expect(mockWriteText).toHaveBeenCalledWith('hello world')
+    expect(result).toBe(true)
+  })
+
+  it('should fall back to execCommand when clipboard API fails', async () => {
+    const mockWriteText = vi.fn().mockRejectedValue(new Error('fail'))
+    const mockExecCommand = vi.fn().mockReturnValue(true)
+    const mockAppendChild = vi.fn()
+    const mockRemoveChild = vi.fn()
+    const mockSelect = vi.fn()
+
+    vi.stubGlobal('navigator', {
+      clipboard: { writeText: mockWriteText },
+    })
+    vi.stubGlobal('document', {
+      createElement: () => ({
+        value: '',
+        style: {},
+        select: mockSelect,
+      }),
+      body: {
+        appendChild: mockAppendChild,
+        removeChild: mockRemoveChild,
+      },
+      execCommand: mockExecCommand,
+    })
+
+    const result = await copyToClipboard('fallback test')
+    expect(mockWriteText).toHaveBeenCalled()
+    expect(mockExecCommand).toHaveBeenCalledWith('copy')
+    expect(result).toBe(true)
+  })
+
+  it('should return false when both methods fail', async () => {
+    const mockWriteText = vi.fn().mockRejectedValue(new Error('fail'))
+    vi.stubGlobal('navigator', {
+      clipboard: { writeText: mockWriteText },
+    })
+    vi.stubGlobal('document', {
+      createElement: () => { throw new Error('fail') },
+    })
+
+    const result = await copyToClipboard('test')
+    expect(result).toBe(false)
+  })
+
+  it('should use execCommand fallback when clipboard API is unavailable', async () => {
+    const mockExecCommand = vi.fn().mockReturnValue(true)
+    const mockAppendChild = vi.fn()
+    const mockRemoveChild = vi.fn()
+    const mockSelect = vi.fn()
+    const mockTextarea = {
+      value: '',
+      style: {},
+      select: mockSelect,
+    }
+
+    vi.stubGlobal('navigator', {})
+    vi.stubGlobal('document', {
+      createElement: () => mockTextarea,
+      body: {
+        appendChild: mockAppendChild,
+        removeChild: mockRemoveChild,
+      },
+      execCommand: mockExecCommand,
+    })
+
+    const result = await copyToClipboard('no clipboard api')
+    expect(mockExecCommand).toHaveBeenCalledWith('copy')
+    expect(result).toBe(true)
+  })
+})
+
+describe('getUrlVoteParam', () => {
+  it('should return null when window is undefined', () => {
+    const originalWindow = globalThis.window
+    delete globalThis.window
+    const result = getUrlVoteParam()
+    globalThis.window = originalWindow
+    expect(result).toBe(null)
+  })
+
+  it('should extract vote param from URL search', () => {
+    vi.stubGlobal('window', {
+      location: {
+        search: '?vote=vote_search_123',
+        hash: '',
+      },
+    })
+    expect(getUrlVoteParam()).toBe('vote_search_123')
+  })
+
+  it('should extract vote param from hash when search is empty', () => {
+    vi.stubGlobal('window', {
+      location: {
+        search: '',
+        hash: '#/voting-app?vote=vote_hash_456',
+      },
+    })
+    expect(getUrlVoteParam()).toBe('vote_hash_456')
+  })
+
+  it('should prefer search param over hash param', () => {
+    vi.stubGlobal('window', {
+      location: {
+        search: '?vote=vote_from_search',
+        hash: '#/voting-app?vote=vote_from_hash',
+      },
+    })
+    expect(getUrlVoteParam()).toBe('vote_from_search')
+  })
+
+  it('should return null when no vote param exists', () => {
+    vi.stubGlobal('window', {
+      location: {
+        search: '?other=value',
+        hash: '#/voting-app',
+      },
+    })
+    expect(getUrlVoteParam()).toBe(null)
+  })
+
+  it('should handle hash without query string', () => {
+    vi.stubGlobal('window', {
+      location: {
+        search: '',
+        hash: '#/voting-app',
+      },
+    })
+    expect(getUrlVoteParam()).toBe(null)
+  })
+
+  it('should handle empty search and hash', () => {
+    vi.stubGlobal('window', {
+      location: {
+        search: '',
+        hash: '',
+      },
+    })
+    expect(getUrlVoteParam()).toBe(null)
+  })
 })
 
 describe('formatDate', () => {
@@ -787,6 +971,26 @@ describe('formatDate', () => {
     expect(formatDate(null)).toBe('')
     expect(formatDate(0)).toBe('')
     expect(formatDate(undefined)).toBe('')
+  })
+})
+
+describe('formatDateTimeLocal', () => {
+  it('should format timestamp to datetime-local format', () => {
+    const timestamp = new Date('2025-06-15T14:30:00').getTime()
+    const formatted = formatDateTimeLocal(timestamp)
+    expect(formatted).toBe('2025-06-15T14:30')
+  })
+
+  it('should pad single digit month, day, hour, minute with zero', () => {
+    const timestamp = new Date('2025-01-05T09:05:00').getTime()
+    const formatted = formatDateTimeLocal(timestamp)
+    expect(formatted).toBe('2025-01-05T09:05')
+  })
+
+  it('should return empty string for falsy input', () => {
+    expect(formatDateTimeLocal(null)).toBe('')
+    expect(formatDateTimeLocal(0)).toBe('')
+    expect(formatDateTimeLocal(undefined)).toBe('')
   })
 })
 

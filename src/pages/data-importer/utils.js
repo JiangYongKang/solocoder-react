@@ -256,6 +256,30 @@ export function findDuplicateRows(rows, targetFields = TARGET_FIELDS) {
   return duplicates
 }
 
+export function isDataEqual(data1, data2) {
+  if (data1 === data2) return true
+  if (!Array.isArray(data1) || !Array.isArray(data2)) return false
+  if (data1.length !== data2.length) return false
+  for (let i = 0; i < data1.length; i++) {
+    const row1 = data1[i]
+    const row2 = data2[i]
+    if (row1 === row2) continue
+    if (typeof row1 !== 'object' || row1 === null ||
+        typeof row2 !== 'object' || row2 === null) {
+      return false
+    }
+    const keys1 = Object.keys(row1)
+    const keys2 = Object.keys(row2)
+    if (keys1.length !== keys2.length) return false
+    for (let j = 0; j < keys1.length; j++) {
+      const key = keys1[j]
+      if (!Object.prototype.hasOwnProperty.call(row2, key)) return false
+      if (row1[key] !== row2[key]) return false
+    }
+  }
+  return true
+}
+
 export function validateAllRows(mappedData, targetFields = TARGET_FIELDS) {
   if (!Array.isArray(mappedData)) {
     return { rows: [], stats: { total: 0, valid: 0, warning: 0, error: 0, duplicate: 0 } }

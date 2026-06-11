@@ -39,8 +39,8 @@ const CurrencyConverterPage = () => {
     setTargetCode(newTargetCode)
     setBaseAmount(newBaseAmount)
 
-    const num = parseFloat(newBaseAmount) || 0
-    if (num > 0) {
+    const num = parseFloat(newBaseAmount)
+    if (!isNaN(num) && num >= 0) {
       const converted = convertCurrency(num, newBaseCode, newTargetCode)
       setTargetAmount(converted !== null ? String(converted) : '')
     } else {

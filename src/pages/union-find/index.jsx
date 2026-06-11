@@ -614,7 +614,7 @@ export default function UnionFindPage() {
       timestamp: log.timestamp,
     }
 
-    commitState(finalState, operation, log, true)
+    commitState(finalState, operation, log)
 
     setTimeout(() => {
       setFindPath([])

@@ -1,0 +1,5 @@
+你实现的实时汇率换算器经过上一轮修复后，还存在以下问题需要进行修复：
+
+1. TrendChart.jsx 中新增的 resampleData 函数通过遍历对象所有属性对 number 类型做线性插值，calculateTrendChartLayout 产出的点位对象中包含 index 属性（离散的位置编号），也被纳入了插值计算产生无意义的浮点索引值。resampleData 应该只对需要插值的连续量属性做计算，而非无差别处理所有数值属性。
+2. TrendChart.jsx 中新增的 resampleData、interpolateLayout、easeOutCubic 三个模块级纯函数当前没有任何单元测试覆盖。这些函数的输入输出明确无副作用，应该提取到独立的工具模块并编写完整的单元测试，覆盖正常路径和 resampleData 单点输入、interpolateLayout progress 为 0/1 等边界情况。
+3. 修复后重新运行 pnpm run test，需要让所有测试通过。

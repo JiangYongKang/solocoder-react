@@ -775,12 +775,12 @@ describe('generateShareUrl', () => {
     expect(generateShareUrl(null)).toBe('')
   })
 
-  it('should use HashRouter format with #/ prefix', () => {
+  it('should preserve current hash path when present', () => {
     const url = generateShareUrl('vote_test')
     expect(url).toBe('http://localhost:5173/#/voting-app?vote=vote_test')
   })
 
-  it('should include origin and pathname correctly', () => {
+  it('should extract path from current location when hash is empty', () => {
     vi.stubGlobal('window', {
       location: {
         origin: 'https://example.com',
@@ -789,7 +789,23 @@ describe('generateShareUrl', () => {
       },
     })
     const url = generateShareUrl('vote_xyz')
-    expect(url).toBe('https://example.com/app/#/voting-app?vote=vote_xyz')
+    expect(url).toContain('https://example.com/app/')
+    expect(url).toContain('vote=vote_xyz')
+    expect(url).toContain('#')
+  })
+
+  it('should handle hash with existing query params', () => {
+    vi.stubGlobal('window', {
+      location: {
+        origin: 'http://localhost:5173',
+        pathname: '/',
+        hash: '#/voting-app?foo=bar',
+      },
+    })
+    const url = generateShareUrl('vote_abc')
+    expect(url).toContain('#/voting-app?')
+    expect(url).toContain('vote=vote_abc')
+    expect(url).toContain('foo=bar')
   })
 })
 

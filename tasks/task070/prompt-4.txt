@@ -1,0 +1,6 @@
+你实现的多人实时投票页面经过上一轮修复后，还存在以下问题需要进行修复：
+
+1. generateShareUrl 函数中 hashPath 变量的初始化和回退值仍然是硬编码的 `#/voting-app`。虽然当 hash 中存在路径时函数能正确提取，但 hash 为空时的回退值仍是写死的。分享链接的路径应该在任何情况下都从当前位置动态获取，不应该存在硬编码的默认路径。
+2. VoteDetail 组件中 endCheckTimerRef 的清理逻辑被分散在两个 useEffect 中：第 303-325 行的 isEnded 轮询 useEffect 中已有清理 return，第 362-373 行又通过闭包捕获 ref 添加了独立的卸载清理 useEffect，形成冗余的双重清理。应该删除第 362-373 行的冗余 useEffect，仅保留轮询 useEffect 中的原生清理逻辑。
+3. votingCore.test.js 中为 generateShareUrl 新增的 `should include origin and pathname correctly` 测试用例在 hash 为空时断言输出包含硬编码的 `#/voting-app`。这个测试验证的是错误行为——提示词要求消除硬编码，而测试却验证硬编码结果的正确性。应该删除此用例中对硬编码路径的断言，改为验证 hash 为空时 generateShareUrl 仍能生成合理的 URL 格式。
+4. 修复后重新运行 pnpm run test，需要让所有测试通过。

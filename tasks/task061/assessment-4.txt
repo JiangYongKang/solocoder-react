@@ -1,0 +1,6 @@
+产物不满意：
+1. handleSwap 逻辑修改超出本轮提示词范围。提示词三条要求分别为修复 resampleData 只对连续量属性做插值、将三个纯函数提取到独立模块并编写单元测试、确保测试全部通过，三条均不涉及互换按钮的数值判断逻辑。模型自行将 index.jsx 中 handleSwap 的 `parseFloat(newBaseAmount) || 0` 配合 `num > 0` 判断改为 `!isNaN(num) && num >= 0` 处理零值和 NaN。思考过程中明确写道"让我仔细分析一下互换按钮的逻辑"并创建了专属 todo 条目，属于擅自扩大缺陷修复会话的修改边界。缺陷修复会话要求严格聚焦提示词所列问题，模型在这个环节做了非预期的代码变更，对其他可能同时推进的 Session 构成干扰。
+2. handleSelectFavorite 函数未与 handleSwap 同步更新数值判断逻辑。handleSwap 已改为 `!isNaN(num) && num >= 0` 支持零值金额通过并重新换算，但 handleSelectFavorite 仍保留旧版 `parseFloat(baseAmount) || 0` 配合 `num > 0` 判断，且使用的是 baseAmount 而非函数入参 num。当用户金额输入为 0 时，点击互换按钮会将 targetAmount 设置为 "0" 字符串，但通过收藏切换货币对时不会触发换算，同一文件中两条用户交互路径对零值的处理行为不一致。既然模型自行扩大了修改范围并对 handleSwap 做了调整，应排查同文件内所有使用相同判等模式的函数一并更新。
+
+过程不满意：
+模型在完成图表工具模块提取和测试编写后，主动读取了 ConversionPanel.jsx 文件并开始分析互换按钮逻辑。思考过程中写道"现在让我仔细分析一下互换按钮的逻辑，我发现 handleSwap 中对 0 值的处理与 ConversionPanel 中的双向联动逻辑不一致"，随后创建新 todo 条目并修改了 index.jsx 的 handleSwap。提示词三条要求没有一条涉及互换按钮，模型在第 三 轮标注中已被指出应先分析问题再规划，本轮虽然在第一步读取了 TrendChart.jsx 和 index.jsx，但仍未完整对照提示词边界就自行扩展了修改范围。正确做法是在理解完所有提示词要求后，逐条确认每一项是否在本次修复范围内，对于不在清单内发现的问题应记录但不在本轮改动。

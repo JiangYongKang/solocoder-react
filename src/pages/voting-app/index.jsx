@@ -359,19 +359,6 @@ function VoteDetail({ vote, onVoteSubmit, viewerCount }) {
     }
   }, [vote.id, isEnded, hasVoted, vote.showResultsBeforeVote, vote, onVoteSubmit])
 
-  useEffect(() => {
-    const simRef = simulationTimerRef
-    const endRef = endCheckTimerRef
-    return () => {
-      if (simRef.current) {
-        clearTimeout(simRef.current)
-      }
-      if (endRef.current) {
-        clearInterval(endRef.current)
-      }
-    }
-  }, [])
-
   const handleOptionSelect = (optionId) => {
     if (hasVoted || isEnded) return
 
@@ -435,7 +422,7 @@ function VoteDetail({ vote, onVoteSubmit, viewerCount }) {
             <span className={`vt-type-badge vt-badge-${vote.type}`}>
               {VOTE_TYPE_LABELS[vote.type]}
             </span>
-            <Countdown vote={vote} />
+            <Countdown vote={vote} isEnded={isEnded} />
             <span className="vt-viewers-badge">
               <span className="vt-viewers-dot"></span>
               {viewerCount} 人正在浏览

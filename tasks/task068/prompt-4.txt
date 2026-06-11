@@ -1,0 +1,5 @@
+你实现的数据导入向导页面经过上一轮修复后，还存在以下问题需要进行修复：
+
+1. ValidationStep.jsx 中新增的 isDataEqual 深度比较函数存在边界缺陷：当 row1 中某属性被显式赋值为 undefined 而 row2 中完全不存在该属性时，JavaScript 读取不存在的属性同样返回 undefined，此时两者被误判为相等。isDataEqual 的比较逻辑应该能区分"属性不存在"和"属性值为 undefined"两种情况，或者至少对比双方键名的并集而非仅迭代一方的键名。
+2. isDataEqual 函数当前直接定义在 ValidationStep.jsx 组件文件内部，没有单元测试覆盖。应该将该函数提取到 dataImporterUtils.js 中导出，并在测试文件中为其编写单元测试，覆盖两行完全相等、某属性值不同、一方多出额外属性、属性值为 undefined 等多场景。
+3. 修复后重新运行 pnpm run test，需要让所有测试通过。

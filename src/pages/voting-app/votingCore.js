@@ -305,7 +305,7 @@ export function generateShareUrl(voteId) {
 
   const { origin, pathname, hash } = window.location
 
-  let hashPath = '#/voting-app'
+  let hashPath = ''
   let hashQuery = ''
 
   if (hash) {
@@ -319,7 +319,8 @@ export function generateShareUrl(voteId) {
   }
 
   if (!hashPath || hashPath === '#') {
-    hashPath = '#/voting-app'
+    const cleanPath = pathname.endsWith('/') ? pathname.slice(0, -1) : pathname
+    hashPath = `#${cleanPath || ''}`
   }
 
   const params = new URLSearchParams(hashQuery)

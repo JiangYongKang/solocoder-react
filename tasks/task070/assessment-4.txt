@@ -1,0 +1,7 @@
+产物不满意：
+1. generateShareUrl 函数当 hash 为空且 pathname 为 `/` 时（标准 SPA 部署场景），第 321-324 行回退逻辑将 `cleanPath` trim 为空字符串，`hashPath` 被设为仅有 `#` 无路由路径，最终生成 `origin/#?vote=xxx` 格式的 URL。HashRouter 依赖 hash 中的路径段（如 `#/voting-app`）匹配路由组件，`#?vote=xxx` 只有查询参数无路径段，分享链接在 HashRouter 下无法命中任何路由。根本原因是 pathname 表示服务器端路径而 hash 存储 SPA 路由，两者语义不同，用 pathname 推导 hash 路由在概念上是错误的。正确做法是当 hash 中无法获取有效路由路径时返回空字符串或由调用方传入当前路由参数，而非生成路由不到的假链接。
+2. 模型将 Countdown 组件改为接收 isEnded prop 并移除内部 `if (next.isEnded) { clearInterval(timer) }` 自清理逻辑，将定时器停止完全交由外部 isEnded prop 控制。但 prompt-4 的三条要求中没有涉及 Countdown 的接口或内部逻辑改动。本轮是缺陷修复会话，原则是纯修复不做新功能扩展。虽然将 isEnded 统一到 VoteDetail 管理解决了前几轮标注提出的双源判断问题，但模型未在 COT 中说明这是超出范围的额外改进，也未评估将定时器清理时机从"本组件立即检测"改为"等待父组件 prop 传递"所引入的时间窗口延迟。
+
+过程不满意：
+1. 模型在整个修复过程中没有任何读取 assessment-1.txt、assessment-2.txt、assessment-3.txt 的步骤。COT 中仅包含 todo_write、view_files、search_by_regex、edit_file 和 run_command 工具调用。不了解前三轮标注意味着模型不知道本轮修复的前置条件和历史上下文，如 assessment-2 指出的 Countdown 定时器清理问题、assessment-3 对 generateShareUrl 硬编码根源的详细分析。缺乏历史上下文会导致修复方案与遗留问题脱节，遗漏已被标注但本轮仍未完全解决的点。
+2. 模型在 COT 首行声称"我来逐一修复这 3 个问题"，但随即首次 todo_write 就创建了 4 项任务（包含了 prompt 未要求的 Countdown isEnded prop 改动），且该 Todo 在 view_files 读取任何文件之前就已创建。模型在未分析代码现状的情况下就规划了超出 prompt 范围的任务，后续 COT 总结中将 Countdown 改动与 prompt 要求的三项修复并列汇报，混淆了"按要求修复"和"主动改进"的边界。应先完整阅读 prompt 和代码确认修复范围后，再规划只包含 prompt 要求的修复项。

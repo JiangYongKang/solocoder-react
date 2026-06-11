@@ -1,0 +1,7 @@
+产物不满意：
+1. generateShareUrl 当 hash 为空且 pathname 为非根路径如 `/app/` 时，去斜杠后 cleanPath 不为空，`hashPath` 被设为 `#/app`，通过了第二阶段空值检查而非返回空字符串。生成的 URL 中 hash 路由为 `#/app` 而非 `#/voting-app`，用户打开分享链接后 HashRouter 无法匹配到 VotingApp 路由组件。根因是 pathname 代表服务端部署路径而 hash 代表前端路由空间，两者语义不同无法互相推导。用 pathname 推导 hash 路由在标准 SPA 部署下不可靠，正确做法是当 hash 中没有有效路由路径时直接返回空字符串而不是尝试从 pathname 拼凑。
+2. 测试用例 `should extract path from current location when hash is empty but pathname has content` 设置为 hash 为空、pathname 为 `/app/` 的场景，只用 toContain 松散断言输出包含 `#` 和投票参数。但实际输出中的 hash 路径 `#/app` 无法在 HashRouter 下匹配 `/voting-app` 路由，toContain 断言完全检测不到路由路径不匹配问题。同时该测试是为 pathname 推导 hash 路径这种不可靠行为编写的验证用例，将错误逻辑固化为正确预期。正确做法是验证 hash 为空时 generateShareUrl 返回空字符串，从根源解决路由不可达问题。
+过程不满意：
+1. 模型在 COT 第一步就调用 todo_write 创建包含 3 项任务的 TodoList，然后才执行 view_files 读取代码。prompt-5 描述了一个具体的边界场景缺陷，模型在未看到 generateShareUrl 的当前代码实现之前就已经规划了修复步骤，违反了先分析再规划的原则。正确做法是先完整理解 prompt-5 描述的具体边界缺陷，再查看文件中的当前实现定位问题所在，最后创建有针对性的 TodoList 而非泛化的三步模板。
+2. 模型整个修复过程没有读取任何一份历史标注文件。前四轮标注记录了 generateShareUrl 从硬编码到动态获取的完整演进过程，不了解这些上下文导致模型无法理解当前的回退逻辑是在多轮迭代中逐步形成的，修复时容易重蹈路径覆盖不全的覆辙。缺陷修复会话应首先阅读历史标注了解问题的演进脉络再动手修复。
+3. 模型将旧测试的断言从精确的 `toBe` 降级为松散的 `toContain`。知道硬编码 `#/voting-app` 的死板断言不再适用是正确的，但没有进一步思考应该验证的核心行为——hash 为空时应返回空字符串。松散的断言实际上放宽了测试标准，路由不匹配的缺陷无法被检测，测试失去了对正确性的约束力，出现了测试向错误代码妥协的倾向。

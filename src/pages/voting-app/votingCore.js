@@ -323,6 +323,10 @@ export function generateShareUrl(voteId) {
     hashPath = `#${cleanPath || ''}`
   }
 
+  if (!hashPath || hashPath === '#') {
+    return ''
+  }
+
   const params = new URLSearchParams(hashQuery)
   params.set('vote', voteId)
 

@@ -1,0 +1,4 @@
+你实现的实时汇率换算器经过上一轮修复后，还存在以下问题需要进行修复：
+
+1. index.jsx 中 handleSwap 函数的零值判断逻辑已在上轮由 `parseFloat(newBaseAmount) || 0` 改为 `!isNaN(num) && num >= 0`，但同文件的 handleSelectFavorite 函数仍然使用旧版 `parseFloat(baseAmount) || 0` 配合 `num > 0` 的废弃判断，而且引用的变量名是 baseAmount 而非函数入参。当用户金额输入为 0 时，点互换按钮可以正常重新换算，但切换到收藏货币对时不会触发换算，同一文件中两条用户交互路径对零值的处理行为不一致。需要将 handleSelectFavorite 的零值判断逻辑与 handleSwap 保持同步一致。
+2. 修复后重新运行 pnpm run test，需要让所有测试通过。

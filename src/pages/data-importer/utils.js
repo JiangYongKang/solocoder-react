@@ -270,11 +270,13 @@ export function isDataEqual(data1, data2) {
     }
     const keys1 = Object.keys(row1)
     const keys2 = Object.keys(row2)
-    if (keys1.length !== keys2.length) return false
-    for (let j = 0; j < keys1.length; j++) {
-      const key = keys1[j]
-      if (!Object.prototype.hasOwnProperty.call(row2, key)) return false
-      if (row1[key] !== row2[key]) return false
+    const allKeys = Array.from(new Set([...keys1, ...keys2]))
+    for (let j = 0; j < allKeys.length; j++) {
+      const key = allKeys[j]
+      const has1 = Object.prototype.hasOwnProperty.call(row1, key)
+      const has2 = Object.prototype.hasOwnProperty.call(row2, key)
+      if (has1 !== has2) return false
+      if (has1 && has2 && row1[key] !== row2[key]) return false
     }
   }
   return true

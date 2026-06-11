@@ -780,7 +780,7 @@ describe('generateShareUrl', () => {
     expect(url).toBe('http://localhost:5173/#/voting-app?vote=vote_test')
   })
 
-  it('should extract path from current location when hash is empty', () => {
+  it('should extract path from current location when hash is empty but pathname has content', () => {
     vi.stubGlobal('window', {
       location: {
         origin: 'https://example.com',
@@ -792,6 +792,30 @@ describe('generateShareUrl', () => {
     expect(url).toContain('https://example.com/app/')
     expect(url).toContain('vote=vote_xyz')
     expect(url).toContain('#')
+  })
+
+  it('should return empty string when hash is empty and pathname is root', () => {
+    vi.stubGlobal('window', {
+      location: {
+        origin: 'http://localhost:5173',
+        pathname: '/',
+        hash: '',
+      },
+    })
+    const url = generateShareUrl('vote_test')
+    expect(url).toBe('')
+  })
+
+  it('should return empty string when hash is only # and pathname is root', () => {
+    vi.stubGlobal('window', {
+      location: {
+        origin: 'http://localhost:5173',
+        pathname: '/',
+        hash: '#',
+      },
+    })
+    const url = generateShareUrl('vote_test')
+    expect(url).toBe('')
   })
 
   it('should handle hash with existing query params', () => {

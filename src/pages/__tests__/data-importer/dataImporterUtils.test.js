@@ -12,6 +12,7 @@ import {
   applyMapping,
   validateRow,
   findDuplicateRows,
+  isDataEqual,
   validateAllRows,
   getRowFailureReasons,
   generateImportDelay,
@@ -527,6 +528,69 @@ describe('findDuplicateRows', () => {
     ]
     const result = findDuplicateRows(rows, TARGET_FIELDS)
     expect(result.size).toBe(0)
+  })
+})
+
+describe('isDataEqual', () => {
+  it('两行完全相等的对象返回 true', () => {
+    const data1 = [
+      { name: '张三', email: 'z@t.com', phone: '13800138000' },
+      { name: '李四', email: 'l@t.com', phone: '13900139000' },
+    ]
+    const data2 = [
+      { name: '张三', email: 'z@t.com', phone: '13800138000' },
+      { name: '李四', email: 'l@t.com', phone: '13900139000' },
+    ]
+    expect(isDataEqual(data1, data2)).toBe(true)
+  })
+
+  it('某属性值不同返回 false', () => {
+    const data1 = [{ name: '张三', email: 'z@t.com' }]
+    const data2 = [{ name: '张三', email: 'l@t.com' }]
+    expect(isDataEqual(data1, data2)).toBe(false)
+  })
+
+  it('一方多出额外属性返回 false', () => {
+    const data1 = [{ name: '张三', email: 'z@t.com' }]
+    const data2 = [{ name: '张三', email: 'z@t.com', phone: '13800138000' }]
+    expect(isDataEqual(data1, data2)).toBe(false)
+  })
+
+  it('某属性显式赋值为 undefined 与另一方属性不存在应返回 false', () => {
+    const data1 = [{ name: '张三', email: undefined }]
+    const data2 = [{ name: '张三' }]
+    expect(isDataEqual(data1, data2)).toBe(false)
+  })
+
+  it('空数组输入返回 true', () => {
+    expect(isDataEqual([], [])).toBe(true)
+  })
+
+  it('输入为非数组时返回 false', () => {
+    expect(isDataEqual(null, [])).toBe(false)
+    expect(isDataEqual(undefined, [])).toBe(false)
+    expect(isDataEqual({}, [])).toBe(false)
+    expect(isDataEqual('abc', [])).toBe(false)
+    expect(isDataEqual([], {})).toBe(false)
+  })
+
+  it('同一引用返回 true', () => {
+    const data = [{ name: '张三' }]
+    expect(isDataEqual(data, data)).toBe(true)
+  })
+
+  it('数组长度不同返回 false', () => {
+    expect(isDataEqual([{ a: 1 }], [{ a: 1 }, { a: 2 }])).toBe(false)
+  })
+
+  it('行对象为 null 时返回 false', () => {
+    expect(isDataEqual([null], [{ a: 1 }])).toBe(false)
+  })
+
+  it('属性值都为 undefined 但都存在时返回 true', () => {
+    const data1 = [{ name: undefined }]
+    const data2 = [{ name: undefined }]
+    expect(isDataEqual(data1, data2)).toBe(true)
   })
 })
 

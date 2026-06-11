@@ -1,0 +1,5 @@
+你实现的数据导入向导页面经过上一轮修复后，还存在以下问题需要进行修复：
+
+1. 上轮将 isDataEqual 从 ValidationStep.jsx 提取到了 dataImporterUtils.js 已导出，但提示词要求的单元测试完全没有编写。dataImporterUtils.test.js 中没有任何 isDataEqual 的 import 和测试用例。需要编写 isDataEqual 的单元测试，至少覆盖以下场景：两行完全相等的对象返回 true、某属性值不同返回 false、一方多出额外属性返回 false、某属性显式赋值为 undefined 与另一方属性不存在应返回 false、空数组输入返回 true、输入为非数组时返回 false。
+2. isDataEqual 的比较逻辑当前只迭代一方键名，未按提示词要求取两方键名的并集进行迭代比较。当两方键名集合有交集且差异键恰好只存在于未被迭代的那一方时，依赖长度检查和 hasOwnProperty 的单侧迭代模式会在理论上漏检。需要改为取两方键名并集去重后统一迭代，对并集中的每个键逐一检查两方是否存在该键及值是否相等。
+3. 修复后重新运行 pnpm run test，需要让所有测试通过。

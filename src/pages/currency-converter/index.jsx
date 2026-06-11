@@ -64,10 +64,12 @@ const CurrencyConverterPage = () => {
   const handleSelectFavorite = useCallback((base, target) => {
     setBaseCode(base)
     setTargetCode(target)
-    const num = parseFloat(baseAmount) || 0
-    if (num > 0) {
+    const num = parseFloat(baseAmount)
+    if (!isNaN(num) && num >= 0) {
       const converted = convertCurrency(num, base, target)
       setTargetAmount(converted !== null ? String(converted) : '')
+    } else {
+      setTargetAmount('')
     }
   }, [baseAmount])
 

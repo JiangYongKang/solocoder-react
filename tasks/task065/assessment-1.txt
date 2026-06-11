@@ -1,6 +1,6 @@
 产物不满意：
 1. index.jsx 中缩放控件使用了 `<select>` 下拉框（第379-389行），而提示词明确要求"时间轴上方有一个缩放滑块"。需求描述的是可拖拽的滑块控件，模型用下拉选择器替代，产品形态与需求描述不符。应改为 range 类型的 `<input type="range">` 滑块控件。
-2. index.jsx 中 zoom 缩放功能没有实现真正的缩放效果。提示词要求"缩放级别为'年'时时间轴被压缩显示范围更广，缩放级别为'周'时时间轴被展开显示更详细的时间间隔"，但实际实现中 zoomLevel 只改变了 timeline.css 第264-272行的 CSS padding（week: 40/60px, year: 8/16px），`getDateRangeFromZoom` 计算的范围仅用于顶部标签展示（第432-436行），没有根据缩放级别过滤时间轴上的事件，也没有调整时间刻度粒度和分组密度。各缩放级别下显示的事件完全相同。应将 zoomLevel 用于过滤事件的时间范围、调整刻度密度和节点间距。
+2. zoom 缩放功能没有实现真正的缩放效果。提示词要求缩放级别不同时时间轴压缩/展开显示不同范围的时间间隔，但 zoomLevel 只改变了 CSS padding，getDateRangeFromZoom 计算的范围仅用于顶部标签展示，没有根据缩放级别过滤时间轴上的事件，也没有调整时间刻度粒度和分组密度。各缩放级别下显示的事件完全相同。应将 zoomLevel 用于过滤事件的时间范围、调整刻度密度和节点间距。
 3. timeline.css 第665行卡片视图使用了 `grid-template-columns: repeat(auto-fill, minmax(300px, 1fr))` 标准 CSS Grid 布局，而提示词要求卡片的"瀑布流布局"。Grid 所有行严格对齐，不同高度的卡片在同行底部留下空白，无法实现瀑布流（Masonry）的紧凑堆叠效果。应使用 CSS `column-count` 多列布局或 JavaScript 实现的 Masonry 库来实现真正的瀑布流。
 4. index.jsx 第86-89行 `listViewEvents` 用 `sortEvents(filteredEvents).reverse()` 先升序再反转得到降序，而第81-84行 `cardViewEvents` 用 `getSortForCardView` 直接降序排列。两条计算路径产生完全相同的结果，却维护了两套排序逻辑，代码冗余。应将列表视图也复用 `getSortForCardView` 函数消除冗余。
 5. 按月份分组时，timeline.css 的 `.et-day-label` 只显示日期数字（如"1日"），index.jsx 第237行 `getDayNumber` 调用只提取 `slice(8,10)` 的天数部分，缺少月份上下文。当跨月浏览时，用户无法从左侧时间刻度判断当前属于哪个月份，必须回看分组标题。时间刻度信息不完整，应在日标签旁补充月份标注。

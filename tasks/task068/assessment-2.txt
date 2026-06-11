@@ -1,6 +1,6 @@
 产物不满意：
-1. ValidationStep.jsx 中新增的 useEffect 用于同步 mappedData prop 到 localData state：`useEffect(() => { setLocalData(mappedData) }, [mappedData])`。这个 effect 在每次 mappedData 变化时都会无条件覆盖 localData，包括用户在校验步骤中手动编辑单元格后的数据。假设用户双击编辑了某行的邮箱字段，此时 localData 被更新，如果父组件中的 mappedData 因为某些原因也重新计算并传入了新引用（即使数据内容相同），effect 就会将用户的本地编辑覆盖掉。更安全的做法是只在 mappedData 的"结构性变化"（如新增行、删除行）时同步，或者使用 key prop 重置组件而非 effect 中的 setState。另外 ESLint 报告了 `react-hooks/set-state-in-effect` 警告，说明这种写法本身不符合 React 最佳实践。
+1. ValidationStep.jsx 中新增的 useEffect 无条件覆盖 localData，包括用户手动编辑后的数据。如果父组件的 mappedData 因引用变化重新传入，effect 会将用户本地编辑覆盖掉。更安全的做法是只在 mappedData 结构变化（如新增行）时同步，或使用 key prop 重置组件。此外 ESLint 报告了 set-state-in-effect 警告，这种写法本身不符合 React 最佳实践。
 2. 模型移除了 validateRow 和 findDuplicateRows 的未使用导入，但导入语句 `import { validateAllRows } from '../utils.js'` 中只保留了一个函数，说明这两个函数确实是组件不需要的。但为什么它们最初会被导入？这说明在第一轮开发时模型就导入了不使用的函数，产物不干净。本轮虽然清理了，但反映了一个持续存在的问题：模型在添加导入时缺乏对实际用到的函数做精确对照。
 
 过程不满意：
-模型处理 ValidationStep.jsx 的三个修复问题时，使用了单次 edit_file_search_replace 调用一次性替换了整个组件。修改内容包括：移除未使用导入、将 useMemo 中的副作用移到 useEffect、添加 mappedData 同步的 useEffect。这样做的好处是效率高，但风险同样高——一次大范围替换如果出错不容易定位。更关键的是，模型修改后只运行了 `pnpm run test -- src/pages/__tests__/data-importer/dataImporterUtils.test.js` 确认 92 个测试通过，但 dataImporterUtils.test.js 测试的是 utils.js 中的工具函数，完全没有覆盖 ValidationStep 组件的行为。模型应该通过启动项目手动验证校验步骤的数据同步和编辑功能是否正常，而不是仅凭工具函数测试就声称完成。
+模型使用了单次大范围替换来处理三个修复问题，但修改后只运行了 dataImporterUtils.test.js 的 92 个工具函数测试，完全没有覆盖 ValidationStep 组件的行为。模型应该通过启动项目手动验证校验步骤的数据同步和编辑功能是否正常，而不是仅凭工具函数测试就声称完成。

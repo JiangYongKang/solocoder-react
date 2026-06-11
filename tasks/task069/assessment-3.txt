@@ -1,5 +1,5 @@
 产物不满意：
-本轮修复正确实现了提示词的全部三项要求，产物无明显缺陷。highlightKeyword 由递归改为 while 循环迭代实现，先遍历收集所有匹配位置索引、再批量构建高亮标签，避免了长文本处理的栈溢出风险。新增的 formatCloseError 函数映射了 1000 到 1015 共 15 种标准 WebSocket 关闭码的中文描述（如"协议错误""连接异常中断""TLS 握手失败"），ws.onclose 中改用 formatCloseError(event.code, event.reason) 替换原有固定中文文案，开发者可以通过关闭码和 reason 字段区分服务端主动关闭、协议错误还是网络中断。新增的 8 个 formatCloseError 测试用例覆盖了标准码、未知码、null 和 undefined 入参、空 reason、空白 reason 等场景，全量 5549 个测试全部通过。
+本轮修复正确实现了提示词的三项要求，产物无明显缺陷。highlightKeyword 由递归改为 while 循环迭代，避免了长文本栈溢出风险。新增 formatCloseError 函数映射了 15 种标准 WebSocket 关闭码的中文描述，ws.onclose 改用 formatCloseError(event.code, event.reason) 替换固定中文文案，开发者可通过关闭码区分服务端主动关闭、协议错误还是网络中断。新增 8 个 formatCloseError 测试用例覆盖了标准码、未知码、null/undefined 入参等场景，全量 5549 个测试通过。
 
 过程不满意：
-模型在运行全量测试时使用了 PowerShell 管道命令 `pnpm run test 2>&1 | Select-Object -Last 10`，只捕获了测试终端输出的最后 10 行。虽然最后 10 行恰好包含了 "Tests 5549 passed" 的汇总行，但这种做法存在显著风险：如果测试中间输出中包含 React 组件 key prop 缺失警告、console.error 调用、内存泄漏提示或非致命但需关注的 vitest 诊断信息，它们出现在前部输出中会完全不可见。模型仅凭最后 10 行就得出"全部测试通过"的结论，没有审阅完整的终端输出日志。根本原因是对终端输出质量的检查范围过窄，只关注最后的 PASS/FAIL 汇总行而忽略了完整输出。正确做法是去掉 Select-Object 截断，通读完整测试输出，确认除 test runner 结果外没有 console 警告、React 组件告警或 vitest 诊断信息残留。
+模型运行全量测试时使用了 PowerShell 管道截取最后 10 行输出。虽然恰好包含了 "Tests 5549 passed" 汇总行，但如果中间输出包含 React key prop 缺失警告、console.error 或 vitest 诊断信息，它们在前部输出中完全不可见。模型仅凭最后 10 行就得出"全部通过"的结论，没有审阅完整终端日志。正确做法是去掉截断，通读完整测试输出，确认没有 console 警告或 React 组件告警残留。

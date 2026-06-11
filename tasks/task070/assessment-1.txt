@@ -1,12 +1,12 @@
 产物不满意：
 1. generateShareUrl 函数生成的分享链接格式有误。项目使用 HashRouter，当前页面 URL 为 http://localhost:5173/#/voting-app，但该函数在 hash 非空时 separator 设为空字符串，生成 http://localhost:5173/voting-app?vote=xxx 缺少 #/ 前缀。将此链接分享给他人后，HashRouter 不会匹配到 voting-app 路由，VotingApp 组件不会挂载，投票链接形同虚设。根本原因是 separator 逻辑反了：hash 存在时理应保留 #/ 前缀，而非省略它。
 2. submitVote 函数中 totalVotes 计算使用三元表达式但两个分支返回完全相同的结果 vote.totalVotes + 1，三元判断完全无意义。虽然当前单多选的总票数语义恰巧一致（一次提交算一票），但这段代码暴露了模型未真正理解单选和多选在票数统计层面是否有差异，只是机械地写完 if/else 结构再填入相同值，产物不干净。
-3. VoteDetail 组件用 useMemo(() => isVoteEnded(vote), [vote]) 计算 isEnded，但 vote 对象的 deadline 是静态字符串，不随实际时间推移变化。当截止时间到达时，Countdown 子组件已显示"已结束"，但 VoteDetail 的 isEnded 仍为 false，导致"投票已结束"横幅不出现，选项卡片也因 isDisabled = hasVoted || isEnded 中 isEnded 为 false 而保持可点击状态，投票到期自动关闭的需求未完整实现。
+3. VoteDetail 组件用 useMemo(() => isVoteEnded(vote), [vote]) 计算 isEnded，但 vote 对象的 deadline 是静态字符串不随时间推移变化。当截止时间到达时 Countdown 已显示"已结束"，但 VoteDetail 的 isEnded 仍为 false，导致"投票已结束"横幅不出现，选项卡片也因 isEnded 为 false 保持可点击状态，投票到期自动关闭的需求未完整实现。
 4. Countdown 组件的 setInterval 在投票到期后未停止。remaining.isEnded 为 true 时组件渲染"已结束"标记，但 interval 仍每秒继续调用 getRemainingTime 和 setRemaining，边界条件处理不彻底。应增加到期后 clearInterval 的逻辑。
 5. copyToClipboard 调用了异步 API navigator.clipboard.writeText() 却没有 await 其返回值，函数始终同步返回 true，无法向调用方反馈复制操作的真实成败。同时测试文件对该函数零覆盖。
 6. 测试文件缺少 getUrlVoteParam 和 formatDateTimeLocal 两个核心工具函数的测试用例。getUrlVoteParam 负责从 URL 参数中识别投票 ID，是链接分享功能的关键路径，没有测试覆盖存在回归风险。
 
 过程不满意：
-1. lint 修复阶段模型先后读取 index.jsx 文件不少于 8 次（对应 COT 约第 440 行到第 620 行步骤区间），每次只修复一个 lint 问题就重新读取文件来确认上下文，而不是一次性通读文件列出所有违规点后批量定位修改。具体表现为修复 effect 中 setState 问题读一次、修复 isEnded 派生状态读一次、修复 handleSubmitVote 参数读一次、修复 JSX 按钮读一次等等，每一次读取之间没有新增知识，纯属重复操作。正确做法是拿到 lint 输出后先完整阅读目标文件一次，梳理所有违规点和修改方案，再逐处编辑。
+1. lint 修复阶段模型先后读取 index.jsx 不少于 8 次，每次只修复一个 lint 问题就重新读取确认上下文，而非一次性列出所有违规点后批量修改。表现为修复 effect 中 setState 读一次、修复 isEnded 读一次、修复 handleSubmitVote 读一次等，每次读取之间没有新增知识。正确做法是拿到 lint 输出后先完整阅读目标文件一次，梳理所有违规点和修改方案，再逐处编辑。
 2. 首次运行测试时 submitVote 单选多选项用例失败，模型选择直接修改测试的预期断言而非先排查 submitVote 代码逻辑是否合理。虽然最终测试通过了，但模型的行为模式是让测试去适配代码，而不是让代码满足正确逻辑。遇到测试失败应先确认是代码有 bug 还是测试预期写错了，再决定修改哪一侧，不应单向迁就。
 3. 标注总结中声称"Lint: 零错误零警告"，但 COT 记录中模型实际只对 voting-app 目录下的两个文件运行了 lint，并未检查 App.jsx 中新增的路由声明和 import 语句是否存在问题。总结范围超出实际验证范围，存在以偏概全的倾向。

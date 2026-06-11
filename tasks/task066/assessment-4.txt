@@ -1,7 +1,7 @@
 产物不满意：
-1. 模型在 index.jsx 的 handleUnion 函数中将 commitState(result.state, operation, log) 改为 commitState(laidOutState, operation, log, true)，该改动不在 prompt-4 的三条修复要求中。虽然从功能上看用 laidOutState 结合 skipLayout=true 可以消除 handleUnion 中的重复布局计算（assessment-3 曾指出该缺陷），但模型在 session-cot-4.md 和修复总结中均未提及此修改，reviewer 无法从思考过程中确认这是有意修复还是无意拖入。正确做法是严格遵守提示词的修复范围，若确需额外修改应在 COT 中说明理由和影响。
-2. 模型在完成 handleFind 的 commitState 跳过布局修复后，仅运行 pnpm vitest run 和 pnpm eslint 通过就声称完成，未启动 pnpm run dev 在浏览器中执行查找操作验证路径压缩后节点位置是否与树结构同步。prompt-4 第 2 条明确描述了"视觉位置与数据结构不一致"的视觉问题，这类 BUG 只能通过浏览器实际操作并观察才能确认修复效果。模型从 session-1 到 session-4 始终跳过浏览器验证步骤，assessment-2 和 assessment-3 均已指出此问题却未改进。
+1. 模型将 handleUnion 的 commitState 从 result.state 改为 laidOutState 并传入 skipLayout=true，该改动不在 prompt-4 的三条修复要求中。虽然用 laidOutState 结合 skipLayout 可消除重复布局计算，但模型在 COT 和修复总结中均未提及此修改，reviewer 无法确认这是有意修复还是无意拖入。应严格遵守提示词修复范围，若确需额外修改应在 COT 中说明理由。
+2. 模型完成 handleFind 的布局修复后仅运行 vitest 和 eslint 就声称完成，未启动浏览器验证路径压缩后节点位置是否与树结构同步。prompt-4 第 2 条描述了"视觉位置与数据结构不一致"的视觉问题，只能通过浏览器实际操作确认。模型从 session-1 到 session-4 始终跳过浏览器验证，assessment-2 和 assessment-3 均已指出此问题却未改进。
 
 过程不满意：
-1. session-cot-4.md 中记录的修复项目仅包含 3 项：恢复 findNonOverlappingPosition、恢复 handleFind 布局、恢复重叠测试。但 git diff 显示模型实际还修改了 handleUnion 的 commitState 调用方式，将入参从 result.state 改为 laidOutState 并传入 skipLayout=true。整个 COT 中完全没有记录这一改动的行为和意图，reviewer 无法追溯修改动机。这是模型连续第二 session 出现未声明的越权修改（assessment-3 已指出 session-3 存在将节点放置函数和 handleFind 等与 prompt 无关的改动一并提交的问题），说明模型未从上一轮反馈中吸取教训。
-2. 模型在 session-cot-4.md 中仅记录了编辑文件、运行测试、运行 lint 三类操作，验证结论为"全部通过！"，完全没有提及需要浏览器端视觉验证。路径压缩后节点在画布上的位置是否正确、union 动画结束后位置是否稳定，这些都无法通过 unionFindCore.test.js 的纯 JS 函数测试验证。模型应当启动 pnpm run dev，在浏览器中手动执行查找和合并操作，确认动画结束后节点没有整体跳变、位置与压缩后的树结构一致，再声称完成。模型连续四轮跳过视觉验证，说明其对视觉 BUG 需要浏览器端验证这一基本认识严重缺失。
+1. session-cot-4.md 记录的修复仅 3 项，但 git diff 显示模型还修改了 handleUnion 的 commitState 调用方式，将入参从 result.state 改为 laidOutState 并传入 skipLayout=true。COT 完全没有记录这一改动，reviewer 无法追溯动机。这是模型连续第二 session 出现未声明的越权修改（assessment-3 已指出 session-3 存在类似问题），说明未从上一轮反馈中吸取教训。
+2. 模型在 COT 中仅记录了编辑文件、运行测试、运行 lint 三类操作，验证结论为"全部通过！"，完全没有提及需要浏览器端视觉验证。路径压缩后节点位置是否正确、union 动画结束后位置是否稳定，这些无法通过纯 JS 函数测试验证。模型应启动 pnpm run dev，在浏览器中手动执行查找和合并操作确认位置稳定性。四轮连续跳过视觉验证，说明对视觉 BUG 需要浏览器验证的认识严重缺失。

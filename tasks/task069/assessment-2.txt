@@ -1,7 +1,7 @@
 产物不满意：
 1. wsDebuggerUtils.js 中新增的 formatMessageForDisplay 函数用于统一处理消息格式化，内部调用了 tryFormatMessage 做 JSON 格式化、highlightJson 做语法高亮、highlightKeyword 做关键词高亮。但在 highlightKeyword 函数中，模型使用了递归调用来处理文本中所有匹配位置的批量高亮：`highlightKeyword(after, keyword)`。如果消息内容特别长（如几千行的 JSON），递归深度可能随匹配次数线性增长，极端情况下有栈溢出风险。正确的做法是用正则全局替换或 while 循环批量处理，而非递归。
-2. index.jsx 中 ws.onclose 的处理逻辑修改为：当 isIntentional 为 false 时设置 `setConnectionStatus(CONNECTION_STATUS.ERROR)` 和 `setErrorReason`。但 ws.onclose 的 event 对象包含 code 和 reason 等标准字段，模型没有将这些 WebSocket 标准的关闭码信息提取到 errorReason 中，而是只用了一个固定的 `连接意外断开` 中文文本。开发者无法区分是服务端主动关闭（1000）、协议错误（1002）、还是网络中断（1006），调试信息不足。应该在 errorReason 中同时包含 code 和 reason 的原始信息。
-3. 心跳检测逻辑中，`isPongResponse` 函数通过 JSON.parse 尝试解析 content 然后检查 `type === 'pong'`，但也兼容纯文本 `pong`。然而对于 echo 服务器（如 echo.websocket.org），服务器返回的是发送的原始消息的完整回显，即如果客户端发送了 `{"type":"ping"}`，回显也是 `{"type":"ping"}` 而不是 `{"type":"pong"}`。也就是说对于 echo 服务器，发出的 ping 回显也是 ping 而不是 pong，isPongResponse 无法识别这种回显，导致心跳超时计数永远不会被重置。模型虽然通过 `isEchoServer` 禁用了 echo 服务器的心跳检测，但非 echo 的真实服务器也可能返回非标准 pong 格式的响应，没有提供配置入口让用户自定义 pong 的匹配模式。
+2. ws.onclose 的处理逻辑修改后设置了 ERROR 状态和 errorReason，但没有将 ws.onclose event 对象的 code 和 reason 等标准字段提取到 errorReason 中，只用了固定的"连接意外断开"中文文本。开发者无法区分是服务端主动关闭（1000）、协议错误（1002）还是网络中断（1006），调试信息不足。应该在 errorReason 中同时包含 code 和 reason 的原始信息。
+3. 心跳检测中 isPongResponse 通过检查 type === 'pong' 识别回包，但对于 echo 服务器，客户端发送 {"type":"ping"} 的回显也是 ping 而非 pong，isPongResponse 无法识别，导致心跳超时计数永不重置。模型虽通过 isEchoServer 禁用了 echo 服务器的心跳检测，但非 echo 的真实服务器也可能返回非标准 pong 格式的响应，没有提供配置入口让用户自定义 pong 的匹配模式。
 
 过程不满意：
-模型在运行全量测试时遇到了 sudokuCore.test.js 的一个测试失败（1 failed），在 COT 中判断失败与 WebSocket 修改无关后继续推进。模型正确识别了失败的测试不属于自己改动的范围，这种做法是可取的。但模型在确认 101 个 WebSocket 测试通过后，运行了 vite build 验证构建成功，然后就直接总结了。模型在整个流程中创建了高度结构化的 TodoList（创建为 6 个子任务），但实际执行中并没有按照 TodoList 顺序推进——例如心跳条件修复排在最后，但在代码修改时和其他修复交织在一起。此外模型在修复 lint 问题（setState-in-effect、依赖数组）时反复多次修改 doConnect 的代码块，每次修改后又重新运行 lint 检查是否还有残留，反映了在写代码前没有充分预估 lint 可能报出的问题点。
+模型运行全量测试时遇到 sudokuCore.test.js 的一个失败，正确识别了该失败与 WebSocket 修改无关，做法可取。但模型创建了结构化 TodoList 后实际执行并未按顺序推进——心跳修复排在最后却在代码修改时和其他修复交织。此外在修复 lint 问题时反复多次修改 doConnect 的代码块，每次修改后又重新运行 lint 检查残留，反映了写代码前没有充分预估 lint 可能报出的问题点。

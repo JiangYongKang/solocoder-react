@@ -1,7 +1,7 @@
 产物不满意：
-1. votingCore.js 中修复后的 generateShareUrl 函数直接硬编码了 `#/voting-app` 前缀：`return `${baseUrl}#/voting-app?vote=${voteId}``。这种实现方式假设应用的 HashRouter 基础路径永远是 `/voting-app`。但如果项目的主路由结构发生变化（如将 voting-app 改为 voting），这个函数就需要同步修改。更健壮的做法是从当前的 window.location 或路由上下文动态获取当前页面的 hash 基础路径。另外函数中使用了 `window.location.pathname` 作为路径部分，在开发环境这个值通常是 `/`，但如果项目部署在子路径（如 `/solocoder/`），生成的链接就会错误地丢失子路径前缀。
-2. index.jsx 的 VoteDetail 组件中，模型用 useState+useEffect+setInterval 替代了原来的 useMemo 来计算 isEnded。但模型同时在 Countdown 组件中也维护了一个 isEnded 判断和定时器清除逻辑。现在 isEnded 的判断逻辑在两个组件中各有一份：Countdown 中用 `next = calculateRemainingTime(vote.deadline)` 计算，VoteDetail 中用 `isVoteEnded(vote)` 判断。两者都是基于 vote.deadline 来判断是否到期，但使用了不同的工具函数和更新频率。如果两个函数的实现细节不同（如对毫秒精度的处理差异），可能出现 Countdown 显示"已结束"而 VoteDetail 仍显示可投票的不一致状态。
-3. 测试文件 votingCore.test.js 中 copyToClipboard 的测试用例 mock 了 `navigator.clipboard.writeText` 和 `document.execCommand` 并验证了各种场景。但对于 getUrlVoteParam 函数，测试用例中只覆盖了 search 参数、hash 参数、优先 search 等场景，没有覆盖多次出现同名参数时取第一个还是最后一个的边界情况、以及 hash 中 query string 存在特殊字符（如 URL 编码后的 %3D）时的解析行为。这些边界场景虽然不常见，但对于 URL 参数解析这类通用工具函数应该是测试的基本覆盖范围。
+1. generateShareUrl 直接硬编码了 `#/voting-app` 前缀，假设 HashRouter 基础路径永远是 /voting-app。如果路由结构发生变化，这个函数就需要同步修改。更健壮的做法是从当前 window.location 或路由上下文动态获取 hash 基础路径。此外函数使用了 window.location.pathname，如果项目部署在子路径下，生成的链接会丢失子路径前缀。
+2. VoteDetail 用 useState+useEffect+setInterval 替代 useMemo 计算 isEnded，但 Countdown 组件中也维护了独立的 isEnded 判断和定时器清除逻辑。isEnded 在两个组件中各有一份，使用了不同的工具函数和更新频率。如果两函数实现细节不同（如毫秒精度差异），可能出现 Countdown 显示"已结束"而 VoteDetail 仍显示可投票的不一致状态。
+3. 测试文件中 getUrlVoteParam 的测试只覆盖了 search 参数、hash 参数、优先 search 等场景，没有覆盖多次出现同名参数时的边界情况，以及 hash 中 query string 存在特殊字符（如 URL 编码后的 %3D）时的解析行为。这些边界场景对于 URL 参数解析这类通用工具函数应该是基本覆盖范围。
 
 过程不满意：
-模型在修复 VoteDetail 的 isEnded 问题时，将 useMemo 改为 useState + useEffect + setInterval 的方案。然后在运行 lint 时遇到了 `react-hooks/set-state-in-effect` 错误——因为在 useEffect 中直接调用 setState 设置 isEnded。模型修复的方式是将 setState 放在 setInterval 的回调中（而非直接在 effect body 中执行），这是正确的规避写法。但模型修改后运行 lint 确认通过、再运行测试确认 106 个通过、最后运行了 `npm run build` 确认构建成功，然后声称完成。整个过程中模型运行了构建验证但并没有在浏览器中验证 HashRouter 下 generateShareUrl 生成的链接格式是否正确——这恰恰是本轮最核心的修复点。链接格式的正确性无法通过单元测试验证（因为 window.location 在测试环境中是 mock 的），必须实际启动项目在浏览器地址栏中查看生成的分享链接格式。
+模型修复完 isEnded 问题后运行了 lint、测试和 build 确认通过，但并没有在浏览器中验证 HashRouter 下 generateShareUrl 生成的链接格式是否正确——这恰是本轮最核心的修复点。链接格式的正确性无法通过单测验证（window.location 在测试环境中是 mock 的），必须实际启动项目在浏览器地址栏中查看生成的分享链接格式。

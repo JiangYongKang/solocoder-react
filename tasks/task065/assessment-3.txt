@@ -1,5 +1,5 @@
 产物不满意：
-模型对跨月周日标签 BUG 的修复正确。timelineUtils.js 中 groupByWeek 函数的 dayGroups key 从 evt.date.slice(8,10) 日号改为 evt.date 完整日期字符串，index.jsx 中 getSubGroupLabel 对周级别子分组（level === 'week'）改用 formatDayLabelWithMonth(subKey) 从事件实际日期提取月日，不再基于 weekStart 偏移推算。新增的跨月周测试用例正确验证了 5 月 27 日和 6 月 1 日两个跨月日期被分入不同日组的场景。但 getSubGroupLabel 函数第 206 行的 parseInt(subKey,10) 对所有 subLevel === 'day' 的分支均执行日号解析，而周级别分支的 subKey 已为完整日期字符串（如"2024-06-01"），解析结果 2024 在周分支中完全不被使用，属于不必要的计算。原因是修改 week 分支时未清理前面公共区域的解析逻辑。正确做法是将该解析移入 level === 'month' 分支内部，仅在需要日号的场景执行。
+模型对跨月周日标签 BUG 的修复正确。groupByWeek 的 dayGroups key 改为完整日期，getSubGroupLabel 对周级别改用 formatDayLabelWithMonth 从实际日期提取月日。新增测试验证了跨月日期分组。但 getSubGroupLabel 中 parseInt(subKey) 对 week 分支的完整日期字符串也执行解析，结果不被使用，属于不必要计算。原因是修改 week 分支时未清理前面的解析逻辑。应将解析移入 month 分支内部。
 
 过程不满意：
-模型在验证阶段运行了 `pnpm test src/pages/__tests__/event-timeline/timelineUtils.test.js` 仅针对事件时间线工具函数测试（83 个用例），而非提示词第 2 条明确要求的 `pnpm run test`（全量 5549 个测试用例）。提示词原文为"修复后重新运行 pnpm run test，需要让所有测试通过"，模型却将测试范围缩小到当前任务的单个测试文件，未验证本次修改是否对项目其他 76 个测试文件产生回归影响。根本原因是模型未严格遵循提示词中的命令字面要求，自行窄化了验证范围。正确做法是执行 `pnpm run test` 全量测试，确认所有测试文件通过后再声称任务完成。
+模型仅运行了 event-timeline 工具函数测试（83 个用例），而非提示词要求的 pnpm run test 全量测试。提示词原文为"修复后重新运行 pnpm run test，需要让所有测试通过"，模型却将范围缩小到当前任务单个测试文件，未验证回归影响。应执行全量测试后再声称完成。

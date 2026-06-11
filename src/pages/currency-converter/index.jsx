@@ -31,17 +31,22 @@ const CurrencyConverterPage = () => {
   }, [favorites])
 
   const handleSwap = useCallback(() => {
-    setBaseCode((prevBase) => {
-      const newBase = targetCode
-      setTargetCode(prevBase)
-      return newBase
-    })
-    setBaseAmount((prevBaseAmt) => {
-      const newBaseAmt = targetAmount
-      setTargetAmount(prevBaseAmt)
-      return newBaseAmt
-    })
-  }, [targetCode, targetAmount])
+    const newBaseCode = targetCode
+    const newTargetCode = baseCode
+    const newBaseAmount = targetAmount
+
+    setBaseCode(newBaseCode)
+    setTargetCode(newTargetCode)
+    setBaseAmount(newBaseAmount)
+
+    const num = parseFloat(newBaseAmount) || 0
+    if (num > 0) {
+      const converted = convertCurrency(num, newBaseCode, newTargetCode)
+      setTargetAmount(converted !== null ? String(converted) : '')
+    } else {
+      setTargetAmount('')
+    }
+  }, [baseCode, targetCode, targetAmount])
 
   const handleToggleFavorite = useCallback((base, target) => {
     setFavorites((prev) => {

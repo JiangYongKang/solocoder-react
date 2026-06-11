@@ -1,0 +1,11 @@
+产物不满意：
+1. PrintView.jsx 第90-99行和第108-109行仍保留了 SUBJECT_COLORS 学科颜色映射、WEEK_TYPE_LABELS 周次标签展示，以及教师和教室字段前的 👤 📍 emoji 图标。assessment-2 已明确指出这三项改动属于视觉增强而非 BUG 修复，超出了缺陷修复轮次"纯修复不做新功能扩展"的约束。第三轮作为修复轮次，核心任务之一就是清除这些越界改动，但模型完全没有处理，代码中该三项无关视觉改动纹丝未动。正确做法是移除 SUBJECT_COLORS 和 WEEK_TYPE_LABELS 的 import，将 course 卡片的 borderLeft、background 内联样式还原，删除 emoji 前缀恢复原始文本显示。
+
+2. index.jsx 第231-233行定义的 handleScheduledCourseDragStart 函数依然是一个孤立函数，既不通过 props 传递给 ScheduleGrid 子组件，也不在 index.jsx 中被任何事件处理器调用。该函数从第一轮就存在于代码中（assessment-1 第4条已指出），经过第二轮和第三轮修复后仍未清理。这是一个没有任何调用路径的废弃代码，属于代码遗留产物。正确做法是删除该函数定义，确保包内不存在未引用的代码。
+
+3. ScheduleGrid.jsx 第158-159行同样存在 👤 和 📍 emoji 图标前缀（"👤 张老师""📍 教室A"），这个问题 assessment-2 仅指出了 PrintView.jsx 中的 emoji，但 ScheduleGrid.jsx 编辑视图中的课程卡片也存在同样的越界视觉改动。缺陷修复轮次不应在课表编辑视图中引入无明确需求的新视觉元素。正确做法是在 ScheduleGrid.jsx 中同样移除 emoji 前缀，仅保留原始文本和教师、教室字段值。
+
+过程不满意：
+1. tasks/task067/ 目录下缺少 prompt-3.txt 和 session-cot-3.md 文件，无法完整还原第三轮模型的行为轨迹。对于第三轮修复会话，prompt-3.txt 应包含基于 assessment-2 识别的四个待修复问题（清除 PrintView 中的视觉增强改动、修复 corner header z-index 层叠冲突、区分测试验证和视觉验证、修复命令拼接中 undefined 变量），但该文件未被创建或提交。模型在完成任务标注所需的交付物上存在遗漏，导致标注人员无法对照提示词验证模型是否按要求完成了所有修复项。
+
+2. pnpm run test 显示 schedule-planner 的 76 个测试全部通过，但所有测试仅覆盖 scheduleUtils.js 中的纯工具函数，没有任何测试用例涉及 PrintView.jsx 的渲染层视觉改动、ScheduleGrid.jsx 的 emoji 前缀、或 index.jsx 中的废弃函数清理。模型无法通过现有测试套件验证第三轮修复是否成功——三项核心修复（清除越界视觉改动、清理废弃函数、修复 z-index 冲突）全都不在测试覆盖范围内。正确做法是运行 pnpm run dev 启动开发服务器，手动目视检查 PrintView 和 ScheduleGrid 的渲染输出，确认 SUBJECT_COLORS、emoji 等越界改动已被清除，而非仅依赖纯函数单元测试结果就声称修复完成。

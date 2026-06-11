@@ -301,8 +301,31 @@ export function getRandomInterval(minSeconds = 3, maxSeconds = 8) {
 
 export function generateShareUrl(voteId) {
   if (!voteId) return ''
-  const baseUrl = typeof window !== 'undefined' ? window.location.origin + window.location.pathname : ''
-  return `${baseUrl}#/voting-app?vote=${voteId}`
+  if (typeof window === 'undefined') return ''
+
+  const { origin, pathname, hash } = window.location
+
+  let hashPath = '#/voting-app'
+  let hashQuery = ''
+
+  if (hash) {
+    const queryIndex = hash.indexOf('?')
+    if (queryIndex !== -1) {
+      hashPath = hash.slice(0, queryIndex)
+      hashQuery = hash.slice(queryIndex + 1)
+    } else {
+      hashPath = hash
+    }
+  }
+
+  if (!hashPath || hashPath === '#') {
+    hashPath = '#/voting-app'
+  }
+
+  const params = new URLSearchParams(hashQuery)
+  params.set('vote', voteId)
+
+  return `${origin}${pathname}${hashPath}?${params.toString()}`
 }
 
 export async function copyToClipboard(text) {

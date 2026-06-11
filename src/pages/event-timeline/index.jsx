@@ -210,16 +210,9 @@ export default function EventTimelinePage() {
         return `${month}月${day}日`;
       }
       if (level === 'week') {
-        const weekStartDate = new Date(
-          group.weekStart.slice(0, 4),
-          parseInt(group.weekStart.slice(5, 7), 10) - 1,
-          parseInt(group.weekStart.slice(8, 10), 10),
-        );
-        weekStartDate.setDate(weekStartDate.getDate() + day - 1);
-        const m = weekStartDate.getMonth() + 1;
-        return `${m}月${day}日`;
+        return formatDayLabelWithMonth(subKey);
       }
-      return formatDayLabelWithMonth(`${group.key}-${subKey}`);
+      return formatDayLabelWithMonth(subKey);
     }
     return subKey;
   };

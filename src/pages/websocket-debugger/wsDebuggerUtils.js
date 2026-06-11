@@ -52,22 +52,66 @@ export function isPongResponse(content) {
   }
 }
 
+const CLOSE_CODE_DESCRIPTIONS = {
+  1000: '正常关闭',
+  1001: '端点离开',
+  1002: '协议错误',
+  1003: '数据类型不支持',
+  1005: '未收到状态码',
+  1006: '连接异常中断',
+  1007: '数据格式错误',
+  1008: '违反政策',
+  1009: '消息过大',
+  1010: '扩展协商失败',
+  1011: '服务器内部错误',
+  1012: '服务重启',
+  1013: '请稍后重试',
+  1014: '服务器处理错误',
+  1015: 'TLS 握手失败',
+}
+
+export function formatCloseError(code, reason) {
+  const codeStr = code != null ? String(code) : 'N/A'
+  const description = CLOSE_CODE_DESCRIPTIONS[code] || '未知错误'
+  const parts = [`[${codeStr}] ${description}`]
+  if (reason && reason.trim()) {
+    parts.push(`: ${reason.trim()}`)
+  }
+  return parts.join('')
+}
+
 export function highlightKeyword(text, keyword) {
   if (!text || !keyword || keyword.trim() === '') return escapeHtml(text)
+  const kw = keyword.trim()
+  const lowerKw = kw.toLowerCase()
   const lowerText = text.toLowerCase()
-  const lowerKeyword = keyword.trim().toLowerCase()
-  const index = lowerText.indexOf(lowerKeyword)
-  if (index === -1) return escapeHtml(text)
+  const kwLen = kw.length
 
-  const before = text.slice(0, index)
-  const match = text.slice(index, index + keyword.trim().length)
-  const after = text.slice(index + keyword.trim().length)
+  const indices = []
+  let pos = 0
+  while (pos < lowerText.length) {
+    const idx = lowerText.indexOf(lowerKw, pos)
+    if (idx === -1) break
+    indices.push(idx)
+    pos = idx + kwLen
+  }
 
-  return (
-    escapeHtml(before) +
-    `<span class="ws-log-highlight">${escapeHtml(match)}</span>` +
-    highlightKeyword(after, keyword)
-  )
+  if (indices.length === 0) return escapeHtml(text)
+
+  const parts = []
+  let lastEnd = 0
+  for (const idx of indices) {
+    if (idx > lastEnd) {
+      parts.push(escapeHtml(text.slice(lastEnd, idx)))
+    }
+    parts.push(`<span class="ws-log-highlight">${escapeHtml(text.slice(idx, idx + kwLen))}</span>`)
+    lastEnd = idx + kwLen
+  }
+  if (lastEnd < text.length) {
+    parts.push(escapeHtml(text.slice(lastEnd)))
+  }
+
+  return parts.join('')
 }
 
 export function generateId() {

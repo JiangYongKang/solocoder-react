@@ -30,6 +30,7 @@ import {
   isEchoServer,
   isPongResponse,
   formatMessageForDisplay,
+  formatCloseError,
 } from './wsDebuggerUtils'
 import './websocket-debugger.css'
 
@@ -441,9 +442,9 @@ function WsDebuggerPage() {
           intentionalDisconnectRef.current = false
         } else {
           setStatus(CONNECTION_STATUS.ERROR)
-          const reason = event.reason || (event.code === 1000 ? '服务器正常关闭' : '服务器关闭连接')
-          setErrorReason(reason)
-          addSystemLog(`连接断开：${reason}`)
+          const errorMsg = formatCloseError(event.code, event.reason)
+          setErrorReason(errorMsg)
+          addSystemLog(`连接断开：${errorMsg}`)
           attemptReconnect()
         }
       }

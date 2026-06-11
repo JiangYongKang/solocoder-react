@@ -224,23 +224,19 @@ function CreateVoteModal({ isOpen, onClose, onCreate }) {
   )
 }
 
-function Countdown({ vote }) {
+function Countdown({ vote, isEnded }) {
   const [remaining, setRemaining] = useState(() => getRemainingTime(vote))
 
   useEffect(() => {
     if (!vote?.deadline) return
-    if (remaining?.isEnded) return
+    if (isEnded) return
 
     const timer = setInterval(() => {
-      const next = getRemainingTime(vote)
-      setRemaining(next)
-      if (next.isEnded) {
-        clearInterval(timer)
-      }
+      setRemaining(getRemainingTime(vote))
     }, 1000)
 
     return () => clearInterval(timer)
-  }, [vote, remaining?.isEnded])
+  }, [vote, isEnded])
 
   if (!vote?.deadline) {
     return (
@@ -252,7 +248,7 @@ function Countdown({ vote }) {
 
   const warningLevel = getTimeWarningLevel(vote)
 
-  if (remaining?.isEnded) {
+  if (isEnded) {
     return (
       <span className="vt-badge vt-badge-ended">
         已结束

@@ -446,7 +446,7 @@ export function groupByWeek(events) {
         dayGroups: {},
       };
     }
-    const dayKey = evt.date.slice(8, 10);
+    const dayKey = evt.date;
     if (!groups[weekStart].dayGroups[dayKey]) {
       groups[weekStart].dayGroups[dayKey] = [];
     }

@@ -547,7 +547,7 @@ export default function UnionFindPage() {
       timestamp: log.timestamp,
     }
 
-    commitState(result.state, operation, log)
+    commitState(laidOutState, operation, log, true)
     setHighlighting(new Set())
     setAnimatingEdge(null)
     setIsAnimating(false)

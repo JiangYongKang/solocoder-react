@@ -1,0 +1,9 @@
+产物不满意：
+1. 模型将 unionFindCore.js 中的 findNonOverlappingPosition 函数重写为 findNewNodePosition，彻底改变了节点放置策略：原来通过随机坐标加最多 500 次碰撞检测循环来确保新节点不与已有节点重叠，新逻辑变成简单地把每个新节点放到已有节点中 X 坐标最大的节点右侧一行排列。prompt-3 仅要求修复 handleUnion 中的重复布局计算问题，完全未涉及节点放置逻辑的重构。这一改动带来了两个后果：首先，所有节点被强制排列在同一 Y 坐标线上，节点数量增多时会向右无限延伸超出可视画布，而非像原来那样随机分布在画布各处以利用二维空间；其次，原来的重叠预防机制被完全移除，如果之后有代码将节点放置到任意位置，不会再有任何保护。
+2. 模型将 handleFind 函数中的 commitState 调用从 commitState(finalState, operation, log) 改为 commitState(finalState, operation, log, true)，跳过了路径压缩后的自动布局计算。prompt-3 只提到了 handleUnion 中的重复布局问题，并未要求修改 handleFind。路径压缩会改变森林的边结构——中间节点的父指针重新指向根节点，树形结构发生实质性变化。跳过布局意味着压缩后的节点虽然在数据层面指向了新父节点，但在画布上仍停留在旧位置，视觉位置与数据结构不一致。这个改动未被 prompt 要求，也未在 session-cot-3.md 中解释理由。
+3. 模型将测试文件中的 `should not overlap existing nodes positions` 测试重写为 `should place new nodes to the right of existing nodes`，将原有的重叠检测断言（for 循环中逐一计算欧几里得距离验证 dist > 0）替换为简单的 X 坐标递增检查。原测试验证的是核心正确性——addNode 函数绝不产生位置冲突。模型为了防止新改的 findNewNodePosition 在旧测试上失败，选择让测试向生产代码妥协，而非保持测试不变去检查新的位置逻辑是否仍然满足不重叠的基本要求。这是典型的"生产代码向测试妥协"模式。
+
+过程不满意：
+1. session-cot-3.md 中模型只记录了一次文件编辑操作——修改 index.jsx 的第 550 行，但 git diff 显示本次提交实际修改了三个文件：index.jsx 中新增了 overlay edge 渲染逻辑、修改了 handleUnion 和 handleFind 的 commitState 参数；unionFindCore.js 中将 findNonOverlappingPosition 整函数重写为 findNewNodePosition；unionFindCore.test.js 中替换和新增了测试用例。模型思考过程中遗漏了大量实际开发步骤， reviewer 无法从 COT 中追溯改动的完整意图和决策过程。应该在 COT 中记录每一次有实际意义的代码修改，包括改了哪个文件、改了什么、为什么这样改。
+2. 模型在 prompt-3 的缺陷修复会话中扩张了修改范围，将节点放置函数、handleFind 布局逻辑和动画 overlay edge 渲染等多个与 prompt 无关的改动一并纳入提交。prompt-3 明确只列出了 handleUnion 重复布局这一个需要修复的问题和一个测试通过的验证要求，模型应严格限定修改范围。超出范围的修改会引入新的回归风险——handleFind 跳过布局是否影响了压缩动画的位置稳定性、overlay edge 逻辑在与已有边渲染逻辑共存时是否会重复渲染，这些在缺乏浏览器端验证的情况下都是未知的。
+3. 模型仅通过运行 pnpm vitest run 和 pnpm eslint 就声称"所有验证通过"，未启动 pnpm run dev 在浏览器中实际操作验证合并和查找功能的动画表现。handleUnion 的重复布局问题是视觉效果类 BUG，修复后是否正确需要在浏览器中执行合并操作并观察动画结束后节点位置是否跳变。assessment-2.txt 已经指出模型在上一轮修复后同样只跑测试不做视觉验证的问题，模型此次仍然重复了同样的行为模式，说明其对视觉 BUG 需要浏览器验证这一基本要求缺乏认识。

@@ -1,0 +1,8 @@
+产物不满意：
+1. TrendChart.jsx 中新增的 resampleData、interpolateLayout、easeOutCubic 三个纯函数均为模块级计算函数，输入输出明确且无副作用，是理想的单元测试候选对象。但本轮未在测试文件中新增任何针对这三个函数的测试用例。比如 resampleData 将 5 点重采样为 7 点时 y 坐标的插值正确性、data.length 为 1 时的边界行为、interpolateLayout 在 progress 为 0 和 1 的边界情况是否返回正确的起止布局等场景均未覆盖。提示词第三条虽仅要求现有测试通过，但新增关键计算逻辑时应在同轮次补充相应的单元测试以确保后续变更不被破坏。
+2. resampleData 函数通过 Object.keys(curr) 遍历所有属性并对每个 number 类型做线性插值。calculateTrendChartLayout 产出的点位对象包含 index 属性（离散的位置编号而非连续量），resampleData 将其也纳入了插值计算，产生 2.3、4.7 等无意义的浮点索引值。虽然在 interpolateLayout 中最终返回的 points 来自 toLayout 的展开覆盖，fromPoints 中的异常 index 不影响实际渲染，但这种无差别插值全部数值属性的实现方式不够精确。未来若布局对象新增其他不应被插值的数值元数据字段，会被静默插值产生难以排查的错误。正确做法是显式列出需要插值的属性名（如 y 和 value），而非依赖属性类型的自动探测。
+
+过程不满意：
+1. 模型收到提示词后第一个工具调用就是 todo_write 创建 TodoList，在此之前完全未对提示词的三条需求做任何分析解读。标注规范明确指出"不能在刚收到任务时就直接创建 TodoList，应先分析问题再规划"。模型跳过了需求理解环节直接进入执行，忽视了本次涉及两个独立的 Bug（走势图 NaN 和互换按钮金额计算），两者需要对不同文件中的不同逻辑做修复，应先完整理解根因再分别制定修改策略。
+2. 模型使用 search_by_regex 搜索 resampleData 和 interpolateLayout 来定位问题代码，但根据 git diff 显示旧版 TrendChart.jsx 中根本不存在这两个函数，旧文件是一个仅 160 行左右的无动画简单组件。模型搜索了代码库中不存在的函数名，但思考过程记录中既未提及搜索返回结果为空，也未基于实际代码状态重新评估修复方案，而是直接声称"理解了两个问题"后立即开始修改。这种基于提示词描述而非实际代码现状的判断方式存在隐患，正确做法是先完整阅读 TrendChart.jsx 的当前完整代码，确认哪些需要修、哪些需要新建，再制定修复计划。
+3. 模型本轮共修改了四个文件（TrendChart.jsx、index.jsx、ConversionPanel.jsx、currencyUtils.js），但从思考过程记录看，只显式读取了 TrendChart.jsx 和 index.jsx。ConversionPanel.jsx 被大幅重构（内部 state 提升为 props、新增 handleBaseCurrencyChange 和 handleTargetCurrencyChange 两个汇率变动回调），currencyUtils.js 也被修改移除了 toLowerCase 冗余调用，但模型未在修改前读取这两个文件的完整内容。修改文件前未先读取的做法属于"零散地读一个改一个"的模式，正确做法是先用 Grep 定位所有关联文件，依次读取整理出完整关联关系后统一修改。

@@ -39,6 +39,7 @@ import {
   isPongResponse,
   highlightKeyword,
   formatMessageForDisplay,
+  formatCloseError,
 } from '@/pages/websocket-debugger/wsDebuggerUtils'
 
 function createMockLocalStorage() {
@@ -672,6 +673,49 @@ describe('isPongResponse', () => {
 
   it('无效 JSON 返回 false', () => {
     expect(isPongResponse('{invalid}')).toBe(false)
+  })
+})
+
+describe('formatCloseError', () => {
+  it('格式化标准关闭码 1000', () => {
+    const result = formatCloseError(1000, '')
+    expect(result).toBe('[1000] 正常关闭')
+  })
+
+  it('格式化标准关闭码 1006（网络中断）', () => {
+    const result = formatCloseError(1006, '')
+    expect(result).toBe('[1006] 连接异常中断')
+  })
+
+  it('格式化标准关闭码 1002（协议错误）', () => {
+    const result = formatCloseError(1002, '')
+    expect(result).toBe('[1002] 协议错误')
+  })
+
+  it('包含 reason 原文', () => {
+    const result = formatCloseError(1008, 'token expired')
+    expect(result).toBe('[1008] 违反政策: token expired')
+  })
+
+  it('处理未知关闭码', () => {
+    const result = formatCloseError(4000, 'custom error')
+    expect(result).toBe('[4000] 未知错误: custom error')
+  })
+
+  it('处理 null/undefined code', () => {
+    expect(formatCloseError(null, 'error')).toBe('[N/A] 未知错误: error')
+    expect(formatCloseError(undefined, 'error')).toBe('[N/A] 未知错误: error')
+  })
+
+  it('空 reason 不显示冒号', () => {
+    const result = formatCloseError(1001, '')
+    expect(result).toBe('[1001] 端点离开')
+    expect(result).not.toContain(':')
+  })
+
+  it('空白 reason 被 trim', () => {
+    const result = formatCloseError(1000, '  ')
+    expect(result).toBe('[1000] 正常关闭')
   })
 })
 

@@ -1,0 +1,6 @@
+产物不满意：
+模型在 ValidationStep.jsx 中新增了 isDataEqual 深度比较函数来实现"仅在 mappedData 内容真正变化时才同步 localData"的逻辑，修复了 prop 引用变化导致用户编辑数据被覆盖的问题。但 isDataEqual 被直接定义在组件文件内部而非提取到 utils.js 中导出，导致该核心同步守卫函数完全没有单元测试覆盖。src/pages/__tests__/data-importer/ 下仅有 dataImporterUtils.test.js 一个测试文件，isDataEqual 和 ValidationStep 均无测试用例。此外 isDataEqual 的比较逻辑只迭代 keys1 的键名匹配 row2 的值，如果 row1 中存在显式赋值为 undefined 的属性而 row2 中缺少该属性，JavaScript 读取不存在的属性同样返回 undefined，此时 `row1[key] !== row2[key]` 为 false 会误判两行相等。正确做法是将 isDataEqual 提取到 utils.js 导出，为正常路径和边界路径编写单元测试。
+
+过程不满意：
+1. 提示词要求"修复后重新运行 pnpm run test，需要让所有测试通过"，但模型实际只执行了 `pnpm run test -- src/pages/__tests__/data-importer/dataImporterUtils.test.js`，仅运行了 data-importer 的 92 个工具函数测试，并没有运行完整的测试套件。虽然实际运行全量测试时 5549 个用例全部通过，模型并未保证本次修改没有影响其他任务包的测试，只是恰好没有产生副作用。应在修改完成后运行完整的 pnpm run test 确认全量通过。
+2. 模型在完成 ValidationStep.jsx 的修改并确认测试通过后，没有启动开发服务器手动验证修复效果。isDataEqual 的比较逻辑和 useEffect 同步行为是否正确、用户在表格中编辑某个单元格后父组件重新渲染是否会丢失数据，这些交互场景仅靠工具函数的单元测试无法覆盖。模型从第一轮到第三轮始终没有做过页面级的手动验证，对交互密集的数据校验步骤仅依赖测试结果就声称完成。正确做法是启动 pnpm run dev 后进入数据导入向导的校验步骤，逐一验证手动编辑后开关映射再返回、手动编辑后页面刷新等场景下数据是否保留。

@@ -649,6 +649,20 @@ describe('timelineUtils', () => {
       expect(groups[0].events.length).toBe(1);
       expect(groups[1].events.length).toBe(2);
     });
+
+    it('should use full date as dayGroups key for correct cross-month labels', () => {
+      const evts = [
+        { id: '1', date: '2024-05-27' },
+        { id: '2', date: '2024-06-01' },
+      ];
+      const groups = groupByWeek(evts);
+      expect(groups.length).toBe(1);
+      const dayKeys = Object.keys(groups[0].dayGroups);
+      expect(dayKeys).toContain('2024-05-27');
+      expect(dayKeys).toContain('2024-06-01');
+      expect(groups[0].dayGroups['2024-05-27'].length).toBe(1);
+      expect(groups[0].dayGroups['2024-06-01'].length).toBe(1);
+    });
   });
 
   describe('getGroupingForZoom', () => {

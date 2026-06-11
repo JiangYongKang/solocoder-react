@@ -24,10 +24,14 @@ function resampleData(data, targetCount) {
     const curr = data[idx]
     const next = data[nextIdx]
 
-    result.push({
-      date: curr.date,
-      value: curr.value + (next.value - curr.value) * frac,
-    })
+    const point = { ...curr }
+    for (const key of Object.keys(curr)) {
+      if (typeof curr[key] === 'number' && typeof next[key] === 'number') {
+        point[key] = curr[key] + (next[key] - curr[key]) * frac
+      }
+    }
+
+    result.push(point)
   }
 
   return result

@@ -1,14 +1,36 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { TARGET_FIELDS, VALIDATION_STATUS } from '../constants.js'
 import { validateAllRows } from '../utils.js'
+
+function isDataEqual(data1, data2) {
+  if (data1 === data2) return true
+  if (!Array.isArray(data1) || !Array.isArray(data2)) return false
+  if (data1.length !== data2.length) return false
+  for (let i = 0; i < data1.length; i++) {
+    const row1 = data1[i]
+    const row2 = data2[i]
+    const keys1 = Object.keys(row1)
+    const keys2 = Object.keys(row2)
+    if (keys1.length !== keys2.length) return false
+    for (let j = 0; j < keys1.length; j++) {
+      const key = keys1[j]
+      if (row1[key] !== row2[key]) return false
+    }
+  }
+  return true
+}
 
 export default function ValidationStep({ mappedData, onValidatedDataChange }) {
   const [editingCell, setEditingCell] = useState(null)
   const [editValue, setEditValue] = useState('')
   const [localData, setLocalData] = useState(mappedData)
+  const lastSyncedDataRef = useRef(mappedData)
 
   useEffect(() => {
-    setLocalData(mappedData)
+    if (!isDataEqual(mappedData, lastSyncedDataRef.current)) {
+      setLocalData(mappedData)
+      lastSyncedDataRef.current = mappedData
+    }
   }, [mappedData])
 
   const validationResult = useMemo(() => {

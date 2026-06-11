@@ -1,0 +1,4 @@
+你实现的并查集算法可视化页面经过上一轮修复后，还存在以下问题需要进行修复：
+
+1. handleUnion 函数在合并操作的动画路径上对同一状态执行了两次完整的布局计算。第一次在动画前调用 calculateForestLayout 提前更新画布，动画结束后 commitState 内部又因 skipLayout 默认为 false 再次调用 calculateForestLayout。这依赖 calculateForestLayout 原地修改 state 的副作用才能在两次计算间传递位置信息的特性——一旦该函数被改为纯函数，commitState 收到的状态会丢失布局位置，导致动画结束后画布跳变。应当消除这次重复计算，将第一次布局的结果直接传给 commitState 并跳过其内部布局。
+2. 修复后重新运行 pnpm run test，需要让所有测试通过。

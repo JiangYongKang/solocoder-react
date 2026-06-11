@@ -1,0 +1,5 @@
+你实现的多人实时投票页面经过上一轮修复后，还存在以下问题需要进行修复：
+
+1. generateShareUrl 函数中直接硬编码了 `#/voting-app` 前缀。如果项目路由结构变化或部署在子路径下，生成的分享链接格式会错误。分享链接的路径部分应该从当前位置动态获取而非写死。
+2. VoteDetail 组件和 Countdown 组件现在各有一份 isEnded 的判断逻辑：VoteDetail 中用 isVoteEnded 工具函数每秒轮询，Countdown 中用 calculateRemainingTime 每次 tick 判断。两个组件使用不同函数来判断同一个截止时间是否到期，可能出现倒计时已显示"已结束"而投票选项仍可点击的不一致状态。截止到期状态的判定逻辑应该收敛到一处。
+3. 修复后重新运行 pnpm run test，需要让所有测试通过。

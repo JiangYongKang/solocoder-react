@@ -1,0 +1,5 @@
+你实现的数独游戏经过上一轮修复后，还存在以下问题需要进行修复：
+
+1. 提示填入了某格子 A，用户手动覆盖了 A，然后撤销该覆盖，再重做该覆盖——这个操作序列完成后，格子 A 显示的是手动填入的值，却被错误标记为蓝色提示样式。handleRedo 中 fill 类型的 hintedCells 处理逻辑有语义反转：handleNumberInput 中手动覆盖提示格子时从 hintedCells 删除该格子，handleUndo 撤销覆盖时加回该格子，这两个语义正确。但 handleRedo 重做 fill 时却照搬了 handleUndo 的"加回"逻辑，重做 fill 应当是一次新的填入，不应将格子加回 hintedCells。重做 fill 时应该删除而非添加。
+2. autoRemoveNotes 函数的返回值已改为 {notes, autoRemoved} 格式以支持撤销时恢复被连带移除的候选数字。但 handleHint 函数中调用 autoRemoveNotes 时仍然只取 result.notes 而丢弃了 result.autoRemoved，导致提示填入时被连带删除的其他格子候选数字永久丢失。handleHint 需要像 handleNumberInput 一样正确处理 autoRemoved 信息。
+3. 修复后重新运行 pnpm run test，需要让所有测试通过。

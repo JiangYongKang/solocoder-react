@@ -683,6 +683,44 @@ describe('noteUtils', () => {
       expect(html).not.toContain('<em>')
       expect(html).not.toContain('<del>')
     })
+
+    it('inline code with external link syntax should not be converted', () => {
+      const html = renderMarkdown('`[example](https://example.com)`', data)
+      expect(html).toContain('<code class="inline-code">[example](https://example.com)</code>')
+      expect(html).not.toContain('<a href="https://example.com"')
+    })
+
+    it('inline code with image syntax should not be converted', () => {
+      const html = renderMarkdown('`![alt](image.png)`', data)
+      expect(html).toContain('<code class="inline-code">![alt](image.png)</code>')
+      expect(html).not.toContain('<img ')
+    })
+
+    it('inline code with internal link syntax should not be converted', () => {
+      const html = renderMarkdown('`[[笔记1]]`', data)
+      expect(html).toContain('<code class="inline-code">[[笔记1]]</code>')
+      expect(html).not.toContain('class="internal-link"')
+    })
+
+    it('inline code with table syntax should not be converted', () => {
+      const html = renderMarkdown('`| a | b |`', data)
+      expect(html).toContain('<code class="inline-code">| a | b |</code>')
+      expect(html).not.toContain('<table>')
+    })
+
+    it('inline code with list marker should not be interpreted as list', () => {
+      const html = renderMarkdown('`- not a list`', data)
+      expect(html).toContain('<code class="inline-code">- not a list</code>')
+      expect(html).not.toContain('<ul>')
+      expect(html).not.toContain('<li>')
+    })
+
+    it('inline code should coexist with links outside', () => {
+      const html = renderMarkdown('`[code](url)` and [real link](https://example.com)', data)
+      expect(html).toContain('<code class="inline-code">[code](url)</code>')
+      expect(html).toContain('<a href="https://example.com"')
+      expect(html).toContain('real link')
+    })
   })
 
   describe('import/export', () => {

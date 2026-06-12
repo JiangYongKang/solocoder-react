@@ -799,6 +799,149 @@ describe('buildReleaseDiff', () => {
     expect(diff.rightRows.length).toBe(0)
     expect(diff.lineDiff.length).toBe(0)
   })
+
+  it('精确断言相等+修改行的 diff 内容和行号', () => {
+    const diff = buildReleaseDiff('a\nb', 'a\nc')
+
+    expect(diff.lineDiff).toHaveLength(2)
+    expect(diff.lineDiff[0].type).toBe(DIFF_TYPE_INTERNAL.EQUAL)
+    expect(diff.lineDiff[0].oldLine).toBe('a')
+    expect(diff.lineDiff[0].newLine).toBe('a')
+    expect(diff.lineDiff[1].type).toBe(DIFF_TYPE_INTERNAL.MODIFIED)
+    expect(diff.lineDiff[1].oldLine).toBe('b')
+    expect(diff.lineDiff[1].newLine).toBe('c')
+
+    expect(diff.leftRows).toHaveLength(2)
+    expect(diff.leftRows[0]).toEqual({
+      lineNum: 1,
+      type: DIFF_TYPE_INTERNAL.EQUAL,
+      content: 'a',
+    })
+    expect(diff.leftRows[1]).toEqual({
+      lineNum: 2,
+      type: DIFF_TYPE_INTERNAL.MODIFIED,
+      content: 'b',
+    })
+
+    expect(diff.rightRows).toHaveLength(2)
+    expect(diff.rightRows[0]).toEqual({
+      lineNum: 1,
+      type: DIFF_TYPE_INTERNAL.EQUAL,
+      content: 'a',
+    })
+    expect(diff.rightRows[1]).toEqual({
+      lineNum: 2,
+      type: DIFF_TYPE_INTERNAL.MODIFIED,
+      content: 'c',
+    })
+  })
+
+  it('精确断言新增行：右侧有行号内容，左侧为空占位', () => {
+    const diff = buildReleaseDiff('same', 'same\nadded')
+
+    expect(diff.lineDiff).toHaveLength(2)
+    expect(diff.lineDiff[0].type).toBe(DIFF_TYPE_INTERNAL.EQUAL)
+    expect(diff.lineDiff[1].type).toBe(DIFF_TYPE_INTERNAL.ADDED)
+    expect(diff.lineDiff[1].newLine).toBe('added')
+
+    expect(diff.leftRows).toHaveLength(2)
+    expect(diff.leftRows[1]).toEqual({
+      lineNum: null,
+      type: DIFF_TYPE_INTERNAL.EQUAL,
+      content: '',
+      empty: true,
+    })
+
+    expect(diff.rightRows).toHaveLength(2)
+    expect(diff.rightRows[1]).toEqual({
+      lineNum: 2,
+      type: DIFF_TYPE_INTERNAL.ADDED,
+      content: 'added',
+    })
+  })
+
+  it('精确断言删除行：左侧有行号内容，右侧为空占位', () => {
+    const diff = buildReleaseDiff('same\nremoved', 'same')
+
+    expect(diff.lineDiff).toHaveLength(2)
+    expect(diff.lineDiff[1].type).toBe(DIFF_TYPE_INTERNAL.REMOVED)
+    expect(diff.lineDiff[1].oldLine).toBe('removed')
+
+    expect(diff.leftRows).toHaveLength(2)
+    expect(diff.leftRows[1]).toEqual({
+      lineNum: 2,
+      type: DIFF_TYPE_INTERNAL.REMOVED,
+      content: 'removed',
+    })
+
+    expect(diff.rightRows).toHaveLength(2)
+    expect(diff.rightRows[1]).toEqual({
+      lineNum: null,
+      type: DIFF_TYPE_INTERNAL.EQUAL,
+      content: '',
+      empty: true,
+    })
+  })
+
+  it('完全相同文本：全部标记为 EQUAL，行号递增', () => {
+    const diff = buildReleaseDiff('x\ny\nz', 'x\ny\nz')
+
+    expect(diff.lineDiff).toHaveLength(3)
+    diff.lineDiff.forEach((r) => expect(r.type).toBe(DIFF_TYPE_INTERNAL.EQUAL))
+
+    expect(diff.leftRows).toHaveLength(3)
+    expect(diff.leftRows[0].lineNum).toBe(1)
+    expect(diff.leftRows[1].lineNum).toBe(2)
+    expect(diff.leftRows[2].lineNum).toBe(3)
+    expect(diff.leftRows[0].content).toBe('x')
+    expect(diff.leftRows[1].content).toBe('y')
+    expect(diff.leftRows[2].content).toBe('z')
+
+    expect(diff.rightRows).toHaveLength(3)
+    expect(diff.rightRows[0].lineNum).toBe(1)
+    expect(diff.rightRows[1].lineNum).toBe(2)
+    expect(diff.rightRows[2].lineNum).toBe(3)
+  })
+
+  it('纯新增：左侧全部为空占位，右侧连续行号', () => {
+    const diff = buildReleaseDiff('', 'a\nb')
+
+    expect(diff.lineDiff).toHaveLength(2)
+    expect(diff.lineDiff[0].type).toBe(DIFF_TYPE_INTERNAL.ADDED)
+    expect(diff.lineDiff[1].type).toBe(DIFF_TYPE_INTERNAL.ADDED)
+
+    expect(diff.leftRows).toHaveLength(2)
+    expect(diff.leftRows[0].empty).toBe(true)
+    expect(diff.leftRows[0].lineNum).toBeNull()
+    expect(diff.leftRows[1].empty).toBe(true)
+    expect(diff.leftRows[1].lineNum).toBeNull()
+
+    expect(diff.rightRows).toHaveLength(2)
+    expect(diff.rightRows[0].lineNum).toBe(1)
+    expect(diff.rightRows[0].content).toBe('a')
+    expect(diff.rightRows[1].lineNum).toBe(2)
+    expect(diff.rightRows[1].content).toBe('b')
+  })
+
+  it('纯删除：左侧连续行号，右侧全部为空占位', () => {
+    const diff = buildReleaseDiff('a\nb', '')
+
+    expect(diff.lineDiff).toHaveLength(2)
+    expect(diff.lineDiff[0].type).toBe(DIFF_TYPE_INTERNAL.REMOVED)
+    expect(diff.lineDiff[1].type).toBe(DIFF_TYPE_INTERNAL.REMOVED)
+
+    expect(diff.leftRows).toHaveLength(2)
+    expect(diff.leftRows[0].lineNum).toBe(1)
+    expect(diff.leftRows[0].content).toBe('a')
+    expect(diff.leftRows[1].lineNum).toBe(2)
+    expect(diff.leftRows[1].content).toBe('b')
+
+    expect(diff.rightRows).toHaveLength(2)
+    expect(diff.rightRows[0].empty).toBe(true)
+    expect(diff.rightRows[0].lineNum).toBeNull()
+    expect(diff.rightRows[1].empty).toBe(true)
+    expect(diff.rightRows[1].lineNum).toBeNull()
+  })
 })
 
 describe('getDiffStats', () => {
@@ -883,16 +1026,17 @@ describe('truncateTextForDiff', () => {
     expect(result).toContain('... (已截断')
     expect(result).toContain(`原文共 ${MAX_DIFF_LINES + 10} 行`)
     expect(result).toContain(`仅显示前 ${MAX_DIFF_LINES} 行`)
-    expect(result.split('\n').length).toBeLessThan(MAX_DIFF_LINES + 5)
+    expect(result.split('\n').length).toBe(MAX_DIFF_LINES + 2)
   })
 
-  it('支持自定义 maxLines', () => {
+  it('自定义 maxLines 截断后行数精确', () => {
     const text = 'a\nb\nc\nd\ne'
     const result = truncateTextForDiff(text, 3)
     expect(result).toContain('原文共 5 行')
     expect(result).toContain('仅显示前 3 行')
     expect(result.split('\n')[0]).toBe('a')
     expect(result.split('\n')[2]).toBe('c')
+    expect(result.split('\n').length).toBe(5)
   })
 
   it('刚好在限值内不截断', () => {

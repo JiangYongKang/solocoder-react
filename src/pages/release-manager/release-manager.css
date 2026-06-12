@@ -1223,7 +1223,7 @@
   }
 
   .rm-diff-container {
-    flex-direction: column;
+    grid-template-columns: 1fr;
     gap: 12px;
   }
 

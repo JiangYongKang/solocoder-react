@@ -706,14 +706,13 @@ describe('递归深度限制', () => {
       }
       return obj
     }
-    const deepObj = buildDeepWithArray(60)
+    const deepObj = buildDeepWithArray(50)
     const result = generateTypeScript(deepObj, { rootName: 'Deep' })
     expect(result).toBeDefined()
     const arrayFields = result.code.split('\n').filter((line) => line.includes('items:'))
-    if (arrayFields.length > 0) {
-      expect(arrayFields[0]).toContain('[]')
-      expect(arrayFields[0]).not.toMatch(/items:\s*any\s*$/)
-    }
+    expect(arrayFields.length).toBeGreaterThan(0)
+    expect(arrayFields[0]).toContain('[]')
+    expect(arrayFields[0]).not.toMatch(/items:\s*any\s*[;}]?$/)
   })
 
   it('深层嵌套中的数组字段在 inferObjectFieldSchemas 中应保留 hasArray 标记和 [] 类型', () => {
@@ -750,8 +749,8 @@ describe('递归深度限制', () => {
     const result = buildTypeDefinitions(deepObj, 'Deep')
     expect(result).toBeDefined()
     expect(Array.isArray(result.typeDefs)).toBe(true)
-    expect(typeof result.listTypeName).toBeDefined()
-    expect(typeof result.topLevelListName).toBeDefined()
+    expect(result).toHaveProperty('listTypeName')
+    expect(result).toHaveProperty('topLevelListName')
   })
 })
 

@@ -618,10 +618,6 @@ export function renderMarkdown(content, data) {
     html = html.replace(/\*(.*?)\*/g, '<em>$1</em>')
     html = html.replace(/~~(.*?)~~/g, '<del>$1</del>')
 
-    for (let si = 0; si < inlineCodeSlots.length; si++) {
-      html = html.replace(`\x00INLINE_CODE_${si}\x00`, inlineCodeSlots[si])
-    }
-
     const htmlLines = html.split('\n')
     const processed = []
     let inList = false
@@ -701,6 +697,10 @@ export function renderMarkdown(content, data) {
         return `<a href="#" class="internal-link broken" data-note-title="${title}" data-create-new="true">[[${title}]]</a>`
       }
     })
+
+    for (let si = 0; si < inlineCodeSlots.length; si++) {
+      html = html.replace(`\x00INLINE_CODE_${si}\x00`, inlineCodeSlots[si])
+    }
 
     html = html.split('\n').map((line) => {
       const trimmed = line.trim()

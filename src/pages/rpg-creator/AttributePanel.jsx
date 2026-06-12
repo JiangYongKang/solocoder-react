@@ -1,5 +1,5 @@
 import { ATTRIBUTES, ATTR_MAX, ATTR_INITIAL } from './constants'
-import { calculateFreePoints, calculateDerivedStats, incrementAttribute, decrementAttribute } from './utils'
+import { calculateFreePoints, calculateDerivedStats, incrementAttribute, decrementAttribute, formatPercent } from './utils'
 
 const ATTR_BAR_CLASSES = {
   strength: 'str',
@@ -91,11 +91,11 @@ export default function AttributePanel({ attributes, onChange }) {
         </div>
         <div className="rpg-derived-item">
           <div className="rpg-derived-label">暴击率</div>
-          <div className="rpg-derived-value">{derived.critRate}</div>
+          <div className="rpg-derived-value">{formatPercent(derived.critRate)}</div>
         </div>
         <div className="rpg-derived-item">
           <div className="rpg-derived-label">闪避率</div>
-          <div className="rpg-derived-value">{derived.dodgeRate}</div>
+          <div className="rpg-derived-value">{formatPercent(derived.dodgeRate)}</div>
         </div>
       </div>
     </div>

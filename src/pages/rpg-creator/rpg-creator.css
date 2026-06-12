@@ -779,3 +779,109 @@
   from { transform: translateX(100%); opacity: 0; }
   to { transform: translateX(0); opacity: 1; }
 }
+
+@media (max-width: 480px) {
+  .rpg-page {
+    padding: 12px;
+  }
+
+  .rpg-header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .rpg-title {
+    font-size: 18px;
+  }
+
+  .rpg-info-section {
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .rpg-info-field.name-field {
+    min-width: 100%;
+  }
+
+  .rpg-info-field.desc-field {
+    min-width: 100%;
+  }
+
+  .rpg-option-row {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    padding-bottom: 4px;
+  }
+
+  .rpg-attr-row {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .rpg-attr-desc {
+    display: none;
+  }
+
+  .rpg-attr-bar-wrapper {
+    order: 10;
+    width: 100%;
+    flex-basis: 100%;
+    margin-top: 2px;
+  }
+
+  .rpg-attr-btn {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+  }
+
+  .rpg-attr-value {
+    width: 24px;
+    flex-shrink: 0;
+  }
+
+  .rpg-derived-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .rpg-skill-nodes {
+    padding-left: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    flex-wrap: nowrap;
+  }
+
+  .rpg-skill-node {
+    width: 120px;
+    flex-shrink: 0;
+  }
+
+  .rpg-connector-line {
+    margin-left: 0;
+  }
+
+  .rpg-actions-bar {
+    gap: 8px;
+  }
+
+  .rpg-action-btn {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  .rpg-preview-canvas-wrapper {
+    padding: 8px;
+  }
+
+  .rpg-card {
+    padding: 12px;
+  }
+
+  .rpg-modal {
+    padding: 16px;
+    width: 95%;
+  }
+}

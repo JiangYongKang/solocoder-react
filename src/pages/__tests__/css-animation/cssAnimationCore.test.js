@@ -1,34 +1,39 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { ANIMATION_PROPERTIES, STORAGE_KEY } from '@/pages/css-animation/constants.js'
 import {
-  generateId,
-  createKeyframe,
-  createPropertyTrack,
-  createAnimation,
-  addPropertyTrack,
-  removePropertyTrack,
-  toggleTrackVisibility,
-  addKeyframe,
-  removeKeyframe,
-  updateKeyframeValue,
-  moveKeyframe,
-  updateEasing,
-  getSurroundingKeyframes,
-  updateAnimationSettings,
-  generateKeyframesCSS,
-  generateAnimationCSS,
-  generateFullCSS,
-  saveAnimations,
-  loadAnimations,
-  saveAnimationToList,
-  deleteAnimationFromList,
-  renameAnimationInList,
-  exportAnimationJSON,
-  validateAnimationJSON,
-  cubicBezierToString,
-  parseCubicBezier,
-  formatDate,
+    addKeyframe,
+    addPropertyTrack,
+    createAnimation,
+    createKeyframe,
+    createPropertyTrack,
+    cubicBezierToString,
+    deleteAnimationFromList,
+    exportAnimationJSON,
+    formatDate,
+    formatValue,
+    generateAnimationCSS,
+    generateFullCSS,
+    generateId,
+    generateKeyframesCSS,
+    getDominantEasing,
+    getEasingAtTime,
+    getSurroundingKeyframes,
+    isColorProperty,
+    isColorValue,
+    loadAnimations,
+    moveKeyframe,
+    parseCubicBezier,
+    removeKeyframe,
+    removePropertyTrack,
+    renameAnimationInList,
+    saveAnimations,
+    saveAnimationToList,
+    toggleTrackVisibility,
+    updateAnimationSettings,
+    updateEasing,
+    updateKeyframeValue,
+    validateAnimationJSON,
 } from '@/pages/css-animation/cssAnimationCore.js'
-import { STORAGE_KEY, MAX_ANIMATIONS, ANIMATION_PROPERTIES } from '@/pages/css-animation/constants.js'
+import { beforeEach, describe, expect, it } from 'vitest'
 
 function createMockStorage() {
   const store = {}
@@ -476,6 +481,131 @@ describe('cssAnimationCore', () => {
         const css = generateKeyframesCSS(hiddenAnim)
         expect(css).toBe('')
       })
+
+      it('should format background-color hex values without appending unit', () => {
+        const colorAnim = {
+          ...createAnimation('colorAnim'),
+          tracks: [
+            {
+              id: 'colorTrack',
+              property: 'background-color',
+              visible: true,
+              unit: '',
+              keyframes: [
+                { id: 'ck1', time: 0, value: '#ff0000', easing: 'linear' },
+                { id: 'ck2', time: 100, value: '#00ff00', easing: 'linear' },
+              ],
+            },
+          ],
+        }
+        const css = generateKeyframesCSS(colorAnim)
+        expect(css).toContain('background-color: #ff0000')
+        expect(css).toContain('background-color: #00ff00')
+        expect(css).not.toContain('background-color: #ff0000px')
+        expect(css).not.toContain('background-color: #00ff00px')
+      })
+
+      it('should format color values with short hex codes correctly', () => {
+        const colorAnim = {
+          ...createAnimation('shortHex'),
+          tracks: [
+            {
+              id: 'colorTrack',
+              property: 'background-color',
+              visible: true,
+              unit: '',
+              keyframes: [
+                { id: 'ck1', time: 0, value: '#f00', easing: 'linear' },
+                { id: 'ck2', time: 100, value: '#0f0', easing: 'linear' },
+              ],
+            },
+          ],
+        }
+        const css = generateKeyframesCSS(colorAnim)
+        expect(css).toContain('background-color: #f00')
+        expect(css).toContain('background-color: #0f0')
+        expect(css).not.toContain('undefined')
+      })
+
+      it('should handle mixed color and numeric properties in same animation', () => {
+        const mixedAnim = {
+          ...createAnimation('mixedAnim'),
+          tracks: [
+            {
+              id: 't1',
+              property: 'background-color',
+              visible: true,
+              unit: '',
+              keyframes: [
+                { id: 'k1', time: 0, value: '#4a90d9', easing: 'linear' },
+                { id: 'k2', time: 100, value: '#e94560', easing: 'linear' },
+              ],
+            },
+            {
+              id: 't2',
+              property: 'translateX',
+              visible: true,
+              unit: 'px',
+              keyframes: [
+                { id: 'k3', time: 0, value: 0, easing: 'linear' },
+                { id: 'k4', time: 100, value: 100, easing: 'linear' },
+              ],
+            },
+            {
+              id: 't3',
+              property: 'opacity',
+              visible: true,
+              unit: '',
+              keyframes: [
+                { id: 'k5', time: 0, value: 1, easing: 'linear' },
+                { id: 'k6', time: 100, value: 0.5, easing: 'linear' },
+              ],
+            },
+          ],
+        }
+        const css = generateKeyframesCSS(mixedAnim)
+        expect(css).toContain('background-color: #4a90d9')
+        expect(css).toContain('background-color: #e94560')
+        expect(css).toContain('translateX(0px)')
+        expect(css).toContain('translateX(100px)')
+        expect(css).toContain('opacity: 1')
+        expect(css).toContain('opacity: 0.5')
+        expect(css).not.toContain('#4a90d9px')
+        expect(css).not.toContain('#e94560px')
+      })
+
+      it('should interpolate color values by returning the from value', () => {
+        const colorAnim = {
+          ...createAnimation('interpColor'),
+          tracks: [
+            {
+              id: 'colorTrack',
+              property: 'background-color',
+              visible: true,
+              unit: '',
+              keyframes: [
+                { id: 'ck1', time: 0, value: '#ff0000', easing: 'linear' },
+                { id: 'ck2', time: 100, value: '#0000ff', easing: 'linear' },
+              ],
+            },
+            {
+              id: 'numTrack',
+              property: 'opacity',
+              visible: true,
+              unit: '',
+              keyframes: [
+                { id: 'nk1', time: 0, value: 1, easing: 'linear' },
+                { id: 'nk3', time: 100, value: 0, easing: 'linear' },
+              ],
+            },
+          ],
+        }
+        const css = generateKeyframesCSS(colorAnim)
+        expect(css).toContain('background-color: #ff0000')
+        expect(css).toContain('background-color: #0000ff')
+        expect(css).toContain('opacity: 1')
+        expect(css).toContain('opacity: 0')
+      })
     })
 
     describe('generateAnimationCSS', () => {
@@ -486,6 +616,110 @@ describe('cssAnimationCore', () => {
         expect(css).toContain('testAnim')
         expect(css).toContain('2s')
         expect(css).toContain('infinite')
+      })
+
+      it('should use the common easing when all keyframes use the same easing', () => {
+        const sameEasingAnim = {
+          ...createAnimation('sameEasing'),
+          tracks: [
+            {
+              id: 't1',
+              property: 'translateX',
+              visible: true,
+              unit: 'px',
+              keyframes: [
+                { id: 'k1', time: 0, value: 0, easing: 'ease-in-out' },
+                { id: 'k2', time: 100, value: 100, easing: 'ease-in-out' },
+              ],
+            },
+            {
+              id: 't2',
+              property: 'opacity',
+              visible: true,
+              unit: '',
+              keyframes: [
+                { id: 'k3', time: 0, value: 1, easing: 'ease-in-out' },
+                { id: 'k4', time: 100, value: 0, easing: 'ease-in-out' },
+              ],
+            },
+          ],
+        }
+        const css = generateAnimationCSS(sameEasingAnim)
+        expect(css).toContain('ease-in-out')
+        expect(css).not.toContain('linear')
+      })
+
+      it('should use ease as fallback when keyframes have different easings', () => {
+        const mixedEasingAnim = {
+          ...createAnimation('mixedEasing'),
+          tracks: [
+            {
+              id: 't1',
+              property: 'translateX',
+              visible: true,
+              unit: 'px',
+              keyframes: [
+                { id: 'k1', time: 0, value: 0, easing: 'ease-in' },
+                { id: 'k2', time: 50, value: 50, easing: 'ease-out' },
+                { id: 'k3', time: 100, value: 100, easing: 'linear' },
+              ],
+            },
+          ],
+        }
+        const css = generateAnimationCSS(mixedEasingAnim)
+        expect(css).toContain('ease')
+        expect(css).not.toContain('ease-in')
+        expect(css).not.toContain('ease-out')
+      })
+
+      it('should only consider visible tracks for easing', () => {
+        const animWithHiddenTrack = {
+          ...createAnimation('hiddenEasing'),
+          tracks: [
+            {
+              id: 't1',
+              property: 'translateX',
+              visible: true,
+              unit: 'px',
+              keyframes: [
+                { id: 'k1', time: 0, value: 0, easing: 'linear' },
+                { id: 'k2', time: 100, value: 100, easing: 'linear' },
+              ],
+            },
+            {
+              id: 't2',
+              property: 'opacity',
+              visible: false,
+              unit: '',
+              keyframes: [
+                { id: 'k3', time: 0, value: 1, easing: 'ease-in' },
+                { id: 'k4', time: 100, value: 0, easing: 'ease-in' },
+              ],
+            },
+          ],
+        }
+        const css = generateAnimationCSS(animWithHiddenTrack)
+        expect(css).toContain('linear')
+      })
+
+      it('should use ease when no visible tracks exist', () => {
+        const noVisibleAnim = {
+          ...createAnimation('noVisible'),
+          tracks: [
+            {
+              id: 't1',
+              property: 'translateX',
+              visible: false,
+              unit: 'px',
+              keyframes: [
+                { id: 'k1', time: 0, value: 0, easing: 'ease-in' },
+                { id: 'k2', time: 100, value: 100, easing: 'ease-in' },
+              ],
+            },
+          ],
+        }
+        const css = generateAnimationCSS(noVisibleAnim)
+        expect(css).toContain('ease')
       })
     })
 
@@ -722,6 +956,278 @@ describe('cssAnimationCore', () => {
       const result = formatDate(timestamp)
       expect(result).toContain('01-05')
       expect(result).toContain('09:05')
+    })
+  })
+
+  describe('color value detection', () => {
+    describe('isColorValue', () => {
+      it('should detect hex color codes', () => {
+        expect(isColorValue('#ff0000')).toBe(true)
+        expect(isColorValue('#FF0000')).toBe(true)
+        expect(isColorValue('#f00')).toBe(true)
+        expect(isColorValue('#abc123')).toBe(true)
+      })
+
+      it('should detect rgb/rgba color codes', () => {
+        expect(isColorValue('rgb(255, 0, 0)')).toBe(true)
+        expect(isColorValue('rgba(255, 0, 0, 0.5)')).toBe(true)
+        expect(isColorValue('RGB(255,0,0)')).toBe(true)
+      })
+
+      it('should detect hsl/hsla color codes', () => {
+        expect(isColorValue('hsl(120, 100%, 50%)')).toBe(true)
+        expect(isColorValue('hsla(120, 100%, 50%, 0.3)')).toBe(true)
+      })
+
+      it('should return false for non-color values', () => {
+        expect(isColorValue(100)).toBe(false)
+        expect(isColorValue(0)).toBe(false)
+        expect(isColorValue('100px')).toBe(false)
+        expect(isColorValue('50%')).toBe(false)
+        expect(isColorValue('linear')).toBe(false)
+        expect(isColorValue('')).toBe(false)
+        expect(isColorValue(null)).toBe(false)
+        expect(isColorValue(undefined)).toBe(false)
+      })
+
+      it('should handle values with whitespace', () => {
+        expect(isColorValue('  #ff0000  ')).toBe(true)
+      })
+    })
+
+    describe('isColorProperty', () => {
+      it('should recognize background-color as color property', () => {
+        expect(isColorProperty('background-color')).toBe(true)
+      })
+
+      it('should return false for non-color properties', () => {
+        expect(isColorProperty('translateX')).toBe(false)
+        expect(isColorProperty('opacity')).toBe(false)
+        expect(isColorProperty('scale')).toBe(false)
+        expect(isColorProperty('width')).toBe(false)
+        expect(isColorProperty('')).toBe(false)
+        expect(isColorProperty(null)).toBe(false)
+        expect(isColorProperty(undefined)).toBe(false)
+      })
+    })
+  })
+
+  describe('formatValue', () => {
+    it('should format numeric values with unit', () => {
+      expect(formatValue(100, 'px', 'translateX')).toBe('100px')
+      expect(formatValue(50, '%', 'translateY')).toBe('50%')
+      expect(formatValue(90, 'deg', 'rotate')).toBe('90deg')
+    })
+
+    it('should format numeric values without unit', () => {
+      expect(formatValue(1, '', 'opacity')).toBe('1')
+      expect(formatValue(0.5, '', 'opacity')).toBe('0.5')
+      expect(formatValue(2, '', 'scale')).toBe('2')
+    })
+
+    it('should format color values by property name', () => {
+      expect(formatValue('#ff0000', '', 'background-color')).toBe('#ff0000')
+      expect(formatValue('#f00', '', 'background-color')).toBe('#f00')
+    })
+
+    it('should format color values by value detection even if unit exists', () => {
+      expect(formatValue('#ff0000', 'px', 'background-color')).toBe('#ff0000')
+      expect(formatValue('rgb(255,0,0)', 'px', 'background-color')).toBe('rgb(255,0,0)')
+    })
+
+    it('should handle edge cases safely', () => {
+      expect(formatValue(0, 'px', 'translateX')).toBe('0px')
+      expect(formatValue(null, '', 'opacity')).toBe('null')
+      expect(formatValue(undefined, '', 'opacity')).toBe('undefined')
+      expect(formatValue('', 'px', 'width')).toBe('')
+    })
+  })
+
+  describe('easing functions', () => {
+    describe('getDominantEasing', () => {
+      it('should return ease when no visible tracks', () => {
+        const anim = {
+          ...createAnimation(),
+          tracks: [
+            { ...createPropertyTrack('translateX'), visible: false },
+          ],
+        }
+        expect(getDominantEasing(anim)).toBe('ease')
+      })
+
+      it('should return ease when no tracks exist', () => {
+        const anim = { ...createAnimation(), tracks: [] }
+        expect(getDominantEasing(anim)).toBe('ease')
+      })
+
+      it('should return the single easing when all keyframes use same easing', () => {
+        const anim = {
+          ...createAnimation('test'),
+          tracks: [
+            {
+              id: 't1',
+              property: 'translateX',
+              visible: true,
+              unit: 'px',
+              keyframes: [
+                { id: 'k1', time: 0, value: 0, easing: 'ease-in-out' },
+                { id: 'k2', time: 50, value: 50, easing: 'ease-in-out' },
+                { id: 'k3', time: 100, value: 100, easing: 'ease-in-out' },
+              ],
+            },
+          ],
+        }
+        expect(getDominantEasing(anim)).toBe('ease-in-out')
+      })
+
+      it('should ignore keyframes at time 100 when collecting easings', () => {
+        const anim = {
+          ...createAnimation('test'),
+          tracks: [
+            {
+              id: 't1',
+              property: 'translateX',
+              visible: true,
+              unit: 'px',
+              keyframes: [
+                { id: 'k1', time: 0, value: 0, easing: 'linear' },
+                { id: 'k2', time: 100, value: 100, easing: 'should-be-ignored' },
+              ],
+            },
+          ],
+        }
+        expect(getDominantEasing(anim)).toBe('linear')
+      })
+
+      it('should return ease when keyframes have mixed easings', () => {
+        const anim = {
+          ...createAnimation('test'),
+          tracks: [
+            {
+              id: 't1',
+              property: 'translateX',
+              visible: true,
+              unit: 'px',
+              keyframes: [
+                { id: 'k1', time: 0, value: 0, easing: 'ease-in' },
+                { id: 'k2', time: 50, value: 50, easing: 'ease-out' },
+                { id: 'k3', time: 100, value: 100, easing: 'linear' },
+              ],
+            },
+          ],
+        }
+        expect(getDominantEasing(anim)).toBe('ease')
+      })
+
+      it('should only consider visible tracks', () => {
+        const anim = {
+          ...createAnimation('test'),
+          tracks: [
+            {
+              id: 't1',
+              property: 'translateX',
+              visible: true,
+              unit: 'px',
+              keyframes: [
+                { id: 'k1', time: 0, value: 0, easing: 'linear' },
+                { id: 'k2', time: 100, value: 100, easing: 'linear' },
+              ],
+            },
+            {
+              id: 't2',
+              property: 'opacity',
+              visible: false,
+              unit: '',
+              keyframes: [
+                { id: 'k3', time: 0, value: 1, easing: 'ease-in' },
+                { id: 'k4', time: 100, value: 0, easing: 'ease-in' },
+              ],
+            },
+          ],
+        }
+        expect(getDominantEasing(anim)).toBe('linear')
+      })
+
+      it('should handle cubic-bezier easing values', () => {
+        const anim = {
+          ...createAnimation('test'),
+          tracks: [
+            {
+              id: 't1',
+              property: 'translateX',
+              visible: true,
+              unit: 'px',
+              keyframes: [
+                { id: 'k1', time: 0, value: 0, easing: 'cubic-bezier(0.25, 0.1, 0.25, 1)' },
+                { id: 'k2', time: 100, value: 100, easing: 'cubic-bezier(0.25, 0.1, 0.25, 1)' },
+              ],
+            },
+          ],
+        }
+        expect(getDominantEasing(anim)).toBe('cubic-bezier(0.25, 0.1, 0.25, 1)')
+      })
+    })
+
+    describe('getEasingAtTime', () => {
+      it('should return null when no matching keyframes at given time', () => {
+        const tracks = [
+          {
+            id: 't1',
+            keyframes: [
+              { id: 'k1', time: 0, value: 0, easing: 'linear' },
+              { id: 'k2', time: 100, value: 100, easing: 'linear' },
+            ],
+          },
+        ]
+        expect(getEasingAtTime(tracks, 50)).toBeNull()
+      })
+
+      it('should return the easing when all tracks agree at given time', () => {
+        const tracks = [
+          {
+            id: 't1',
+            keyframes: [
+              { id: 'k1', time: 0, value: 0, easing: 'ease-in' },
+              { id: 'k2', time: 100, value: 100, easing: 'linear' },
+            ],
+          },
+          {
+            id: 't2',
+            keyframes: [
+              { id: 'k3', time: 0, value: 1, easing: 'ease-in' },
+              { id: 'k4', time: 100, value: 0, easing: 'ease-in' },
+            ],
+          },
+        ]
+        expect(getEasingAtTime(tracks, 0)).toBe('ease-in')
+      })
+
+      it('should return most frequent easing when tracks differ at given time', () => {
+        const tracks = [
+          {
+            id: 't1',
+            keyframes: [
+              { id: 'k1', time: 0, value: 0, easing: 'ease-in' },
+              { id: 'k2', time: 100, value: 100, easing: 'linear' },
+            ],
+          },
+          {
+            id: 't2',
+            keyframes: [
+              { id: 'k3', time: 0, value: 1, easing: 'ease-in' },
+              { id: 'k4', time: 100, value: 0, easing: 'linear' },
+            ],
+          },
+          {
+            id: 't3',
+            keyframes: [
+              { id: 'k5', time: 0, value: 50, easing: 'ease-out' },
+              { id: 'k6', time: 100, value: 100, easing: 'linear' },
+            ],
+          },
+        ]
+        expect(getEasingAtTime(tracks, 0)).toBe('ease-in')
+      })
     })
   })
 })

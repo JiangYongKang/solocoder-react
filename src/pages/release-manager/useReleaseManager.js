@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   loadReleases,
   saveReleases,
@@ -8,6 +8,7 @@ import {
   getReleaseList,
   getReleaseStats,
 } from './utils.js'
+import { AVAILABLE_USERS } from './constants.js'
 
 export function useReleaseManager() {
   const [releases, setReleases] = useState(() => loadReleases())
@@ -19,6 +20,18 @@ export function useReleaseManager() {
   const [diffModalOpen, setDiffModalOpen] = useState(false)
   const [diffBaseId, setDiffBaseId] = useState(null)
   const [diffCompareId, setDiffCompareId] = useState(null)
+  const [currentUserId, setCurrentUserId] = useState(AVAILABLE_USERS[0].id)
+  const [processingIds, setProcessingIds] = useState(() => new Set())
+
+  const currentUser = useMemo(
+    () => AVAILABLE_USERS.find((u) => u.id === currentUserId) || AVAILABLE_USERS[0],
+    [currentUserId]
+  )
+
+  const releasesRef = useRef(releases)
+  useEffect(() => {
+    releasesRef.current = releases
+  }, [releases])
 
   useEffect(() => {
     saveReleases(releases)
@@ -62,9 +75,11 @@ export function useReleaseManager() {
 
   const handleSubmitForm = useCallback(
     (formData) => {
+      const currentReleases = releasesRef.current
       if (editingRelease) {
-        const result = updateRelease(releases, editingRelease.id, formData)
+        const result = updateRelease(currentReleases, editingRelease.id, formData)
         if (result.success) {
+          releasesRef.current = result.releases
           setReleases(result.releases)
           setFormModalOpen(false)
           setEditingRelease(null)
@@ -72,8 +87,9 @@ export function useReleaseManager() {
         }
         return result
       } else {
-        const result = createRelease(releases, formData)
+        const result = createRelease(currentReleases, formData, currentUser)
         if (result.success) {
+          releasesRef.current = result.releases
           setReleases(result.releases)
           setFormModalOpen(false)
           return { success: true }
@@ -81,16 +97,46 @@ export function useReleaseManager() {
         return result
       }
     },
-    [editingRelease, releases]
+    [editingRelease, currentUser]
   )
 
+  const isProcessing = useCallback((id) => processingIds.has(id), [processingIds])
+
   const handleApprovalAction = useCallback((id, action, remark = '') => {
-    const result = performApprovalAction(releases, id, action, remark)
-    if (result.success) {
-      setReleases(result.releases)
+    if (processingIds.has(id)) {
+      return { success: false, error: '操作进行中，请稍候' }
     }
-    return result
-  }, [releases])
+
+    const currentReleases = releasesRef.current
+    const release = currentReleases.find((r) => r.id === id)
+    if (!release) {
+      return { success: false, error: '版本不存在' }
+    }
+
+    setProcessingIds((prev) => new Set(prev).add(id))
+
+    try {
+      const result = performApprovalAction(
+        currentReleases,
+        id,
+        action,
+        remark,
+        currentUser,
+        release.updatedAt
+      )
+      if (result.success) {
+        releasesRef.current = result.releases
+        setReleases(result.releases)
+      }
+      return result
+    } finally {
+      setProcessingIds((prev) => {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
+    }
+  }, [currentUser, processingIds])
 
   const handleOpenDetail = useCallback((release) => {
     setDetailReleaseId(release.id)
@@ -148,6 +194,9 @@ export function useReleaseManager() {
     diffCompareId,
     diffBaseRelease,
     diffCompareRelease,
+    currentUser,
+    setCurrentUserId,
+    isProcessing,
     setStatusFilter: handleStatusFilterChange,
     setCurrentPage: handlePageChange,
     handleCreate,

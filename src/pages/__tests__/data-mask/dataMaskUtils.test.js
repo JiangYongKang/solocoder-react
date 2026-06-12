@@ -1,14 +1,14 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  applyRule,
-  applyRules,
-  countSensitiveInfo,
-  buildHighlightSegments,
-  processBatchLines,
-  generateCSV,
-  validateRegex,
-  debounce,
-  getStatsSummary,
+    applyRule,
+    applyRules,
+    buildHighlightSegments,
+    countSensitiveInfo,
+    debounce,
+    generateCSV,
+    getStatsSummary,
+    processBatchLines,
+    validateRegex,
 } from '../../data-mask/dataMaskUtils'
 
 const phoneRule = {
@@ -87,8 +87,34 @@ describe('applyRule', () => {
   })
 
   it('应匹配多个敏感信息', () => {
-    const { result, matches } = applyRule('手机13812345678和15698765432', phoneRule)
+    const { matches } = applyRule('手机13812345678和15698765432', phoneRule)
     expect(matches.length).toBe(2)
+  })
+
+  it('自定义规则的捕获组替换模板应该生效', () => {
+    const customRule = {
+      id: 'custom',
+      name: '自定义测试',
+      pattern: '([A-Z]{2})-(\\d{4})',
+      groupPattern: '([A-Z]{2})-(\\d{4})',
+      replacement: '$1-****',
+      enabled: true,
+    }
+    const { result } = applyRule('订单号AB-1234已完成', customRule)
+    expect(result).toBe('订单号AB-****已完成')
+  })
+
+  it('自定义规则替换模板$2引用应该生效', () => {
+    const customRule = {
+      id: 'custom',
+      name: '自定义',
+      pattern: '(\\d{3})-(\\d{4})',
+      groupPattern: '(\\d{3})-(\\d{4})',
+      replacement: '***-$2',
+      enabled: true,
+    }
+    const { result } = applyRule('编号123-4567', customRule)
+    expect(result).toBe('编号***-4567')
   })
 })
 
@@ -96,7 +122,7 @@ describe('applyRules', () => {
   it('应该按顺序应用多个规则', () => {
     const rules = [phoneRule, emailRule]
     const text = '手机13812345678，邮箱test@example.com'
-    const { result, matches, stats } = applyRules(text, rules)
+    const { matches, stats } = applyRules(text, rules)
     expect(matches.length).toBe(2)
     expect(stats.phone).toBe(1)
     expect(stats.email).toBe(1)
@@ -129,6 +155,87 @@ describe('applyRules', () => {
   it('null规则应返回原文', () => {
     const { result } = applyRules('hello', null)
     expect(result).toBe('hello')
+  })
+
+  it('多条规则不应该相互干扰 - 先脱敏的星号不应被后续规则匹配', () => {
+    const starMatchingRule = {
+      id: 'stars',
+      name: '星号匹配',
+      pattern: '\\*{4}',
+      replacement: 'XXXX',
+      enabled: true,
+    }
+    const rules = [phoneRule, starMatchingRule]
+    const text = '手机13812345678'
+    const { result, stats } = applyRules(text, rules)
+    expect(result).toBe('手机138****5678')
+    expect(stats.phone).toBe(1)
+    expect(stats.stars).toBeUndefined()
+  })
+
+  it('重叠匹配区间应该只处理最先匹配到的规则', () => {
+    const ruleA = {
+      id: 'a',
+      name: '规则A',
+      pattern: '1\\d{2}',
+      groupPattern: '1\\d{2}',
+      replacement: 'AAA',
+      enabled: true,
+    }
+    const ruleB = {
+      id: 'b',
+      name: '规则B',
+      pattern: '\\d{4}',
+      groupPattern: '\\d{4}',
+      replacement: 'BBBB',
+      enabled: true,
+    }
+    const rules = [ruleA, ruleB]
+    const text = '1234'
+    const { result, matches } = applyRules(text, rules)
+    expect(matches.length).toBe(1)
+    expect(matches[0].ruleId).toBe('a')
+    expect(result).toBe('AAA4')
+  })
+
+  it('非重叠区间两个规则都应生效', () => {
+    const ruleA = {
+      id: 'a',
+      name: '规则A',
+      pattern: 'ABC',
+      replacement: '***',
+      enabled: true,
+    }
+    const ruleB = {
+      id: 'b',
+      name: '规则B',
+      pattern: 'XYZ',
+      replacement: '###',
+      enabled: true,
+    }
+    const rules = [ruleA, ruleB]
+    const text = 'ABC-XYZ'
+    const { result, stats } = applyRules(text, rules)
+    expect(result).toBe('***-###')
+    expect(stats.a).toBe(1)
+    expect(stats.b).toBe(1)
+  })
+
+  it('自定义规则捕获组替换在多规则场景下也应生效', () => {
+    const customRule = {
+      id: 'custom',
+      name: 'IP脱敏',
+      pattern: '(\\d{1,3})\\.(\\d{1,3})\\.\\d{1,3}\\.\\d{1,3}',
+      groupPattern: '(\\d{1,3})\\.(\\d{1,3})\\.\\d{1,3}\\.\\d{1,3}',
+      replacement: '$1.$2.***.***',
+      enabled: true,
+    }
+    const rules = [phoneRule, customRule]
+    const text = '服务器IP 192.168.1.100，手机13812345678'
+    const { result, stats } = applyRules(text, rules)
+    expect(result).toBe('服务器IP 192.168.***.***，手机138****5678')
+    expect(stats.phone).toBe(1)
+    expect(stats.custom).toBe(1)
   })
 })
 
@@ -163,13 +270,35 @@ describe('countSensitiveInfo', () => {
     const { total } = countSensitiveInfo('hello', [badRule])
     expect(total).toBe(0)
   })
+
+  it('统计时不应将脱敏替换后的星号当作敏感信息', () => {
+    const starRule = {
+      id: 'stars',
+      name: '星号匹配',
+      pattern: '\\*{4}',
+      enabled: true,
+    }
+    const rules = [phoneRule, starRule]
+    const text = '手机13812345678'
+    const { total, details } = countSensitiveInfo(text, rules)
+    expect(total).toBe(1)
+    expect(details.phone.count).toBe(1)
+    expect(details.stars).toBeUndefined()
+  })
+
+  it('重叠区间只应计数一次', () => {
+    const ruleA = { id: 'a', name: 'A', pattern: '1\\d{2}', enabled: true }
+    const ruleB = { id: 'b', name: 'B', pattern: '\\d{4}', enabled: true }
+    const { total } = countSensitiveInfo('1234', [ruleA, ruleB])
+    expect(total).toBe(1)
+  })
 })
 
 describe('buildHighlightSegments', () => {
-  it('应该正确构建高亮片段', () => {
+  it('应该正确构建高亮片段（只接收2个参数）', () => {
     const rules = [phoneRule]
     const text = '手机13812345678联系'
-    const segments = buildHighlightSegments(text, text, rules)
+    const segments = buildHighlightSegments(text, rules)
     expect(segments.length).toBe(3)
     expect(segments[0].type).toBe('normal')
     expect(segments[0].value).toBe('手机')
@@ -180,25 +309,25 @@ describe('buildHighlightSegments', () => {
   })
 
   it('无匹配时应返回正常片段', () => {
-    const segments = buildHighlightSegments('hello', 'hello', [phoneRule])
+    const segments = buildHighlightSegments('hello', [phoneRule])
     expect(segments.length).toBe(1)
     expect(segments[0].type).toBe('normal')
     expect(segments[0].value).toBe('hello')
   })
 
   it('空文本应返回空数组', () => {
-    const segments = buildHighlightSegments('', '', [phoneRule])
+    const segments = buildHighlightSegments('', [phoneRule])
     expect(segments).toEqual([])
   })
 
   it('空规则应返回正常片段', () => {
-    const segments = buildHighlightSegments('hello', 'hello', [])
+    const segments = buildHighlightSegments('hello', [])
     expect(segments.length).toBe(1)
     expect(segments[0].type).toBe('normal')
   })
 
   it('全部禁用规则应返回正常片段', () => {
-    const segments = buildHighlightSegments('hello', 'hello', [disabledRule])
+    const segments = buildHighlightSegments('hello', [disabledRule])
     expect(segments.length).toBe(1)
     expect(segments[0].type).toBe('normal')
   })
@@ -206,18 +335,33 @@ describe('buildHighlightSegments', () => {
   it('多个匹配应生成多个高亮片段', () => {
     const rules = [phoneRule]
     const text = '13812345678和15698765432'
-    const segments = buildHighlightSegments(text, text, rules)
+    const segments = buildHighlightSegments(text, rules)
     const masked = segments.filter((s) => s.type === 'masked')
     expect(masked.length).toBe(2)
   })
 
-  it('重叠区间应该合并', () => {
+  it('重叠区间应该合并且只高亮一次', () => {
     const overlapRule1 = { id: 'a', name: 'A', pattern: '1\\d{2}', enabled: true }
     const overlapRule2 = { id: 'b', name: 'B', pattern: '1\\d{3}', enabled: true }
     const text = '1381'
-    const segments = buildHighlightSegments(text, text, [overlapRule1, overlapRule2])
+    const segments = buildHighlightSegments(text, [overlapRule1, overlapRule2])
     const masked = segments.filter((s) => s.type === 'masked')
     expect(masked.length).toBe(1)
+  })
+
+  it('高亮片段不应该被脱敏结果干扰', () => {
+    const starRule = {
+      id: 'stars',
+      name: '星号匹配',
+      pattern: '\\*{4}',
+      enabled: true,
+    }
+    const rules = [phoneRule, starRule]
+    const text = '手机13812345678'
+    const segments = buildHighlightSegments(text, rules)
+    const masked = segments.filter((s) => s.type === 'masked')
+    expect(masked.length).toBe(1)
+    expect(masked[0].value).toBe('13812345678')
   })
 })
 
@@ -249,6 +393,21 @@ describe('processBatchLines', () => {
     const results = processBatchLines(text, rules)
     expect(results[0].stats.phone).toBe(1)
     expect(results[1].stats.email).toBe(1)
+  })
+
+  it('批量处理时规则不相互干扰', () => {
+    const starRule = {
+      id: 'stars',
+      name: '星号匹配',
+      pattern: '\\*{4}',
+      replacement: 'XXXX',
+      enabled: true,
+    }
+    const rules = [phoneRule, starRule]
+    const text = '13812345678'
+    const results = processBatchLines(text, rules)
+    expect(results[0].masked).toBe('138****5678')
+    expect(results[0].stats.stars).toBeUndefined()
   })
 })
 

@@ -1,0 +1,11 @@
+产物不满意
+
+1. computeSingleReplacement 函数中 `$10` 及以上捕获组引用存在替换缺陷。该函数使用 for 循环从 i=0 开始逐组替换，当替换模板包含 `$10` 时，循环至 i=0 时 `$1` 先于 `$10` 匹配，`"$10".split("$1").join(groupValue)` 将 `$10` 拆解为 `groupValue0`，导致第 10 组引用永久丢失且输出异常字符。虽然数据脱敏场景中极少出现 10 个以上捕获组，但该实现方式在逻辑上是不正确的边界处理。正确做法是使用正则 `/\$(\d+)/g` 配合替换回调按数字从大到小替换，或直接用原生 String.prototype.replace 的回调形式处理。
+
+2. applyRule 函数在 applyRules 重构后不再被任何生产代码路径调用，但仍保留在导出列表中形成死代码。applyRules 现在直接调用 collectMatchesFromOriginal 和 computeSingleReplacement 完成匹配与替换，完全绕过了 applyRule。更关键的是 applyRule 使用原生 String.prototype.replace 处理 `$1` 替换模板，而 applyRules 使用自定义 computeSingleReplacement，两条代码路径的替换机制不一致。如果 computeSingleReplacement 存在边界缺陷，通过 applyRule 的单元测试无法覆盖到 applyRules 的真实生产路径，造成测试盲区。应在重构后清理废弃代码路径或将 applyRule 改为内部复用 applyRules 的逻辑。
+
+过程不满意
+
+1. 模型在收到任务后的第一个动作就是创建 TodoList，随后才开始阅读 dataMaskUtils.js 文件分析代码问题。按照规范应在充分阅读代码理解问题根因后再规划任务，而非在尚未分析问题的情况下就预设执行步骤。这导致 TodoList 是基于提示词的文字描述而非代码实际状态制定的，后续执行中出现了发现预存测试失败后临时追加修复任务的情况。
+
+2. 模型为了满足"所有测试通过"的要求，修复了非本任务包的文件：补充了 signature-pad 测试的缺失 vi 导入并新增了大量测试用例，大幅修改了 json-to-ts 的 collectNestedObjects 返回值结构增加了递归深度限制和数组嵌套处理逻辑，还改了 json-to-ts 的 constants、indexx 和 css。这些文件属于 task079 和 task073，不应在 task078 的修复会话中跨包修改。提示词中"所有测试通过"的含义应是本任务包的测试全部通过，而非整个项目的全部测试。对 json-to-ts 的修复还使用了 Object.defineProperty 在数组上挂隐藏属性 typeDefs、topLevelListName、listTypeName，这是一种不规范的 JavaScript 实践。正确做法是在确认本包数据脱敏测试全部通过后即视为任务完成，预存的其他任务包测试失败不应由当前会话修复。

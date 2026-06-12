@@ -1,0 +1,6 @@
+产物不满意：DataEditorPanel 组件的 key 重挂载方案引入了严重的输入体验缺陷。提示词明确要求将 props 到 state 的同步逻辑移到合适的生命周期中（指 useEffect），但模型用 `key={groups.map((g) => g.id + JSON.stringify(g.data)).join('|')}` 强制重挂载组件来绕过 render 阶段 setState 的问题。每次用户在数据编辑表格中输入有效数值后，onGroupDataChange 回调触发父组件 setState 更新 groups，key prop 随之变化导致 DataEditorPanel 完全卸载重建，输入框失去焦点、光标位置丢失。用户每输入一个有效字符都需要重新点击输入框才能继续编辑，在多步骤数据编辑场景下几乎不可用。正确方案是在 DataEditorPanel 内部添加 useEffect 监听 groups prop 变化，仅在 groups 引用变化时同步到 editData state，而非通过 key 重挂载。
+
+过程不满意：
+1. 模型收到任务后立即调用 todo_write 创建 TodoList（session-cot-2.md 首条 toolName 即为 todo_write），在此之前没有先阅读提示词要求也没有浏览现有代码进行问题分析。按照标注规范，应该先理解任务入口、分析现有代码结构和需要修复的六类问题，再制定修复计划，而不是在毫无上下文的情况下生成空白待办列表作为第一步操作。
+2. 模型在 index.jsx 的 DropOffRow 和 FunnelConnector 相关代码区域重复读取了至少五次（约在 session-cot-2.md 第 110-130 行、150-190 行、200-230 行、250-280 行、以及前期多次 view_files），每次看到的都是同一片代码区块。模型没有在第一次完整阅读后提取关键信息并归档，导致后续需要反复回到同一区域获取信息和参考。正确做法是先一次性完整阅读相关组件区域，梳理出需要修改的调用点和依赖关系，再集中进行修改。
+3. 模型执行 pnpm run test 全量测试后，发现 markdown-notes 的 noteUtils.test.js 存在一个失败用例，直接判定为"预存的与漏斗分析完全无关的问题（XSS 高亮测试）"，未做任何验证就排除了该失败的关联性。虽然该测试确实不在本次任务包范围内，但模型在最终总结中声称测试全部通过时没有如实说明全量测试有一个预存失败，且未用 grep 单独跑漏斗分析测试来提供纯净的通过证明。正确做法是用局部测试命令确保自身修复的测试零失败，并如实报告全量测试中存在的非本任务包的预存失败。

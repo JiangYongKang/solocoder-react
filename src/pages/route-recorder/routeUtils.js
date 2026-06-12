@@ -1,14 +1,14 @@
 import {
-  MIN_ZOOM,
-  MAX_ZOOM,
-  METERS_PER_PIXEL,
-  TRAVEL_MODES,
-  STORAGE_KEY,
-  MAX_WAYPOINTS,
-  ELEVATION_START_MIN,
-  ELEVATION_START_MAX,
-  ELEVATION_MIN,
-  ELEVATION_MAX,
+    ELEVATION_MAX,
+    ELEVATION_MIN,
+    ELEVATION_START_MAX,
+    ELEVATION_START_MIN,
+    MAX_WAYPOINTS,
+    MAX_ZOOM,
+    METERS_PER_PIXEL,
+    MIN_ZOOM,
+    STORAGE_KEY,
+    TRAVEL_MODES,
 } from './constants.js';
 
 export function generateId() {
@@ -219,8 +219,9 @@ export function saveFavorites(favorites, storage = typeof window !== 'undefined'
 }
 
 export function createFavorite(routeData) {
-  const { name, start, waypoints, end } = routeData || {};
+  const { name, start, waypoints, end, climb, descent, elevations } = routeData || {};
   const distance = calculateKilometers(start, waypoints, end);
+  const elevData = generateElevation(start, waypoints, end);
   return {
     id: generateId(),
     name: (name || '未命名路线').trim(),
@@ -229,6 +230,11 @@ export function createFavorite(routeData) {
     end: end ? { x: end.x, y: end.y } : null,
     distance,
     waypointCount: Array.isArray(waypoints) ? waypoints.length : 0,
+    climb: typeof climb === 'number' ? climb : (elevData?.climb || 0),
+    descent: typeof descent === 'number' ? descent : (elevData?.descent || 0),
+    elevations: Array.isArray(elevations)
+      ? elevations.slice()
+      : (elevData?.elevations ? elevData.elevations.map((e) => e.elevation) : []),
     createdAt: Date.now(),
   };
 }
@@ -270,13 +276,46 @@ export function generateShareText(favorite) {
   if (!favorite) return '';
   const lines = [];
   lines.push(`【路线分享】${favorite.name}`);
+  lines.push('---');
   const startText = favorite.start ? `(${favorite.start.x.toFixed(0)}, ${favorite.start.y.toFixed(0)})` : '未设置';
   const endText = favorite.end ? `(${favorite.end.x.toFixed(0)}, ${favorite.end.y.toFixed(0)})` : '未设置';
   lines.push(`起点: ${startText}`);
   lines.push(`终点: ${endText}`);
   lines.push(`距离: ${formatDistance(favorite.distance)}`);
   lines.push(`途经点: ${favorite.waypointCount || 0} 个`);
+  lines.push(`累计爬升: ${favorite.climb || 0} m`);
+  lines.push(`累计下降: ${favorite.descent || 0} m`);
+  lines.push('---');
+  const structured = {
+    version: '1.0',
+    type: 'route',
+    name: favorite.name,
+    start: favorite.start ? { x: favorite.start.x, y: favorite.start.y } : null,
+    end: favorite.end ? { x: favorite.end.x, y: favorite.end.y } : null,
+    waypoints: Array.isArray(favorite.waypoints)
+      ? favorite.waypoints.map((w) => ({ x: w.x, y: w.y }))
+      : [],
+    distance: favorite.distance || 0,
+    waypointCount: favorite.waypointCount || 0,
+    climb: favorite.climb || 0,
+    descent: favorite.descent || 0,
+    createdAt: favorite.createdAt || Date.now(),
+  };
+  lines.push(`DATA:${JSON.stringify(structured)}`);
   return lines.join('\n');
+}
+
+export function parseShareText(text) {
+  if (typeof text !== 'string' || !text) return null;
+  const match = text.match(/DATA:(\{.*\})/);
+  if (!match) return null;
+  try {
+    const parsed = JSON.parse(match[1]);
+    if (!parsed || parsed.type !== 'route' || parsed.version !== '1.0') return null;
+    return parsed;
+  } catch {
+    return null;
+  }
 }
 
 export function formatDateTime(timestamp) {

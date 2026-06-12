@@ -1,10 +1,10 @@
 import {
-  RELEASE_STATUS_LABEL,
-  RELEASE_STATUS_COLOR,
-  APPROVAL_ACTION,
-  APPROVAL_ACTION_LABEL,
+    APPROVAL_ACTION,
+    APPROVAL_ACTION_LABEL,
+    RELEASE_STATUS_COLOR,
+    RELEASE_STATUS_LABEL,
 } from '../constants.js'
-import { formatDateOnly, isReleaseEditable, getStatusActions } from '../utils.js'
+import { formatDateOnly, getStatusActions, isReleaseEditable } from '../utils.js'
 
 export default function ReleaseList({
   items,
@@ -16,6 +16,7 @@ export default function ReleaseList({
   diffCompareId,
   onSelectForDiff,
   isDiffSelectMode,
+  isProcessing = () => false,
 }) {
   return (
     <div className="rm-table-wrap">
@@ -43,6 +44,7 @@ export default function ReleaseList({
             const editable = isReleaseEditable(release)
             const actions = getStatusActions(release)
             const checkedForDiff = diffBaseId === release.id || diffCompareId === release.id
+            const disabled = isProcessing(release.id)
 
             return (
               <tr key={release.id} className="rm-table-row">
@@ -87,46 +89,50 @@ export default function ReleaseList({
                 <td>
                   <div className="rm-actions">
                     {editable && (
-                      <button className="rm-action-btn" onClick={() => onEdit(release)}>
+                      <button className="rm-action-btn" onClick={() => onEdit(release)} disabled={disabled}>
                         编辑
                       </button>
                     )}
-                    <button className="rm-action-btn" onClick={() => onDetail(release)}>
+                    <button className="rm-action-btn" onClick={() => onDetail(release)} disabled={disabled}>
                       详情
                     </button>
-                    <button className="rm-action-btn" onClick={() => onDiff(release)}>
+                    <button className="rm-action-btn" onClick={() => onDiff(release)} disabled={disabled}>
                       对比
                     </button>
                     {actions.includes(APPROVAL_ACTION.SUBMIT) && (
                       <button
                         className="rm-action-btn rm-action-warn"
                         onClick={() => onApprovalAction(release.id, APPROVAL_ACTION.SUBMIT)}
+                        disabled={disabled}
                       >
-                        {APPROVAL_ACTION_LABEL[APPROVAL_ACTION.SUBMIT]}
+                        {disabled ? '处理中...' : APPROVAL_ACTION_LABEL[APPROVAL_ACTION.SUBMIT]}
                       </button>
                     )}
                     {actions.includes(APPROVAL_ACTION.APPROVE) && (
                       <button
                         className="rm-action-btn rm-action-success"
                         onClick={() => onApprovalAction(release.id, APPROVAL_ACTION.APPROVE)}
+                        disabled={disabled}
                       >
-                        {APPROVAL_ACTION_LABEL[APPROVAL_ACTION.APPROVE]}
+                        {disabled ? '处理中...' : APPROVAL_ACTION_LABEL[APPROVAL_ACTION.APPROVE]}
                       </button>
                     )}
                     {actions.includes(APPROVAL_ACTION.REJECT) && (
                       <button
                         className="rm-action-btn rm-action-danger"
                         onClick={() => onApprovalAction(release.id, APPROVAL_ACTION.REJECT)}
+                        disabled={disabled}
                       >
-                        {APPROVAL_ACTION_LABEL[APPROVAL_ACTION.REJECT]}
+                        {disabled ? '处理中...' : APPROVAL_ACTION_LABEL[APPROVAL_ACTION.REJECT]}
                       </button>
                     )}
                     {actions.includes(APPROVAL_ACTION.ROLLBACK) && (
                       <button
                         className="rm-action-btn rm-action-danger"
                         onClick={() => onApprovalAction(release.id, APPROVAL_ACTION.ROLLBACK)}
+                        disabled={disabled}
                       >
-                        {APPROVAL_ACTION_LABEL[APPROVAL_ACTION.ROLLBACK]}
+                        {disabled ? '处理中...' : APPROVAL_ACTION_LABEL[APPROVAL_ACTION.ROLLBACK]}
                       </button>
                     )}
                   </div>

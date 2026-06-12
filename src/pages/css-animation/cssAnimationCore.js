@@ -1,4 +1,4 @@
-import { STORAGE_KEY, MAX_ANIMATIONS, ANIMATION_PROPERTIES, TRANSFORM_PROPERTIES, COLOR_PROPERTIES } from './constants.js'
+import { ANIMATION_PROPERTIES, COLOR_PROPERTIES, MAX_ANIMATIONS, STORAGE_KEY, TRANSFORM_PROPERTIES } from './constants.js'
 
 export function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).substr(2, 9)
@@ -241,6 +241,35 @@ export function updateAnimationSettings(animation, settings) {
   }
 }
 
+export function getEasingAtTime(visibleTracks, time) {
+  const easings = []
+  visibleTracks.forEach((track) => {
+    const kf = track.keyframes.find((k) => k.time === time)
+    if (kf && kf.easing) easings.push(kf.easing)
+  })
+  if (easings.length === 0) return null
+  const unique = new Set(easings)
+  if (unique.size === 1) return easings[0]
+  const counts = {}
+  easings.forEach((e) => { counts[e] = (counts[e] || 0) + 1 })
+  return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0]
+}
+
+export function getDominantEasing(animation) {
+  const visibleTracks = animation.tracks.filter((t) => t.visible)
+  if (visibleTracks.length === 0) return 'ease'
+  const allEasings = []
+  visibleTracks.forEach((track) => {
+    track.keyframes.forEach((k) => {
+      if (k.time < 100 && k.easing) allEasings.push(k.easing)
+    })
+  })
+  if (allEasings.length === 0) return 'ease'
+  const unique = [...new Set(allEasings)]
+  if (unique.length === 1) return unique[0]
+  return 'ease'
+}
+
 export function generateKeyframesCSS(animation, name = animation.name) {
   const visibleTracks = animation.tracks.filter((t) => t.visible)
   if (visibleTracks.length === 0) return ''
@@ -266,19 +295,26 @@ export function generateKeyframesCSS(animation, name = animation.name) {
         if (TRANSFORM_PROPERTIES.includes(track.property)) {
           transformParts.push(formatTransformValue(track.property, interpolated, track.unit))
         } else {
-          css += `    ${ANIMATION_PROPERTIES[track.property].cssProp}: ${formatValue(interpolated, track.unit)};\n`
+          css += `    ${ANIMATION_PROPERTIES[track.property].cssProp}: ${formatValue(interpolated, track.unit, track.property)};\n`
         }
       } else {
         if (TRANSFORM_PROPERTIES.includes(track.property)) {
           transformParts.push(formatTransformValue(track.property, keyframe.value, track.unit))
         } else {
-          css += `    ${ANIMATION_PROPERTIES[track.property].cssProp}: ${formatValue(keyframe.value, track.unit)};\n`
+          css += `    ${ANIMATION_PROPERTIES[track.property].cssProp}: ${formatValue(keyframe.value, track.unit, track.property)};\n`
         }
       }
     })
 
     if (transformParts.length > 0) {
       css += `    transform: ${transformParts.join(' ')};\n`
+    }
+
+    if (time < 100) {
+      const easing = getEasingAtTime(visibleTracks, time)
+      if (easing && easing !== 'ease') {
+        css += `    animation-timing-function: ${easing};\n`
+      }
     }
 
     css += `  }\n`
@@ -288,9 +324,18 @@ export function generateKeyframesCSS(animation, name = animation.name) {
   return css
 }
 
-function formatValue(value, unit) {
-  if (COLOR_PROPERTIES.includes(unit === '' ? value : unit)) {
-    return value
+export function isColorValue(value) {
+  if (typeof value !== 'string') return false
+  return /^(#|rgb\(.*\)|rgba\(.*\)|hsl\(.*\)|hsla\(.*\))/i.test(value.trim())
+}
+
+export function isColorProperty(propertyName) {
+  return COLOR_PROPERTIES.includes(propertyName)
+}
+
+export function formatValue(value, unit, property) {
+  if (isColorProperty(property) || isColorValue(value)) {
+    return String(value)
   }
   if (typeof value === 'number' && unit) {
     return `${value}${unit}`
@@ -313,8 +358,10 @@ function formatTransformValue(property, value, unit) {
 }
 
 export function generateAnimationCSS(animation, name = animation.name) {
+  const easing = getDominantEasing(animation)
+
   return `.animated-element {
-  animation: ${name} ${animation.duration}s ${animation.tracks[0]?.keyframes[0]?.easing || 'linear'} ${animation.iterations} ${animation.direction} ${animation.fillMode};
+  animation: ${name} ${animation.duration}s ${easing} ${animation.iterations} ${animation.direction} ${animation.fillMode};
 }`
 }
 

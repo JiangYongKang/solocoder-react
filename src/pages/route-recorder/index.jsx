@@ -222,6 +222,8 @@ function RouteRecorderPage() {
       start,
       waypoints,
       end,
+      climb: elevationData?.climb || 0,
+      descent: elevationData?.descent || 0,
     });
     setFavorites((prev) => addFavorite(prev, fav));
     setShowSaveModal(false);
@@ -284,6 +286,8 @@ function RouteRecorderPage() {
       start,
       waypoints,
       end,
+      climb: elevationData?.climb || 0,
+      descent: elevationData?.descent || 0,
     });
     handleShareFavorite(fav);
   };

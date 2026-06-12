@@ -1,0 +1,8 @@
+产物不满意：
+1. 模型修改 getBezierPoints 函数将返回值结构从三次贝塞尔格式 `{cp1x, cp1y, cp2x, cp2y}` 改为二次贝塞尔格式 `{cpX, cpY}`，但同文件中的 strokeToPathData 函数（第164-166行）仍然使用旧格式 `p.cp2x, p.cp2y, p.cp1x, p.cp1y` 读取控制点坐标。getBezierPoints 是 strokeToPathData 的调用依赖，修改其返回结构后 strokeToPathData 生成的 SVG 路径字符串中所有控制点位置均为 `undefined`，实际产物类似 `M 0 0 C undefined undefined, undefined undefined, 10 10`。提示词要求修复贝塞尔控制点计算，模型正确修改了 drawStrokesOnCanvas 的绘制逻辑，但遗漏了对同一包内其他消费方的影响评估。根本原因是未在修改公共函数签名后检索所有调用点，正确做法是先 grep 搜索 getBezierPoints 的引用位置，确认全部调用方后再逐一适配。
+2. strokeToPathData 的现存测试用例（signatureCore.test.js 第394-406行）仅通过 `toContain('M')` 和 `toContain('0')` 等弱断言验证路径字符串中包含特定字符，未检验 SVG 控制点坐标是否为有效数值。因为路径字符串中仍然包含字母 'M' 和坐标点中的数字 '0' 和 '20'，测试依然通过，导致本次 getBezierPoints 返回值结构变更引发的回归在 69 个测试全部 PASS 的情况下被掩盖。正确做法是对 strokeToPathData 编写验证控制点坐标值是否为合法数值的断言，确保回归能被测试捕获。
+
+过程不满意：
+1. 模型在收到提示词后直接创建 TodoList（思考过程第1行"我来修复这些问题。首先创建任务计划"），没有先分析各个修复点的关联关系和影响范围，违反了"不能在刚收到任务时就直接创建 TodoList，应先分析问题再规划"的标注规范。这个行为直接导致后续修改 getBezierPoints 时没有检索函数的所有引用点，遗漏了对 strokeToPathData 的适配。
+2. 模型在整个会话中多次重复读取同一文件但未获取新信息：signatureCore.js 被 read 了至少三次（第100-107行、第131-137行、第171-177行），signature-pad.css 被 read 了至少四次（第65-68行、第387-393行、第397-403行、第404-413行）。且模型始终未使用 grep 搜索 getBezierPoints 的所有调用位置来做影响范围评估，只凭对 drawStrokesOnCanvas 的记忆修改了返回值结构。正确的工具使用方式是先通过 grep 定位所有消费 getBezierPoints 的函数，整理出完整的影响列表后再逐一修改。
+3. 模型在添加 vi 导入时第一次 edit_file_search_replace 操作失败（第807-811行 marked as failed），说明首次替换操作未正确匹配目标字符串，随后重试才成功。另外模型使用 `npm test` 和 `npm run dev` 而非项目指定的 `pnpm run test` 和 `pnpm run dev` 命令执行测试和启动开发服务器，在处理过程中总结声称"69 passed, ESLint 0 errors"就认定所有问题已修复完成，未对修复后的 strokeToPathData 输出做任何验证。

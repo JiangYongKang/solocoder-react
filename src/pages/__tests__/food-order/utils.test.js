@@ -79,6 +79,16 @@ describe('food-order/utils', () => {
     it('handles string numbers', () => {
       expect(formatPrice('128.5')).toBe('¥128.50');
     });
+
+    it('handles negative numbers', () => {
+      expect(formatPrice(-10)).toBe('¥-10.00');
+    });
+
+    it('ensures currency symbol appears only once', () => {
+      const result = formatPrice(25.5);
+      const yuanCount = (result.match(/¥/g) || []).length;
+      expect(yuanCount).toBe(1);
+    });
   });
 
   describe('formatDateTime', () => {
@@ -204,6 +214,16 @@ describe('food-order/utils', () => {
       expect(addToCart([], {}, {}, 1)).toEqual([]);
     });
 
+    it('addToCart clamps quantity to at least 1', () => {
+      const cart = addToCart([], simpleProduct, {}, -5);
+      expect(cart[0].quantity).toBe(1);
+    });
+
+    it('addToCart handles non-numeric quantity', () => {
+      const cart = addToCart([], simpleProduct, {}, 'abc');
+      expect(cart[0].quantity).toBe(1);
+    });
+
     it('updateCartQuantity changes quantity', () => {
       let cart = addToCart([], simpleProduct, {}, 2);
       cart = updateCartQuantity(cart, 'p1', 5);
@@ -216,10 +236,26 @@ describe('food-order/utils', () => {
       expect(cart.length).toBe(0);
     });
 
+    it('updateCartQuantity handles non-numeric quantity', () => {
+      let cart = addToCart([], simpleProduct, {}, 2);
+      cart = updateCartQuantity(cart, 'p1', 'invalid');
+      expect(cart.length).toBe(0);
+    });
+
+    it('updateCartQuantity handles empty cartItemId', () => {
+      const cart = [{ cartItemId: 'p1', quantity: 2 }];
+      expect(updateCartQuantity(cart, '', 5)).toEqual(cart);
+    });
+
     it('removeFromCart removes item', () => {
       let cart = addToCart([], simpleProduct, {}, 1);
       cart = removeFromCart(cart, 'p1');
       expect(cart.length).toBe(0);
+    });
+
+    it('removeFromCart handles empty cartItemId', () => {
+      const cart = [{ cartItemId: 'p1' }];
+      expect(removeFromCart(cart, '')).toEqual(cart);
     });
 
     it('clearCart returns empty array', () => {
@@ -296,6 +332,22 @@ describe('food-order/utils', () => {
     it('handles null/undefined address', () => {
       expect(validateAddress(null).valid).toBe(false);
       expect(validateAddress(undefined).valid).toBe(false);
+    });
+
+    it('returns correct error messages for missing fields', () => {
+      const result = validateAddress({ receiver: '', phone: '', province: '', city: '', district: '', detail: '' });
+      expect(result.errors.receiver).toBeTruthy();
+      expect(result.errors.phone).toBeTruthy();
+      expect(result.errors.province).toBeTruthy();
+      expect(result.errors.city).toBeTruthy();
+      expect(result.errors.district).toBeTruthy();
+      expect(result.errors.detail).toBeTruthy();
+    });
+
+    it('rejects phone with wrong length', () => {
+      const result = validateAddress({ ...validAddress, phone: '1380013800' });
+      expect(result.valid).toBe(false);
+      expect(result.errors.phone).toBeTruthy();
     });
   });
 
@@ -532,9 +584,21 @@ describe('food-order/utils', () => {
       expect(getAdvancementDelay(ORDER_STATUSES.ACCEPTED)).toBe(20000);
     });
 
+    it('returns 20000 for picked_up status', () => {
+      expect(getAdvancementDelay(ORDER_STATUSES.PICKED_UP)).toBe(20000);
+    });
+
+    it('returns 25000 for delivering status', () => {
+      expect(getAdvancementDelay(ORDER_STATUSES.DELIVERING)).toBe(25000);
+    });
+
     it('returns null for terminal status', () => {
       expect(getAdvancementDelay(ORDER_STATUSES.DELIVERED)).toBeNull();
       expect(getAdvancementDelay(ORDER_STATUSES.CANCELLED)).toBeNull();
+    });
+
+    it('returns null for unknown status', () => {
+      expect(getAdvancementDelay('unknown')).toBeNull();
     });
   });
 
@@ -612,6 +676,31 @@ describe('food-order/utils', () => {
     it('handles negative rating', () => {
       const stars = renderStars(-1);
       expect(stars.length).toBe(0);
+    });
+
+    it('caps rating at 5', () => {
+      const stars = renderStars(10);
+      expect(stars.length).toBe(5);
+      expect(stars.every((s) => s === 'full')).toBe(true);
+    });
+
+    it('handles null/undefined rating', () => {
+      expect(renderStars(null)).toEqual([]);
+      expect(renderStars(undefined)).toEqual([]);
+    });
+
+    it('handles 2.3 rating (rounds down to no half)', () => {
+      const stars = renderStars(2.3);
+      expect(stars.filter((s) => s === 'full').length).toBe(2);
+      expect(stars.filter((s) => s === 'half').length).toBe(0);
+      expect(stars.filter((s) => s === 'empty').length).toBe(3);
+    });
+
+    it('handles 2.6 rating (rounds to half)', () => {
+      const stars = renderStars(2.6);
+      expect(stars.filter((s) => s === 'full').length).toBe(2);
+      expect(stars.filter((s) => s === 'half').length).toBe(1);
+      expect(stars.filter((s) => s === 'empty').length).toBe(2);
     });
   });
 

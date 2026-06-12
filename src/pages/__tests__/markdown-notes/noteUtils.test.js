@@ -30,6 +30,7 @@ import {
   buildSearchIndex,
   searchNotes,
   highlightText,
+  highlightTextSafe,
   parseInternalLinks,
   escapeHtml,
   renderMarkdown,
@@ -731,6 +732,353 @@ describe('noteUtils', () => {
       const frozen = JSON.stringify(data)
       moveNode(data, 'note2', 'nb1')
       expect(JSON.stringify(data)).toBe(frozen)
+    })
+  })
+
+  describe('XSS safety tests', () => {
+    let data
+    beforeEach(() => {
+      data = createSimpleTestData()
+    })
+
+    it('highlightTextSafe should escape HTML tags in text', () => {
+      const result = highlightTextSafe('<script>alert(1)</script>', 'alert')
+      expect(result).not.toContain('<script>')
+      expect(result).not.toContain('</script>')
+      expect(result).toContain('&lt;script&gt;')
+      expect(result).toContain('&lt;/script&gt;')
+      expect(result).toContain('<span class="highlight">')
+    })
+
+    it('highlightTextSafe should escape HTML tags in query too', () => {
+      const result = highlightTextSafe('hello <b>world</b>', '<b>world</b>')
+      expect(result).not.toContain('<b>')
+      expect(result).not.toContain('</b>')
+      expect(result).toContain('&lt;b&gt;')
+      expect(result).toContain('<span class="highlight">&lt;b&gt;world&lt;/b&gt;</span>')
+    })
+
+    it('highlightTextSafe should handle script in query matching script in text', () => {
+      const text = 'Search <img src=x onerror=alert(1)> here'
+      const query = '<img src=x onerror=alert(1)>'
+      const result = highlightTextSafe(text, query)
+      expect(result).toContain('&lt;img')
+      expect(result).toContain('&gt;')
+      expect(result).toContain('<span class="highlight">')
+      expect(result).toContain('</span>')
+      const stripped = result
+        .replace(/<span class="highlight">/g, '')
+        .replace(/<\/span>/g, '')
+      expect(stripped).not.toMatch(/<[a-zA-Z]/)
+      expect(stripped).not.toMatch(/<\//)
+    })
+
+    it('highlightTextSafe should return escaped text when query empty', () => {
+      const result = highlightTextSafe('<a href="#">link</a>', '')
+      expect(result).not.toContain('<a ')
+      expect(result).not.toContain('</a>')
+      expect(result).toContain('&lt;a')
+    })
+
+    it('highlightTextSafe should handle multiple matches safely', () => {
+      const result = highlightTextSafe('<div>foo</div> and <span>foo</span>', 'foo')
+      expect(result).not.toContain('<div>')
+      expect(result).not.toContain('<span>')
+      const highlights = result.match(/<span class="highlight">/g)
+      expect(highlights).toBeTruthy()
+      expect(highlights.length).toBe(2)
+    })
+
+    it('escapeHtml should handle all special characters', () => {
+      const result = escapeHtml(`<>&"'`)
+      expect(result).toBe('&lt;&gt;&amp;&quot;&#39;')
+    })
+  })
+
+  describe('code block isolation tests', () => {
+    let data
+    beforeEach(() => {
+      data = createSimpleTestData()
+    })
+
+    it('should not apply inline code formatting inside code blocks', () => {
+      const md = '```\ncode with `backticks` inside\n```'
+      const html = renderMarkdown(md, data)
+      const codeBlockMatch = html.match(/<pre class="code-block"><code>([\s\S]*?)<\/code><\/pre>/)
+      expect(codeBlockMatch).toBeTruthy()
+      const codeBlockContent = codeBlockMatch[1]
+      expect(codeBlockContent).not.toContain('<code class="inline-code">')
+      expect(codeBlockContent).toContain('`backticks`')
+    })
+
+    it('should not apply bold formatting inside code blocks', () => {
+      const md = '```\n**not bold** inside code\n```'
+      const html = renderMarkdown(md, data)
+      const codeBlockMatch = html.match(/<pre class="code-block"><code>([\s\S]*?)<\/code><\/pre>/)
+      expect(codeBlockMatch).toBeTruthy()
+      expect(codeBlockMatch[1]).not.toContain('<strong>')
+      expect(codeBlockMatch[1]).toContain('**not bold**')
+    })
+
+    it('should not apply header formatting inside code blocks', () => {
+      const md = '```\n# Not a header\n## Also not\n```'
+      const html = renderMarkdown(md, data)
+      expect(html).not.toContain('<h1>')
+      expect(html).not.toContain('<h2>')
+      const codeBlockMatch = html.match(/<pre class="code-block"><code>([\s\S]*?)<\/code><\/pre>/)
+      expect(codeBlockMatch).toBeTruthy()
+      expect(codeBlockMatch[1]).toContain('# Not a header')
+    })
+
+    it('should render inline code normally outside code blocks', () => {
+      const md = '```\ncode block\n```\n\nand `inline code` here'
+      const html = renderMarkdown(md, data)
+      expect(html).toContain('<pre class="code-block">')
+      expect(html).toContain('<code class="inline-code">inline code</code>')
+    })
+
+    it('should handle multiple code blocks', () => {
+      const md = '```\nfirst `code`\n```\n\ntext **bold**\n\n```\nsecond `code`\n```'
+      const html = renderMarkdown(md, data)
+      const codeBlocks = html.match(/<pre class="code-block">/g)
+      expect(codeBlocks).toBeTruthy()
+      expect(codeBlocks.length).toBe(2)
+      expect(html).toContain('<strong>bold</strong>')
+      const allCodeBlocks = html.match(/<pre class="code-block"><code>([\s\S]*?)<\/code><\/pre>/g)
+      expect(allCodeBlocks).toBeTruthy()
+      for (const block of allCodeBlocks) {
+        expect(block).not.toContain('<code class="inline-code">')
+      }
+    })
+
+    it('should not nest code tags within code blocks', () => {
+      const md = '```\nlet x = `template ${literal}`\n```'
+      const html = renderMarkdown(md, data)
+      const codeBlockMatch = html.match(/<pre class="code-block"><code>([\s\S]*?)<\/code><\/pre>/)
+      expect(codeBlockMatch).toBeTruthy()
+      const nestedCodes = codeBlockMatch[1].match(/<code/g)
+      expect(nestedCodes).toBeNull()
+    })
+
+    it('should handle code block with language identifier', () => {
+      const md = '```javascript\nconst x = `value`\n```'
+      const html = renderMarkdown(md, data)
+      expect(html).toContain('<pre class="code-block">')
+      const codeBlockMatch = html.match(/<pre class="code-block"><code>([\s\S]*?)<\/code><\/pre>/)
+      expect(codeBlockMatch).toBeTruthy()
+      expect(codeBlockMatch[1]).toContain('const x = `value`')
+      expect(codeBlockMatch[1]).not.toContain('<code class="inline-code">')
+    })
+
+    it('should not apply internal link formatting inside code blocks', () => {
+      const md = '```\n[[笔记1]] is not a link here\n```'
+      const html = renderMarkdown(md, data)
+      const codeBlockMatch = html.match(/<pre class="code-block"><code>([\s\S]*?)<\/code><\/pre>/)
+      expect(codeBlockMatch).toBeTruthy()
+      expect(codeBlockMatch[1]).not.toContain('class="internal-link"')
+      expect(codeBlockMatch[1]).toContain('[[笔记1]]')
+    })
+
+    it('should not apply list formatting inside code blocks', () => {
+      const md = '```\n- not a list\n1. also not a list\n```'
+      const html = renderMarkdown(md, data)
+      expect(html).not.toContain('<ul>')
+      expect(html).not.toContain('<ol>')
+      expect(html).not.toContain('<li>')
+      const codeBlockMatch = html.match(/<pre class="code-block"><code>([\s\S]*?)<\/code><\/pre>/)
+      expect(codeBlockMatch).toBeTruthy()
+      expect(codeBlockMatch[1]).toContain('- not a list')
+    })
+
+    it('should preserve table-like text inside code blocks', () => {
+      const md = '```\n| col1 | col2 |\n|------|------|\n|  a   |  b   |\n```'
+      const html = renderMarkdown(md, data)
+      expect(html).not.toContain('<table>')
+      const codeBlockMatch = html.match(/<pre class="code-block"><code>([\s\S]*?)<\/code><\/pre>/)
+      expect(codeBlockMatch).toBeTruthy()
+      expect(codeBlockMatch[1]).toContain('| col1 | col2 |')
+    })
+
+    it('should preserve strikethrough markers inside code blocks', () => {
+      const md = '```\n~~not deleted~~ in code\n```'
+      const html = renderMarkdown(md, data)
+      const codeBlockMatch = html.match(/<pre class="code-block"><code>([\s\S]*?)<\/code><\/pre>/)
+      expect(codeBlockMatch).toBeTruthy()
+      expect(codeBlockMatch[1]).not.toContain('<del>')
+      expect(codeBlockMatch[1]).toContain('~~not deleted~~')
+    })
+  })
+
+  describe('data consistency tests', () => {
+    it('updateNoteContent should not affect other notes', () => {
+      const data = createSimpleTestData()
+      const origNote2Content = data.nodes.note2.content
+      const newData = updateNoteContent(data, 'note1', 'new content')
+      expect(getNode(newData, 'note1').content).toBe('new content')
+      expect(getNode(newData, 'note2').content).toBe(origNote2Content)
+    })
+
+    it('tag operations should not affect other properties', () => {
+      const data = createSimpleTestData()
+      const origContent = data.nodes.note1.content
+      const newData = addTagToNote(data, 'note1', '新标签')
+      expect(getNode(newData, 'note1').content).toBe(origContent)
+      expect(getNode(newData, 'note1').tags).toContain('新标签')
+      const newData2 = removeTagFromNote(newData, 'note1', '标签1')
+      expect(getNode(newData2, 'note1').content).toBe(origContent)
+    })
+
+    it('renameNode should preserve all other node properties', () => {
+      const data = createSimpleTestData()
+      const origContent = data.nodes.note1.content
+      const origTags = [...data.nodes.note1.tags]
+      const origParent = data.nodes.note1.parentId
+      const newData = renameNode(data, 'note1', '新标题')
+      const note = getNode(newData, 'note1')
+      expect(note.content).toBe(origContent)
+      expect(note.tags).toEqual(origTags)
+      expect(note.parentId).toBe(origParent)
+      expect(note.title).toBe('新标题')
+    })
+
+    it('searchNotes should handle notes with HTML-like titles safely', () => {
+      const xssTitle = '<script>alert(1)</script>'
+      const xssData = createNote(
+        createSimpleTestData(),
+        'nb1',
+        xssTitle,
+        'content with <b>html</b>'
+      )
+      const index = buildSearchIndex(xssData)
+      const results = searchNotes(index, 'alert')
+      expect(results.length).toBeGreaterThan(0)
+      const result = results[0]
+      expect(result.title).toBe(xssTitle)
+    })
+  })
+
+  describe('additional XSS safety edge cases', () => {
+    it('highlightTextSafe should handle null and undefined inputs', () => {
+      expect(highlightTextSafe(null, 'test')).toBe('')
+      expect(highlightTextSafe(undefined, 'test')).toBe('')
+      expect(highlightTextSafe('text', null)).toBe(escapeHtml('text'))
+      expect(highlightTextSafe('text', undefined)).toBe(escapeHtml('text'))
+    })
+
+    it('highlightTextSafe should handle query with only special regex chars', () => {
+      const result = highlightTextSafe('a.b*c+d?e^f{g}h[i]j', '.')
+      expect(result).toContain('<span class="highlight">.</span>')
+      const stripped = result.replace(/<span class="highlight">/g, '').replace(/<\/span>/g, '')
+      expect(stripped).not.toMatch(/<[a-zA-Z]/)
+    })
+
+    it('highlightTextSafe should handle query matching at multiple positions', () => {
+      const result = highlightTextSafe('<a>first</a> and <a>second</a>', '<a>')
+      const highlights = result.match(/<span class="highlight">/g)
+      expect(highlights).toBeTruthy()
+      expect(highlights.length).toBe(2)
+      const stripped = result.replace(/<span class="highlight">/g, '').replace(/<\/span>/g, '')
+      expect(stripped).not.toMatch(/<[a-zA-Z]/)
+    })
+
+    it('highlightTextSafe should preserve escaped entities when highlighting', () => {
+      const result = highlightTextSafe('Tom & Jerry', '&')
+      expect(result).toContain('&amp;')
+      expect(result).not.toContain(' & ')
+    })
+
+    it('escapeHtml should handle various input types', () => {
+      expect(escapeHtml(null)).toBe('')
+      expect(escapeHtml(undefined)).toBe('')
+      expect(escapeHtml(123)).toBe('123')
+      expect(escapeHtml(true)).toBe('true')
+    })
+  })
+
+  describe('additional code block isolation edge cases', () => {
+    let data
+    beforeEach(() => {
+      data = createSimpleTestData()
+    })
+
+    it('should handle unclosed code blocks gracefully', () => {
+      const md = '```\nunclosed code block\nwith `backticks`'
+      const html = renderMarkdown(md, data)
+      expect(html).toContain('<pre class="code-block">')
+      const codeBlockMatch = html.match(/<pre class="code-block"><code>([\s\S]*?)<\/code><\/pre>/)
+      expect(codeBlockMatch).toBeTruthy()
+      expect(codeBlockMatch[1]).toContain('`backticks`')
+      expect(codeBlockMatch[1]).not.toContain('<code class=')
+    })
+
+    it('should handle empty code blocks', () => {
+      const md = '```\n```'
+      const html = renderMarkdown(md, data)
+      expect(html).toContain('<pre class="code-block">')
+    })
+
+    it('should handle code blocks with language specifiers containing special chars', () => {
+      const md = '```c++\nint main() { return 0; }\n```'
+      const html = renderMarkdown(md, data)
+      expect(html).toContain('<pre class="code-block">')
+      expect(html).toContain('int main()')
+    })
+
+    it('should handle backticks at start of normal lines without being code blocks', () => {
+      const md = '`inline` at start\n\nnot a code block'
+      const html = renderMarkdown(md, data)
+      expect(html).toContain('<code class="inline-code">inline</code>')
+      expect(html).not.toContain('<pre class="code-block">')
+    })
+
+    it('should handle mixed content around code blocks', () => {
+      const md = 'before\n\n```\ncode **with** `markers`\n```\n\nafter **bold**'
+      const html = renderMarkdown(md, data)
+      expect(html).toContain('<pre class="code-block">')
+      expect(html).toContain('<strong>bold</strong>')
+      const codeBlockMatch = html.match(/<pre class="code-block"><code>([\s\S]*?)<\/code><\/pre>/)
+      expect(codeBlockMatch).toBeTruthy()
+      expect(codeBlockMatch[1]).not.toContain('<strong>')
+      expect(codeBlockMatch[1]).toContain('**with**')
+    })
+  })
+
+  describe('additional data consistency tests', () => {
+    it('multiple sequential operations should all be reflected in final state', () => {
+      let data = createSimpleTestData()
+      data = addTagToNote(data, 'note1', 'tag-a')
+      data = addTagToNote(data, 'note1', 'tag-b')
+      data = renameNode(data, 'note1', 'New Title')
+      data = updateNoteContent(data, 'note1', 'new content')
+
+      const note = getNode(data, 'note1')
+      expect(note.tags).toContain('tag-a')
+      expect(note.tags).toContain('tag-b')
+      expect(note.title).toBe('New Title')
+      expect(note.content).toBe('new content')
+    })
+
+    it('tag operations should be idempotent for duplicates', () => {
+      const data = createSimpleTestData()
+      const data1 = addTagToNote(data, 'note1', '标签1')
+      const data2 = addTagToNote(data1, 'note1', '标签1')
+      expect(getNode(data2, 'note1').tags.filter((t) => t === '标签1').length).toBe(1)
+    })
+
+    it('deleteNode should clean up parent children references', () => {
+      const data = createSimpleTestData()
+      const newData = deleteNode(data, 'note1')
+      const parent = getNode(newData, 'nb1')
+      expect(parent.children).not.toContain('note1')
+    })
+
+    it('moveNode should clean up old parent references', () => {
+      const data = createSimpleTestData()
+      const newData = moveNode(data, 'note2', 'nb1')
+      const oldParent = getNode(newData, 'folder1')
+      const newParent = getNode(newData, 'nb1')
+      expect(oldParent.children).not.toContain('note2')
+      expect(newParent.children).toContain('note2')
     })
   })
 })

@@ -8,30 +8,45 @@ export default function OrderTracking({ order, onBack, onOrderUpdate }) {
   const isTerminal = order.status === ORDER_STATUSES.DELIVERED || order.status === ORDER_STATUSES.CANCELLED;
   const timeline = buildOrderTimeline(order);
 
-  useEffect(() => {
-    if (isTerminal) return;
-
-    const delay = getAdvancementDelay(order.status);
-    if (delay == null) return;
-
-    timerRef.current = setInterval(() => {
-      onOrderUpdate(advanceOrderStatus(order));
-    }, delay);
-
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-    };
-  }, [order.status, isTerminal]);
-
-  useEffect(() => {
-    if (isTerminal && timerRef.current) {
+  const clearOrderTimer = () => {
+    if (timerRef.current !== null) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
-  }, [isTerminal]);
+  };
+
+  useEffect(() => {
+    clearOrderTimer();
+
+    if (isTerminal) return;
+
+    const checkAndAdvance = () => {
+      const advanced = advanceOrderStatus(order);
+      if (advanced && advanced.status !== order.status) {
+        onOrderUpdate(advanced);
+      }
+    };
+
+    const initialDelay = getAdvancementDelay(order.status);
+    if (initialDelay == null) return;
+
+    let elapsed = 0;
+    const checkInterval = 1000;
+
+    timerRef.current = setInterval(() => {
+      elapsed += checkInterval;
+      if (elapsed >= initialDelay) {
+        clearOrderTimer();
+        checkAndAdvance();
+      }
+    }, checkInterval);
+
+    return clearOrderTimer;
+  }, [order, isTerminal, onOrderUpdate]);
+
+  useEffect(() => {
+    return clearOrderTimer;
+  }, []);
 
   return (
     <div className="fo-tracking">

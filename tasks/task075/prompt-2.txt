@@ -1,0 +1,11 @@
+你实现的电子签名板存在以下问题，需要进行修复：
+
+1. 自定义取色器被 CSS 隐藏导致无法使用：index.jsx 中工具栏放置了 `<input type="color">` 取色控件用于自定义颜色选择，但 CSS 将该控件设置为 `opacity: 0; position: absolute; width: 0; height: 0`，用户无法看到也无法点击触发。提示词要求"支持自定义取色"，当前只能从 8 种预设颜色中选择。修复时需要使取色器可被用户正常触发使用。
+
+2. Canvas 笔迹平滑处理中贝塞尔曲线的控制点参数有误：signatureCore.js 的 drawStrokesOnCanvas 函数在调用 ctx.bezierCurveTo 绘制平滑线段时，传入的控制点坐标没有正确计算两个相邻点之间的中点位置，导致线条弯曲方向偏离原始笔画轨迹。修复时需要确保控制点为相邻两点的中点。
+
+3. 修复后需要为该页面补充纯 JS 函数的单元测试，只测和页面渲染无关的逻辑。测试代码放在 src/pages/__tests__/signature-pad/ 下。
+
+4. 确保所有子页面在 375px 移动端宽度下布局不崩坏，使用 pnpm run dev 启动后手动验证关键页面。
+
+5. 重新运行 pnpm run test，需要让所有测试通过。

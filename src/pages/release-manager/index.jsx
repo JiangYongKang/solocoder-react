@@ -1,14 +1,14 @@
 import { useState } from 'react'
-import './release-manager.css'
-import { useReleaseManager } from './useReleaseManager.js'
-import StatsCards from './components/StatsCards.jsx'
-import FilterBar from './components/FilterBar.jsx'
-import ReleaseList from './components/ReleaseList.jsx'
-import Pagination from './components/Pagination.jsx'
-import ReleaseFormModal from './components/ReleaseFormModal.jsx'
-import ReleaseDetailModal from './components/ReleaseDetailModal.jsx'
 import ApprovalActionModal from './components/ApprovalActionModal.jsx'
 import DiffPanel from './components/DiffPanel.jsx'
+import FilterBar from './components/FilterBar.jsx'
+import Pagination from './components/Pagination.jsx'
+import ReleaseDetailModal from './components/ReleaseDetailModal.jsx'
+import ReleaseFormModal from './components/ReleaseFormModal.jsx'
+import ReleaseList from './components/ReleaseList.jsx'
+import StatsCards from './components/StatsCards.jsx'
+import './release-manager.css'
+import { useReleaseManager } from './useReleaseManager.js'
 
 export default function ReleaseManager() {
   const manager = useReleaseManager()
@@ -69,6 +69,8 @@ export default function ReleaseManager() {
         statusFilter={manager.statusFilter}
         onStatusChange={manager.setStatusFilter}
         onCreate={manager.handleCreate}
+        currentUser={manager.currentUser}
+        onUserChange={manager.setCurrentUserId}
       />
 
       <ReleaseList
@@ -78,6 +80,7 @@ export default function ReleaseManager() {
         onDiff={manager.handleOpenDiff}
         onApprovalAction={handleApprovalAction}
         isDiffSelectMode={false}
+        isProcessing={manager.isProcessing}
       />
 
       <Pagination

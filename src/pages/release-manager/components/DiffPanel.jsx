@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { sortReleasesByVersion, buildReleaseDiff, getDiffStats, DIFF_TYPE_INTERNAL } from '../utils.js'
+import { sortReleasesByVersion, buildReleaseDiff, getDiffStats, isDiffTooLarge, truncateTextForDiff, DIFF_TYPE_INTERNAL } from '../utils.js'
 
 function getRowBgClass(type) {
   switch (type) {
@@ -25,9 +25,16 @@ export default function DiffPanel({
 }) {
   const sortedReleases = useMemo(() => sortReleasesByVersion(allReleases, true), [allReleases])
 
+  const tooLarge = useMemo(() => {
+    if (!baseRelease || !compareRelease) return false
+    return isDiffTooLarge(baseRelease.changelog || '', compareRelease.changelog || '')
+  }, [baseRelease, compareRelease])
+
   const diffResult = useMemo(() => {
     if (!baseRelease || !compareRelease) return null
-    return buildReleaseDiff(baseRelease.changelog || '', compareRelease.changelog || '')
+    const oldText = truncateTextForDiff(baseRelease.changelog || '')
+    const newText = truncateTextForDiff(compareRelease.changelog || '')
+    return buildReleaseDiff(oldText, newText)
   }, [baseRelease, compareRelease])
 
   const diffStats = useMemo(() => {
@@ -124,6 +131,11 @@ export default function DiffPanel({
               <span className="rm-diff-stat-item">
                 相同: <strong>{diffStats.equal}</strong>
               </span>
+              {tooLarge && (
+                <span className="rm-diff-stat-item rm-diff-warning">
+                  ⚠️ 文本过长已截断对比
+                </span>
+              )}
             </div>
           )}
 

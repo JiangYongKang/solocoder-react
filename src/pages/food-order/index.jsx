@@ -24,6 +24,7 @@ import {
     clearCart as clearCartUtil,
     createOrder,
     filterCartByShop,
+    formatPrice,
     removeFromCart,
     updateCartQuantity,
     updateOrderInList
@@ -194,7 +195,7 @@ export default function FoodOrderPage() {
           {shopCount > 0 && <span className="fo-bottom-bar-badge">{shopCount}</span>}
         </div>
         <div className="fo-bottom-bar-info">
-          <span className="fo-bottom-bar-total">{shopCount > 0 ? `¥${shopTotal.toFixed(2)}` : '未选购商品'}</span>
+          <span className="fo-bottom-bar-total">{shopCount > 0 ? formatPrice(shopTotal) : '未选购商品'}</span>
           {shopCount > 0 && <span className="fo-bottom-bar-count">共{shopCount}件</span>}
         </div>
         <button

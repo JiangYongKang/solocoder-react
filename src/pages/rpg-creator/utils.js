@@ -99,10 +99,14 @@ export function calculateDerivedStats(attrs) {
     physicalAttack: attrs.strength * 3,
     magicalAttack: attrs.intelligence * 3,
     magicalDefense: attrs.spirit * 2,
-    critRate: (attrs.agility * 0.5) + '%',
-    dodgeRate: (attrs.agility * 0.3) + '%',
+    critRate: attrs.agility * 0.5,
+    dodgeRate: attrs.agility * 0.3,
     socialBonus: attrs.charisma * 2,
   }
+}
+
+export function formatPercent(value) {
+  return value + '%'
 }
 
 export function getSkillTree(outfitKey) {
@@ -578,7 +582,7 @@ function drawRadarChart(ctx, attrs) {
   }
 }
 
-export function drawCardCanvas(ctx, character) {
+export function drawCardCanvas(ctx, character, createCanvas) {
   const outfitData = OUTFITS.find(o => o.key === character.appearance.outfit) || OUTFITS[5]
   const bgColor = outfitData.primaryColor
   const borderColor = outfitData.accent
@@ -608,9 +612,8 @@ export function drawCardCanvas(ctx, character) {
     CARD_W / 2, 64
   )
 
-  const miniCanvas = document.createElement('canvas')
-  miniCanvas.width = 200
-  miniCanvas.height = 280
+  const makeCanvas = createCanvas || (() => document.createElement('canvas'))
+  const miniCanvas = makeCanvas(200, 280)
   const miniCtx = miniCanvas.getContext('2d')
   drawCharacter(miniCtx, character.appearance)
 
@@ -647,4 +650,22 @@ export function drawCardCanvas(ctx, character) {
   ctx.font = '10px sans-serif'
   ctx.textAlign = 'center'
   ctx.fillText(`创建于 ${formatDateTime(character.createdAt)}`, CARD_W / 2, CARD_H - 24)
+}
+
+export function getCardData(character) {
+  const outfitData = OUTFITS.find(o => o.key === character.appearance.outfit) || OUTFITS[5]
+  const genderLabel = character.gender === 'male' ? '男' : character.gender === 'female' ? '女' : '其他'
+  const skills = SKILL_TREES[character.appearance.outfit] || []
+  const unlockedNames = skills
+    .filter(s => character.unlockedSkills.includes(s.id))
+    .map(s => `${s.icon}${s.name}`)
+  return {
+    bgColor: outfitData.primaryColor,
+    borderColor: outfitData.accent,
+    secondaryColor: outfitData.secondaryColor,
+    name: character.name || '未命名角色',
+    subtitle: `${getOutfitName(character.appearance.outfit)} · ${genderLabel} · Lv.${character.level}`,
+    unlockedSkills: unlockedNames,
+    createdAt: formatDateTime(character.createdAt),
+  }
 }

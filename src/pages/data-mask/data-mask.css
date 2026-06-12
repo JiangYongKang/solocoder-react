@@ -66,6 +66,163 @@
   }
 }
 
+@media (max-width: 768px) {
+  .dm-container {
+    padding: 12px;
+  }
+  .dm-header {
+    margin-bottom: 12px;
+    gap: 8px;
+  }
+  .dm-title {
+    font-size: 17px;
+  }
+  .dm-stats {
+    margin-left: 0;
+    width: 100%;
+  }
+  .dm-textarea {
+    min-height: 240px;
+    font-size: 12px;
+  }
+  .dm-preview-content {
+    min-height: 240px;
+    font-size: 12px;
+  }
+  .dm-rules-scroll {
+    max-height: none;
+  }
+  .dm-panel-header {
+    padding: 8px 10px;
+  }
+  .dm-panel-body {
+    padding: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .dm-container {
+    padding: 10px;
+  }
+  .dm-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .dm-title {
+    font-size: 16px;
+  }
+  .dm-toolbar {
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .dm-toolbar-group {
+    gap: 4px;
+    width: 100%;
+  }
+  .dm-toolbar-btn {
+    flex: 1;
+    padding: 6px 8px;
+    font-size: 11px;
+  }
+  .dm-panel-title {
+    font-size: 13px;
+  }
+  .dm-input-stats {
+    gap: 6px;
+    font-size: 11px;
+  }
+  .dm-input {
+    font-size: 12px;
+  }
+  .dm-btn {
+    padding: 5px 10px;
+    font-size: 11px;
+  }
+  .dm-rule-name {
+    font-size: 12px;
+  }
+  .dm-rule-desc,
+  .dm-rule-example {
+    font-size: 10px;
+  }
+  .dm-scheme-name {
+    font-size: 12px;
+  }
+  .dm-batch-table th,
+  .dm-batch-table td {
+    font-size: 11px;
+    padding: 5px 6px;
+  }
+  .dm-batch-table .dm-line-num {
+    padding: 5px 4px;
+    width: 30px;
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 375px) {
+  .dm-container {
+    padding: 8px;
+  }
+  .dm-title {
+    font-size: 15px;
+  }
+  .dm-stat-badge {
+    font-size: 11px;
+    padding: 2px 8px;
+  }
+  .dm-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .dm-toolbar-group {
+    width: 100%;
+  }
+  .dm-toolbar-btn {
+    font-size: 11px;
+    padding: 6px 4px;
+  }
+  .dm-textarea {
+    min-height: 200px;
+    font-size: 11px;
+    padding: 8px;
+  }
+  .dm-preview-content {
+    min-height: 200px;
+    font-size: 11px;
+    padding: 8px;
+  }
+  .dm-input-stats {
+    font-size: 10px;
+    gap: 4px;
+  }
+  .dm-rule-card {
+    padding: 8px 10px;
+  }
+  .dm-panel-header {
+    padding: 6px 8px;
+  }
+  .dm-panel-body {
+    padding: 8px;
+  }
+  .dm-add-rule-section {
+    padding: 10px;
+  }
+  .dm-input {
+    font-size: 11px;
+    padding: 5px 8px;
+  }
+  .dm-batch-table th,
+  .dm-batch-table td {
+    font-size: 10px;
+    padding: 4px;
+  }
+  .dm-preview-stats {
+    font-size: 11px;
+    gap: 4px;
+  }
+}
+
 .dm-panel {
   background: var(--bg);
   border: 1px solid var(--border);

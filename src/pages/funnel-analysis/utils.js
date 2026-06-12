@@ -1,12 +1,12 @@
 import {
-  STORAGE_KEY,
-  DEFAULT_STEPS,
-  MIN_STEPS,
-  MAX_STEPS,
-  MAX_GROUPS,
-  GROUP_COLORS,
-  DROP_OFF_LEVELS,
-  DROP_OFF_CAUSES,
+    DEFAULT_STEPS,
+    DROP_OFF_CAUSES,
+    DROP_OFF_LEVELS,
+    GROUP_COLORS,
+    MAX_GROUPS,
+    MAX_STEPS,
+    MIN_STEPS,
+    STORAGE_KEY,
 } from './constants'
 
 export function generateStepId() {
@@ -35,12 +35,44 @@ export function getDefaultState() {
   }
 }
 
+export function isValidStep(step) {
+  if (!step || typeof step !== 'object') return false
+  if (Array.isArray(step)) return false
+  if (typeof step.id !== 'string' || step.id.length === 0) return false
+  if (typeof step.name !== 'string' || step.name.length === 0) return false
+  return true
+}
+
+export function isValidGroup(group) {
+  if (!group || typeof group !== 'object') return false
+  if (Array.isArray(group)) return false
+  if (typeof group.id !== 'string' || group.id.length === 0) return false
+  if (typeof group.name !== 'string' || group.name.length === 0) return false
+  if (!group.data || typeof group.data !== 'object' || Array.isArray(group.data)) return false
+  return true
+}
+
+export function validateStateStructure(state) {
+  if (!state || typeof state !== 'object') return false
+  if (Array.isArray(state)) return false
+  if (!Array.isArray(state.steps) || state.steps.length < MIN_STEPS || state.steps.length > MAX_STEPS) return false
+  if (!state.steps.every(isValidStep)) return false
+  if (!Array.isArray(state.groups) || state.groups.length < 1 || state.groups.length > MAX_GROUPS) return false
+  if (!state.groups.every(isValidGroup)) return false
+  if (!state.dateRange || typeof state.dateRange !== 'object' || Array.isArray(state.dateRange)) return false
+  if (typeof state.dateRange.startDate !== 'string' || typeof state.dateRange.endDate !== 'string') return false
+  if (!isValidDateRange(state.dateRange.startDate, state.dateRange.endDate)) return false
+  const stepIds = new Set(state.steps.map((s) => s.id))
+  if (stepIds.size !== state.steps.length) return false
+  return true
+}
+
 export function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return null
     const parsed = JSON.parse(raw)
-    if (!parsed || !Array.isArray(parsed.steps)) return null
+    if (!validateStateStructure(parsed)) return null
     return parsed
   } catch {
     return null
@@ -215,10 +247,21 @@ export function getDropOffColor(rate) {
   return DROP_OFF_LEVELS[level].color
 }
 
-export function getDropOffCause(rate) {
+export function hashString(str) {
+  if (!str) return 0
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i)
+    hash = ((hash << 5) - hash) + char
+    hash = hash & hash
+  }
+  return Math.abs(hash)
+}
+
+export function getDropOffCause(rate, stepId = '') {
   const level = getDropOffLevel(rate)
   if (level === 'LOW') return '该环节转化良好，无明显流失问题'
-  const idx = Math.floor(Math.random() * DROP_OFF_CAUSES.length)
+  const idx = hashString(stepId) % DROP_OFF_CAUSES.length
   return DROP_OFF_CAUSES[idx]
 }
 

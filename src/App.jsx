@@ -7,11 +7,11 @@ import BudgetTrackerPage from '@/pages/budget-tracker/index.jsx'
 import CalendarPage from '@/pages/calendar/index.jsx'
 import ChatPage from '@/pages/chat/index.jsx'
 import CouponPage from '@/pages/coupon/index.jsx'
+import CSSAnimationPage from '@/pages/css-animation/index.jsx'
 import CurrencyConverterPage from '@/pages/currency-converter/index.jsx'
 import Dashboard from '@/pages/dashboard/Dashboard.jsx'
 import DataImporterPage from '@/pages/data-importer/index.jsx'
 import DataMaskPage from '@/pages/data-mask/index.jsx'
-import JsonToTsPage from '@/pages/json-to-ts/index.jsx'
 import DBDesignerPage from '@/pages/db-designer/index.jsx'
 import EventTimelinePage from '@/pages/event-timeline/index.jsx'
 import ExamPage from '@/pages/exam/index.jsx'
@@ -28,6 +28,7 @@ import GitBrowserPage from '@/pages/git-browser/index.jsx'
 import HabitTrackerPage from '@/pages/habit-tracker/index.jsx'
 import I18nManagerPage from '@/pages/i18n-manager/index.jsx'
 import InfiniteListPage from '@/pages/infinite-list/index.jsx'
+import JsonToTsPage from '@/pages/json-to-ts/index.jsx'
 import KanbanPage from '@/pages/kanban/KanbanPage.jsx'
 import KnowledgeBasePage from '@/pages/knowledge-base/index.jsx'
 import MapAreaPage from '@/pages/map-area/index.jsx'
@@ -175,6 +176,7 @@ function App() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/file-manager" element={<FileManager onBack={() => window.history.back()} />} />
             <Route path="/chat" element={<ChatPage />} />
+            <Route path="/css-animation" element={<CSSAnimationPage />} />
             <Route path="/form-builder" element={<FormBuilder />} />
             <Route path="/infinite-list" element={<InfiniteListPage />} />
             <Route path="/wizard" element={<Wizard />} />

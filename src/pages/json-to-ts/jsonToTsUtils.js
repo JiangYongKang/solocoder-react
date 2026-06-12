@@ -3,6 +3,8 @@ export const TYPE_MODE = {
   PREFER_TYPE: 'prefer-type',
 }
 
+import { MAX_RECURSION_DEPTH } from './constants'
+
 export const toPascalCase = (str) => {
   if (typeof str !== 'string' || str === '') return 'Type'
   const cleaned = str.replace(/[^a-zA-Z0-9]/g, '_')
@@ -133,7 +135,11 @@ const getValueType = (val) => {
 
 
 
-export const inferObjectFieldSchemas = (objects, parentKey = '') => {
+export const inferObjectFieldSchemas = (objects, parentKey = '', depth = 0) => {
+  const HARD_DEPTH_LIMIT = 200
+  if (depth > HARD_DEPTH_LIMIT) {
+    return {}
+  }
   const fieldInfo = {}
 
   objects.forEach((obj) => {
@@ -191,8 +197,8 @@ export const inferObjectFieldSchemas = (objects, parentKey = '') => {
       const nestedName = toPascalCase(`${parentKey}_${key}`)
       baseType = baseType ? `${baseType} | ${nestedName}` : nestedName
     }
-    if (info.hasArray) {
-      const itemType = inferArrayItemType(info.arraySamples, `${parentKey}_${key}`)
+    if (info.hasArray && depth + 1 <= MAX_RECURSION_DEPTH) {
+      const itemType = inferArrayItemType(info.arraySamples, `${parentKey}_${key}`, depth + 1)
       const arrayType = `(${itemType})[]`
       baseType = baseType ? `${baseType} | ${arrayType}` : arrayType
     }
@@ -217,7 +223,10 @@ export const inferObjectFieldSchemas = (objects, parentKey = '') => {
   return result
 }
 
-export const inferArrayItemType = (arrays, parentKey = '') => {
+export const inferArrayItemType = (arrays, parentKey = '', depth = 0) => {
+  const HARD_DEPTH_LIMIT = 200
+  if (depth > HARD_DEPTH_LIMIT) return 'any'
+  if (depth > MAX_RECURSION_DEPTH) return 'any'
   if (!arrays || arrays.length === 0) return 'any'
 
   const allItems = []
@@ -259,8 +268,8 @@ export const inferArrayItemType = (arrays, parentKey = '') => {
     const nestedName = toPascalCase(`${parentKey}_Item`)
     parts.push(nestedName)
   }
-  if (arraySamples.length > 0) {
-    const itemType = inferArrayItemType(arraySamples, `${parentKey}_Nested`)
+  if (arraySamples.length > 0 && depth + 1 <= MAX_RECURSION_DEPTH) {
+    const itemType = inferArrayItemType(arraySamples, `${parentKey}_Nested`, depth + 1)
     parts.push(`(${itemType})[]`)
   }
 
@@ -272,6 +281,11 @@ export const inferArrayItemType = (arrays, parentKey = '') => {
 }
 
 const collectNestedObjects = (value, name = 'RootType', depth = 0, typeDefs = [], usedNames = new Set(), customNames = {}) => {
+  const HARD_DEPTH_LIMIT = 200
+  if (depth > HARD_DEPTH_LIMIT || depth > MAX_RECURSION_DEPTH) {
+    return typeDefs
+  }
+
   const getName = (defaultName) => {
     if (customNames[defaultName]) return customNames[defaultName]
     if (usedNames.has(defaultName)) {
@@ -292,33 +306,11 @@ const collectNestedObjects = (value, name = 'RootType', depth = 0, typeDefs = []
       const items = value.filter((v) => isPlainObject(v))
       if (items.length === value.length && items.length > 0) {
         const itemName = getName(name)
-        const fields = inferObjectFieldSchemas(items, name)
+        const fields = inferObjectFieldSchemas(items, name, depth + 1)
         typeDefs.push({ name: itemName, isArray: false, fields, depth: depth + 1 })
-        typeDefs.push({ name: listName, isArray: true, itemType: itemName, fields: null, depth })
+        typeDefs.push({ name: listName, isArray: true, itemType: itemName, fields: null, depth, isItemObjectArray: true, itemTypeName: itemName })
 
-        Object.values(fields).forEach((f) => {
-          if (f.hasObject && f.objectSamples.length > 0) {
-            const subName = toPascalCase(`${name}_${f.key}`)
-            collectNestedObjects(
-              f.objectSamples.length === 1 ? f.objectSamples[0] : f.objectSamples,
-              subName,
-              depth + 2,
-              typeDefs,
-              usedNames,
-              customNames
-            )
-          }
-        })
-      } else {
-        const itemType = inferArrayItemType([value], name)
-        typeDefs.push({ name: listName, isArray: true, itemType, fields: null, depth })
-
-        const objs = value.filter((v) => isPlainObject(v))
-        if (objs.length > 0) {
-          const objNameMatch = itemType.match(/[A-Z][A-Za-z0-9]*(?=\s*\|)/) || itemType.match(/[A-Z][A-Za-z0-9]*$/)
-          const objName = objNameMatch ? objNameMatch[0] : getName(name)
-          const fields = inferObjectFieldSchemas(objs, name)
-          typeDefs.push({ name: objName, isArray: false, fields, depth: depth + 1 })
+        if (depth + 2 <= MAX_RECURSION_DEPTH) {
           Object.values(fields).forEach((f) => {
             if (f.hasObject && f.objectSamples.length > 0) {
               const subName = toPascalCase(`${name}_${f.key}`)
@@ -331,50 +323,229 @@ const collectNestedObjects = (value, name = 'RootType', depth = 0, typeDefs = []
                 customNames
               )
             }
+            if (f.hasArray && f.arraySamples.length > 0) {
+              const subListName = toPascalCase(`${name}_${f.key}`)
+              const allSubItems = []
+              f.arraySamples.forEach((arr) => {
+                if (Array.isArray(arr) && arr.length > 0) {
+                  allSubItems.push(...arr)
+                }
+              })
+              if (allSubItems.length > 0) {
+                const subObjects = allSubItems.filter((v) => isPlainObject(v))
+                if (subObjects.length === allSubItems.length && subObjects.length > 0) {
+                  const result = collectNestedObjects(
+                    subObjects.length === 1 ? subObjects[0] : subObjects,
+                    subListName,
+                    depth + 2,
+                    typeDefs,
+                    usedNames,
+                    customNames
+                  )
+                  if (result && result.listTypeName) {
+                    f.type = result.listTypeName
+                    if (f.hasNull) f.type = `${f.type} | null`
+                  }
+                } else {
+                  const subListType = getName(`${subListName}List`)
+                  const subItemType = inferArrayItemType(f.arraySamples, subListName, depth + 2)
+                  typeDefs.push({ name: subListType, isArray: true, itemType: subItemType, fields: null, depth: depth + 2 })
+                  f.type = subListType
+                  if (f.hasNull) f.type = `${f.type} | null`
+                  const subObjs = allSubItems.filter((v) => isPlainObject(v))
+                  if (subObjs.length > 0 && depth + 3 <= MAX_RECURSION_DEPTH) {
+                    const objNameMatch = subItemType.match(/[A-Z][A-Za-z0-9]*(?=\s*\|)/) || subItemType.match(/[A-Z][A-Za-z0-9]*$/)
+                    const objName = objNameMatch ? objNameMatch[0] : getName(subListName)
+                    const subFields = inferObjectFieldSchemas(subObjs, subListName, depth + 3)
+                    typeDefs.push({ name: objName, isArray: false, fields: subFields, depth: depth + 3 })
+                  }
+                }
+              } else {
+                const subListType = getName(`${subListName}List`)
+                typeDefs.push({ name: subListType, isArray: true, itemType: 'any', fields: null, depth: depth + 2 })
+                f.type = subListType
+                if (f.hasNull) f.type = `${f.type} | null`
+              }
+            }
           })
         }
+        return { typeDefs, listTypeName: listName }
+      } else {
+        const itemType = inferArrayItemType([value], name, depth)
+        typeDefs.push({ name: listName, isArray: true, itemType, fields: null, depth })
+
+        const objs = value.filter((v) => isPlainObject(v))
+        if (objs.length > 0) {
+          const objNameMatch = itemType.match(/[A-Z][A-Za-z0-9]*(?=\s*\|)/) || itemType.match(/[A-Z][A-Za-z0-9]*$/)
+          const objName = objNameMatch ? objNameMatch[0] : getName(name)
+          const fields = inferObjectFieldSchemas(objs, name, depth + 1)
+          typeDefs.push({ name: objName, isArray: false, fields, depth: depth + 1 })
+          if (depth + 2 <= MAX_RECURSION_DEPTH) {
+            Object.values(fields).forEach((f) => {
+              if (f.hasObject && f.objectSamples.length > 0) {
+                const subName = toPascalCase(`${name}_${f.key}`)
+                collectNestedObjects(
+                  f.objectSamples.length === 1 ? f.objectSamples[0] : f.objectSamples,
+                  subName,
+                  depth + 2,
+                  typeDefs,
+                  usedNames,
+                  customNames
+                )
+              }
+              if (f.hasArray && f.arraySamples.length > 0) {
+                const subListName = toPascalCase(`${name}_${f.key}`)
+                const allSubItems = []
+                f.arraySamples.forEach((arr) => {
+                  if (Array.isArray(arr) && arr.length > 0) {
+                    allSubItems.push(...arr)
+                  }
+                })
+                if (allSubItems.length > 0) {
+                  const subObjects = allSubItems.filter((v) => isPlainObject(v))
+                  if (subObjects.length === allSubItems.length && subObjects.length > 0) {
+                    const result = collectNestedObjects(
+                      subObjects.length === 1 ? subObjects[0] : subObjects,
+                      subListName,
+                      depth + 2,
+                      typeDefs,
+                      usedNames,
+                      customNames
+                    )
+                    if (result && result.listTypeName) {
+                      f.type = result.listTypeName
+                      if (f.hasNull) f.type = `${f.type} | null`
+                    }
+                  } else {
+                    const subListType = getName(`${subListName}List`)
+                    const subItemType = inferArrayItemType(f.arraySamples, subListName, depth + 2)
+                    typeDefs.push({ name: subListType, isArray: true, itemType: subItemType, fields: null, depth: depth + 2 })
+                    f.type = subListType
+                    if (f.hasNull) f.type = `${f.type} | null`
+                  }
+                } else {
+                  const subListType = getName(`${subListName}List`)
+                  typeDefs.push({ name: subListType, isArray: true, itemType: 'any', fields: null, depth: depth + 2 })
+                  f.type = subListType
+                  if (f.hasNull) f.type = `${f.type} | null`
+                }
+              }
+            })
+          }
+        }
+        return { typeDefs, listTypeName: listName }
       }
     }
-    return typeDefs
+    return { typeDefs, listTypeName: listName }
   }
 
   if (isPlainObject(value)) {
     if (Object.keys(value).length === 0) {
       const typeName = getName(name)
       typeDefs.push({ name: typeName, isRecord: true, fields: null, depth })
-      return typeDefs
+      return { typeDefs }
     }
 
     const typeName = getName(name)
-    const fields = inferObjectFieldSchemas([value], name)
+    const fields = inferObjectFieldSchemas([value], name, depth)
     typeDefs.push({ name: typeName, isArray: false, fields, depth })
 
-    Object.values(fields).forEach((f) => {
-      if (f.hasObject && f.objectSamples.length > 0) {
-        const subName = toPascalCase(`${name}_${f.key}`)
-        collectNestedObjects(
-          f.objectSamples.length === 1 ? f.objectSamples[0] : f.objectSamples,
-          subName,
-          depth + 1,
-          typeDefs,
-          usedNames,
-          customNames
-        )
-      }
-    })
-    return typeDefs
+    let topLevelListName = null
+
+    if (depth + 1 <= MAX_RECURSION_DEPTH) {
+      Object.values(fields).forEach((f) => {
+        if (f.hasObject && f.objectSamples.length > 0) {
+          const subName = toPascalCase(`${name}_${f.key}`)
+          collectNestedObjects(
+            f.objectSamples.length === 1 ? f.objectSamples[0] : f.objectSamples,
+            subName,
+            depth + 1,
+            typeDefs,
+            usedNames,
+            customNames
+          )
+        }
+        if (f.hasArray && f.arraySamples.length > 0) {
+          const subListName = toPascalCase(`${name}_${f.key}`)
+          const allSubItems = []
+          f.arraySamples.forEach((arr) => {
+            if (Array.isArray(arr) && arr.length > 0) {
+              allSubItems.push(...arr)
+            }
+          })
+          if (allSubItems.length > 0) {
+            const subObjects = allSubItems.filter((v) => isPlainObject(v))
+            if (subObjects.length === allSubItems.length && subObjects.length > 0) {
+              const result = collectNestedObjects(
+                subObjects,
+                subListName,
+                depth + 1,
+                typeDefs,
+                usedNames,
+                customNames
+              )
+              if (result && result.listTypeName) {
+                f.type = result.listTypeName
+                if (f.hasNull) f.type = `${f.type} | null`
+                if (depth === 0 && topLevelListName === null) {
+                  topLevelListName = result.listTypeName
+                }
+              }
+            } else {
+              const subListType = getName(`${subListName}List`)
+              const subItemType = inferArrayItemType(f.arraySamples, subListName, depth + 1)
+              typeDefs.push({ name: subListType, isArray: true, itemType: subItemType, fields: null, depth: depth + 1 })
+              f.type = subListType
+              if (f.hasNull) f.type = `${f.type} | null`
+              if (depth === 0 && topLevelListName === null) {
+                topLevelListName = subListType
+              }
+              const subObjs = allSubItems.filter((v) => isPlainObject(v))
+              if (subObjs.length > 0 && depth + 2 <= MAX_RECURSION_DEPTH) {
+                const objNameMatch = subItemType.match(/[A-Z][A-Za-z0-9]*(?=\s*\|)/) || subItemType.match(/[A-Z][A-Za-z0-9]*$/)
+                const objName = objNameMatch ? objNameMatch[0] : getName(subListName)
+                const subFields = inferObjectFieldSchemas(subObjs, subListName, depth + 2)
+                typeDefs.push({ name: objName, isArray: false, fields: subFields, depth: depth + 2 })
+                Object.values(subFields).forEach((sf) => {
+                  if (sf.hasObject && sf.objectSamples.length > 0 && depth + 3 <= MAX_RECURSION_DEPTH) {
+                    const subObjName = toPascalCase(`${subListName}_${sf.key}`)
+                    collectNestedObjects(
+                      sf.objectSamples.length === 1 ? sf.objectSamples[0] : sf.objectSamples,
+                      subObjName,
+                      depth + 3,
+                      typeDefs,
+                      usedNames,
+                      customNames
+                    )
+                  }
+                })
+              }
+            }
+          } else {
+            const subListType = getName(`${subListName}List`)
+            typeDefs.push({ name: subListType, isArray: true, itemType: 'any', fields: null, depth: depth + 1 })
+            f.type = subListType
+            if (f.hasNull) f.type = `${f.type} | null`
+            if (depth === 0 && topLevelListName === null) {
+              topLevelListName = subListType
+            }
+          }
+        }
+      })
+    }
+    return { typeDefs, topLevelListName }
   }
 
   const typeName = getName(name)
   const primitiveType = typeof value === 'number' ? 'number' : typeof value
   typeDefs.push({ name: typeName, isArray: false, primitiveType, fields: null, depth })
-  return typeDefs
+  return { typeDefs }
 }
 
 export const buildTypeDefinitions = (value, rootName = 'RootType', customNames = {}) => {
   const usedNames = new Set()
   const allDefs = []
-  collectNestedObjects(value, rootName, 0, allDefs, usedNames, customNames)
+  const result = collectNestedObjects(value, rootName, 0, allDefs, usedNames, customNames)
 
   const seen = new Set()
   const deduped = []
@@ -384,6 +555,9 @@ export const buildTypeDefinitions = (value, rootName = 'RootType', customNames =
       deduped.unshift(allDefs[i])
     }
   }
+  Object.defineProperty(deduped, 'typeDefs', { value: deduped, enumerable: false })
+  Object.defineProperty(deduped, 'topLevelListName', { value: result?.topLevelListName || null, enumerable: false })
+  Object.defineProperty(deduped, 'listTypeName', { value: result?.listTypeName || null, enumerable: false })
   return deduped
 }
 
@@ -416,11 +590,13 @@ export const generateTypeScript = (value, options = {}) => {
     return { code: '', typeDefs: [], rootTypeName: rootName, rootListName: null }
   }
 
-  const typeDefs = buildTypeDefinitions(value, rootName, customNames)
+  const buildResult = buildTypeDefinitions(value, rootName, customNames)
+  const typeDefs = buildResult.typeDefs
+  const { topLevelListName, listTypeName } = buildResult
 
   const defs = []
   let rootTypeName = rootName
-  let rootListName = null
+  let rootListName = listTypeName || null
 
   typeDefs.forEach((def) => {
     if (def.isRecord) {
@@ -441,6 +617,12 @@ export const generateTypeScript = (value, options = {}) => {
       }
       defs.push(`export type ${def.name} = ${itemType}[]`)
       if (def.depth === 0) {
+        rootListName = def.name
+      }
+      if (!rootListName && def.depth === 1 && topLevelListName && def.name === topLevelListName) {
+        rootListName = def.name
+      }
+      if (!rootListName && def.depth === 1 && rootTypeName && def.name !== rootTypeName) {
         rootListName = def.name
       }
       return
@@ -481,6 +663,13 @@ export const generateTypeScript = (value, options = {}) => {
       defs.push(`export type ${def.name} = ${def.primitiveType}`)
     }
   })
+
+  if (!rootListName && topLevelListName) {
+    rootListName = topLevelListName
+    if (customNames && customNames[topLevelListName]) {
+      rootListName = customNames[topLevelListName]
+    }
+  }
 
   return {
     code: defs.join('\n'),
@@ -533,9 +722,9 @@ export const copyToClipboard = async (text) => {
       ta.style.opacity = '0'
       document.body.appendChild(ta)
       ta.select()
-      document.execCommand('copy')
+      const ok = document.execCommand('copy')
       document.body.removeChild(ta)
-      return true
+      return !!ok
     }
   } catch {
     // Fall through to return false

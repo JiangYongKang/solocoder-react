@@ -1,45 +1,45 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  PRESET_COLORS,
-  DEFAULT_COLOR,
-  DEFAULT_LINE_WIDTH,
-  DEFAULT_SMOOTHING,
-  MIN_LINE_WIDTH,
-  MAX_LINE_WIDTH,
-  MIN_SMOOTHING,
-  MAX_SMOOTHING,
-  CANVAS_MIN_WIDTH,
-  CANVAS_MIN_HEIGHT,
-  TEMPLATES,
-  TEMPLATE_TYPES,
-  HISTORY_MAX_ITEMS,
+    CANVAS_MIN_HEIGHT,
+    CANVAS_MIN_WIDTH,
+    DEFAULT_COLOR,
+    DEFAULT_LINE_WIDTH,
+    DEFAULT_SMOOTHING,
+    HISTORY_MAX_ITEMS,
+    MAX_LINE_WIDTH,
+    MAX_SMOOTHING,
+    MIN_LINE_WIDTH,
+    MIN_SMOOTHING,
+    PRESET_COLORS,
+    TEMPLATES,
+    TEMPLATE_TYPES,
 } from './constants.js'
-import {
-  createStroke,
-  addPointToStroke,
-  createHistory,
-  pushHistory,
-  undoHistory,
-  redoHistory,
-  canUndo,
-  canRedo,
-  isCanvasEmpty,
-  canvasToDataURL,
-  generateFileName,
-  downloadDataURL,
-  createSignatureRecord,
-  loadSignaturesFromStorage,
-  saveSignaturesToStorage,
-  addSignatureToHistory,
-  removeSignatureFromHistory,
-  formatDate,
-  clampLineWidth,
-  clampSmoothing,
-  drawStrokesOnCanvas,
-  dataURLToImage,
-} from './signatureCore.js'
 import './signature-pad.css'
+import {
+    addPointToStroke,
+    addSignatureToHistory,
+    canRedo,
+    canUndo,
+    canvasToDataURL,
+    clampLineWidth,
+    clampSmoothing,
+    createHistory,
+    createSignatureRecord,
+    createStroke,
+    dataURLToImage,
+    downloadDataURL,
+    drawStrokesOnCanvas,
+    formatDate,
+    generateFileName,
+    isCanvasEmpty,
+    loadSignaturesFromStorage,
+    pushHistory,
+    redoHistory,
+    removeSignatureFromHistory,
+    saveSignaturesToStorage,
+    undoHistory,
+} from './signatureCore.js'
 
 function SignaturePadPage() {
   const canvasRef = useRef(null)
@@ -54,6 +54,7 @@ function SignaturePadPage() {
   const [lineWidth, setLineWidth] = useState(DEFAULT_LINE_WIDTH)
   const [smoothing, setSmoothing] = useState(DEFAULT_SMOOTHING)
   const [showColorPicker, setShowColorPicker] = useState(false)
+  const colorInputRef = useRef(null)
 
   const [selectedTemplate, setSelectedTemplate] = useState(null)
   const [selectedSignatureSlot, setSelectedSignatureSlot] = useState(null)
@@ -76,8 +77,10 @@ function SignaturePadPage() {
 
     const resizeCanvas = () => {
       const rect = container.getBoundingClientRect()
-      const width = Math.max(CANVAS_MIN_WIDTH, rect.width)
-      const height = CANVAS_MIN_HEIGHT
+      const isMobile = window.innerWidth <= 480
+      const minWidth = isMobile ? Math.min(300, rect.width) : CANVAS_MIN_WIDTH
+      const width = Math.max(minWidth, Math.min(rect.width, CANVAS_MIN_WIDTH))
+      const height = isMobile ? 250 : CANVAS_MIN_HEIGHT
       const dpr = window.devicePixelRatio || 1
 
       canvas.width = width * dpr
@@ -322,12 +325,15 @@ function SignaturePadPage() {
               className="sp-color-current"
               style={{ backgroundColor: color }}
               onClick={() => setShowColorPicker(!showColorPicker)}
+              title="预设颜色"
             />
             <input
+              ref={colorInputRef}
               type="color"
               value={color}
               onChange={(e) => setColor(e.target.value)}
               className="sp-color-input"
+              title="自定义颜色"
             />
           </div>
           {showColorPicker && (
@@ -341,6 +347,7 @@ function SignaturePadPage() {
                     setColor(c)
                     setShowColorPicker(false)
                   }}
+                  title={c}
                 />
               ))}
             </div>

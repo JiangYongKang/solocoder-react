@@ -1,0 +1,11 @@
+你实现的 CSS 动画生成器存在以下问题，需要进行修复：
+
+1. 颜色属性值格式化逻辑存在缺陷：cssAnimationCore.js 中 formatValue 函数在处理颜色类型的属性值（如 background-color 的 "#ff0000"）时，使用了 COLOR_PROPERTIES 常量判断是否为颜色类型，但该常量在 constants.js 中被定义为空数组，导致颜色判断条件永远为 false。这会使颜色值错误地走 number + unit 拼接路径，生成无效的 CSS 值。修复时需要确保颜色属性值能被正确识别和格式化。
+
+2. 生成的 animation 简写属性中缓动函数取值错误：generateAnimationCSS 函数在生成 CSS animation 属性时，easing 值直接取了第一个轨道第一个关键帧的缓动设置。但当不同关键帧设置了不同缓动函数时，animation 简写中的 easing 应反映整体的缓动策略而非某个关键帧的具体值。修复时需要让 animation 简写的 easing 合理表示动画的整体缓动。
+
+3. 修复后需要为该页面补充纯 JS 函数的单元测试，只测和页面渲染无关的逻辑。测试代码放在 src/pages/__tests__/css-animation/ 下。
+
+4. 确保所有子页面在 375px 移动端宽度下布局不崩坏，使用 pnpm run dev 启动后手动验证关键页面。
+
+5. 重新运行 pnpm run test，需要让所有测试通过。

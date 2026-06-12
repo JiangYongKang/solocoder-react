@@ -28,6 +28,7 @@ import {
   searchFavorites,
   sortFavorites,
   generateShareText,
+  parseShareText,
   formatDateTime,
   isValidCoordinate,
   parseCoordinate,
@@ -516,6 +517,8 @@ describe('routeUtils', () => {
         end: { x: 78.9, y: 10.1 },
         distance: 5.5,
         waypointCount: 3,
+        climb: 120,
+        descent: 80,
       };
       const text = generateShareText(fav);
       expect(text).toContain('测试路线');
@@ -524,19 +527,133 @@ describe('routeUtils', () => {
       expect(text).toContain('距离');
       expect(text).toContain('途经点');
       expect(text).toContain('3 个');
+      expect(text).toContain('累计爬升: 120 m');
+      expect(text).toContain('累计下降: 80 m');
     });
 
-    it('should handle missing start/end', () => {
+    it('should include structured JSON data with DATA: prefix', () => {
+      const fav = {
+        name: '结构化路线',
+        start: { x: 10, y: 20 },
+        end: { x: 30, y: 40 },
+        waypoints: [{ x: 15, y: 25 }, { x: 20, y: 30 }],
+        distance: 2.5,
+        waypointCount: 2,
+        climb: 200,
+        descent: 150,
+        createdAt: 1700000000000,
+      };
+      const text = generateShareText(fav);
+      const dataMatch = text.match(/DATA:(\{.*\})/);
+      expect(dataMatch).not.toBeNull();
+      const parsed = JSON.parse(dataMatch[1]);
+      expect(parsed.version).toBe('1.0');
+      expect(parsed.type).toBe('route');
+      expect(parsed.name).toBe('结构化路线');
+      expect(parsed.start).toEqual({ x: 10, y: 20 });
+      expect(parsed.end).toEqual({ x: 30, y: 40 });
+      expect(parsed.waypoints).toEqual([{ x: 15, y: 25 }, { x: 20, y: 30 }]);
+      expect(parsed.distance).toBe(2.5);
+      expect(parsed.waypointCount).toBe(2);
+      expect(parsed.climb).toBe(200);
+      expect(parsed.descent).toBe(150);
+      expect(parsed.createdAt).toBe(1700000000000);
+    });
+
+    it('should handle missing start/end in structured data', () => {
       const text = generateShareText({
         name: '无',
         distance: 0,
         waypointCount: 0,
       });
       expect(text).toContain('未设置');
+      const dataMatch = text.match(/DATA:(\{.*\})/);
+      expect(dataMatch).not.toBeNull();
+      const parsed = JSON.parse(dataMatch[1]);
+      expect(parsed.start).toBeNull();
+      expect(parsed.end).toBeNull();
+      expect(parsed.waypoints).toEqual([]);
+      expect(parsed.climb).toBe(0);
+      expect(parsed.descent).toBe(0);
     });
 
     it('should return empty string for null', () => {
       expect(generateShareText(null)).toBe('');
+    });
+  });
+
+  describe('parseShareText', () => {
+    it('should parse structured data from generated share text', () => {
+      const fav = {
+        name: '解析测试',
+        start: { x: 100, y: 200 },
+        end: { x: 300, y: 400 },
+        waypoints: [{ x: 150, y: 250 }],
+        distance: 1.5,
+        waypointCount: 1,
+        climb: 50,
+        descent: 30,
+        createdAt: 1700000000000,
+      };
+      const text = generateShareText(fav);
+      const parsed = parseShareText(text);
+      expect(parsed).not.toBeNull();
+      expect(parsed.version).toBe('1.0');
+      expect(parsed.type).toBe('route');
+      expect(parsed.name).toBe('解析测试');
+      expect(parsed.start).toEqual({ x: 100, y: 200 });
+      expect(parsed.end).toEqual({ x: 300, y: 400 });
+      expect(parsed.waypoints).toEqual([{ x: 150, y: 250 }]);
+      expect(parsed.distance).toBe(1.5);
+      expect(parsed.waypointCount).toBe(1);
+      expect(parsed.climb).toBe(50);
+      expect(parsed.descent).toBe(30);
+      expect(parsed.createdAt).toBe(1700000000000);
+    });
+
+    it('should return null for non-string input', () => {
+      expect(parseShareText(null)).toBeNull();
+      expect(parseShareText(undefined)).toBeNull();
+      expect(parseShareText(123)).toBeNull();
+    });
+
+    it('should return null for empty string', () => {
+      expect(parseShareText('')).toBeNull();
+    });
+
+    it('should return null for text without DATA: prefix', () => {
+      expect(parseShareText('some random text')).toBeNull();
+    });
+
+    it('should return null for invalid JSON after DATA:', () => {
+      expect(parseShareText('DATA:not json')).toBeNull();
+      expect(parseShareText('DATA:{broken')).toBeNull();
+    });
+
+    it('should return null if type is not route', () => {
+      const data = JSON.stringify({ version: '1.0', type: 'other' });
+      expect(parseShareText(`DATA:${data}`)).toBeNull();
+    });
+
+    it('should return null if version is missing', () => {
+      const data = JSON.stringify({ type: 'route' });
+      expect(parseShareText(`DATA:${data}`)).toBeNull();
+    });
+
+    it('should round-trip through generateShareText and parseShareText', () => {
+      const fav = createFavorite({
+        name: '往返测试',
+        start: { x: 0, y: 0 },
+        waypoints: [{ x: 50, y: 50 }],
+        end: { x: 100, y: 100 },
+      });
+      const text = generateShareText(fav);
+      const parsed = parseShareText(text);
+      expect(parsed.name).toBe('往返测试');
+      expect(parsed.start).toEqual({ x: 0, y: 0 });
+      expect(parsed.end).toEqual({ x: 100, y: 100 });
+      expect(parsed.waypoints.length).toBe(1);
+      expect(parsed.waypointCount).toBe(1);
     });
   });
 

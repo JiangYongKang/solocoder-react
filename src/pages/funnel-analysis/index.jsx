@@ -1,55 +1,55 @@
-import { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
 import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
+    closestCenter,
+    DndContext,
+    KeyboardSensor,
+    PointerSensor,
+    useSensor,
+    useSensors,
 } from '@dnd-kit/core'
 import {
-  SortableContext,
-  sortableKeyboardCoordinates,
-  useSortable,
-  verticalListSortingStrategy,
+    SortableContext,
+    sortableKeyboardCoordinates,
+    useSortable,
+    verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { useCallback, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import {
+    DATE_PRESETS,
+    GROUP_COLORS,
+    MAX_GROUPS,
+    MAX_STEPS,
+    MIN_STEPS,
+} from './constants'
 import './funnel-analysis.css'
 import {
-  MIN_STEPS,
-  MAX_STEPS,
-  MAX_GROUPS,
-  GROUP_COLORS,
-  DATE_PRESETS,
-} from './constants'
-import {
-  getDefaultState,
-  loadState,
-  saveState,
-  addStep,
-  removeStep,
-  updateStepName,
-  reorderSteps,
-  addGroup,
-  removeGroup,
-  updateGroupName,
-  updateGroupData,
-  fillGroupWithRandomData,
-  calculateConversionRate,
-  calculateOverallConversionRate,
-  calculateDropOff,
-  getDropOffLevel,
-  getDropOffColor,
-  getDropOffCause,
-  getBarWidthPercentage,
-  getBarGradientColor,
-  validateFunnelData,
-  exportToCSV,
-  downloadCSV,
-  getDatePresetRange,
-  isValidDateRange,
-  generateRandomData,
+    addGroup,
+    addStep,
+    calculateConversionRate,
+    calculateDropOff,
+    calculateOverallConversionRate,
+    downloadCSV,
+    exportToCSV,
+    fillGroupWithRandomData,
+    generateRandomData,
+    getBarGradientColor,
+    getBarWidthPercentage,
+    getDatePresetRange,
+    getDefaultState,
+    getDropOffCause,
+    getDropOffColor,
+    getDropOffLevel,
+    isValidDateRange,
+    loadState,
+    removeGroup,
+    removeStep,
+    reorderSteps,
+    saveState,
+    updateGroupData,
+    updateGroupName,
+    updateStepName,
+    validateFunnelData,
 } from './utils'
 
 function SortableStepItem({ step, index, onNameChange, onDelete, canDelete }) {
@@ -115,11 +115,11 @@ function FunnelBar({ step, index, total, value, maxValue, prevValue }) {
   )
 }
 
-function DropOffRow({ prevValue, currentValue }) {
+function DropOffRow({ prevValue, currentValue, stepId }) {
   const { count, rate } = calculateDropOff(currentValue, prevValue)
   const level = getDropOffLevel(rate)
   const color = getDropOffColor(rate)
-  const cause = getDropOffCause(rate)
+  const cause = getDropOffCause(rate, stepId)
 
   return (
     <div className="fa-dropoff-row">
@@ -143,6 +143,49 @@ function DropOffRow({ prevValue, currentValue }) {
   )
 }
 
+function FunnelConnector({ topWidthPct, bottomWidthPct, color }) {
+  const topW = Math.max(topWidthPct, 8)
+  const botW = Math.max(bottomWidthPct, 8)
+  return (
+    <div className="fa-funnel-connector">
+      <svg
+        viewBox="0 0 100 20"
+        preserveAspectRatio="none"
+        style={{ width: '100%', height: 20, display: 'block' }}
+      >
+        <polygon
+          points={`0,0 ${topW},0 ${botW},20 0,20`}
+          fill={color}
+          opacity="0.35"
+        />
+        <line
+          x1="0"
+          y1="0"
+          x2="0"
+          y2="20"
+          stroke={color}
+          strokeWidth="0.8"
+          opacity="0.6"
+        />
+        <line
+          x1={topW}
+          y1="0"
+          x2={botW}
+          y2="20"
+          stroke={color}
+          strokeWidth="0.8"
+          opacity="0.6"
+        />
+        <polygon
+          points={`2,14 5,19 8,14`}
+          fill={color}
+          opacity="0.7"
+        />
+      </svg>
+    </div>
+  )
+}
+
 function SingleFunnelView({ steps, group }) {
   const maxValue = Math.max(...steps.map((s) => group.data[s.id] || 0), 1)
 
@@ -151,6 +194,9 @@ function SingleFunnelView({ steps, group }) {
       {steps.map((step, i) => {
         const value = group.data[step.id] || 0
         const prevValue = i > 0 ? group.data[steps[i - 1].id] || 0 : null
+        const widthPct = getBarWidthPercentage(value, maxValue)
+        const nextValue = i < steps.length - 1 ? (group.data[steps[i + 1].id] || 0) : null
+        const nextWidthPct = nextValue != null ? getBarWidthPercentage(nextValue, maxValue) : null
         return (
           <div key={step.id}>
             <FunnelBar
@@ -162,7 +208,14 @@ function SingleFunnelView({ steps, group }) {
               prevValue={prevValue}
             />
             {i < steps.length - 1 && (
-              <DropOffRow prevValue={prevValue != null ? prevValue : value} currentValue={steps[i + 1] ? (group.data[steps[i + 1].id] || 0) : 0} />
+              <>
+                <FunnelConnector
+                  topWidthPct={Math.max(widthPct, 8)}
+                  bottomWidthPct={Math.max(nextWidthPct, 8)}
+                  color={getBarGradientColor(i, steps.length)}
+                />
+                <DropOffRow prevValue={value} currentValue={nextValue} stepId={steps[i + 1].id} />
+              </>
             )}
           </div>
         )
@@ -187,6 +240,9 @@ function MultiFunnelView({ steps, groups }) {
                 const value = group.data[step.id] || 0
                 const maxValue = Math.max(...steps.map((s) => group.data[s.id] || 0), 1)
                 const prevValue = i > 0 ? group.data[steps[i - 1].id] || 0 : null
+                const widthPct = getBarWidthPercentage(value, maxValue)
+                const nextValue = i < steps.length - 1 ? (group.data[steps[i + 1].id] || 0) : null
+                const nextWidthPct = nextValue != null ? getBarWidthPercentage(nextValue, maxValue) : null
                 return (
                   <div key={step.id}>
                     <div className="fa-bar-row">
@@ -194,7 +250,7 @@ function MultiFunnelView({ steps, groups }) {
                         <div
                           className="fa-bar"
                           style={{
-                            width: `${Math.max(getBarWidthPercentage(value, maxValue), 8)}%`,
+                            width: `${Math.max(widthPct, 8)}%`,
                             backgroundColor: color.primary,
                           }}
                         >
@@ -219,10 +275,18 @@ function MultiFunnelView({ steps, groups }) {
                       </div>
                     </div>
                     {i < steps.length - 1 && (
-                      <DropOffRow
-                        prevValue={value}
-                        currentValue={group.data[steps[i + 1].id] || 0}
-                      />
+                      <>
+                        <FunnelConnector
+                          topWidthPct={Math.max(widthPct, 8)}
+                          bottomWidthPct={Math.max(nextWidthPct, 8)}
+                          color={color.primary}
+                        />
+                        <DropOffRow
+                          prevValue={value}
+                          currentValue={nextValue}
+                          stepId={steps[i + 1].id}
+                        />
+                      </>
                     )}
                   </div>
                 )
@@ -244,17 +308,6 @@ function DataEditorPanel({ steps, groups, onGroupDataChange }) {
     return d
   })
   const [errors, setErrors] = useState({})
-  const [prevGroupsRef, setPrevGroupsRef] = useState(groups)
-
-  if (prevGroupsRef !== groups) {
-    const d = {}
-    groups.forEach((g) => {
-      d[g.id] = { ...g.data }
-    })
-    setEditData(d)
-    setErrors({})
-    setPrevGroupsRef(groups)
-  }
 
   const handleValueChange = (groupId, stepId, rawValue) => {
     const numVal = rawValue === '' ? 0 : Number(rawValue)
@@ -544,6 +597,7 @@ export default function FunnelAnalysisPage() {
 
           {editMode && (
             <DataEditorPanel
+              key={groups.map((g) => g.id + JSON.stringify(g.data)).join('|')}
               steps={steps}
               groups={groups}
               onGroupDataChange={handleGroupDataChange}

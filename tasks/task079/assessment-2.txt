@@ -1,0 +1,9 @@
+产物不满意：
+1. generateKeyframesCSS 函数中新增了 animation-timing-function 输出逻辑，在每个非 100% 的关键帧块中插入了 `animation-timing-function: ${easing}` 语句，配套新增了 getEasingAtTime 函数。提示词要求修复的是 generateAnimationCSS 中 animation 简写属性的 easing 取值问题，并未要求修改 @keyframes 内部的 CSS 生成逻辑。在缺陷修复会话中，这两处修改属于功能扩展而非 BUG 修复，违反了缺陷修复会话"不做新功能扩展"的约束。虽然生成的 CSS 语法上正确，但这种范围蔓延可能导致额外引入样式冲突或干扰已有测试用例的输出预期。正确做法是只修改 generateAnimationCSS 中的 easing 取值逻辑，不触动 generateKeyframesCSS 的输出格式。
+
+过程不满意：
+1. 模型在收到提示词后的第一步操作就是创建包含 5 项任务的 TodoList，而没有先阅读 constants.js、cssAnimationCore.js 和测试文件来理清问题的全貌。根据标注规范，模型应"先分析问题再规划"，而非把 TodoList 作为第一步输出。正确的做法是先通读相关代码文件，确认 COLOR_PROPERTIES 常量的实际定义值、formatValue 的逻辑路径、generateAnimationCSS 中 easing 的取值方式，然后再制定修复计划和 TodoList。
+
+2. 模型启动了 pnpm run dev 开发服务器并打开了浏览器预览页面，但完全没有进行 375px 移动端布局的实际验证——没有任何浏览器截图、没有切换到设备模拟模式、没有缩放视口的操作记录。模型在总结中写道"建议在浏览器中按 F12 切换到移动端模式（375px 宽度）手动验证页面布局"，这是将验证任务推给了用户，而非自己完成。提示词第 4 条明确要求"使用 pnpm run dev 启动后手动验证关键页面"，模型应主动使用浏览器工具将视口设为 375px 宽度并截图确认布局不崩坏，而不是仅给出操作建议就算完成任务。
+
+3. 模型在缺陷修复会话中自行扩展了功能范围——在 generateKeyframesCSS 中新增了 animation-timing-function 输出和 getEasingAtTime 辅助函数，并在测试文件中为这些新增功能编写了测试用例。这说明模型没有严格遵循提示词中"修复"而非"扩展"的边界约束。正确的做法是聚焦于提示词列出的两个问题（颜色属性格式化和 animation 简写 easing），只修改对应的 formatValue 和 generateAnimationCSS，不应在 keyframes 级别引入新的 CSS 输出行为。

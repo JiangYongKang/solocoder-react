@@ -849,3 +849,161 @@
     gap: 14px;
   }
 }
+
+@media (max-width: 375px) {
+  .route-recorder-header {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+
+  .route-recorder-header-left {
+    gap: 8px;
+  }
+
+  .route-recorder-title {
+    font-size: 16px;
+  }
+
+  .route-back-link {
+    font-size: 12px;
+    padding: 5px 8px;
+  }
+
+  .route-btn {
+    padding: 5px 8px;
+    font-size: 12px;
+  }
+
+  .route-toolbar {
+    padding: 6px 10px;
+    gap: 6px;
+  }
+
+  .route-map-container {
+    min-height: 240px;
+  }
+
+  .route-mode-banner {
+    font-size: 11px;
+    padding: 5px 10px;
+  }
+
+  .sidebar-scroll {
+    padding: 10px;
+    gap: 12px;
+  }
+
+  .info-panel {
+    padding: 10px;
+  }
+
+  .info-stats {
+    gap: 6px;
+  }
+
+  .info-stat-value {
+    font-size: 14px;
+  }
+
+  .travel-mode-btn {
+    padding: 5px 2px;
+    font-size: 11px;
+  }
+
+  .travel-mode-emoji {
+    font-size: 13px;
+  }
+
+  .coord-input-section {
+    padding: 10px;
+  }
+
+  .coord-input-row {
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+
+  .coord-input {
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+
+  .coord-add-btn {
+    padding: 5px 6px;
+    font-size: 11px;
+  }
+
+  .waypoint-list-section {
+    padding: 10px;
+  }
+
+  .waypoint-item {
+    padding: 6px 8px;
+    gap: 6px;
+  }
+
+  .elevation-section {
+    padding: 10px;
+  }
+
+  .favorites-section {
+    padding: 10px;
+  }
+
+  .favorites-toolbar {
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+
+  .favorite-card {
+    padding: 10px;
+  }
+
+  .favorite-meta {
+    gap: 8px;
+  }
+
+  .favorite-actions {
+    gap: 4px;
+  }
+
+  .action-btn {
+    padding: 5px 6px;
+    font-size: 11px;
+  }
+
+  .sort-select {
+    width: 100%;
+  }
+
+  .modal {
+    max-width: calc(100vw - 24px);
+  }
+
+  .modal-header {
+    padding: 12px 14px;
+  }
+
+  .modal-body {
+    padding: 14px;
+  }
+
+  .modal-footer {
+    padding: 10px 14px;
+  }
+
+  .toast {
+    font-size: 12px;
+    padding: 8px 14px;
+    left: 12px;
+    right: 12px;
+    transform: none;
+    text-align: center;
+  }
+
+  @keyframes toastFade {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}

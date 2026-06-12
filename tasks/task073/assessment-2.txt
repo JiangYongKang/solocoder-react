@@ -1,0 +1,10 @@
+产物不满意：
+1. OrderTracking.jsx 定时器修复过度设计。提示词要求修复 setInterval 清理函数的缺失，但原始代码（从 diff 删除行可见）第一个 useEffect 的 return 中已包含 clearInterval(timerRef.current)，清理逻辑实际存在。模型未判断原有清理逻辑是否已经足够，直接将整个定时器逻辑重写为每秒轮询的间接方案，引入 elapsed 变量和 checkInterval 中间量，增加了非必要的复杂度。同时新版 useEffect 的依赖数组写为 [order, isTerminal, onOrderUpdate]，但 onOrderUpdate 是父组件 FoodOrderPage 中内联的 handleOrderUpdate 函数，未用 useCallback 包装，每次父组件渲染都产生新的函数引用，导致 effect 频繁重建和定时器反复销毁重建，造成不必要的性能开销。正确做法是先检查原始代码 cleanup 是否已正确调用 clearInterval，确认问题根因后再做最小修改。
+2. ShopDetail.jsx 中 handleProductImgPressEnd 函数声明了 product 参数但函数体内从未使用，全程仅操作 longPressTimerRef，导致 ESLint 报 no-unused-vars 警告。原因是编写时按事件处理器惯例添加了参数但代码实现不依赖该参数。应移除未使用的 product 形参。
+3. ShopDetail.jsx 图片预览弹窗的蒙层 div 直接复用 fo-spec-overlay 类名，该类原本为规格选择弹窗设计，包含 align-items: flex-end 样式使弹窗从底部弹出。图片预览弹窗自身使用 position: fixed 居中定位，虽表面上覆盖了 overlay 的对齐方式，但语义混乱，后续维护者在修改 fo-spec-overlay 样式时容易误影响预览弹窗。应该为预览弹窗单独定义独立蒙层类名。
+
+过程不满意：
+1. 模型在收到提示词后的第一步就调用 todo_write 创建了 6 项任务列表，第二、第三步才开始搜索代码定位问题。标注规范要求"不能在刚收到任务时就直接创建 TodoList，应先分析问题再规划"，因为未充分理解实际问题前制定的计划缺乏针对性，属于流程性问题。
+2. 问题1定位方向错误。模型分析价格重复货币符号时，首先认定"index.jsx 第197行手动拼接了 ¥"是问题根源，认为 CartSidebar.jsx 代码看似正确，但实际导致双货币符号的真正原因是 CSS 中 fo-cart-item-price::before、fo-product-price::before 等多处 ::before 伪元素规则通过 content: '\00A5' 额外追加了 ¥ 前缀。模型在修改了 index.jsx 后才通过多次搜索 ¥ 正则发现 CSS 伪元素并删除，走了弯路。正确做法是先全局搜索所有货币符号输出点，再判断哪处是冗余的，而非凭直觉指向特定文件。
+3. 模型在修改完所有代码并运行测试后直接 todo_write 标记全部完成，在总结中写道"确保所有子页面在 375px 移动端宽度下布局不崩坏，使用 pnpm run dev 启动后手动验证关键页面"，但思考过程中从未出现 pnpm run dev 执行记录，也没有任何浏览器验证操作。提示词第 5 条明确要求手动验证，模型虚假声称了完成，属于幻觉与虚假完成问题。
+4. 执行测试时使用了命令 npm test -- src/pages/__tests__/food-order/utils.test.js undefined，不仅命令末尾夹带了 undefined 多余参数，而且使用的是 npm test 而非提示词要求的 pnpm run test。项目是 pnpm 工程，未遵守提示词中的命令规范，工具使用不够谨慎。

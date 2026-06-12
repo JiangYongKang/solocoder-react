@@ -57,6 +57,13 @@ export const CURRENT_USER = {
   name: '当前用户',
 }
 
+export const AVAILABLE_USERS = [
+  { id: 'u_001', name: '张三', role: '开发者' },
+  { id: 'u_002', name: '李四', role: '开发者' },
+  { id: 'u_003', name: '王五', role: '审核员' },
+  { id: 'u_004', name: '赵六', role: '运维' },
+]
+
 const FIXED_BASE_TIME = 1700000000000
 const DAY_MS = 86400000
 

@@ -12,6 +12,8 @@ import {
   generateTypeScript,
   truncateText,
   getJsonPreviewSummary,
+  copyToClipboard,
+  downloadTsFile,
 } from '../../json-to-ts/jsonToTsUtils'
 
 describe('TYPE_MODE', () => {
@@ -320,7 +322,8 @@ describe('inferArrayItemType', () => {
 describe('buildTypeDefinitions', () => {
   it('应该为简单对象构建类型定义', () => {
     const value = { id: 1, name: 'John' }
-    const defs = buildTypeDefinitions(value, 'User')
+    const result = buildTypeDefinitions(value, 'User')
+    const defs = result.typeDefs
     expect(defs.length).toBeGreaterThan(0)
     expect(defs[0].name).toBe('User')
     expect(defs[0].fields).toBeDefined()
@@ -332,11 +335,13 @@ describe('buildTypeDefinitions', () => {
       { id: 1, name: 'John' },
       { id: 2, name: 'Jane' },
     ]
-    const defs = buildTypeDefinitions(value, 'User')
+    const result = buildTypeDefinitions(value, 'User')
+    const defs = result.typeDefs
     const listDef = defs.find((d) => d.isArray)
     expect(listDef).toBeDefined()
     expect(listDef.name).toBe('UserList')
     expect(listDef.itemType).toBe('User')
+    expect(result.listTypeName).toBe('UserList')
   })
 
   it('应该递归处理嵌套对象', () => {
@@ -348,7 +353,8 @@ describe('buildTypeDefinitions', () => {
         country: 'China',
       },
     }
-    const defs = buildTypeDefinitions(value, 'User')
+    const result = buildTypeDefinitions(value, 'User')
+    const defs = result.typeDefs
     const addressDef = defs.find((d) => d.name === 'UserAddress')
     expect(addressDef).toBeDefined()
     expect(addressDef.fields.city).toBeDefined()
@@ -356,22 +362,37 @@ describe('buildTypeDefinitions', () => {
 
   it('应该处理空对象为 Record<string, any>', () => {
     const value = {}
-    const defs = buildTypeDefinitions(value, 'Empty')
+    const result = buildTypeDefinitions(value, 'Empty')
+    const defs = result.typeDefs
     expect(defs[0].isRecord).toBe(true)
   })
 
   it('应该处理空数组为 any[]', () => {
     const value = []
-    const defs = buildTypeDefinitions(value, 'Empty')
+    const result = buildTypeDefinitions(value, 'Empty')
+    const defs = result.typeDefs
     expect(defs[0].isArray).toBe(true)
     expect(defs[0].itemType).toBe('any')
+    expect(result.listTypeName).toBe('EmptyList')
   })
 
   it('应该尊重自定义类型名称', () => {
     const value = { id: 1, name: 'John' }
     const customNames = { RootType: 'MyCustomType' }
-    const defs = buildTypeDefinitions(value, 'RootType', customNames)
+    const result = buildTypeDefinitions(value, 'RootType', customNames)
+    const defs = result.typeDefs
     expect(defs[0].name).toBe('MyCustomType')
+  })
+
+  it('处理带数组字段的对象时应返回 topLevelListName', () => {
+    const value = { items: [1, 2, 3] }
+    const result = buildTypeDefinitions(value, 'RootType')
+    const defs = result.typeDefs
+    expect(defs.length).toBeGreaterThan(1)
+    expect(result.topLevelListName).toBeDefined()
+    const arrayDef = defs.find((d) => d.isArray && d.depth === 1)
+    expect(arrayDef).toBeDefined()
+    expect(arrayDef.name).toBe(result.topLevelListName)
   })
 })
 
@@ -537,6 +558,38 @@ describe('generateTypeScript', () => {
     expect(result.code).toContain('matrix:')
     expect(result.code).toContain('[]')
   })
+
+  it('根对象包含数组字段时应正确设置 rootListName', () => {
+    const value = { items: [1, 2, 3] }
+    const result = generateTypeScript(value, { rootName: 'RootType' })
+    expect(result.rootTypeName).toBeDefined()
+    expect(result.rootListName).toBeDefined()
+    expect(result.rootListName).not.toBeNull()
+    expect(result.code).toContain(result.rootListName)
+  })
+
+  it('根对象包含对象数组字段时应正确设置 rootListName', () => {
+    const value = {
+      users: [
+        { id: 1, name: 'John' },
+        { id: 2, name: 'Jane' },
+      ],
+    }
+    const result = generateTypeScript(value, { rootName: 'RootType' })
+    expect(result.rootListName).toBeDefined()
+    expect(result.rootListName).not.toBeNull()
+    expect(result.code).toContain(result.rootListName)
+  })
+
+  it('根对象包含多个数组字段时 rootListName 应为第一个数组类型', () => {
+    const value = {
+      numbers: [1, 2, 3],
+      names: ['a', 'b'],
+    }
+    const result = generateTypeScript(value, { rootName: 'RootType' })
+    expect(result.rootListName).toBeDefined()
+    expect(result.rootListName).not.toBeNull()
+  })
 })
 
 describe('truncateText', () => {
@@ -594,5 +647,457 @@ describe('getJsonPreviewSummary', () => {
     const result = getJsonPreviewSummary(json, 50)
     expect(result.length).toBeLessThanOrEqual(53)
     expect(result.endsWith('...')).toBe(true)
+  })
+})
+
+describe('递归深度限制', () => {
+  it('处理超过最大递归深度的嵌套对象不应崩溃', () => {
+    const buildDeepObject = (depth) => {
+      let obj = { value: 'leaf' }
+      for (let i = 0; i < depth; i++) {
+        obj = { nested: obj }
+      }
+      return obj
+    }
+    const deepObj = buildDeepObject(200)
+    expect(() => {
+      const result = generateTypeScript(deepObj, { rootName: 'Deep' })
+      expect(result).toBeDefined()
+      expect(typeof result.code).toBe('string')
+    }).not.toThrow()
+  })
+
+  it('处理超过最大递归深度的嵌套数组不应崩溃', () => {
+    const buildDeepArray = (depth) => {
+      let arr = [1]
+      for (let i = 0; i < depth; i++) {
+        arr = [arr]
+      }
+      return arr
+    }
+    const deepArr = buildDeepArray(200)
+    expect(() => {
+      const result = generateTypeScript(deepArr, { rootName: 'Deep' })
+      expect(result).toBeDefined()
+      expect(typeof result.code).toBe('string')
+    }).not.toThrow()
+  })
+
+  it('超过深度限制的嵌套对象字段应停止生成子类型', () => {
+    const buildDeepObject = (depth) => {
+      let obj = { value: 'leaf' }
+      for (let i = 0; i < depth; i++) {
+        obj = { nested: obj }
+      }
+      return obj
+    }
+    const deepObj = buildDeepObject(30)
+    const result = generateTypeScript(deepObj, { rootName: 'Deep' })
+    const lines = result.code.split('\n')
+    expect(lines.length).toBeGreaterThan(0)
+    expect(lines.length).toBeLessThan(200)
+  })
+})
+
+describe('generateTypeScript - rootListName', () => {
+  it('根为数组时 rootListName 应正确返回', () => {
+    const value = [
+      { id: 1, name: 'a' },
+      { id: 2, name: 'b' },
+    ]
+    const result = generateTypeScript(value, { rootName: 'Item' })
+    expect(result.rootListName).toBe('ItemList')
+    expect(result.code).toContain('export type ItemList = Item[]')
+  })
+
+  it('根为包含数组字段的对象时 rootListName 应返回顶层数组类型名', () => {
+    const value = { items: [1, 2, 3] }
+    const result = generateTypeScript(value, { rootName: 'RootType' })
+    expect(result.rootListName).toBeDefined()
+    expect(result.rootListName).not.toBeNull()
+    expect(result.code).toContain('export type RootTypeItemsList =')
+  })
+
+  it('根为包含对象数组字段的对象时 rootListName 应正确返回', () => {
+    const value = { items: [{ id: 1 }, { id: 2 }] }
+    const result = generateTypeScript(value, { rootName: 'RootType' })
+    expect(result.rootListName).toBeDefined()
+    expect(result.code).toContain(`export type ${result.rootListName} =`)
+  })
+
+  it('根为纯对象（无数组字段）时 rootListName 应为 null', () => {
+    const value = { id: 1, name: 'test' }
+    const result = generateTypeScript(value, { rootName: 'User' })
+    expect(result.rootListName).toBeNull()
+  })
+
+  it('数组字段类型应引用容器类型别名而非内联类型', () => {
+    const value = { items: [1, 2, 3] }
+    const result = generateTypeScript(value, { rootName: 'Root' })
+    expect(result.code).toContain('items: RootItemsList')
+    expect(result.code).toContain('export type RootItemsList = number[]')
+  })
+})
+
+describe('copyToClipboard', () => {
+  const originalNavigator = global.navigator
+
+  afterEach(() => {
+    global.navigator = originalNavigator
+    delete global.document
+  })
+
+  it('SSR 环境（navigator 未定义）应返回 false', async () => {
+    delete global.navigator
+    const result = await copyToClipboard('test')
+    expect(result).toBe(false)
+  })
+
+  it('优先使用 navigator.clipboard.writeText API', async () => {
+    let writtenText = null
+    global.navigator = {
+      clipboard: {
+        writeText: vi.fn().mockImplementation((text) => {
+          writtenText = text
+          return Promise.resolve()
+        }),
+      },
+    }
+    const result = await copyToClipboard('hello clipboard')
+    expect(result).toBe(true)
+    expect(writtenText).toBe('hello clipboard')
+    expect(global.navigator.clipboard.writeText).toHaveBeenCalledWith('hello clipboard')
+  })
+
+  it('navigator.clipboard 失败时回退到 execCommand', async () => {
+    global.navigator = {
+      clipboard: {
+        writeText: vi.fn().mockRejectedValue(new Error('clipboard failed')),
+      },
+    }
+    let execCommandCalled = false
+    let appendedTextarea = null
+    const fakeSelection = { removeAllRanges: vi.fn(), addRange: vi.fn() }
+    global.document = {
+      createElement: vi.fn().mockImplementation((tag) => {
+        if (tag === 'textarea') {
+          appendedTextarea = { value: '', style: {}, select: vi.fn() }
+          return appendedTextarea
+        }
+        return {}
+      }),
+      body: { appendChild: vi.fn(), removeChild: vi.fn() },
+      getSelection: vi.fn().mockReturnValue(fakeSelection),
+      createRange: vi.fn().mockReturnValue({ selectNodeContents: vi.fn() }),
+      execCommand: vi.fn().mockImplementation((cmd) => {
+        if (cmd === 'copy') {
+          execCommandCalled = true
+          return true
+        }
+        return false
+      }),
+    }
+    const result = await copyToClipboard('fallback text')
+    expect(result).toBe(true)
+    expect(execCommandCalled).toBe(true)
+    expect(appendedTextarea).not.toBeNull()
+    expect(appendedTextarea.value).toBe('fallback text')
+    expect(global.document.body.appendChild).toHaveBeenCalled()
+    expect(global.document.body.removeChild).toHaveBeenCalled()
+  })
+
+  it('所有复制方式都失败时应返回 false', async () => {
+    global.navigator = {
+      clipboard: {
+        writeText: vi.fn().mockRejectedValue(new Error('fail')),
+      },
+    }
+    global.document = {
+      createElement: vi.fn().mockReturnValue({ value: '', style: {}, select: vi.fn() }),
+      body: { appendChild: vi.fn(), removeChild: vi.fn() },
+      getSelection: vi.fn().mockReturnValue({ removeAllRanges: vi.fn(), addRange: vi.fn() }),
+      createRange: vi.fn().mockReturnValue({ selectNodeContents: vi.fn() }),
+      execCommand: vi.fn().mockReturnValue(false),
+    }
+    const result = await copyToClipboard('will fail')
+    expect(result).toBe(false)
+  })
+
+  it('处理空字符串应正常工作', async () => {
+    global.navigator = {
+      clipboard: {
+        writeText: vi.fn().mockResolvedValue(),
+      },
+    }
+    const result = await copyToClipboard('')
+    expect(result).toBe(true)
+  })
+
+  it('navigator.clipboard 存在但无 writeText 方法时应回退到 execCommand', async () => {
+    global.navigator = {
+      clipboard: {},
+    }
+    let execCommandCalled = false
+    global.document = {
+      createElement: vi.fn().mockImplementation((tag) => {
+        if (tag === 'textarea') {
+          return { value: '', style: {}, select: vi.fn() }
+        }
+        return {}
+      }),
+      body: { appendChild: vi.fn(), removeChild: vi.fn() },
+      getSelection: vi.fn().mockReturnValue({ removeAllRanges: vi.fn(), addRange: vi.fn() }),
+      createRange: vi.fn().mockReturnValue({ selectNodeContents: vi.fn() }),
+      execCommand: vi.fn().mockImplementation((cmd) => {
+        if (cmd === 'copy') {
+          execCommandCalled = true
+          return true
+        }
+        return false
+      }),
+    }
+    const result = await copyToClipboard('no writeText')
+    expect(result).toBe(true)
+    expect(execCommandCalled).toBe(true)
+  })
+
+  it('navigator.clipboard.writeText 同步抛异常时应回退到 execCommand', async () => {
+    global.navigator = {
+      clipboard: {
+        writeText: vi.fn().mockImplementation(() => {
+          throw new Error('sync error')
+        }),
+      },
+    }
+    let execCommandCalled = false
+    global.document = {
+      createElement: vi.fn().mockReturnValue({ value: '', style: {}, select: vi.fn() }),
+      body: { appendChild: vi.fn(), removeChild: vi.fn() },
+      getSelection: vi.fn().mockReturnValue({ removeAllRanges: vi.fn(), addRange: vi.fn() }),
+      createRange: vi.fn().mockReturnValue({ selectNodeContents: vi.fn() }),
+      execCommand: vi.fn().mockImplementation(() => {
+        execCommandCalled = true
+        return true
+      }),
+    }
+    const result = await copyToClipboard('sync throw')
+    expect(result).toBe(true)
+    expect(execCommandCalled).toBe(true)
+  })
+
+  it('document.execCommand 抛异常时应返回 false', async () => {
+    global.navigator = {
+      clipboard: {
+        writeText: vi.fn().mockRejectedValue(new Error('fail')),
+      },
+    }
+    global.document = {
+      createElement: vi.fn().mockReturnValue({ value: '', style: {}, select: vi.fn() }),
+      body: { appendChild: vi.fn(), removeChild: vi.fn() },
+      getSelection: vi.fn().mockReturnValue({ removeAllRanges: vi.fn(), addRange: vi.fn() }),
+      createRange: vi.fn().mockReturnValue({ selectNodeContents: vi.fn() }),
+      execCommand: vi.fn().mockImplementation(() => {
+        throw new Error('execCommand error')
+      }),
+    }
+    const result = await copyToClipboard('will fail')
+    expect(result).toBe(false)
+  })
+
+  it('navigator 存在但 document 不存在时应返回 false', async () => {
+    global.navigator = {
+      clipboard: {
+        writeText: vi.fn().mockRejectedValue(new Error('fail')),
+      },
+    }
+    delete global.document
+    const result = await copyToClipboard('no document')
+    expect(result).toBe(false)
+  })
+})
+
+describe('downloadTsFile', () => {
+  const originalDocument = global.document
+  const originalWindow = global.window
+  const originalURL = global.URL
+
+  afterEach(() => {
+    global.document = originalDocument
+    global.window = originalWindow
+    global.URL = originalURL
+    vi.restoreAllMocks()
+  })
+
+  it('SSR 环境（document/window 未定义）应返回 false', () => {
+    delete global.document
+    delete global.window
+    const result = downloadTsFile('export type A = string')
+    expect(result).toBe(false)
+  })
+
+  it('应正确创建 Blob 并触发下载', () => {
+    const mockBlob = vi.fn()
+    const mockCreateObjectURL = vi.fn().mockReturnValue('blob:test-url')
+    const mockRevokeObjectURL = vi.fn()
+    const mockClick = vi.fn()
+    const mockAppendChild = vi.fn()
+    const mockRemoveChild = vi.fn()
+
+    global.Blob = mockBlob
+    global.URL = {
+      createObjectURL: mockCreateObjectURL,
+      revokeObjectURL: mockRevokeObjectURL,
+    }
+    global.window = {}
+    global.document = {
+      createElement: vi.fn().mockReturnValue({
+        href: '',
+        download: '',
+        click: mockClick,
+      }),
+      body: {
+        appendChild: mockAppendChild,
+        removeChild: mockRemoveChild,
+      },
+    }
+
+    vi.useFakeTimers()
+
+    const result = downloadTsFile('export type Foo = { id: number }', 'output.ts')
+
+    expect(result).toBe(true)
+    expect(mockBlob).toHaveBeenCalledWith(
+      ['export type Foo = { id: number }'],
+      { type: 'text/typescript;charset=utf-8' }
+    )
+    expect(mockCreateObjectURL).toHaveBeenCalled()
+    expect(mockAppendChild).toHaveBeenCalled()
+    expect(mockClick).toHaveBeenCalled()
+    expect(mockRemoveChild).toHaveBeenCalled()
+
+    vi.advanceTimersByTime(200)
+    expect(mockRevokeObjectURL).toHaveBeenCalledWith('blob:test-url')
+
+    vi.useRealTimers()
+  })
+
+  it('默认文件名应为 types.ts', () => {
+    const mockClick = vi.fn()
+    let createdElement = null
+
+    global.Blob = vi.fn()
+    global.URL = {
+      createObjectURL: vi.fn().mockReturnValue('blob:url'),
+      revokeObjectURL: vi.fn(),
+    }
+    global.window = {}
+    global.document = {
+      createElement: vi.fn().mockImplementation((tag) => {
+        createdElement = { href: '', download: '', click: mockClick }
+        return createdElement
+      }),
+      body: { appendChild: vi.fn(), removeChild: vi.fn() },
+    }
+
+    downloadTsFile('code here')
+
+    expect(createdElement.download).toBe('types.ts')
+  })
+
+  it('异常抛出时应返回 false', () => {
+    global.window = {}
+    global.document = {
+      createElement: vi.fn().mockImplementation(() => {
+        throw new Error('DOM error')
+      }),
+    }
+    const result = downloadTsFile('code')
+    expect(result).toBe(false)
+  })
+
+  it('Blob 构造函数缺失时应优雅降级返回 false', () => {
+    global.window = {}
+    global.document = { createElement: vi.fn(), body: { appendChild: vi.fn() } }
+    const originalBlob = global.Blob
+    delete global.Blob
+
+    const result = downloadTsFile('code')
+    expect(result).toBe(false)
+
+    global.Blob = originalBlob
+  })
+
+  it('document 存在但 window 未定义时应返回 false', () => {
+    delete global.window
+    global.document = { createElement: vi.fn(), body: { appendChild: vi.fn() } }
+    const result = downloadTsFile('code')
+    expect(result).toBe(false)
+  })
+
+  it('window 存在但 document 未定义时应返回 false', () => {
+    delete global.document
+    global.window = {}
+    const result = downloadTsFile('code')
+    expect(result).toBe(false)
+  })
+
+  it('URL.createObjectURL 抛异常时应返回 false', () => {
+    global.Blob = vi.fn()
+    global.URL = {
+      createObjectURL: vi.fn().mockImplementation(() => {
+        throw new Error('URL error')
+      }),
+      revokeObjectURL: vi.fn(),
+    }
+    global.window = {}
+    global.document = {
+      createElement: vi.fn().mockReturnValue({ href: '', download: '', click: vi.fn() }),
+      body: { appendChild: vi.fn(), removeChild: vi.fn() },
+    }
+    const result = downloadTsFile('code')
+    expect(result).toBe(false)
+  })
+
+  it('document.body.appendChild 抛异常时应返回 false', () => {
+    global.Blob = vi.fn()
+    global.URL = {
+      createObjectURL: vi.fn().mockReturnValue('blob:url'),
+      revokeObjectURL: vi.fn(),
+    }
+    global.window = {}
+    global.document = {
+      createElement: vi.fn().mockReturnValue({ href: '', download: '', click: vi.fn() }),
+      body: {
+        appendChild: vi.fn().mockImplementation(() => {
+          throw new Error('append error')
+        }),
+        removeChild: vi.fn(),
+      },
+    }
+    const result = downloadTsFile('code')
+    expect(result).toBe(false)
+  })
+
+  it('自定义文件名应正确设置', () => {
+    const mockClick = vi.fn()
+    let createdElement = null
+
+    global.Blob = vi.fn()
+    global.URL = {
+      createObjectURL: vi.fn().mockReturnValue('blob:url'),
+      revokeObjectURL: vi.fn(),
+    }
+    global.window = {}
+    global.document = {
+      createElement: vi.fn().mockImplementation((tag) => {
+        createdElement = { href: '', download: '', click: mockClick }
+        return createdElement
+      }),
+      body: { appendChild: vi.fn(), removeChild: vi.fn() },
+    }
+
+    downloadTsFile('code here', 'my-custom-types.ts')
+
+    expect(createdElement.download).toBe('my-custom-types.ts')
   })
 })

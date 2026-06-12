@@ -25,6 +25,7 @@ import {
   incrementAttribute,
   decrementAttribute,
   calculateDerivedStats,
+  formatPercent,
   getSkillTree,
   canUnlockSkill,
   unlockSkill,
@@ -39,6 +40,10 @@ import {
   getAttributeSummary,
   getOutfitName,
   charactersEqual,
+  getCardData,
+  drawCardCanvas,
+  PREVIEW_W,
+  PREVIEW_H,
 } from '../../rpg-creator/utils'
 
 const createMockLocalStorage = () => {
@@ -234,8 +239,8 @@ describe('calculateDerivedStats', () => {
     expect(derived.physicalAttack).toBe(5 * 3)
     expect(derived.magicalAttack).toBe(5 * 3)
     expect(derived.magicalDefense).toBe(5 * 2)
-    expect(derived.critRate).toBe('2.5%')
-    expect(derived.dodgeRate).toBe('1.5%')
+    expect(derived.critRate).toBe(2.5)
+    expect(derived.dodgeRate).toBe(1.5)
     expect(derived.socialBonus).toBe(5 * 2)
   })
 
@@ -246,9 +251,44 @@ describe('calculateDerivedStats', () => {
     expect(derived.physicalAttack).toBe(60)
     expect(derived.magicalAttack).toBe(60)
     expect(derived.magicalDefense).toBe(40)
-    expect(derived.critRate).toBe('10%')
-    expect(derived.dodgeRate).toBe('6%')
+    expect(derived.critRate).toBe(10)
+    expect(derived.dodgeRate).toBe(6)
     expect(derived.socialBonus).toBe(40)
+  })
+
+  it('所有字段返回数字类型', () => {
+    const attrs = createDefaultCharacter().attributes
+    const derived = calculateDerivedStats(attrs)
+    for (const val of Object.values(derived)) {
+      expect(typeof val).toBe('number')
+    }
+  })
+
+  it('衍生数值可用于进一步数学计算而不产生NaN', () => {
+    const attrs = createDefaultCharacter().attributes
+    const derived = calculateDerivedStats(attrs)
+    expect(derived.hp + derived.physicalAttack).toBe(100 + 15)
+    expect(derived.critRate * 2).toBe(5)
+    expect(derived.dodgeRate + 1).toBe(2.5)
+  })
+})
+
+describe('formatPercent', () => {
+  it('格式化整数百分比值', () => {
+    expect(formatPercent(10)).toBe('10%')
+  })
+
+  it('格式化小数百分比值', () => {
+    expect(formatPercent(2.5)).toBe('2.5%')
+    expect(formatPercent(0.5)).toBe('0.5%')
+  })
+
+  it('格式化零值', () => {
+    expect(formatPercent(0)).toBe('0%')
+  })
+
+  it('格式化负值', () => {
+    expect(formatPercent(-1)).toBe('-1%')
   })
 })
 
@@ -534,6 +574,168 @@ describe('charactersEqual', () => {
     const c1 = createDefaultCharacter()
     const c2 = { ...c1, appearance: { ...c1.appearance, outfit: 'warrior' } }
     expect(charactersEqual(c1, c2)).toBe(false)
+  })
+})
+
+describe('getCardData', () => {
+  it('返回正确的卡片数据结构', () => {
+    const c = createDefaultCharacter()
+    c.name = '英雄'
+    const data = getCardData(c)
+    expect(data).toHaveProperty('bgColor')
+    expect(data).toHaveProperty('borderColor')
+    expect(data).toHaveProperty('secondaryColor')
+    expect(data).toHaveProperty('name')
+    expect(data).toHaveProperty('subtitle')
+    expect(data).toHaveProperty('unlockedSkills')
+    expect(data).toHaveProperty('createdAt')
+  })
+
+  it('名称使用角色名', () => {
+    const c = createDefaultCharacter()
+    c.name = '勇者'
+    expect(getCardData(c).name).toBe('勇者')
+  })
+
+  it('空名称显示未命名角色', () => {
+    const c = createDefaultCharacter()
+    expect(getCardData(c).name).toBe('未命名角色')
+  })
+
+  it('副标题包含职业、性别和等级', () => {
+    const c = createDefaultCharacter()
+    const data = getCardData(c)
+    expect(data.subtitle).toContain('平民')
+    expect(data.subtitle).toContain('男')
+    expect(data.subtitle).toContain('Lv.1')
+  })
+
+  it('女性角色副标题包含女', () => {
+    const c = createDefaultCharacter()
+    c.gender = 'female'
+    expect(getCardData(c).subtitle).toContain('女')
+  })
+
+  it('其他性别角色副标题包含其他', () => {
+    const c = createDefaultCharacter()
+    c.gender = 'other'
+    expect(getCardData(c).subtitle).toContain('其他')
+  })
+
+  it('战士职业的背景色使用战士配色', () => {
+    const c = createDefaultCharacter()
+    c.appearance.outfit = 'warrior'
+    const data = getCardData(c)
+    const warriorOutfit = OUTFITS.find(o => o.key === 'warrior')
+    expect(data.bgColor).toBe(warriorOutfit.primaryColor)
+    expect(data.borderColor).toBe(warriorOutfit.accent)
+  })
+
+  it('已解锁技能列表包含技能名', () => {
+    const c = createDefaultCharacter()
+    c.appearance.outfit = 'warrior'
+    c.unlockedSkills = ['w1']
+    const data = getCardData(c)
+    expect(data.unlockedSkills.length).toBe(1)
+    const w1 = SKILL_TREES.warrior.find(s => s.id === 'w1')
+    expect(data.unlockedSkills[0]).toContain(w1.name)
+  })
+
+  it('无已解锁技能时列表为空', () => {
+    const c = createDefaultCharacter()
+    const data = getCardData(c)
+    expect(data.unlockedSkills).toEqual([])
+  })
+
+  it('createdAt 是格式化的时间字符串', () => {
+    const c = createDefaultCharacter()
+    const data = getCardData(c)
+    expect(data.createdAt).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/)
+  })
+})
+
+describe('drawCardCanvas', () => {
+  function createMockCtx() {
+    const calls = []
+    const handler = {
+      get(target, prop) {
+        if (prop in target) return target[prop]
+        return (...args) => { calls.push({ method: prop, args }) }
+      }
+    }
+    return { ctx: new Proxy({}, handler), calls }
+  }
+
+  function createMockCanvasFactory() {
+    const { ctx: miniCtx, calls: miniCalls } = createMockCtx()
+    return {
+      factory: () => ({
+        width: 200,
+        height: 280,
+        getContext: () => miniCtx,
+      }),
+      miniCalls,
+    }
+  }
+
+  it('在 Node.js 环境中通过注入 createCanvas 可正常运行', () => {
+    const { ctx, calls } = createMockCtx()
+    const { factory } = createMockCanvasFactory()
+    const c = createDefaultCharacter()
+    c.name = '测试'
+    expect(() => drawCardCanvas(ctx, c, factory)).not.toThrow()
+  })
+
+  it('调用了 fillRect 绘制背景', () => {
+    const { ctx, calls } = createMockCtx()
+    const { factory } = createMockCanvasFactory()
+    const c = createDefaultCharacter()
+    drawCardCanvas(ctx, c, factory)
+    const fillRectCalls = calls.filter(c => c.method === 'fillRect')
+    expect(fillRectCalls.length).toBeGreaterThan(0)
+  })
+
+  it('调用了 fillText 绘制角色名', () => {
+    const { ctx, calls } = createMockCtx()
+    const { factory } = createMockCanvasFactory()
+    const c = createDefaultCharacter()
+    c.name = '勇者'
+    drawCardCanvas(ctx, c, factory)
+    const fillTextCalls = calls.filter(c => c.method === 'fillText')
+    const nameCall = fillTextCalls.find(c => c.args[0] === '勇者')
+    expect(nameCall).toBeDefined()
+  })
+
+  it('有已解锁技能时绘制技能文本', () => {
+    const { ctx, calls } = createMockCtx()
+    const { factory } = createMockCanvasFactory()
+    const c = createDefaultCharacter()
+    c.appearance.outfit = 'warrior'
+    c.unlockedSkills = ['w1']
+    drawCardCanvas(ctx, c, factory)
+    const fillTextCalls = calls.filter(c => c.method === 'fillText')
+    const skillTitleCall = fillTextCalls.find(c => c.args[0].includes('已解锁技能'))
+    expect(skillTitleCall).toBeDefined()
+  })
+
+  it('无已解锁技能时不绘制技能标题', () => {
+    const { ctx, calls } = createMockCtx()
+    const { factory } = createMockCanvasFactory()
+    const c = createDefaultCharacter()
+    drawCardCanvas(ctx, c, factory)
+    const fillTextCalls = calls.filter(c => c.method === 'fillText')
+    const skillTitleCall = fillTextCalls.find(c => c.args[0].includes('已解锁技能'))
+    expect(skillTitleCall).toBeUndefined()
+  })
+})
+
+describe('PREVIEW_W and PREVIEW_H', () => {
+  it('PREVIEW_W 等于 200', () => {
+    expect(PREVIEW_W).toBe(200)
+  })
+
+  it('PREVIEW_H 等于 280', () => {
+    expect(PREVIEW_H).toBe(280)
   })
 })
 

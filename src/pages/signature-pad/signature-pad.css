@@ -93,11 +93,33 @@
 }
 
 .sp-color-input {
-  width: 0;
-  height: 0;
-  opacity: 0;
-  position: absolute;
-  pointer-events: none;
+  width: 36px;
+  height: 36px;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  cursor: pointer;
+  background: transparent;
+  padding: 0;
+  transition: all 0.2s;
+}
+
+.sp-color-input:hover {
+  border-color: #999;
+  transform: scale(1.05);
+}
+
+.sp-color-input::-webkit-color-swatch-wrapper {
+  padding: 2px;
+}
+
+.sp-color-input::-webkit-color-swatch {
+  border: none;
+  border-radius: 4px;
+}
+
+.sp-color-input::-moz-color-swatch {
+  border: none;
+  border-radius: 4px;
 }
 
 .sp-color-presets {
@@ -130,6 +152,31 @@
 
 .sp-color-swatch.active {
   border-color: #333;
+}
+
+.sp-color-custom-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 1px dashed #bbb;
+  border-radius: 16px;
+  background: #fafafa;
+  color: #555;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.sp-color-custom-btn:hover {
+  background: #f0f0f0;
+  border-color: #888;
+  color: #333;
+}
+
+.sp-color-custom-icon {
+  font-size: 14px;
 }
 
 .sp-slider-wrap {
@@ -643,5 +690,318 @@
 
   .sp-slider {
     width: 80px;
+  }
+}
+
+@media (max-width: 480px) {
+  .sp-page {
+    padding: 12px;
+  }
+
+  .sp-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .sp-header-left {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .sp-title {
+    font-size: 20px;
+  }
+
+  .sp-toolbar {
+    padding: 10px;
+    gap: 10px;
+  }
+
+  .sp-toolbar-section {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .sp-toolbar-label {
+    font-size: 12px;
+  }
+
+  .sp-slider {
+    width: 60px;
+  }
+
+  .sp-btn {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  .sp-canvas-wrapper {
+    padding: 12px;
+  }
+
+  .sp-canvas-hint {
+    flex-direction: column;
+    gap: 4px;
+    align-items: flex-start;
+  }
+
+  .sp-history {
+    padding: 12px;
+  }
+
+  .sp-history-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 10px;
+  }
+
+  .sp-history-item {
+    padding: 8px;
+  }
+
+  .sp-history-thumb {
+    height: 60px;
+  }
+
+  .sp-template-preview {
+    padding: 12px;
+  }
+
+  .sp-template-content {
+    padding: 16px;
+    min-height: 300px;
+  }
+
+  .sp-template-text {
+    font-size: 12px;
+    line-height: 2;
+  }
+
+  .sp-slot-marker {
+    min-width: 80px;
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+
+  .sp-modal-content {
+    max-width: 100%;
+  }
+
+  .sp-template-list {
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .sp-template-card {
+    padding: 12px 8px;
+  }
+}
+
+@media (max-width: 375px) {
+  .sp-page {
+    padding: 8px;
+  }
+
+  .sp-header {
+    margin-bottom: 12px;
+  }
+
+  .sp-title {
+    font-size: 18px;
+  }
+
+  .sp-back-link {
+    font-size: 12px;
+    padding: 4px 8px;
+  }
+
+  .sp-toolbar {
+    padding: 8px;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .sp-toolbar-section {
+    gap: 4px;
+  }
+
+  .sp-toolbar-label {
+    font-size: 11px;
+  }
+
+  .sp-color-current {
+    width: 26px;
+    height: 26px;
+  }
+
+  .sp-color-input {
+    width: 28px;
+    height: 28px;
+  }
+
+  .sp-color-presets {
+    padding: 6px;
+    gap: 4px;
+  }
+
+  .sp-color-swatch {
+    width: 22px;
+    height: 22px;
+  }
+
+  .sp-slider {
+    width: 50px;
+  }
+
+  .sp-slider-wrap {
+    gap: 6px;
+  }
+
+  .sp-thickness-preview {
+    margin-left: 2px;
+  }
+
+  .sp-btn {
+    padding: 5px 8px;
+    font-size: 11px;
+    min-width: auto;
+  }
+
+  .sp-toolbar-divider {
+    height: 20px;
+    margin: 0 4px;
+  }
+
+  .sp-canvas-wrapper {
+    padding: 8px;
+    margin-bottom: 12px;
+  }
+
+  .sp-canvas {
+    min-height: 200px;
+  }
+
+  .sp-canvas-hint {
+    font-size: 11px;
+    padding: 8px;
+  }
+
+  .sp-main {
+    gap: 12px;
+  }
+
+  .sp-template-preview {
+    padding: 8px;
+  }
+
+  .sp-template-content {
+    padding: 12px;
+    min-height: 250px;
+  }
+
+  .sp-template-text {
+    font-size: 11px;
+    line-height: 1.8;
+  }
+
+  .sp-slot-marker {
+    min-width: 60px;
+    padding: 4px 8px;
+    font-size: 10px;
+  }
+
+  .sp-slot-marker.filled {
+    min-width: 60px;
+    height: 30px;
+  }
+
+  .sp-history {
+    padding: 10px;
+  }
+
+  .sp-history-header {
+    margin-bottom: 8px;
+  }
+
+  .sp-history-title {
+    font-size: 14px;
+  }
+
+  .sp-history-count {
+    font-size: 11px;
+  }
+
+  .sp-history-grid {
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 8px;
+  }
+
+  .sp-history-item {
+    padding: 6px;
+  }
+
+  .sp-history-thumb {
+    height: 50px;
+  }
+
+  .sp-history-date {
+    font-size: 10px;
+  }
+
+  .sp-history-actions {
+    gap: 4px;
+  }
+
+  .sp-history-btn {
+    padding: 3px 6px;
+    font-size: 10px;
+  }
+
+  .sp-modal {
+    padding: 10px;
+  }
+
+  .sp-modal-content {
+    border-radius: 6px;
+  }
+
+  .sp-modal-header {
+    padding: 12px 14px;
+  }
+
+  .sp-modal-header h3 {
+    font-size: 14px;
+  }
+
+  .sp-template-list {
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .sp-template-card {
+    padding: 10px 6px;
+  }
+
+  .sp-template-card-icon {
+    font-size: 28px;
+  }
+
+  .sp-template-card-name {
+    font-size: 11px;
+  }
+
+  .sp-preview-content {
+    padding: 12px;
+  }
+
+  .sp-preview-content img {
+    max-height: 200px;
+  }
+
+  .sp-preview-actions {
+    padding: 12px 14px;
+    gap: 8px;
   }
 }

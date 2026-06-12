@@ -1,0 +1,11 @@
+产物不满意：
+1. drawCardCanvas 默认 canvas 工厂未设置宽高，导致运行时角色缩略图绘制尺寸错误。修改后 utils.js 将原来的 document.createElement 加 miniCanvas.width 和 miniCanvas.height 赋值三行代码替换为 makeCanvas(200, 280) 调用，但默认工厂定义为 () => document.createElement('canvas')，是一个无参函数，调用时传入的 200 和 280 参数被 JavaScript 静默忽略，创建的 miniCanvas 宽高回退为浏览器默认的 300×150，而非预期的 200×280。这导致 drawCharacter 在错误尺寸的画布上绘图，卡片中的角色缩略图比例失真。正确做法是让默认工厂接收并应用宽高参数，如 (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }。
+2. CharacterCard.jsx 未随 drawCardCanvas 签名变更同步更新。该组件的 drawCardCanvas 调用仍以两参数传入，没有传递新增的可选 createCanvas 参数。虽然第三个参数设计为可选，但结合默认工厂的宽高缺失缺陷，运行时该组件的卡片预览实际已损坏。模型在修改完 utils.js 后没有搜索所有调用 drawCardCanvas 的位置来确认变更影响面。
+3. drawCardCanvas 和 getCardData 之间存在数据计算逻辑重复。提示词要求将卡片数据计算与 Canvas 绘制分离，模型新增了 getCardData 纯函数来导出结构化数据，但 drawCardCanvas 内部仍然完整保留了 outfitData 查找、genderLabel 三元计算、技能列表 filter 和 map 等逻辑，与 getCardData 的实现几乎完全重复。正确的实现应该是 drawCardCanvas 内部调用 getCardData 来获取数据计算结果，消除两处相同逻辑的维护负担。
+4. getCardData 函数在生产代码中处于孤立状态。该函数仅存在于 utils.js 导出并被测试文件引用，没有任何 React 组件实际导入或使用它。提示词要求分离计算与绘制的目的是让卡片数据计算脱离 DOM 依赖后在 Node.js 中可测，但如果新增的纯函数始终不被实际渲染链路集成，那么它只是一个仅服务于测试的辅助函数，没有完成"数据计算逻辑分离到生产可用"的目标。
+
+过程不满意：
+1. 模型在打开所有源文件后直接创建了包含5个修复任务的 TodoList，没有先通读提示词、分析各修复项之间的关联和影响面。规范明确要求"不能在刚收到任务时就直接创建 TodoList，应先分析问题再规划"。正确的做法是先理解每条需求的技术影响范围：修复1只涉及 utils.js 和 AttributePanel.jsx 两处，修复2意味着需要检查所有 drawCardCanvas 的调用方，修复3需要确认页面中哪些元素布局崩坏再针对性写样式。
+2. 模型修改 drawCardCanvas 时只替换了 canvas 创建方式但未验证默认路径的行为。原代码中有三行紧密耦合的操作：createElement、设 width、设 height，模型将其合并为一步 makeCanvas(200, 280) 调用，但默认工厂实现完全忽略了调用参数，等价于删除了 width 和 height 赋值。这是典型的只改签名不做行为验证的表面修复，模型没有追问自己"当 createCanvas 为 undefined 时，makeCanvas(200, 280) 的返回值和原代码等价吗"。
+3. 模型测试了 drawCardCanvas 的 mock 注入路径后便声称修复完成，未启动 pnpm run dev 做浏览器端手动验证。测试中的 mock factory 在返回值中硬编码了 width 和 height，恰好掩盖了默认工厂缺失参数处理的问题——测试覆盖的路径和浏览器实际执行的路径行为不一致，而模型未意识到这种差异。
+4. 模型在思考过程中没有 grep 搜索 drawCardCanvas 的所有引用位置，遗漏了对 CharacterCard.jsx 的检查。虽然新增参数是可选的，不需要强制修改调用方，但模型至少应当确认调用方是否受到签名变更的影响，这是修改公共函数接口后的基本验证步骤。

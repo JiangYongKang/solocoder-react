@@ -46,6 +46,8 @@ export default function MarkdownNotes() {
   const [isResizing, setIsResizing] = useState(false)
   const saveTimeoutRef = useRef(null)
   const containerRef = useRef(null)
+  const currentDataVersionRef = useRef(0)
+  const latestDataRef = useRef(data)
 
   const searchIndex = useMemo(() => buildSearchIndex(data), [data])
   const searchResults = useMemo(() => searchNotes(searchIndex, searchQuery), [searchIndex, searchQuery])
@@ -71,19 +73,54 @@ export default function MarkdownNotes() {
   }, [data, uiState.selectedNoteId])
 
   useEffect(() => {
-    saveData(data)
+    latestDataRef.current = data
   }, [data])
 
   useEffect(() => {
     saveUIState(uiState)
   }, [uiState])
 
+  const commitData = useCallback((newData) => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current)
+      saveTimeoutRef.current = null
+    }
+    latestDataRef.current = newData
+    currentDataVersionRef.current += 1
+    saveData(newData)
+    return newData
+  }, [])
+
+  const updateData = useCallback((updater) => {
+    let result
+    setData((prev) => {
+      result = updater(prev)
+      commitData(result)
+      return result
+    })
+  }, [commitData])
+
+  const flushPendingSave = useCallback(() => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current)
+      saveTimeoutRef.current = null
+      saveData(latestDataRef.current)
+    }
+  }, [])
+
   const debouncedSave = useCallback((newData) => {
+    latestDataRef.current = newData
+    currentDataVersionRef.current += 1
+    const saveVersion = currentDataVersionRef.current
+
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current)
     }
     saveTimeoutRef.current = setTimeout(() => {
-      saveData(newData)
+      if (saveVersion === currentDataVersionRef.current) {
+        saveData(latestDataRef.current)
+      }
+      saveTimeoutRef.current = null
     }, AUTOSAVE_DELAY)
   }, [])
 
@@ -96,12 +133,13 @@ export default function MarkdownNotes() {
   }, [])
 
   function handleSelectNote(noteId) {
+    flushPendingSave()
     setUiState((prev) => ({ ...prev, selectedNoteId: noteId }))
     setSearchQuery('')
   }
 
   function handleToggleNode(nodeId) {
-    setData((prev) => toggleExpanded(prev, nodeId))
+    updateData((prev) => toggleExpanded(prev, nodeId))
   }
 
   function handleContextMenu(e, node) {
@@ -151,7 +189,7 @@ export default function MarkdownNotes() {
       alert('已存在同名笔记本')
       return
     }
-    setData((prev) => createNotebook(prev, name.trim()))
+    updateData((prev) => createNotebook(prev, name.trim()))
   }
 
   function handleCreateFolder(parentId) {
@@ -162,10 +200,7 @@ export default function MarkdownNotes() {
       alert('该文件夹下已存在同名项目')
       return
     }
-    setData((prev) => {
-      let newData = createFolder(prev, parentId, name.trim())
-      return newData
-    })
+    updateData((prev) => createFolder(prev, parentId, name.trim()))
   }
 
   function handleCreateNote(parentId, title = '新笔记', content = '') {
@@ -175,16 +210,17 @@ export default function MarkdownNotes() {
     while (hasChildWithName(data, parentId, noteTitle)) {
       noteTitle = `${title} ${counter++}`
     }
-    setData((prev) => {
-      let newData = createNote(prev, parentId, noteTitle, content)
-      const newNoteId = Object.keys(newData.nodes).find(
+    let capturedNoteId = null
+    updateData((prev) => {
+      const newData = createNote(prev, parentId, noteTitle, content)
+      capturedNoteId = Object.keys(newData.nodes).find(
         (id) => !prev.nodes[id] && newData.nodes[id].type === NODE_TYPES.NOTE
       )
-      if (newNoteId) {
-        setUiState((uiPrev) => ({ ...uiPrev, selectedNoteId: newNoteId }))
-      }
       return newData
     })
+    if (capturedNoteId) {
+      setUiState((uiPrev) => ({ ...uiPrev, selectedNoteId: capturedNoteId }))
+    }
   }
 
   function handleStartRename(nodeId) {
@@ -204,7 +240,7 @@ export default function MarkdownNotes() {
       return
     }
 
-    setData((prev) => {
+    updateData((prev) => {
       let newData = renameNode(prev, nodeId, newName.trim())
       if (node.type === NODE_TYPES.NOTE) {
         newData = updateLinksOnRename(newData, currentName, newName.trim())
@@ -225,7 +261,7 @@ export default function MarkdownNotes() {
 
     if (!confirm(confirmMsg)) return
 
-    setData((prev) => {
+    updateData((prev) => {
       let newData = prev
       if (node.type === NODE_TYPES.NOTE) {
         newData = markLinksBrokenOnDelete(prev, node.title)
@@ -255,7 +291,7 @@ export default function MarkdownNotes() {
       return
     }
 
-    setData((prev) => {
+    updateData((prev) => {
       let newData = renameNode(prev, nodeId, newName.trim())
       if (node.type === NODE_TYPES.NOTE) {
         newData = updateLinksOnRename(newData, currentName, newName.trim())
@@ -265,7 +301,7 @@ export default function MarkdownNotes() {
   }
 
   function handleMoveNode(draggedId, targetId) {
-    setData((prev) => moveNode(prev, draggedId, targetId))
+    updateData((prev) => moveNode(prev, draggedId, targetId))
   }
 
   function handleNoteContentChange(content) {
@@ -279,12 +315,12 @@ export default function MarkdownNotes() {
 
   function handleAddTag(tag) {
     if (!uiState.selectedNoteId) return
-    setData((prev) => addTagToNote(prev, uiState.selectedNoteId, tag))
+    updateData((prev) => addTagToNote(prev, uiState.selectedNoteId, tag))
   }
 
   function handleRemoveTag(tag) {
     if (!uiState.selectedNoteId) return
-    setData((prev) => removeTagFromNote(prev, uiState.selectedNoteId, tag))
+    updateData((prev) => removeTagFromNote(prev, uiState.selectedNoteId, tag))
   }
 
   function handleTagClick(tagName) {

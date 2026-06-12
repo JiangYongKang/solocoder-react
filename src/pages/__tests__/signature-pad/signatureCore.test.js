@@ -1,41 +1,41 @@
-import { describe, it, expect, beforeEach } from 'vitest'
 import {
-  generateId,
-  clamp,
-  clampLineWidth,
-  clampSmoothing,
-  createStroke,
-  addPointToStroke,
-  smoothPoints,
-  getBezierPoints,
-  createHistory,
-  pushHistory,
-  undoHistory,
-  redoHistory,
-  canUndo,
-  canRedo,
-  strokeToPathData,
-  isCanvasEmpty,
-  getStrokesBounds,
-  generateFileName,
-  loadSignaturesFromStorage,
-  saveSignaturesToStorage,
-  addSignatureToHistory,
-  removeSignatureFromHistory,
-  isValidColor,
-  formatDate,
-  drawStrokesOnCanvas,
-} from '@/pages/signature-pad/signatureCore.js'
-import {
-  STORAGE_KEY,
-  MIN_LINE_WIDTH,
-  MAX_LINE_WIDTH,
-  MIN_SMOOTHING,
-  MAX_SMOOTHING,
-  DEFAULT_COLOR,
-  DEFAULT_LINE_WIDTH,
-  HISTORY_MAX_ITEMS,
+    DEFAULT_COLOR,
+    DEFAULT_LINE_WIDTH,
+    HISTORY_MAX_ITEMS,
+    MAX_LINE_WIDTH,
+    MAX_SMOOTHING,
+    MIN_LINE_WIDTH,
+    MIN_SMOOTHING,
+    STORAGE_KEY,
 } from '@/pages/signature-pad/constants.js'
+import {
+    addPointToStroke,
+    addSignatureToHistory,
+    canRedo,
+    canUndo,
+    clamp,
+    clampLineWidth,
+    clampSmoothing,
+    createHistory,
+    createStroke,
+    drawStrokesOnCanvas,
+    formatDate,
+    generateFileName,
+    generateId,
+    getBezierPoints,
+    getStrokesBounds,
+    isCanvasEmpty,
+    isValidColor,
+    loadSignaturesFromStorage,
+    pushHistory,
+    redoHistory,
+    removeSignatureFromHistory,
+    saveSignaturesToStorage,
+    smoothPoints,
+    strokeToPathData,
+    undoHistory,
+} from '@/pages/signature-pad/signatureCore.js'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 function createMockStorage() {
   const store = {}
@@ -217,20 +217,51 @@ describe('signatureCore', () => {
       expect(getBezierPoints([])).toEqual([])
     })
 
-    it('should return bezier points with control points', () => {
+    it('should return bezier points with quadratic control points', () => {
       const points = [
         { x: 0, y: 0 },
         { x: 10, y: 10 },
         { x: 20, y: 5 },
       ]
-      const bezier = getBezierPoints(points, 5)
+      const bezier = getBezierPoints(points, 0)
       expect(bezier.length).toBe(3)
       expect(bezier[0]).toEqual({ x: 0, y: 0 })
-      expect(bezier[1]).toHaveProperty('cp1x')
-      expect(bezier[1]).toHaveProperty('cp1y')
-      expect(bezier[1]).toHaveProperty('cp2x')
-      expect(bezier[1]).toHaveProperty('cp2y')
-      expect(bezier[2]).toEqual({ x: 20, y: 5 })
+      expect(bezier[1]).toHaveProperty('cpX')
+      expect(bezier[1]).toHaveProperty('cpY')
+      expect(bezier[2]).toHaveProperty('cpX')
+      expect(bezier[2]).toHaveProperty('cpY')
+      expect(bezier[2].x).toBe(20)
+      expect(bezier[2].y).toBe(5)
+    })
+
+    it('should calculate control points as midpoints between adjacent points', () => {
+      const points = [
+        { x: 0, y: 0 },
+        { x: 10, y: 10 },
+        { x: 20, y: 20 },
+      ]
+      const bezier = getBezierPoints(points, 0)
+
+      expect(bezier[1].cpX).toBe((0 + 10) / 2)
+      expect(bezier[1].cpY).toBe((0 + 10) / 2)
+      expect(bezier[2].cpX).toBe((10 + 20) / 2)
+      expect(bezier[2].cpY).toBe((10 + 20) / 2)
+    })
+
+    it('should apply smoothing before calculating bezier points', () => {
+      const rawPoints = [
+        { x: 0, y: 0 },
+        { x: 10, y: 10 },
+        { x: 11, y: 11 },
+        { x: 20, y: 20 },
+      ]
+      const bezierWithSmoothing = getBezierPoints(rawPoints, 10)
+      const bezierWithoutSmoothing = getBezierPoints(rawPoints, 0)
+
+      expect(bezierWithSmoothing.length).toBe(bezierWithoutSmoothing.length)
+      expect(bezierWithSmoothing[0]).toEqual(bezierWithoutSmoothing[0])
+      expect(bezierWithSmoothing[bezierWithSmoothing.length - 1].x).toBe(20)
+      expect(bezierWithSmoothing[bezierWithSmoothing.length - 1].y).toBe(20)
     })
   })
 
@@ -599,6 +630,119 @@ describe('signatureCore', () => {
         restore: () => {},
       }
       expect(() => drawStrokesOnCanvas(mockCtx, [])).not.toThrow()
+    })
+
+    it('should use lineTo for strokes with less than 3 points', () => {
+      const moveTo = vi.fn()
+      const lineTo = vi.fn()
+      const stroke = vi.fn()
+      const beginPath = vi.fn()
+      const mockCtx = {
+        save: () => {},
+        restore: () => {},
+        beginPath,
+        moveTo,
+        lineTo,
+        stroke,
+      }
+      const strokes = [
+        createStroke('#000', 3),
+      ]
+      strokes[0] = addPointToStroke(strokes[0], { x: 0, y: 0 })
+      strokes[0] = addPointToStroke(strokes[0], { x: 10, y: 10 })
+
+      drawStrokesOnCanvas(mockCtx, strokes, 5)
+
+      expect(beginPath).toHaveBeenCalled()
+      expect(moveTo).toHaveBeenCalledWith(0, 0)
+      expect(lineTo).toHaveBeenCalledWith(10, 10)
+      expect(stroke).toHaveBeenCalled()
+    })
+
+    it('should use quadraticCurveTo for smooth strokes with 3+ points', () => {
+      const moveTo = vi.fn()
+      const quadraticCurveTo = vi.fn()
+      const bezierCurveTo = vi.fn()
+      const stroke = vi.fn()
+      const beginPath = vi.fn()
+      const mockCtx = {
+        save: () => {},
+        restore: () => {},
+        beginPath,
+        moveTo,
+        quadraticCurveTo,
+        bezierCurveTo,
+        stroke,
+      }
+      const strokes = [
+        createStroke('#000', 3),
+      ]
+      strokes[0] = addPointToStroke(strokes[0], { x: 0, y: 0 })
+      strokes[0] = addPointToStroke(strokes[0], { x: 10, y: 10 })
+      strokes[0] = addPointToStroke(strokes[0], { x: 20, y: 5 })
+
+      drawStrokesOnCanvas(mockCtx, strokes, 5)
+
+      expect(beginPath).toHaveBeenCalled()
+      expect(moveTo).toHaveBeenCalledWith(0, 0)
+      expect(quadraticCurveTo).toHaveBeenCalled()
+      expect(bezierCurveTo).not.toHaveBeenCalled()
+      expect(stroke).toHaveBeenCalled()
+    })
+
+    it('should use lineTo when smoothing level is 0', () => {
+      const moveTo = vi.fn()
+      const lineTo = vi.fn()
+      const quadraticCurveTo = vi.fn()
+      const stroke = vi.fn()
+      const beginPath = vi.fn()
+      const mockCtx = {
+        save: () => {},
+        restore: () => {},
+        beginPath,
+        moveTo,
+        lineTo,
+        quadraticCurveTo,
+        stroke,
+      }
+      const strokes = [
+        createStroke('#000', 3),
+      ]
+      strokes[0] = addPointToStroke(strokes[0], { x: 0, y: 0 })
+      strokes[0] = addPointToStroke(strokes[0], { x: 10, y: 10 })
+      strokes[0] = addPointToStroke(strokes[0], { x: 20, y: 5 })
+
+      drawStrokesOnCanvas(mockCtx, strokes, 0)
+
+      expect(lineTo).toHaveBeenCalledTimes(2)
+      expect(quadraticCurveTo).not.toHaveBeenCalled()
+    })
+
+    it('should set stroke style and line width from stroke data', () => {
+      const mockCtx = {
+        save: () => {},
+        restore: () => {},
+        beginPath: () => {},
+        moveTo: () => {},
+        lineTo: () => {},
+        stroke: () => {},
+        lineCap: '',
+        lineJoin: '',
+        strokeStyle: '',
+        lineWidth: 0,
+      }
+      const strokes = [
+        createStroke('#ff0000', 5),
+      ]
+      strokes[0] = addPointToStroke(strokes[0], { x: 0, y: 0 })
+      strokes[0] = addPointToStroke(strokes[0], { x: 10, y: 10 })
+
+      drawStrokesOnCanvas(mockCtx, strokes, 0)
+
+      expect(mockCtx.strokeStyle).toBe('#ff0000')
+      expect(mockCtx.lineWidth).toBe(5)
+      expect(mockCtx.lineCap).toBe('round')
+      expect(mockCtx.lineJoin).toBe('round')
     })
   })
 })

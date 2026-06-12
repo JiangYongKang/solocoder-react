@@ -73,6 +73,11 @@
   color: var(--jtt-text);
 }
 
+.jtt-header-spacer {
+  width: 80px;
+  flex-shrink: 0;
+}
+
 .jtt-title {
   font-size: 22px;
   font-weight: 600;
@@ -174,6 +179,12 @@
 
 .jtt-input[type="text"] {
   font-family: inherit;
+}
+
+.jtt-input-root-name,
+.jtt-input-list-name {
+  width: 160px;
+  max-width: 100%;
 }
 
 .jtt-switch {
@@ -507,4 +518,290 @@
   color: var(--jtt-text-secondary);
   font-size: 13px;
   font-style: italic;
+}
+
+@media (max-width: 480px) {
+  .jtt-container {
+    padding: 12px;
+    gap: 12px;
+  }
+
+  .jtt-header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .jtt-back-link {
+    font-size: 12px;
+    padding: 4px 8px;
+    order: 1;
+  }
+
+  .jtt-header-spacer {
+    display: none;
+  }
+
+  .jtt-title {
+    font-size: 16px;
+    flex-basis: 100%;
+    order: 3;
+    text-align: left;
+  }
+
+  .jtt-header .jtt-toolbar-row {
+    order: 2;
+    padding: 0;
+    border: none;
+    flex: 1;
+    justify-content: flex-end;
+  }
+
+  .jtt-toolbar-row {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+
+  .jtt-label {
+    font-size: 11px;
+  }
+
+  .jtt-input {
+    padding: 5px 8px;
+    font-size: 12px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .jtt-input-root-name,
+  .jtt-input-list-name {
+    width: auto;
+    flex: 1;
+    min-width: 80px;
+  }
+
+  .jtt-switch {
+    font-size: 11px;
+    gap: 4px;
+  }
+
+  .jtt-btn {
+    padding: 5px 10px;
+    font-size: 11px;
+    gap: 3px;
+  }
+
+  .jtt-btn-sm {
+    padding: 3px 6px;
+    font-size: 10px;
+  }
+
+  .jtt-panel-header {
+    padding: 10px 12px;
+    gap: 6px;
+  }
+
+  .jtt-panel-title {
+    font-size: 13px;
+  }
+
+  .jtt-line-numbers {
+    padding: 10px 6px 10px 8px;
+    font-size: 11px;
+    min-width: 36px;
+  }
+
+  .jtt-code-textarea {
+    padding: 10px 8px;
+    font-size: 11px;
+    line-height: 1.6;
+  }
+
+  .jtt-editor-wrap {
+    min-height: 260px;
+  }
+
+  .jtt-output-wrap {
+    padding: 10px 8px;
+    min-height: 260px;
+  }
+
+  .jtt-output-code {
+    font-size: 11px;
+    line-height: 1.6;
+  }
+
+  .jtt-type-name-input {
+    width: 120px;
+    font-size: 11px;
+    padding: 1px 3px;
+  }
+
+  .jtt-error-box {
+    padding: 8px 10px;
+    font-size: 11.5px;
+  }
+
+  .jtt-toast {
+    top: 12px;
+    padding: 8px 16px;
+    font-size: 12px;
+    max-width: calc(100vw - 48px);
+  }
+
+  .jtt-history-header {
+    padding: 10px 12px;
+  }
+
+  .jtt-history-title {
+    font-size: 13px;
+  }
+
+  .jtt-history-meta {
+    font-size: 10px;
+  }
+
+  .jtt-history-list {
+    max-height: 220px;
+    padding: 6px;
+    gap: 5px;
+  }
+
+  .jtt-history-item {
+    padding: 8px 10px;
+  }
+
+  .jtt-history-item-top {
+    gap: 6px;
+    margin-bottom: 4px;
+  }
+
+  .jtt-history-root-name {
+    font-size: 12px;
+  }
+
+  .jtt-history-summary {
+    font-size: 10.5px;
+  }
+
+  .jtt-history-time {
+    font-size: 10px;
+  }
+
+  .jtt-history-footer {
+    padding: 8px 12px;
+  }
+
+  .jtt-history-empty {
+    padding: 20px 12px;
+    font-size: 12px;
+  }
+
+  .jtt-icon-btn {
+    width: 22px;
+    height: 22px;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 375px) {
+  .jtt-container {
+    padding: 10px;
+    gap: 10px;
+  }
+
+  .jtt-toolbar-row {
+    padding: 8px 10px;
+    gap: 6px;
+  }
+
+  .jtt-label {
+    display: none;
+  }
+
+  .jtt-input {
+    padding: 4px 7px;
+    font-size: 11px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .jtt-input-root-name,
+  .jtt-input-list-name {
+    width: auto;
+    flex: 1;
+    min-width: 60px;
+  }
+
+  .jtt-switch {
+    font-size: 10px;
+  }
+
+  .jtt-switch input {
+    width: 12px;
+    height: 12px;
+  }
+
+  .jtt-btn {
+    padding: 4px 8px;
+    font-size: 10.5px;
+  }
+
+  .jtt-panel-header {
+    padding: 8px 10px;
+    flex-wrap: wrap;
+  }
+
+  .jtt-line-numbers {
+    font-size: 10px;
+    padding: 8px 5px 8px 7px;
+    min-width: 32px;
+  }
+
+  .jtt-code-textarea {
+    padding: 8px 6px;
+    font-size: 10.5px;
+    line-height: 1.55;
+  }
+
+  .jtt-editor-wrap {
+    min-height: 240px;
+  }
+
+  .jtt-output-wrap {
+    padding: 8px 6px;
+    min-height: 240px;
+  }
+
+  .jtt-output-code {
+    font-size: 10.5px;
+    line-height: 1.55;
+  }
+
+  .jtt-type-name-input {
+    width: 100px;
+    font-size: 10px;
+  }
+
+  .jtt-history-header {
+    padding: 8px 10px;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .jtt-history-title {
+    font-size: 12px;
+  }
+
+  .jtt-history-list {
+    max-height: 200px;
+  }
+
+  .jtt-history-item {
+    padding: 7px 8px;
+  }
+
+  .jtt-error-box {
+    padding: 7px 9px;
+    font-size: 10.5px;
+  }
 }

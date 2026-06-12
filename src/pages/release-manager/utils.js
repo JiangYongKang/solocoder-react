@@ -14,6 +14,21 @@ export const DIFF_TYPE_INTERNAL = {
   MODIFIED: 'modified',
 }
 
+export const MAX_DIFF_LINES = 500
+
+export function isDiffTooLarge(oldText, newText, maxLines = MAX_DIFF_LINES) {
+  const oldLineCount = typeof oldText === 'string' ? oldText.split('\n').length : 0
+  const newLineCount = typeof newText === 'string' ? newText.split('\n').length : 0
+  return oldLineCount > maxLines || newLineCount > maxLines
+}
+
+export function truncateTextForDiff(text, maxLines = MAX_DIFF_LINES) {
+  if (typeof text !== 'string') return ''
+  const lines = text.split('\n')
+  if (lines.length <= maxLines) return text
+  return lines.slice(0, maxLines).join('\n') + `\n\n... (已截断，原文共 ${lines.length} 行，仅显示前 ${maxLines} 行)`
+}
+
 export function generateId(prefix = 'rel') {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
 }
@@ -225,13 +240,18 @@ export function actionRequiresRemark(action) {
   return action === APPROVAL_ACTION.REJECT || action === APPROVAL_ACTION.ROLLBACK
 }
 
-export function performApprovalAction(releases, id, action, remark = '', operator = CURRENT_USER) {
+export function performApprovalAction(releases, id, action, remark = '', operator = CURRENT_USER, expectedUpdatedAt) {
   const index = releases.findIndex((r) => r.id === id)
   if (index === -1) {
     return { success: false, error: '版本不存在' }
   }
 
   const release = releases[index]
+
+  if (expectedUpdatedAt !== undefined && expectedUpdatedAt !== null && release.updatedAt !== expectedUpdatedAt) {
+    return { success: false, error: '版本已被修改，请刷新后重试' }
+  }
+
   const allowedActions = getStatusActions(release)
   if (!allowedActions.includes(action)) {
     return { success: false, error: '当前状态不允许该操作' }

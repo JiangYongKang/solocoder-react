@@ -1,27 +1,27 @@
-import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import './data-mask.css'
 import { PRESET_RULES, SAMPLE_TEXT } from './constants'
+import './data-mask.css'
 import {
-  applyRules,
-  countSensitiveInfo,
-  buildHighlightSegments,
-  processBatchLines,
-  generateCSV,
-  downloadCSV,
-  validateRegex,
-  debounce,
-  getStatsSummary,
+    applyRules,
+    buildHighlightSegments,
+    countSensitiveInfo,
+    debounce,
+    downloadCSV,
+    generateCSV,
+    getStatsSummary,
+    processBatchLines,
+    validateRegex,
 } from './dataMaskUtils'
 import {
-  loadCustomRules,
-  addCustomRule,
-  deleteCustomRule,
-  loadSchemes,
-  addScheme,
-  deleteScheme,
-  saveEnabledRuleIds,
-  loadEnabledRuleIds,
+    addCustomRule,
+    addScheme,
+    deleteCustomRule,
+    deleteScheme,
+    loadCustomRules,
+    loadEnabledRuleIds,
+    loadSchemes,
+    saveEnabledRuleIds,
 } from './storage'
 
 const DataMaskPage = () => {
@@ -105,7 +105,7 @@ const DataMaskPage = () => {
 
   const highlightSegments = useMemo(() => {
     if (!debouncedText) return []
-    return buildHighlightSegments(debouncedText, debouncedText, allRules)
+    return buildHighlightSegments(debouncedText, allRules)
   }, [debouncedText, allRules])
 
   const batchResults = useMemo(() => {

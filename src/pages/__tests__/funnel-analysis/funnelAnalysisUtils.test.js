@@ -1,45 +1,50 @@
-import { describe, it, expect, beforeEach, beforeAll, afterAll } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import {
-  STORAGE_KEY,
-  MIN_STEPS,
-  MAX_STEPS,
-  MAX_GROUPS,
-  DEFAULT_STEPS,
-  GROUP_COLORS,
-  DROP_OFF_LEVELS,
-  DATE_PRESETS,
+    DATE_PRESETS,
+    DEFAULT_STEPS,
+    DROP_OFF_LEVELS,
+    GROUP_COLORS,
+    MAX_GROUPS,
+    MAX_STEPS,
+    MIN_STEPS,
+    STORAGE_KEY,
 } from '../../funnel-analysis/constants'
 import {
-  generateStepId,
-  generateGroupId,
-  getDefaultState,
-  loadState,
-  saveState,
-  getToday,
-  getDateNDaysAgo,
-  formatDateToStr,
-  getDatePresetRange,
-  isValidDateRange,
-  addStep,
-  removeStep,
-  updateStepName,
-  reorderSteps,
-  addGroup,
-  removeGroup,
-  updateGroupName,
-  updateGroupData,
-  generateRandomData,
-  fillGroupWithRandomData,
-  calculateConversionRate,
-  calculateOverallConversionRate,
-  calculateDropOff,
-  getDropOffLevel,
-  getDropOffColor,
-  getBarWidthPercentage,
-  getBarGradientColor,
-  validateFunnelData,
-  escapeCSVValue,
-  exportToCSV,
+    addGroup,
+    addStep,
+    calculateConversionRate,
+    calculateDropOff,
+    calculateOverallConversionRate,
+    escapeCSVValue,
+    exportToCSV,
+    fillGroupWithRandomData,
+    formatDateToStr,
+    generateGroupId,
+    generateRandomData,
+    generateStepId,
+    getBarGradientColor,
+    getBarWidthPercentage,
+    getDateNDaysAgo,
+    getDatePresetRange,
+    getDefaultState,
+    getDropOffCause,
+    getDropOffColor,
+    getDropOffLevel,
+    getToday,
+    hashString,
+    isValidDateRange,
+    isValidGroup,
+    isValidStep,
+    loadState,
+    removeGroup,
+    removeStep,
+    reorderSteps,
+    saveState,
+    updateGroupData,
+    updateGroupName,
+    updateStepName,
+    validateFunnelData,
+    validateStateStructure
 } from '../../funnel-analysis/utils'
 
 const createMockLocalStorage = () => {
@@ -176,6 +181,425 @@ describe('loadState / saveState', () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ steps: 'not-array' }))
     expect(loadState()).toBeNull()
   })
+
+  it('loadState groups 非数组时返回 null', () => {
+    const state = getDefaultState()
+    const invalidState = { ...state, groups: 'not-array' }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(invalidState))
+    expect(loadState()).toBeNull()
+  })
+
+  it('loadState groups 为空数组时返回 null', () => {
+    const state = getDefaultState()
+    const invalidState = { ...state, groups: [] }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(invalidState))
+    expect(loadState()).toBeNull()
+  })
+
+  it('loadState step 缺少 id 时返回 null', () => {
+    const state = getDefaultState()
+    const invalidState = { ...state, steps: [{ name: 'test' }] }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(invalidState))
+    expect(loadState()).toBeNull()
+  })
+
+  it('loadState step 缺少 name 时返回 null', () => {
+    const state = getDefaultState()
+    const invalidState = { ...state, steps: [{ id: 'test' }] }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(invalidState))
+    expect(loadState()).toBeNull()
+  })
+
+  it('loadState group 缺少 data 时返回 null', () => {
+    const state = getDefaultState()
+    const invalidState = { ...state, groups: [{ id: 'g1', name: 'test' }] }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(invalidState))
+    expect(loadState()).toBeNull()
+  })
+
+  it('loadState dateRange 无效时返回 null', () => {
+    const state = getDefaultState()
+    const invalidState = { ...state, dateRange: null }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(invalidState))
+    expect(loadState()).toBeNull()
+  })
+
+  it('loadState dateRange 缺少 startDate 时返回 null', () => {
+    const state = getDefaultState()
+    const invalidState = { ...state, dateRange: { endDate: state.dateRange.endDate } }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(invalidState))
+    expect(loadState()).toBeNull()
+  })
+
+  it('loadState steps 少于 MIN_STEPS 时返回 null', () => {
+    const state = getDefaultState()
+    const invalidState = { ...state, steps: state.steps.slice(0, MIN_STEPS - 1) }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(invalidState))
+    expect(loadState()).toBeNull()
+  })
+
+  it('loadState steps 多于 MAX_STEPS 时返回 null', () => {
+    const state = getDefaultState()
+    const manySteps = Array.from({ length: MAX_STEPS + 1 }, (_, i) => ({
+      id: `s${i}`,
+      name: `步骤${i + 1}`,
+    }))
+    const invalidState = { ...state, steps: manySteps }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(invalidState))
+    expect(loadState()).toBeNull()
+  })
+
+  it('loadState group.data 是数组时返回 null', () => {
+    const state = getDefaultState()
+    const invalidState = { ...state, groups: [{ id: 'g1', name: 'test', data: [1, 2, 3] }] }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(invalidState))
+    expect(loadState()).toBeNull()
+  })
+
+  it('loadState dateRange startDate 大于 endDate 返回 null', () => {
+    const state = getDefaultState()
+    const invalidState = { ...state, dateRange: { startDate: '2026-12-31', endDate: '2026-01-01' } }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(invalidState))
+    expect(loadState()).toBeNull()
+  })
+
+  it('loadState group 缺少 name 返回 null', () => {
+    const state = getDefaultState()
+    const invalidState = { ...state, groups: [{ id: 'g1', data: {} }] }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(invalidState))
+    expect(loadState()).toBeNull()
+  })
+
+  it('loadState steps 有重复 id 返回 null', () => {
+    const state = getDefaultState()
+    const dupSteps = [...state.steps, { ...state.steps[0], name: '重复' }]
+    const invalidState = { ...state, steps: dupSteps }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(invalidState))
+    expect(loadState()).toBeNull()
+  })
+
+  it('loadState groups 超过 MAX_GROUPS 返回 null', () => {
+    const state = getDefaultState()
+    const manyGroups = Array.from({ length: MAX_GROUPS + 1 }, (_, i) => ({
+      id: `g${i}`,
+      name: `组${i + 1}`,
+      data: {},
+    }))
+    const invalidState = { ...state, groups: manyGroups }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(invalidState))
+    expect(loadState()).toBeNull()
+  })
+})
+
+describe('hashString', () => {
+  it('相同输入返回相同 hash', () => {
+    const h1 = hashString('step1')
+    const h2 = hashString('step1')
+    expect(h1).toBe(h2)
+  })
+
+  it('不同输入返回不同 hash', () => {
+    const h1 = hashString('step1')
+    const h2 = hashString('step2')
+    expect(h1).not.toBe(h2)
+  })
+
+  it('空字符串返回 0', () => {
+    expect(hashString('')).toBe(0)
+  })
+
+  it('null 返回 0', () => {
+    expect(hashString(null)).toBe(0)
+  })
+
+  it('返回非负数', () => {
+    expect(hashString('any-string')).toBeGreaterThanOrEqual(0)
+  })
+})
+
+describe('isValidStep', () => {
+  it('有效 step 返回 true', () => {
+    expect(isValidStep({ id: 's1', name: '页面访问' })).toBe(true)
+  })
+
+  it('null 返回 false', () => {
+    expect(isValidStep(null)).toBe(false)
+  })
+
+  it('非对象返回 false', () => {
+    expect(isValidStep('not-an-object')).toBe(false)
+  })
+
+  it('缺少 id 返回 false', () => {
+    expect(isValidStep({ name: '页面访问' })).toBe(false)
+  })
+
+  it('id 不是字符串返回 false', () => {
+    expect(isValidStep({ id: 123, name: '页面访问' })).toBe(false)
+  })
+
+  it('id 为空字符串返回 false', () => {
+    expect(isValidStep({ id: '', name: '页面访问' })).toBe(false)
+  })
+
+  it('缺少 name 返回 false', () => {
+    expect(isValidStep({ id: 's1' })).toBe(false)
+  })
+
+  it('name 不是字符串返回 false', () => {
+    expect(isValidStep({ id: 's1', name: 123 })).toBe(false)
+  })
+
+  it('name 为空字符串返回 false', () => {
+    expect(isValidStep({ id: 's1', name: '' })).toBe(false)
+  })
+
+  it('step 是数组返回 false', () => {
+    expect(isValidStep(['s1', '页面访问'])).toBe(false)
+  })
+})
+
+describe('isValidGroup', () => {
+  it('有效 group 返回 true', () => {
+    expect(isValidGroup({ id: 'g1', name: '对照组', data: {} })).toBe(true)
+  })
+
+  it('null 返回 false', () => {
+    expect(isValidGroup(null)).toBe(false)
+  })
+
+  it('非对象返回 false', () => {
+    expect(isValidGroup('not-an-object')).toBe(false)
+  })
+
+  it('缺少 id 返回 false', () => {
+    expect(isValidGroup({ name: '对照组', data: {} })).toBe(false)
+  })
+
+  it('id 不是字符串返回 false', () => {
+    expect(isValidGroup({ id: 123, name: '对照组', data: {} })).toBe(false)
+  })
+
+  it('id 为空字符串返回 false', () => {
+    expect(isValidGroup({ id: '', name: '对照组', data: {} })).toBe(false)
+  })
+
+  it('缺少 name 返回 false', () => {
+    expect(isValidGroup({ id: 'g1', data: {} })).toBe(false)
+  })
+
+  it('name 不是字符串返回 false', () => {
+    expect(isValidGroup({ id: 'g1', name: 123, data: {} })).toBe(false)
+  })
+
+  it('name 为空字符串返回 false', () => {
+    expect(isValidGroup({ id: 'g1', name: '', data: {} })).toBe(false)
+  })
+
+  it('缺少 data 返回 false', () => {
+    expect(isValidGroup({ id: 'g1', name: '对照组' })).toBe(false)
+  })
+
+  it('data 不是对象返回 false', () => {
+    expect(isValidGroup({ id: 'g1', name: '对照组', data: 'not-object' })).toBe(false)
+  })
+
+  it('group 是数组返回 false', () => {
+    expect(isValidGroup(['g1', '对照组', {}])).toBe(false)
+  })
+
+  it('data 是数组返回 false', () => {
+    expect(isValidGroup({ id: 'g1', name: '对照组', data: [1, 2, 3] })).toBe(false)
+  })
+})
+
+describe('validateStateStructure', () => {
+  it('有效状态返回 true', () => {
+    const state = getDefaultState()
+    expect(validateStateStructure(state)).toBe(true)
+  })
+
+  it('null 返回 false', () => {
+    expect(validateStateStructure(null)).toBe(false)
+  })
+
+  it('非对象返回 false', () => {
+    expect(validateStateStructure('not-object')).toBe(false)
+  })
+
+  it('缺少 steps 返回 false', () => {
+    const state = getDefaultState()
+    delete state.steps
+    expect(validateStateStructure(state)).toBe(false)
+  })
+
+  it('steps 非数组返回 false', () => {
+    const state = getDefaultState()
+    expect(validateStateStructure({ ...state, steps: 'not-array' })).toBe(false)
+  })
+
+  it('steps 长度小于 MIN_STEPS 返回 false', () => {
+    const state = getDefaultState()
+    expect(validateStateStructure({ ...state, steps: state.steps.slice(0, MIN_STEPS - 1) })).toBe(false)
+  })
+
+  it('steps 长度大于 MAX_STEPS 返回 false', () => {
+    const state = getDefaultState()
+    const manySteps = Array.from({ length: MAX_STEPS + 1 }, (_, i) => ({
+      id: `s${i}`,
+      name: `步骤${i + 1}`,
+    }))
+    expect(validateStateStructure({ ...state, steps: manySteps })).toBe(false)
+  })
+
+  it('steps 包含无效 step 返回 false', () => {
+    const state = getDefaultState()
+    const badSteps = [...state.steps, { id: '', name: '' }]
+    expect(validateStateStructure({ ...state, steps: badSteps })).toBe(false)
+  })
+
+  it('缺少 groups 返回 false', () => {
+    const state = getDefaultState()
+    delete state.groups
+    expect(validateStateStructure(state)).toBe(false)
+  })
+
+  it('groups 非数组返回 false', () => {
+    const state = getDefaultState()
+    expect(validateStateStructure({ ...state, groups: 'not-array' })).toBe(false)
+  })
+
+  it('groups 为空数组返回 false', () => {
+    const state = getDefaultState()
+    expect(validateStateStructure({ ...state, groups: [] })).toBe(false)
+  })
+
+  it('groups 长度大于 MAX_GROUPS 返回 false', () => {
+    const state = getDefaultState()
+    const manyGroups = Array.from({ length: MAX_GROUPS + 1 }, (_, i) => ({
+      id: `g${i}`,
+      name: `组${i + 1}`,
+      data: {},
+    }))
+    expect(validateStateStructure({ ...state, groups: manyGroups })).toBe(false)
+  })
+
+  it('groups 包含无效 group 返回 false', () => {
+    const state = getDefaultState()
+    const badGroups = [...state.groups, { id: '', name: '', data: {} }]
+    expect(validateStateStructure({ ...state, groups: badGroups })).toBe(false)
+  })
+
+  it('缺少 dateRange 返回 false', () => {
+    const state = getDefaultState()
+    delete state.dateRange
+    expect(validateStateStructure(state)).toBe(false)
+  })
+
+  it('dateRange 非对象返回 false', () => {
+    const state = getDefaultState()
+    expect(validateStateStructure({ ...state, dateRange: 'not-object' })).toBe(false)
+  })
+
+  it('dateRange 缺少 startDate 返回 false', () => {
+    const state = getDefaultState()
+    expect(validateStateStructure({ ...state, dateRange: { endDate: state.dateRange.endDate } })).toBe(false)
+  })
+
+  it('dateRange 缺少 endDate 返回 false', () => {
+    const state = getDefaultState()
+    expect(validateStateStructure({ ...state, dateRange: { startDate: state.dateRange.startDate } })).toBe(false)
+  })
+
+  it('dateRange startDate 非字符串返回 false', () => {
+    const state = getDefaultState()
+    expect(validateStateStructure({ ...state, dateRange: { startDate: 123, endDate: state.dateRange.endDate } })).toBe(false)
+  })
+
+  it('state 本身是数组返回 false', () => {
+    expect(validateStateStructure([1, 2, 3])).toBe(false)
+  })
+
+  it('dateRange 是数组返回 false', () => {
+    const state = getDefaultState()
+    expect(validateStateStructure({ ...state, dateRange: ['2026-01-01', '2026-06-01'] })).toBe(false)
+  })
+
+  it('dateRange endDate 非字符串返回 false', () => {
+    const state = getDefaultState()
+    expect(validateStateStructure({ ...state, dateRange: { startDate: state.dateRange.startDate, endDate: 456 } })).toBe(false)
+  })
+
+  it('dateRange 中 startDate > endDate 返回 false', () => {
+    const state = getDefaultState()
+    expect(validateStateStructure({ ...state, dateRange: { startDate: '2026-12-31', endDate: '2026-01-01' } })).toBe(false)
+  })
+
+  it('dateRange 中无效日期格式返回 false', () => {
+    const state = getDefaultState()
+    expect(validateStateStructure({ ...state, dateRange: { startDate: 'not-date', endDate: 'also-invalid' } })).toBe(false)
+  })
+
+  it('steps 有重复 id 返回 false', () => {
+    const state = getDefaultState()
+    const dupSteps = [...state.steps, { ...state.steps[0], name: '重复ID' }]
+    expect(validateStateStructure({ ...state, steps: dupSteps })).toBe(false)
+  })
+})
+
+describe('getDropOffCause', () => {
+  it('LOW 级别返回固定文案', () => {
+    const result = getDropOffCause(20, 'step1')
+    expect(result).toBe('该环节转化良好，无明显流失问题')
+  })
+
+  it('相同 stepId 和 rate 返回相同原因', () => {
+    const cause1 = getDropOffCause(60, 'step_register')
+    const cause2 = getDropOffCause(60, 'step_register')
+    expect(cause1).toBe(cause2)
+  })
+
+  it('不同 stepId 可能返回不同原因', () => {
+    const causes = new Set()
+    for (let i = 0; i < 10; i++) {
+      causes.add(getDropOffCause(60, `step_${i}`))
+    }
+    expect(causes.size).toBeGreaterThan(1)
+  })
+
+  it('MEDIUM 级别返回原因文案', () => {
+    const result = getDropOffCause(40, 'step_purchase')
+    expect(typeof result).toBe('string')
+    expect(result.length).toBeGreaterThan(0)
+  })
+
+  it('HIGH 级别返回原因文案', () => {
+    const result = getDropOffCause(70, 'step_payment')
+    expect(typeof result).toBe('string')
+    expect(result.length).toBeGreaterThan(0)
+  })
+
+  it('空 stepId 也能返回确定结果', () => {
+    const cause1 = getDropOffCause(60, '')
+    const cause2 = getDropOffCause(60, '')
+    expect(cause1).toBe(cause2)
+  })
+
+  it('stepId 为 null 也能返回确定结果', () => {
+    const cause1 = getDropOffCause(60, null)
+    const cause2 = getDropOffCause(60, null)
+    expect(cause1).toBe(cause2)
+  })
+
+  it('多次调用同一参数结果一致', () => {
+    const stepId = 'test_step_123'
+    const results = []
+    for (let i = 0; i < 20; i++) {
+      results.push(getDropOffCause(55, stepId))
+    }
+    const uniqueResults = new Set(results)
+    expect(uniqueResults.size).toBe(1)
+  })
 })
 
 describe('日期函数', () => {
@@ -183,11 +607,38 @@ describe('日期函数', () => {
     expect(getToday()).toMatch(/^\d{4}-\d{2}-\d{2}$/)
   })
 
-  it('getDateNDaysAgo 返回正确的日期', () => {
+  it('getDateNDaysAgo 返回正确的日期 - 完整n天包含两端', () => {
     const today = new Date()
     const result = new Date(getDateNDaysAgo(7))
     const diff = Math.round((today - result) / 86400000)
     expect(diff).toBe(6)
+  })
+
+  it('getDateNDaysAgo(1) 返回今天（因为包含今天）', () => {
+    const today = new Date()
+    const result = new Date(getDateNDaysAgo(1))
+    const diff = Math.round((today - result) / 86400000)
+    expect(diff).toBe(0)
+  })
+
+  it('getDateNDaysAgo(7) 与 today 之间相差6天间隔共7个自然日', () => {
+    const todayStr = getToday()
+    const startStr = getDateNDaysAgo(7)
+    const days = []
+    let cursor = new Date(startStr)
+    const end = new Date(todayStr)
+    while (cursor <= end) {
+      days.push(formatDateToStr(cursor))
+      cursor.setDate(cursor.getDate() + 1)
+    }
+    expect(days.length).toBe(7)
+  })
+
+  it('getDateNDaysAgo 不修改原始日期对象', () => {
+    const d = new Date()
+    const originalTime = d.getTime()
+    getDateNDaysAgo(7)
+    expect(d.getTime()).toBe(originalTime)
   })
 
   it('formatDateToStr 格式化正确', () => {

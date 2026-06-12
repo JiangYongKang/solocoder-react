@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { highlightTextSafe } from './noteUtils.js'
 
 export default function SearchBar({ value, onChange, onResultClick, results }) {
   const [showResults, setShowResults] = useState(false)
@@ -54,10 +55,7 @@ export default function SearchBar({ value, onChange, onResultClick, results }) {
                 <div className="search-result-title">
                   <span
                     dangerouslySetInnerHTML={{
-                      __html: result.title.replace(
-                        new RegExp(`(${value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi'),
-                        '<span class="highlight">$1</span>'
-                      ),
+                      __html: highlightTextSafe(result.title, value),
                     }}
                   />
                 </div>
@@ -65,10 +63,7 @@ export default function SearchBar({ value, onChange, onResultClick, results }) {
                 <div className="search-result-snippet">
                   <span
                     dangerouslySetInnerHTML={{
-                      __html: result.snippet.replace(
-                        new RegExp(`(${value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi'),
-                        '<span class="highlight">$1</span>'
-                      ),
+                      __html: highlightTextSafe(result.snippet, value),
                     }}
                   />
                 </div>

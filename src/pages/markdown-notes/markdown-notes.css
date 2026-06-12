@@ -600,3 +600,162 @@
   background: #eee;
   margin: 4px 0;
 }
+
+@media (max-width: 768px) {
+  .markdown-notes-header {
+    flex-wrap: wrap;
+    padding: 8px 12px;
+    gap: 8px;
+  }
+
+  .markdown-notes-header h1 {
+    font-size: 16px;
+    width: 100%;
+  }
+
+  .search-bar {
+    max-width: 100%;
+    flex: 1 1 100%;
+    order: 3;
+  }
+
+  .markdown-notes-toolbar {
+    order: 2;
+    flex-wrap: wrap;
+  }
+
+  .sidebar {
+    width: 220px;
+    min-width: 200px;
+  }
+
+  .markdown-notes-body {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: 100%;
+    max-height: 40vh;
+    border-right: none;
+    border-bottom: 1px solid #e0e0e0;
+  }
+
+  .editor-container {
+    flex-direction: column;
+  }
+
+  .resize-handle {
+    width: 100%;
+    height: 4px;
+    cursor: row-resize;
+  }
+
+  .editor-panel {
+    min-height: 40vh;
+  }
+
+  .preview-panel {
+    padding: 12px 16px;
+  }
+
+  .preview-panel h1 {
+    font-size: 22px;
+  }
+
+  .preview-panel h2 {
+    font-size: 18px;
+  }
+}
+
+@media (max-width: 480px) {
+  .markdown-notes-header {
+    padding: 6px 10px;
+  }
+
+  .markdown-notes-header h1 {
+    font-size: 15px;
+  }
+
+  .sidebar {
+    max-height: 35vh;
+  }
+
+  .sidebar-header {
+    padding: 8px 10px;
+  }
+
+  .sidebar-header h3 {
+    font-size: 13px;
+  }
+
+  .icon-btn {
+    width: 26px;
+    height: 26px;
+    font-size: 13px;
+  }
+
+  .tag-list {
+    padding: 8px 10px;
+    max-height: 150px;
+  }
+
+  .panel-header {
+    padding: 8px 12px;
+  }
+
+  .note-title-input {
+    font-size: 14px;
+  }
+
+  .tag-bar {
+    padding: 6px 12px;
+  }
+
+  .textarea-editor {
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+
+  .preview-panel {
+    padding: 10px 12px;
+  }
+
+  .preview-panel h1 {
+    font-size: 20px;
+  }
+
+  .preview-panel h2 {
+    font-size: 17px;
+  }
+
+  .preview-panel h3 {
+    font-size: 15px;
+  }
+
+  .preview-panel p {
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  .toolbar-btn {
+    padding: 5px 10px;
+    font-size: 12px;
+  }
+
+  .search-result-item {
+    padding: 10px 12px;
+  }
+
+  .search-empty {
+    padding: 16px;
+    font-size: 13px;
+  }
+
+  .empty-state-icon {
+    font-size: 36px;
+  }
+
+  .empty-state-text {
+    font-size: 14px;
+  }
+}

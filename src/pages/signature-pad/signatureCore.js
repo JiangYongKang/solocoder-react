@@ -1,15 +1,15 @@
 import {
-  STORAGE_KEY,
-  DEFAULT_LINE_WIDTH,
-  DEFAULT_COLOR,
-  DEFAULT_SMOOTHING,
-  MIN_LINE_WIDTH,
-  MAX_LINE_WIDTH,
-  MIN_SMOOTHING,
-  MAX_SMOOTHING,
-  HISTORY_MAX_ITEMS,
-  THUMBNAIL_WIDTH,
-  THUMBNAIL_HEIGHT,
+    DEFAULT_COLOR,
+    DEFAULT_LINE_WIDTH,
+    DEFAULT_SMOOTHING,
+    HISTORY_MAX_ITEMS,
+    MAX_LINE_WIDTH,
+    MAX_SMOOTHING,
+    MIN_LINE_WIDTH,
+    MIN_SMOOTHING,
+    STORAGE_KEY,
+    THUMBNAIL_HEIGHT,
+    THUMBNAIL_WIDTH,
 } from './constants.js'
 
 let idCounter = 0
@@ -86,27 +86,20 @@ export const getBezierPoints = (points, smoothingLevel = DEFAULT_SMOOTHING) => {
 
   const bezierPoints = [{ x: smoothed[0].x, y: smoothed[0].y }]
 
-  for (let i = 1; i < smoothed.length - 1; i++) {
-    const p0 = smoothed[i - 1]
-    const p1 = smoothed[i]
-    const p2 = smoothed[i + 1]
-
-    const cp1x = p1.x + (p2.x - p0.x) / 6
-    const cp1y = p1.y + (p2.y - p0.y) / 6
-    const cp2x = p1.x - (p2.x - p0.x) / 6
-    const cp2y = p1.y - (p2.y - p0.y) / 6
+  for (let i = 1; i < smoothed.length; i++) {
+    const prev = smoothed[i - 1]
+    const curr = smoothed[i]
+    const midX = (prev.x + curr.x) / 2
+    const midY = (prev.y + curr.y) / 2
 
     bezierPoints.push({
-      x: p1.x,
-      y: p1.y,
-      cp1x,
-      cp1y,
-      cp2x,
-      cp2y,
+      x: curr.x,
+      y: curr.y,
+      cpX: midX,
+      cpY: midY,
     })
   }
 
-  bezierPoints.push({ x: smoothed[smoothed.length - 1].x, y: smoothed[smoothed.length - 1].y })
   return bezierPoints
 }
 
@@ -381,13 +374,11 @@ export const drawStrokesOnCanvas = (ctx, strokes, smoothingLevel = DEFAULT_SMOOT
       ctx.beginPath()
       ctx.moveTo(bezierPoints[0].x, bezierPoints[0].y)
 
-      for (let i = 1; i < bezierPoints.length - 1; i++) {
+      for (let i = 1; i < bezierPoints.length; i++) {
         const p = bezierPoints[i]
-        ctx.bezierCurveTo(p.cp2x, p.cp2y, p.cp1x, p.cp1y, p.x, p.y)
+        ctx.quadraticCurveTo(p.cpX, p.cpY, p.x, p.y)
       }
 
-      const last = bezierPoints[bezierPoints.length - 1]
-      ctx.lineTo(last.x, last.y)
       ctx.stroke()
     }
   })

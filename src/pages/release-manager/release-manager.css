@@ -881,6 +881,11 @@
   margin-left: 4px;
 }
 
+.rm-diff-warning {
+  color: #d97706;
+  font-weight: 500;
+}
+
 .rm-diff-container {
   display: grid;
   grid-template-columns: 1fr 1fr;

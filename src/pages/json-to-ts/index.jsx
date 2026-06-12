@@ -320,7 +320,7 @@ const JsonToTsPage = () => {
             ← 返回首页
           </Link>
           <h1 className="jtt-title">JSON 转 TypeScript 类型生成器</h1>
-          <div style={{ width: '80px' }} />
+          <div className="jtt-header-spacer" />
         </header>
 
         <div className="jtt-main-layout">
@@ -331,11 +331,10 @@ const JsonToTsPage = () => {
             <input
               id="root-name-input"
               type="text"
-              className="jtt-input"
+              className="jtt-input jtt-input-root-name"
               value={rootName}
               onChange={handleRootNameChange}
               spellCheck={false}
-              style={{ width: '160px' }}
             />
             {rootListName && (
               <>
@@ -345,11 +344,10 @@ const JsonToTsPage = () => {
                 <input
                   id="list-name-input"
                   type="text"
-                  className="jtt-input"
+                  className="jtt-input jtt-input-list-name"
                   value={listName}
                   onChange={handleListNameChange}
                   spellCheck={false}
-                  style={{ width: '160px' }}
                 />
               </>
             )}

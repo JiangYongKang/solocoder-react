@@ -400,6 +400,12 @@
   flex-direction: column;
 }
 
+.fa-funnel-connector {
+  margin: 0;
+  padding: 0;
+  line-height: 0;
+}
+
 .fa-bar-row {
   display: flex;
   align-items: center;
@@ -647,5 +653,187 @@
 
   .fa-multi-chart-col {
     min-width: auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .fa-page {
+    padding: 16px 12px 40px;
+  }
+
+  .fa-header {
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .fa-back-btn {
+    padding: 6px 12px;
+    font-size: 13px;
+  }
+
+  .fa-title {
+    font-size: 22px;
+  }
+
+  .fa-toolbar {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+
+  .fa-toolbar-group {
+    gap: 6px;
+  }
+
+  .fa-date-input {
+    padding: 6px 8px;
+    font-size: 12px;
+    width: 110px;
+  }
+
+  .fa-preset-btn {
+    padding: 5px 10px;
+    font-size: 11px;
+  }
+
+  .fa-btn {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+
+  .fa-btn-sm {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+
+  .fa-sidebar {
+    gap: 12px;
+  }
+
+  .fa-panel {
+    padding: 12px;
+  }
+
+  .fa-panel-title {
+    font-size: 14px;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .fa-step-item {
+    padding: 6px 8px;
+    gap: 6px;
+  }
+
+  .fa-step-name-input {
+    font-size: 12px;
+    min-width: 0;
+  }
+
+  .fa-funnel-container {
+    padding: 14px 12px;
+  }
+
+  .fa-funnel-title {
+    font-size: 14px;
+    margin-bottom: 14px;
+  }
+
+  .fa-bar {
+    height: 38px;
+    padding: 0 10px;
+    gap: 6px;
+    min-width: 60px;
+  }
+
+  .fa-bar-label {
+    font-size: 12px;
+  }
+
+  .fa-bar-count {
+    font-size: 11px;
+  }
+
+  .fa-bar-rate {
+    font-size: 10px;
+  }
+
+  .fa-step-info {
+    min-width: 56px;
+    font-size: 11px;
+  }
+
+  .fa-step-info .overall {
+    font-size: 10px;
+  }
+
+  .fa-dropoff-row {
+    padding: 3px 0;
+  }
+
+  .fa-dropoff-connector {
+    width: 20px;
+    height: 16px;
+    margin-left: 4px;
+  }
+
+  .fa-dropoff-info {
+    font-size: 11px;
+    padding: 2px 8px;
+    gap: 4px;
+  }
+
+  .fa-dropoff-tooltip {
+    min-width: 180px;
+    padding: 10px 12px;
+    font-size: 11px;
+    left: 0;
+    transform: none;
+  }
+
+  .fa-group-section {
+    padding: 12px;
+  }
+
+  .fa-group-header {
+    gap: 6px;
+    align-items: flex-start;
+  }
+
+  .fa-group-name-input {
+    font-size: 13px;
+    width: 100px;
+  }
+
+  .fa-group-actions {
+    gap: 4px;
+  }
+
+  .fa-data-table {
+    font-size: 12px;
+  }
+
+  .fa-data-table th,
+  .fa-data-table td {
+    padding: 6px 8px;
+  }
+
+  .fa-data-input {
+    width: 64px;
+    font-size: 12px;
+    padding: 3px 6px;
+  }
+
+  .fa-switch {
+    font-size: 12px;
+    gap: 6px;
+  }
+
+  .fa-switch-track {
+    width: 32px;
+    height: 18px;
+  }
+
+  .fa-switch-track.active .fa-switch-thumb {
+    left: 14px;
   }
 }

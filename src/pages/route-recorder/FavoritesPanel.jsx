@@ -102,6 +102,10 @@ function FavoritesPanel({
                   <span className="meta-item">📏 {formatDistance(f.distance)}</span>
                   <span className="meta-item">📍 {f.waypointCount || 0} 途经</span>
                 </div>
+                <div className="favorite-meta">
+                  <span className="meta-item">⬆️ {f.climb || 0}m 爬升</span>
+                  <span className="meta-item">⬇️ {f.descent || 0}m 下降</span>
+                </div>
                 <div className="favorite-time">⏱️ {formatDateTime(f.createdAt)}</div>
                 <div className="favorite-actions">
                   <button className="action-btn action-load" onClick={() => onLoad(f)}>

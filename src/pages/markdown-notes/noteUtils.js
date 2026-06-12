@@ -1,9 +1,9 @@
 import {
-  STORAGE_KEY,
-  UI_STORAGE_KEY,
-  DEFAULT_PANEL_RATIO,
-  NODE_TYPES,
-  DEFAULT_NOTE_CONTENT,
+    DEFAULT_NOTE_CONTENT,
+    DEFAULT_PANEL_RATIO,
+    NODE_TYPES,
+    STORAGE_KEY,
+    UI_STORAGE_KEY,
 } from './constants.js'
 
 export function generateId(prefix = 'node') {
@@ -508,6 +508,15 @@ export function highlightText(text, query) {
   return text.replace(regex, '{{{HIGHLIGHT}}}$1{{{/HIGHLIGHT}}}')
 }
 
+export function highlightTextSafe(text, query) {
+  if (!query || !text) return escapeHtml(text)
+  const escapedText = escapeHtml(text)
+  const escapedQuery = escapeHtml(query)
+  const escapedRegexQuery = escapedQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const regex = new RegExp(`(${escapedRegexQuery})`, 'gi')
+  return escapedText.replace(regex, '<span class="highlight">$1</span>')
+}
+
 export function parseInternalLinks(content) {
   const linkRegex = /\[\[([^\]]+)\]\]/g
   const links = []
@@ -535,112 +544,171 @@ export function escapeHtml(text) {
 export function renderMarkdown(content, data) {
   if (!content) return ''
 
-  let html = escapeHtml(content)
+  const segments = []
+  const lines = content.split('\n')
+  let inCodeBlock = false
+  let codeBlockLang = ''
+  let codeBlockLines = []
+  let normalLines = []
 
-  html = html.replace(/^### (.*$)/gm, '<h3>$1</h3>')
-  html = html.replace(/^## (.*$)/gm, '<h2>$1</h2>')
-  html = html.replace(/^# (.*$)/gm, '<h1>$1</h1>')
+  function flushNormal() {
+    if (normalLines.length > 0) {
+      segments.push({ type: 'normal', content: normalLines.join('\n') })
+      normalLines = []
+    }
+  }
 
-  html = html.replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>')
-  html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-  html = html.replace(/\*(.*?)\*/g, '<em>$1</em>')
-  html = html.replace(/~~(.*?)~~/g, '<del>$1</del>')
-
-  html = html.replace(/`{3}([\s\S]*?)`{3}/g, (match, code) => {
-    return `<pre class="code-block"><code>${code}</code></pre>`
-  })
-  html = html.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>')
-
-  const lines = html.split('\n')
-  const processed = []
-  let inList = false
-  let listType = null
+  function flushCodeBlock() {
+    if (codeBlockLines.length > 0 || inCodeBlock) {
+      segments.push({ type: 'code', lang: codeBlockLang, content: codeBlockLines.join('\n') })
+      codeBlockLang = ''
+      codeBlockLines = []
+      inCodeBlock = false
+    }
+  }
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
+    const fenceMatch = line.match(/^\s*```([\w+\-#]*)\s*$/)
 
-    const olMatch = line.match(/^(\d+)\.\s+(.*)$/)
-    const ulMatch = line.match(/^[-*]\s+(.*)$/)
-
-    if (olMatch) {
-      if (!inList || listType !== 'ol') {
-        if (inList) processed.push(`</${listType}>`)
-        processed.push('<ol>')
-        inList = true
-        listType = 'ol'
-      }
-      processed.push(`<li>${olMatch[2]}</li>`)
-    } else if (ulMatch) {
-      if (!inList || listType !== 'ul') {
-        if (inList) processed.push(`</${listType}>`)
-        processed.push('<ul>')
-        inList = true
-        listType = 'ul'
-      }
-      processed.push(`<li>${ulMatch[1]}</li>`)
-    } else {
-      if (inList) {
-        processed.push(`</${listType}>`)
-        inList = false
-        listType = null
-      }
-      if (line.trim() === '') {
-        processed.push('')
+    if (fenceMatch) {
+      if (!inCodeBlock) {
+        flushNormal()
+        inCodeBlock = true
+        codeBlockLang = fenceMatch[1] || ''
       } else {
-        processed.push(line)
+        flushCodeBlock()
+      }
+    } else {
+      if (inCodeBlock) {
+        codeBlockLines.push(line)
+      } else {
+        normalLines.push(line)
       }
     }
   }
-  if (inList) processed.push(`</${listType}>`)
 
-  html = processed.join('\n')
+  if (inCodeBlock) {
+    flushCodeBlock()
+  } else {
+    flushNormal()
+  }
 
-  const tableRegex = /\|(.+)\|\n\|[-:\s|]+\|\n((?:\|.+\|\n?)+)/g
-  html = html.replace(tableRegex, (match, headerRow, bodyRows) => {
-    const headers = headerRow.split('|').map((h) => h.trim()).filter(Boolean)
-    const bodyLines = bodyRows.split('\n').filter(Boolean)
-
-    let tableHtml = '<table><thead><tr>'
-    for (const h of headers) {
-      tableHtml += `<th>${h}</th>`
+  const renderedSegments = segments.map((seg) => {
+    if (seg.type === 'code') {
+      const escapedCode = escapeHtml(seg.content)
+      return `<pre class="code-block"><code>${escapedCode}</code></pre>`
     }
-    tableHtml += '</tr></thead><tbody>'
 
-    for (const bodyLine of bodyLines) {
-      const cells = bodyLine.split('|').map((c) => c.trim()).filter(Boolean)
-      tableHtml += '<tr>'
-      for (let i = 0; i < headers.length; i++) {
-        tableHtml += `<td>${cells[i] || ''}</td>`
+    let html = escapeHtml(seg.content)
+
+    html = html.replace(/`([^`]+)`/g, (match, code) => {
+      return `<code class="inline-code">${code}</code>`
+    })
+
+    html = html.replace(/^### (.*$)/gm, '<h3>$1</h3>')
+    html = html.replace(/^## (.*$)/gm, '<h2>$1</h2>')
+    html = html.replace(/^# (.*$)/gm, '<h1>$1</h1>')
+
+    html = html.replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>')
+    html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    html = html.replace(/\*(.*?)\*/g, '<em>$1</em>')
+    html = html.replace(/~~(.*?)~~/g, '<del>$1</del>')
+
+    const htmlLines = html.split('\n')
+    const processed = []
+    let inList = false
+    let listType = null
+
+    for (let i = 0; i < htmlLines.length; i++) {
+      const line = htmlLines[i]
+
+      const olMatch = line.match(/^(\d+)\.\s+(.*)$/)
+      const ulMatch = line.match(/^[-*]\s+(.*)$/)
+
+      if (olMatch) {
+        if (!inList || listType !== 'ol') {
+          if (inList) processed.push(`</${listType}>`)
+          processed.push('<ol>')
+          inList = true
+          listType = 'ol'
+        }
+        processed.push(`<li>${olMatch[2]}</li>`)
+      } else if (ulMatch) {
+        if (!inList || listType !== 'ul') {
+          if (inList) processed.push(`</${listType}>`)
+          processed.push('<ul>')
+          inList = true
+          listType = 'ul'
+        }
+        processed.push(`<li>${ulMatch[1]}</li>`)
+      } else {
+        if (inList) {
+          processed.push(`</${listType}>`)
+          inList = false
+          listType = null
+        }
+        if (line.trim() === '') {
+          processed.push('')
+        } else {
+          processed.push(line)
+        }
       }
-      tableHtml += '</tr>'
     }
-    tableHtml += '</tbody></table>'
-    return tableHtml
+    if (inList) processed.push(`</${listType}>`)
+
+    html = processed.join('\n')
+
+    const tableRegex = /\|(.+)\|\n\|[-:\s|]+\|\n((?:\|.+\|\n?)+)/g
+    html = html.replace(tableRegex, (match, headerRow, bodyRows) => {
+      const headers = headerRow.split('|').map((h) => h.trim()).filter(Boolean)
+      const bodyLines = bodyRows.split('\n').filter(Boolean)
+
+      let tableHtml = '<table><thead><tr>'
+      for (const h of headers) {
+        tableHtml += `<th>${h}</th>`
+      }
+      tableHtml += '</tr></thead><tbody>'
+
+      for (const bodyLine of bodyLines) {
+        const cells = bodyLine.split('|').map((c) => c.trim()).filter(Boolean)
+        tableHtml += '<tr>'
+        for (let i = 0; i < headers.length; i++) {
+          tableHtml += `<td>${cells[i] || ''}</td>`
+        }
+        tableHtml += '</tr>'
+      }
+      tableHtml += '</tbody></table>'
+      return tableHtml
+    })
+
+    html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" />')
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+
+    const linkRegex = /\[\[([^\]]+)\]\]/g
+    html = html.replace(linkRegex, (match, title) => {
+      const existingNote = findNoteByTitle(data, title)
+      if (existingNote) {
+        return `<a href="#" class="internal-link" data-note-id="${existingNote.id}" data-note-title="${title}">[[${title}]]</a>`
+      } else {
+        return `<a href="#" class="internal-link broken" data-note-title="${title}" data-create-new="true">[[${title}]]</a>`
+      }
+    })
+
+    html = html.split('\n').map((line) => {
+      const trimmed = line.trim()
+      if (trimmed === '' || line.startsWith('<h') || line.startsWith('<ul') || line.startsWith('<ol') ||
+          line.startsWith('</ul') || line.startsWith('</ol') || line.startsWith('<li') || line.startsWith('</li') ||
+          line.startsWith('<table') || line.startsWith('</table')) {
+        return line
+      }
+      return `<p>${line}</p>`
+    }).join('\n')
+
+    return html
   })
 
-  html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" />')
-  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
-
-  const linkRegex = /\[\[([^\]]+)\]\]/g
-  html = html.replace(linkRegex, (match, title) => {
-    const existingNote = findNoteByTitle(data, title)
-    if (existingNote) {
-      return `<a href="#" class="internal-link" data-note-id="${existingNote.id}" data-note-title="${title}">[[${title}]]</a>`
-    } else {
-      return `<a href="#" class="internal-link broken" data-note-title="${title}" data-create-new="true">[[${title}]]</a>`
-    }
-  })
-
-  html = html.split('\n').map((line) => {
-    if (line.trim() === '' || line.startsWith('<h') || line.startsWith('<ul') || line.startsWith('<ol') ||
-        line.startsWith('</ul') || line.startsWith('</ol') || line.startsWith('<li') || line.startsWith('</li') ||
-        line.startsWith('<pre') || line.startsWith('</pre') || line.startsWith('<table') || line.startsWith('</table')) {
-      return line
-    }
-    return `<p>${line}</p>`
-  }).join('\n')
-
-  return html
+  return renderedSegments.join('\n')
 }
 
 export function getBrokenLinks(data) {

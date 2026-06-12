@@ -1,6 +1,12 @@
-import { STATUS_FILTER_OPTIONS } from '../constants.js'
+import { AVAILABLE_USERS, STATUS_FILTER_OPTIONS } from '../constants.js'
 
-export default function FilterBar({ statusFilter, onStatusChange, onCreate }) {
+export default function FilterBar({
+  statusFilter,
+  onStatusChange,
+  onCreate,
+  currentUser,
+  onUserChange,
+}) {
   return (
     <div className="rm-filter-bar">
       <div className="rm-filter-left">
@@ -18,6 +24,20 @@ export default function FilterBar({ statusFilter, onStatusChange, onCreate }) {
         </div>
       </div>
       <div className="rm-filter-right">
+        <div className="rm-user-selector">
+          <span className="rm-filter-label">当前用户：</span>
+          <select
+            className="rm-input rm-user-select"
+            value={currentUser?.id || ''}
+            onChange={(e) => onUserChange && onUserChange(e.target.value)}
+          >
+            {AVAILABLE_USERS.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.name} ({u.role})
+              </option>
+            ))}
+          </select>
+        </div>
         <button className="rm-btn rm-btn-primary" onClick={onCreate}>
           + 新建版本
         </button>

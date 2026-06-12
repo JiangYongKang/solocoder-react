@@ -16,8 +16,11 @@ export default function ShopDetail({ shop, cart, onAddToCart, onBack }) {
   const [specPopup, setSpecPopup] = useState(null);
   const [selectedSpecs, setSelectedSpecs] = useState({});
   const [plusAnimation, setPlusAnimation] = useState(null);
+  const [previewProduct, setPreviewProduct] = useState(null);
   const observerRef = useRef(null);
   const groupElementsRef = useRef({});
+  const longPressTimerRef = useRef(null);
+  const longPressTriggeredRef = useRef(false);
 
   const groups = shop ? getShopProductGroups(shop, SHOP_PRODUCTS_GROUPS) : [];
   const grouped = shop ? groupProducts(shop.products) : {};
@@ -27,6 +30,14 @@ export default function ShopDetail({ shop, cart, onAddToCart, onBack }) {
       setActiveGroup(groups[0]);
     }
   }, [groups, activeGroup]);
+
+  useEffect(() => {
+    return () => {
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const container = scrollRef.current;
@@ -113,6 +124,28 @@ export default function ShopDetail({ shop, cart, onAddToCart, onBack }) {
     setSelectedSpecs({});
   };
 
+  const handleProductImgPressStart = (product) => {
+    longPressTriggeredRef.current = false;
+    longPressTimerRef.current = setTimeout(() => {
+      longPressTriggeredRef.current = true;
+      setPreviewProduct(product);
+    }, 500);
+  };
+
+  const handleProductImgPressEnd = (product) => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const handleProductImgClick = (product) => {
+    if (!longPressTriggeredRef.current) {
+      setPreviewProduct(product);
+    }
+    longPressTriggeredRef.current = false;
+  };
+
   if (!shop) return null;
 
   const starChars = { full: '★', half: '½', empty: '☆' };
@@ -165,7 +198,14 @@ export default function ShopDetail({ shop, cart, onAddToCart, onBack }) {
               <div key={product.id} className="fo-product-item">
                 <div
                   className="fo-product-img"
-                  style={{ backgroundColor: generateProductColor(product.name) }}
+                  style={{ backgroundColor: generateProductColor(product.name), cursor: 'pointer' }}
+                  onClick={() => handleProductImgClick(product)}
+                  onMouseDown={() => handleProductImgPressStart(product)}
+                  onMouseUp={() => handleProductImgPressEnd(product)}
+                  onMouseLeave={() => handleProductImgPressEnd(product)}
+                  onTouchStart={() => handleProductImgPressStart(product)}
+                  onTouchEnd={() => handleProductImgPressEnd(product)}
+                  title="点击或长按查看大图"
                 >
                   {product.name.charAt(0)}
                 </div>
@@ -241,6 +281,42 @@ export default function ShopDetail({ shop, cart, onAddToCart, onBack }) {
               >
                 加入购物车
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {previewProduct && (
+        <div className="fo-spec-overlay" onClick={() => setPreviewProduct(null)}>
+          <div className="fo-preview-popup" onClick={(e) => e.stopPropagation()}>
+            <div className="fo-spec-header">
+              <div className="fo-spec-title">商品详情</div>
+              <button className="fo-spec-close" onClick={() => setPreviewProduct(null)}>✕</button>
+            </div>
+            <div className="fo-preview-body">
+              <div
+                className="fo-preview-img"
+                style={{ backgroundColor: generateProductColor(previewProduct.name) }}
+              >
+                {previewProduct.name.charAt(0)}
+              </div>
+              <div className="fo-preview-name">{previewProduct.name}</div>
+              <div className="fo-preview-desc">{previewProduct.description}</div>
+              <div className="fo-preview-meta">
+                <span>月售 {previewProduct.monthlySales}</span>
+                <span className="fo-preview-price">{formatPrice(previewProduct.price)}</span>
+              </div>
+              {previewProduct.specs && previewProduct.specs.length > 0 && (
+                <div className="fo-preview-specs">
+                  <div className="fo-spec-group-label">可选规格</div>
+                  {previewProduct.specs.map((spec) => (
+                    <div key={spec.name} className="fo-preview-spec-row">
+                      <span className="fo-preview-spec-name">{spec.name}：</span>
+                      <span>{spec.options.join(' / ')}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>

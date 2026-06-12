@@ -2,6 +2,7 @@ export const STORAGE_KEY = 'json-to-ts-history'
 export const MAX_HISTORY_ITEMS = 30
 export const DEBOUNCE_DELAY = 300
 export const DEFAULT_ROOT_NAME = 'RootType'
+export const MAX_RECURSION_DEPTH = 50
 
 export const SAMPLE_JSON = `{
   "id": 1,

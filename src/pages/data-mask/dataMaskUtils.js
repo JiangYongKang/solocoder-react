@@ -11,14 +11,15 @@ export const applyRule = (text, rule) => {
     return { result: text, matches: [] }
   }
 
-  const matches = []
+  const rawMatches = []
   let match
 
   while ((match = regex.exec(text)) !== null) {
-    matches.push({
+    rawMatches.push({
       start: match.index,
       end: match.index + match[0].length,
       original: match[0],
+      groups: match.slice(1),
       ruleId: rule.id,
       ruleName: rule.name,
     })
@@ -31,38 +32,34 @@ export const applyRule = (text, rule) => {
   const replacement = rule.replacement || '***'
   const result = text.replace(regex, replacement)
 
+  const matches = rawMatches.map((m) => ({
+    start: m.start,
+    end: m.end,
+    original: m.original,
+    ruleId: m.ruleId,
+    ruleName: m.ruleName,
+  }))
+
   return { result, matches }
 }
 
-export const applyRules = (text, rules) => {
-  if (!text) return { result: '', matches: [], stats: {} }
-  if (!rules || rules.length === 0) return { result: text, matches: [], stats: {} }
+const computeSingleReplacement = (originalText, groups, replacement) => {
+  if (!replacement) return '***'
+  if (typeof replacement !== 'string') return String(replacement)
+  if (!replacement.includes('$')) return replacement
 
-  const enabledRules = rules.filter((r) => r.enabled)
-  if (enabledRules.length === 0) return { result: text, matches: [], stats: {} }
-
-  let currentText = text
-  const allMatches = []
-  const stats = {}
-
-  for (const rule of enabledRules) {
-    const { result, matches } = applyRule(currentText, rule)
-    currentText = result
-    for (const m of matches) {
-      allMatches.push(m)
-      stats[rule.id] = (stats[rule.id] || 0) + 1
-    }
+  let result = replacement
+  for (let i = 0; i < groups.length; i++) {
+    const groupValue = groups[i] == null ? '' : groups[i]
+    const placeholder = '$' + (i + 1)
+    result = result.split(placeholder).join(groupValue)
   }
-
-  return { result: currentText, matches: allMatches, stats }
+  result = result.split('$&').join(originalText)
+  return result
 }
 
-export const countSensitiveInfo = (text, rules) => {
-  if (!text) return { total: 0, details: {} }
-  if (!rules || rules.length === 0) return { total: 0, details: {} }
-
-  const details = {}
-  let total = 0
+const collectMatchesFromOriginal = (text, rules) => {
+  const allRawMatches = []
 
   for (const rule of rules) {
     if (!rule.enabled) continue
@@ -74,40 +71,16 @@ export const countSensitiveInfo = (text, rules) => {
       continue
     }
 
-    const matches = text.match(regex)
-    const count = matches ? matches.length : 0
-    details[rule.id] = { count, name: rule.name }
-    total += count
-  }
-
-  return { total, details }
-}
-
-export const buildHighlightSegments = (originalText, maskedText, rules) => {
-  if (!originalText) return []
-  if (!rules || rules.length === 0) return [{ type: 'normal', value: originalText }]
-
-  const enabledRules = rules.filter((r) => r.enabled)
-  if (enabledRules.length === 0) return [{ type: 'normal', value: originalText }]
-
-  const allRanges = []
-
-  for (const rule of enabledRules) {
-    const pattern = rule.groupPattern || rule.pattern
-    let regex
-    try {
-      regex = new RegExp(pattern, 'g')
-    } catch {
-      continue
-    }
-
     let match
-    while ((match = regex.exec(originalText)) !== null) {
-      allRanges.push({
+    while ((match = regex.exec(text)) !== null) {
+      allRawMatches.push({
         start: match.index,
         end: match.index + match[0].length,
+        original: match[0],
+        groups: match.slice(1),
         ruleId: rule.id,
         ruleName: rule.name,
+        replacement: rule.replacement || '***',
       })
       if (match.index === regex.lastIndex) {
         regex.lastIndex++
@@ -115,36 +88,109 @@ export const buildHighlightSegments = (originalText, maskedText, rules) => {
     }
   }
 
-  if (allRanges.length === 0) return [{ type: 'normal', value: originalText }]
+  allRawMatches.sort((a, b) => a.start - b.start)
 
-  allRanges.sort((a, b) => a.start - b.start)
-
-  const mergedRanges = []
-  for (const range of allRanges) {
-    if (mergedRanges.length > 0) {
-      const last = mergedRanges[mergedRanges.length - 1]
-      if (range.start <= last.end) {
-        last.end = Math.max(last.end, range.end)
-        continue
-      }
+  const selected = []
+  let lastEnd = -1
+  for (const m of allRawMatches) {
+    if (m.start >= lastEnd) {
+      selected.push(m)
+      lastEnd = m.end
     }
-    mergedRanges.push({ start: range.start, end: range.end, ruleId: range.ruleId, ruleName: range.ruleName })
   }
+
+  return selected
+}
+
+export const applyRules = (text, rules) => {
+  if (!text) return { result: '', matches: [], stats: {} }
+  if (!rules || rules.length === 0) return { result: text, matches: [], stats: {} }
+
+  const enabledRules = rules.filter((r) => r.enabled)
+  if (enabledRules.length === 0) return { result: text, matches: [], stats: {} }
+
+  const selectedMatches = collectMatchesFromOriginal(text, enabledRules)
+
+  if (selectedMatches.length === 0) {
+    return { result: text, matches: [], stats: {} }
+  }
+
+  const parts = []
+  let cursor = 0
+  const stats = {}
+  const matches = []
+
+  for (const m of selectedMatches) {
+    if (cursor < m.start) {
+      parts.push(text.slice(cursor, m.start))
+    }
+    const replaced = computeSingleReplacement(m.original, m.groups, m.replacement)
+    parts.push(replaced)
+    cursor = m.end
+    stats[m.ruleId] = (stats[m.ruleId] || 0) + 1
+    matches.push({
+      start: m.start,
+      end: m.end,
+      original: m.original,
+      ruleId: m.ruleId,
+      ruleName: m.ruleName,
+    })
+  }
+
+  if (cursor < text.length) {
+    parts.push(text.slice(cursor))
+  }
+
+  return { result: parts.join(''), matches, stats }
+}
+
+export const countSensitiveInfo = (text, rules) => {
+  if (!text) return { total: 0, details: {} }
+  if (!rules || rules.length === 0) return { total: 0, details: {} }
+
+  const enabledRules = rules.filter((r) => r.enabled)
+  if (enabledRules.length === 0) return { total: 0, details: {} }
+
+  const selectedMatches = collectMatchesFromOriginal(text, enabledRules)
+
+  const details = {}
+  for (const rule of rules) {
+    if (!rule.enabled) continue
+    const count = selectedMatches.filter((m) => m.ruleId === rule.id).length
+    if (count > 0) {
+      details[rule.id] = { count, name: rule.name }
+    }
+  }
+
+  const total = selectedMatches.length
+  return { total, details }
+}
+
+export const buildHighlightSegments = (originalText, rules) => {
+  if (!originalText) return []
+  if (!rules || rules.length === 0) return [{ type: 'normal', value: originalText }]
+
+  const enabledRules = rules.filter((r) => r.enabled)
+  if (enabledRules.length === 0) return [{ type: 'normal', value: originalText }]
+
+  const selectedMatches = collectMatchesFromOriginal(originalText, enabledRules)
+
+  if (selectedMatches.length === 0) return [{ type: 'normal', value: originalText }]
 
   const segments = []
   let cursor = 0
 
-  for (const range of mergedRanges) {
-    if (cursor < range.start) {
-      segments.push({ type: 'normal', value: originalText.slice(cursor, range.start) })
+  for (const m of selectedMatches) {
+    if (cursor < m.start) {
+      segments.push({ type: 'normal', value: originalText.slice(cursor, m.start) })
     }
     segments.push({
       type: 'masked',
-      value: originalText.slice(range.start, range.end),
-      ruleId: range.ruleId,
-      ruleName: range.ruleName,
+      value: originalText.slice(m.start, m.end),
+      ruleId: m.ruleId,
+      ruleName: m.ruleName,
     })
-    cursor = range.end
+    cursor = m.end
   }
 
   if (cursor < originalText.length) {

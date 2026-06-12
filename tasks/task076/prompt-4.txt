@@ -1,0 +1,9 @@
+你补充的响应式 CSS 和测试用例还存在以下问题需要修复：
+
+1. Diff 面板在移动端的上下堆叠布局不生效：768px 断点中 .rm-diff-container 设置了 flex-direction: column，但该元素基础样式使用 display: grid，flex-direction 对 grid 容器无效，导致 375px 宽度下 Diff 面板仍然左右并排显示。需要同时覆写 display 属性使 flex-direction 生效，或使用 grid-template-columns: 1fr 改为单列布局。
+
+2. buildReleaseDiff 的测试用例只做了输出是否为空的浅层长度判断（leftRows.length > 0 等），没有验证 diff 的具体内容——哪些行被标记为新增、删除或修改，左右面板的行号是否正确赋值。需要补充对 buildReleaseDiff 函数输出结果的精确内容断言。
+
+3. truncateTextForDiff 截断测试中行数断言使用了 expect(result.split("\n").length).toBeLessThan(MAX_DIFF_LINES + 5)，输入 510 行时正确结果为 503 行但 <505 的条件范围过宽。需要使用精确的行数断言替换该断言。
+
+4. 重新运行 pnpm run test，需要让所有测试通过。

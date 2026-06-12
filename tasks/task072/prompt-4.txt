@@ -1,0 +1,7 @@
+你新增的测试用例存在两个问题需要修复：
+
+1. 深层嵌套数组类型保留测试中，buildDeepWithArray(60) 构造的深度 60 对象里，collectNestedObjects 在 depth=50 时已停止递归遍历嵌套字段，导致 items: [1,2,3] 字段永远不会出现在 generateTypeScript 输出中，arrayFields 结果为空，if (arrayFields.length > 0) 的条件 guard 使测试静默通过，完全没有验证到修复效果。需要将测试深度调整到能确保数组字段实际出现在输出中的范围。
+
+2. collectNestedObjects 提前返回一致性测试断言使用了 expect(typeof result.listTypeName).toBeDefined()，typeof 始终返回字符串值导致该断言永远为 true，完全无效。需要使用 expect(result).toHaveProperty('listTypeName') 等能实际验证返回值结构的断言。
+
+3. 重新运行 pnpm run test，需要让所有测试通过。

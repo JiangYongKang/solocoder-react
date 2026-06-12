@@ -1,5 +1,8 @@
 产物不满意：
 1. funnel-analysis 的漏斗图使用纯 CSS 横向条形图实现，但步骤之间的连接线（斜线或箭头表示流程）未在图表中渲染。提示词明确要求"条形之间用斜线或箭头连接表示流程"，模型在 constants.js 中定义了步骤间连接的颜色变量但在 index.jsx 的渲染逻辑中没有生成对应的连接线元素。这导致漏斗步骤之间的流程关系在视觉上不够清晰。
 2. 日期范围筛选的快捷选择在 getDatePresetRange 函数中，"本月"和"本季度"的起始日期计算逻辑存在边界问题——getDateNDaysAgo 函数的实现中使用了 `d.setDate(d.getDate() - n + 1)`，导致"最近 7 天"实际只涵盖 6 天而非完整的 7 天。提示词要求"最近 7 天"，应返回从 7 天前到今天的完整 7 天数据。
+3. index.jsx 的 DataEditorPanel 组件在渲染函数体中直接调用 setEditData 和 setErrors 状态更新函数。React 禁止在 render 阶段调用 useState 的 setter，因为这会导致额外的同步重渲染，严重时可能触发无限循环。正确做法是将 props 到 state 的同步逻辑移到 useEffect 中，仅在 groups 引用变化时执行。
+4. utils.js 中 getDropOffCause 函数使用 Math.random() 随机选择流失原因文本。同一组流失数据每次渲染时显示的"可能原因"都可能不同，UI 输出非确定性。在数据分析工具中，相同数据应产生一致的展示结果。正确做法是根据数据特征确定性选择原因词条，而非随机选取。
+5. utils.js 中 loadState 函数对 localStorage 数据的结构验证不充分——只检查了 steps 是否为数组，未验证 groups 是否为数组、数据对象是否包含合法键值。当 localStorage 中存在部分损坏的数据（如 groups 是字符串而非数组）时，loadState 返回该对象后后续代码访问 groups[0].data 会抛出 TypeError 导致页面崩溃。正确做法是在加载时做完整的结构验证，不合格时回退到默认状态。
 
 过程不满意：模型在 session-cot-1.md 中创建目录使用了 `mkdir -p` 命令（第 110 行），但该命令在 Windows PowerShell 中可能不被原生支持（Windows 上 -p 不是 mkdir 的标准参数）。虽然项目运行环境可能装有兼容工具，但模型应该使用跨平台兼容的命令或在创建目录前先检查环境。另外模型在总结中没有明确提及 App.jsx 的路由注册操作，但实际上路由已在 App.jsx 中存在，这使得无法判断路由是由模型添加还是其他任务补全。

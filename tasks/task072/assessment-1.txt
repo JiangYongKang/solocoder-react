@@ -1,5 +1,6 @@
 产物不满意：
-1. jsonToTsUtils.js 中 `buildTypeDefinitions` 函数的类型推导在处理空数组时，对 `[]` 推导为 `any[]` 符合提示词要求，但对嵌套空数组 `[[]]` 的处理逻辑不完整，第二层空数组推导出的类型变成了 `any[][]` 而非更精确的 `any[]`。提示词要求空数组推导为 `any[]`，多层嵌套的空数组应保持一致的推导逻辑。正确做法是递归处理数组元素类型时，对空数组做特殊判定统一返回 `any[]`。
-2. 输入文本框的格式化按钮在处理超大 JSON（超过 10000 行）时，`JSON.stringify` 的缩进格式化可能导致浏览器短暂卡顿。提示词没有要求性能优化，但作为开发者工具应该考虑对大型输入的分块处理或防抖保护的降级策略。
+1. jsonToTsUtils.js 中 collectNestedObjects 函数的递归处理没有深度上限检查。当输入的 JSON 对象包含深层嵌套结构（如超过 200 层的嵌套对象）时，该函数会持续递归直到调用栈溢出，导致浏览器页面崩溃。提示词提到了"深度超过 3 层时可使用 type 别名引用"，说明模型意识到了深度控制的需求，但在实际实现中只在 buildTypeDefinitions 中做了深度标识，而没有在递归收集阶段做栈溢出保护。正确做法是在 collectNestedObjects 递归调用前检查 depth 参数并设置硬上限（如 50 层）。
+2. generateTypeScript 函数中对 rootListName 的赋值逻辑存在缺陷——代码通过 `if (def.depth === 0)` 判断是否为根级类型定义来设置 rootListName，但在 collectNestedObjects 中，数组容器的 depth 参数直接使用了父级 depth 而非递增后的值。当根 JSON 是一个包含数组字段的对象（如 `{"items": [1,2,3]}`）而非直接数组时，列表类型的 depth 可能不为 0，导致 rootListName 设置失败，生成的类型代码中缺少容器类型别名。
+3. copyToClipboard 和 downloadTsFile 两个工具函数完全没有单元测试覆盖。copyToClipboard 包含 Clipboard API 和 document.execCommand 回退两个分支以及浏览器/SSR 环境判断，downloadTsFile 包含 DOM 操作创建下载链接的逻辑——这些多分支函数缺少测试意味着代码在各种环境下的行为未被验证。正确做法是至少 mock navigator.clipboard 和 document.createElement 来覆盖各分支路径。
 
 过程不满意：模型在 session-cot-1.md 中反复读取 App.jsx 多达 5 次以上（第 174、233、251、496、526 行），每次读取的动机都是"检查路由是否注册"。在前面几次已经确认 App.jsx 结构和当前路由状态后，后续的重复读取属于冗余操作。正确做法是第一次读取后就记录关键信息，后续直接进行修改操作而非反复验证。

@@ -1,3 +1,7 @@
-产物不满意：App.jsx 中虽然添加了 Markdown 笔记应用的任务卡片条目（id:64, route: markdown-notes），但缺少对应的 import 语句和 Route 组件配置。用户点击首页的"Markdown 笔记应用"卡片后会触发 navigate 到 /markdown-notes 路径，由于没有对应的 Route 匹配，页面会显示空白或 404，属于页面不可访问的阻断性问题。原因是在修改 App.jsx 时只添加了 TASKS 数组中的卡片描述，遗漏了 import 和 Route 两个必要步骤。正确做法是三者同步添加——先 import MarkdownNotesPage 组件，再在 TASKS 中添加卡片条目，最后在 Routes 中注册路径。
+产物不满意：
+1. App.jsx 中虽然添加了 Markdown 笔记应用的任务卡片条目（id:64, route: markdown-notes），但缺少对应的 import 语句和 Route 组件配置。用户点击首页的"Markdown 笔记应用"卡片后会触发 navigate 到 /markdown-notes 路径，由于没有对应的 Route 匹配，页面会显示空白或 404，属于页面不可访问的阻断性问题。原因是在修改 App.jsx 时只添加了 TASKS 数组中的卡片描述，遗漏了 import 和 Route 两个必要步骤。正确做法是三者同步添加——先 import MarkdownNotesPage 组件，再在 TASKS 中添加卡片条目，最后在 Routes 中注册路径。
+2. SearchBar.jsx 中搜索结果的高亮渲染使用了 `dangerouslySetInnerHTML` 直接插入包含用户笔记标题和内容片段的 HTML，未对笔记内容中的 `<`、`>` 等字符做转义处理。当用户创建标题包含 `<script>alert(1)</script>` 的笔记后进行搜索，该搜索结果的 HTML 片段会导致 XSS 代码执行。正确做法是先对匹配内容调用 HTML 实体转义函数，再包装高亮 `<mark>` 标签后设置 innerHTML。
+3. noteUtils.js 中 Markdown 渲染函数对代码块内行内代码的处理存在嵌套错误——代码块（``` 包围）内的反引号被行内代码正则再次匹配，导致代码块内 `<code>` 标签被额外包裹一层，破坏了 HTML 结构。原因是渲染正则的匹配顺序未考虑代码块优先级。正确做法是先匹配代码块整体，在代码块范围内不执行行内代码高亮的替换。
+4. 保存逻辑存在双重冲突——useEffect 中每当选中的笔记变化时立即执行 `saveData` 全量保存，同时编辑器的 500ms 防抖回调也调用 `saveData`。当用户快速切换笔记后，前一个笔记的防抖回调可能后于切换笔记的即时保存执行，导致新笔记被前一个笔记的旧快照覆盖。正确做法是只保留一种保存策略或在防抖回调中添加笔记 ID 检查确保保存的是当前笔记。
 
 过程不满意：模型在 session-cot-1.md 中完全没有提到 App.jsx 的修改需求，流程中只关注了 markdown-notes 目录内的代码实现和测试运行。模型在总结中声称"所有功能均已完成"，但一个二级页面从首页无法访问属于功能未完成的严重缺陷。根本原因是模型对"页面开发完成"的理解只停留在页面内部代码层面，没有从端到端的用户体验角度验证页面是否可被用户实际访问。正确做法是在开发完成后打开首页点击对应任务卡片验证跳转是否正常。

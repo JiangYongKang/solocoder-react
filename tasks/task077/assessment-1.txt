@@ -1,6 +1,7 @@
 产物不满意：
-1. rpg-creator 的 CharacterCard.jsx 中角色卡片导出功能通过 Canvas 绘制，但雷达图（六维属性分布图）的绘制逻辑在 drawCardCanvas 函数中直接从 0 到最大值绘制多边形，没有标注各轴的最大值和当前值的数值标签。用户在查看导出的角色卡片时只能看到形状而无法精确读取各项属性的具体数值，卡片的可读性不足。提示词要求卡片展示"六维属性雷达图"，应包含数值标注。
-2. 技能树 SkillTree.jsx 中的技能解锁逻辑在检查前置条件时，如果前置技能已被解锁且属性值恰好等于要求值，解锁按钮应该可用。但模型在处理属性值比较时使用了严格相等判断（===），对于属性值 >= 要求值的场景应该有明确的大于等于判断逻辑。
+1. rpg-creator 的 utils.js 中 calculateDerivedStats 函数的返回值类型不一致——hp、physicalAttack、magicalAttack 等字段返回数字类型，而 critRate 返回 `(attrs.agility * 0.5) + '%'` 即字符串类型，dodgeRate 同理。同一个函数的返回值中混用数字和字符串类型，导致调用方 AttributePanel.jsx 在渲染时直接使用 `{derived.critRate}` 显示，严重依赖函数的特定字符串格式。如果后续需要对这些衍生数值做计算（如技能伤害加成），字符串格式将导致 NaN。正确做法是统一返回数字类型，格式化逻辑由展示层负责。
+2. rpg-creator.css 和所有子组件的样式缺少 375px 移动端断点的适配——唯一的响应式规则是 @media (max-width: 900px)，仅将三栏布局改为单栏。在 375px 宽度下，属性面板的 +/- 按钮挤在一起难以点击，技能树的树形节点连线溢出，外观选择面板的横向滚动缩略图列表宽度不足。说明模型在样式开发阶段完全没有针对移动端做适配验证。
+3. utils.js 中的 drawCardCanvas 函数内部直接使用了 `document.createElement('canvas')`，使该函数在纯 JS 测试环境（Node.js）中完全不可测试。虽然 Canvas 绘制函数本身就依赖浏览器 API，但应该将 DOM 操作抽象为可注入的依赖，或至少将卡片数据计算逻辑与 DOM 绘制逻辑分离以便单元测试。
 
 过程不满意：
 1. 模型在 session-cot-1.md 中第 18 行就读取了 App.jsx，发现 RpgCreatorPage 和 RouteRecorderPage 的导入缺失。但模型在修复时还额外添加了 DataImporterPage 和 JsonToTsPage 的导入，这些是其他任务的页面，模型在没有充分了解这些页面是否已完成开发的情况下就擅自添加导入。虽然这个操作没有导致编译错误，但超出了当前任务范围，存在过度干预的风险。

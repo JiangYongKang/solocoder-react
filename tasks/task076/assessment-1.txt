@@ -1,7 +1,9 @@
 产物不满意：
-1. release-manager 的 DiffPanel.jsx 中行级 Diff 对比使用了 LCS（最长公共子序列）动态规划算法，这是一个 O(n×m) 时间复杂度的算法。当两个版本的变更日志都较长（如超过 500 行 Markdown）时，LCS 矩阵计算会导致明显的 UI 卡顿。提示词只要求行级差异高亮，不需要字符级 diff，但对于可能的大文本场景，应该在 Diff 计算前对输入做长度截断保护或使用 Web Worker 异步计算。
-2. 版本审批流程中的状态变更记录了操作人和操作时间，但操作人使用的是硬编码的常量 CURRENT_USER，没有提供切换用户的机制。这对于一个模拟审批流程的工具来说，不同角色的审批本应由不同用户执行，但当前实现中所有操作都标记为同一用户，降低了审批时间线的真实感。
+1. useReleaseManager.js 中 handleApprove、handleRollback、handleDelete 三个函数通过 useCallback 创建闭包，依赖数组只包含 releases，但回调内部使用了 setReleases 的函数式更新 `setReleases(prevReleases => ...)`。当多个审批操作快速连续触发时，函数式更新虽然能拿到最新状态，但操作校验（如检查版本当前是否处于可审批状态）使用的是闭包中捕获的旧 releases 数组，可能导致校验绕过——用户快速双击"审核通过"时，第二次点击仍使用旧的 releases 做权限校验，可能重复通过审批。正确做法是使用 useRef 保存 releases 的最新引用或在校验时也使用函数式更新。
+2. DiffPanel.jsx 中行级 Diff 对比使用了 LCS 动态规划算法，时间复杂度 O(n×m)。当两个版本的变更日志都较长（如超过 500 行 Markdown）时，LCS 矩阵计算会导致明显的 UI 卡顿。提示词只要求行级差异高亮，无需字符级 diff，但对于可能的大文本场景，应该在 Diff 计算前对输入做长度截断保护或使用 Web Worker 异步计算。
+3. 版本审批流程中的状态变更记录了操作人和操作时间，但操作人使用的是硬编码的常量 CURRENT_USER，没有提供批量操作中切换用户上下文的机制。一个审批流程工具中，提交人、审核人、回滚执行人本应是不同角色，但当前实现全部标记为同一用户，审批时间线的真实感降低。正确做法是至少提供当前操作用户的名称输入或选择框。
+4. release-manager.css 和所有子组件的 CSS 缺少 375px 移动端断点的响应式设计——整个样式文件没有 @media (max-width: 375px) 或类似的移动端适配规则。表格列表、Diff 左右分栏、审批弹窗在 375px 宽度下会出现横向溢出。说明模型在样式开发阶段完全没有考虑移动端适配。
 
 过程不满意：
-1. 模型在修复 ESLint 错误时，对 ApprovalActionModal 和 ReleaseFormModal 中 setState-in-effect 问题的修复方式是将 useEffect 中的 reset 逻辑改为调用方使用 key prop 强制重挂载组件。虽然这种方式在功能上可行，但属于为了通过 ESLint 规则而对生产代码做结构变更。ESLint 的 react-hooks/setState-in-effect 规则只是建议性的，模型应该评估是否需要修复而非为过规则而改架构。
-2. 模型执行 pnpm build 时构建失败（data-importer 模块缺少 constants.js），模型判断"和我们的代码无关"后直接跳过。虽然这个判断在本任务范围内是正确的，但模型应该追问是否需要在当前 session 中一并修复这个跨任务问题，因为构建失败意味着整个项目无法部署。
+1. 模型在修复 ESLint 错误时，对 ApprovalActionModal 和 ReleaseFormModal 中 setState-in-effect 问题的修复方式是将 useEffect 中的 reset 逻辑改为调用方使用 key prop 强制重挂载组件。虽然这种方式在功能上可行，但属于为了通过一条 ESLint 规则而改变了组件使用方式，增加了父组件的维护复杂度。正确做法应评估规则的重要性后选择最小侵入的修复方案。
+2. 模型执行 pnpm build 时构建失败（data-importer 模块缺少 constants.js），模型判断"和我们的代码无关"后直接跳过。虽然这个判断在本任务范围内是正确的，但模型应该追问是否需要在当前 session 中一并修复这个阻塞性问题，因为构建失败意味着整个项目无法部署。

@@ -9,6 +9,9 @@ import ChatPage from '@/pages/chat/index.jsx'
 import CouponPage from '@/pages/coupon/index.jsx'
 import CurrencyConverterPage from '@/pages/currency-converter/index.jsx'
 import Dashboard from '@/pages/dashboard/Dashboard.jsx'
+import DataImporterPage from '@/pages/data-importer/index.jsx'
+import DataMaskPage from '@/pages/data-mask/index.jsx'
+import JsonToTsPage from '@/pages/json-to-ts/index.jsx'
 import DBDesignerPage from '@/pages/db-designer/index.jsx'
 import EventTimelinePage from '@/pages/event-timeline/index.jsx'
 import ExamPage from '@/pages/exam/index.jsx'
@@ -16,7 +19,9 @@ import FileManager from '@/pages/file-manager/FileManager.jsx'
 import FinancePage from '@/pages/finance/index.jsx'
 import FitnessTrackerPage from '@/pages/fitness-tracker/index.jsx'
 import FlashSalePage from '@/pages/flash-sale/index.jsx'
+import FoodOrderPage from '@/pages/food-order/index.jsx'
 import FormBuilder from '@/pages/form-builder/FormBuilder.jsx'
+import FunnelAnalysisPage from '@/pages/funnel-analysis/index.jsx'
 import GanttChartPage from '@/pages/gantt-chart/index.jsx'
 import GeometryBoardPage from '@/pages/geometry-board/index.jsx'
 import GitBrowserPage from '@/pages/git-browser/index.jsx'
@@ -39,7 +44,10 @@ import ProductReviewPage from '@/pages/product-review/index.jsx'
 import ProductsPage from '@/pages/products/index.jsx'
 import QRCodePage from '@/pages/qrcode/index.jsx'
 import RegexTesterPage from '@/pages/regex-tester/index.jsx'
+import ReleaseManagerPage from '@/pages/release-manager/index.jsx'
 import RichEditorPage from '@/pages/rich-editor/index.jsx'
+import RouteRecorderPage from '@/pages/route-recorder/index.jsx'
+import RpgCreatorPage from '@/pages/rpg-creator/index.jsx'
 import SchedulePlannerPage from '@/pages/schedule-planner/index.jsx'
 import SkuSelectorPage from '@/pages/sku-selector/index.jsx'
 import SnippetsPage from '@/pages/snippets/index.jsx'
@@ -120,6 +128,13 @@ const TASKS = [
     { id: 59, title: '课程表排课', route: 'schedule-planner', description: '高校课程表制作工具，周视图网格排课、拖拽课程到时间格、教室/教师冲突检测、JSON导入导出、打印友好视图，基于 localStorage 持久化。' },
     { id: 60, title: '事件时间线', route: 'event-timeline', description: '时间线可视化工具，事件按时间排列，年代/月份分组浏览，增删改查与缩放滚动，搜索标签筛选，多视图切换，localStorage 持久化。' },
     { id: 61, title: '数据导入向导', route: 'data-importer', description: '多步骤数据导入向导，支持 CSV/Excel 文件解析、字段映射自动匹配、数据校验修正、逐行导入进度追踪、失败原因分析与CSV导出。' },
+    { id: 62, title: '漏斗分析', route: 'funnel-analysis', description: '用户行为漏斗分析工具，多步骤漏斗配置、转化率横向条形图、日期范围筛选、步骤间流失标注、多组 A/B 对比、数据编辑与 CSV 导出，基于 localStorage 持久化。' },
+    { id: 63, title: '版本发布管理', route: 'release-manager', description: '软件版本发布全生命周期管理，版本分页列表、新增编辑、Diff 对比、审批流程模拟（提交→审核→发布→回滚），基于 localStorage 持久化。' },
+    { id: 64, title: 'Markdown 笔记应用', route: 'markdown-notes', description: '完整的 Markdown 笔记应用，多笔记本树形目录、Markdown 编辑与实时预览、标签分类、全文搜索高亮、笔记间内部链接跳转、.md 文件导入导出，基于 localStorage 持久化。' },
+    { id: 68, title: 'JSON 转 TypeScript 类型生成器', route: 'json-to-ts', description: '开发者工具，粘贴 JSON 自动生成 TypeScript 接口/类型，支持递归类型推导、可选字段识别、类型名自定义、一键复制和历史记录，基于 localStorage 持久化。' },
+    { id: 66, title: '外卖点餐', route: 'food-order', description: '完整外卖点餐流程，店铺列表与品类筛选、商品分组与规格选择加购、购物车管理、地址备注填写、订单状态实时跟踪、历史订单查看，基于 localStorage 持久化。' },
+    { id: 65, title: 'RPG 角色创建器', route: 'rpg-creator', description: '可视化RPG角色创建工具，CSS/Canvas绘制角色形象、外观定制、30点属性分配、树形技能解锁、角色保存加载与卡片导出，基于 localStorage 持久化。' },
+    { id: 67, title: '路线记录器', route: 'route-recorder', description: 'Canvas自绘地图路线规划工具，标记起终点和途经点、拖拽排序、距离时间计算、海拔剖面图、收藏与分享路线，基于 localStorage 持久化。' },
 ]
 
 function HomePage() {
@@ -200,6 +215,7 @@ function App() {
             <Route path="/minesweeper" element={<MinesweeperPage />} />
             <Route path="/geometry-board" element={<GeometryBoardPage />} />
             <Route path="/flash-sale" element={<FlashSalePage />} />
+            <Route path="/funnel-analysis" element={<FunnelAnalysisPage />} />
             <Route path="/i18n-manager" element={<I18nManagerPage />} />
             <Route path="/weather" element={<WeatherPage />} />
             <Route path="/budget-tracker" element={<BudgetTrackerPage />} />
@@ -212,6 +228,12 @@ function App() {
             <Route path="/schedule-planner" element={<SchedulePlannerPage />} />
             <Route path="/event-timeline" element={<EventTimelinePage />} />
             <Route path="/data-importer" element={<DataImporterPage />} />
+            <Route path="/data-mask" element={<DataMaskPage />} />
+            <Route path="/json-to-ts" element={<JsonToTsPage />} />
+            <Route path="/release-manager" element={<ReleaseManagerPage />} />
+            <Route path="/food-order" element={<FoodOrderPage />} />
+            <Route path="/rpg-creator" element={<RpgCreatorPage />} />
+            <Route path="/route-recorder" element={<RouteRecorderPage />} />
         </Routes>
     )
 }

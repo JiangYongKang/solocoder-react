@@ -1,0 +1,9 @@
+你实现的 JSON 转 TypeScript 类型生成器还存在以下问题，需要进行修复：
+
+1. inferObjectFieldSchemas 函数的递归深度保护存在过度抑制问题：当深度超过限制后，代码不仅停止了嵌套类型的递归展开，也错误地跳过了数组类型标记的添加逻辑，导致深层嵌套中的数组字段退化为 `any` 而非 `any[]`。修复时需要让深度限制只阻止递归展开类型内部细节，但不丢失"该字段是数组"这一基础类型信息。
+
+2. collectNestedObjects 函数在不同返回路径上的返回结构不一致：正常路径返回 `{ typeDefs, topLevelListName, listTypeName }` 对象，深度限制提前返回时却直接返回 typeDefs 裸数组，调用方通过 .listTypeName 访问得到 undefined。需要统一所有提前返回路径的返回值结构。
+
+3. 确保所有子页面在 375px 移动端宽度下布局不崩坏，使用 pnpm run dev 启动后手动验证关键页面。
+
+4. 重新运行 pnpm run test，需要让所有测试通过。

@@ -201,6 +201,8 @@ export const inferObjectFieldSchemas = (objects, parentKey = '', depth = 0) => {
       const itemType = inferArrayItemType(info.arraySamples, `${parentKey}_${key}`, depth + 1)
       const arrayType = `(${itemType})[]`
       baseType = baseType ? `${baseType} | ${arrayType}` : arrayType
+    } else if (info.hasArray) {
+      baseType = baseType ? `${baseType} | (any)[]` : '(any)[]'
     }
     if (baseType === '') {
       baseType = 'any'
@@ -271,6 +273,8 @@ export const inferArrayItemType = (arrays, parentKey = '', depth = 0) => {
   if (arraySamples.length > 0 && depth + 1 <= MAX_RECURSION_DEPTH) {
     const itemType = inferArrayItemType(arraySamples, `${parentKey}_Nested`, depth + 1)
     parts.push(`(${itemType})[]`)
+  } else if (arraySamples.length > 0) {
+    parts.push('(any)[]')
   }
 
   let result = parts.length > 0 ? parts.join(' | ') : 'any'
@@ -283,7 +287,7 @@ export const inferArrayItemType = (arrays, parentKey = '', depth = 0) => {
 const collectNestedObjects = (value, name = 'RootType', depth = 0, typeDefs = [], usedNames = new Set(), customNames = {}) => {
   const HARD_DEPTH_LIMIT = 200
   if (depth > HARD_DEPTH_LIMIT || depth > MAX_RECURSION_DEPTH) {
-    return typeDefs
+    return { typeDefs }
   }
 
   const getName = (defaultName) => {

@@ -1,0 +1,11 @@
+你实现的 RPG 角色创建器还存在以下问题，需要进行修复：
+
+1. drawCardCanvas 函数新增的 createCanvas 参数在默认路径下存在缺陷：当调用方不传入 createCanvas 参数时，默认工厂定义为无参函数 `() => document.createElement('canvas')`，调用时传入的宽高参数 200 和 280 被 JavaScript 忽略，创建出的 canvas 使用浏览器默认尺寸而非预期的 200×280，导致角色缩略图比例失真。默认工厂需要正确接收并应用宽高参数。
+
+2. drawCardCanvas 函数和新增的 getCardData 函数之间存在大量重复的计算逻辑：两处都各自完成了 outfitData 查找、性别标签映射、已解锁技能列表过滤映射等相同的操作。drawCardCanvas 应该复用 getCardData 获取已计算好的数据，消除代码重复。
+
+3. CharacterCard.jsx 中 drawCardCanvas 的调用未随函数签名变更同步更新，仍以旧的参数列表调用。需要确保所有调用方与新的函数签名一致。
+
+4. 确保所有子页面在 375px 移动端宽度下布局不崩坏，使用 pnpm run dev 启动后手动验证关键页面。
+
+5. 重新运行 pnpm run test，需要让所有测试通过。

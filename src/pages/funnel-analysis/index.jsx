@@ -13,7 +13,7 @@ import {
     verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
     DATE_PRESETS,
@@ -308,27 +308,48 @@ function DataEditorPanel({ steps, groups, onGroupDataChange }) {
     return d
   })
   const [errors, setErrors] = useState({})
+  const lastSyncRef = useRef({
+    groupIds: groups.map((g) => g.id).sort().join(','),
+    stepIds: steps.map((s) => s.id).sort().join(','),
+  })
+
+  useEffect(() => {
+    const currGroupIds = groups.map((g) => g.id).sort().join(',')
+    const currStepIds = steps.map((s) => s.id).sort().join(',')
+    const { groupIds: prevGroupIds, stepIds: prevStepIds } = lastSyncRef.current
+    if (prevGroupIds === currGroupIds && prevStepIds === currStepIds) return
+    const d = {}
+    groups.forEach((g) => {
+      d[g.id] = { ...g.data }
+    })
+    setEditData(d)
+    setErrors({})
+    lastSyncRef.current = { groupIds: currGroupIds, stepIds: currStepIds }
+  }, [groups, steps])
 
   const handleValueChange = (groupId, stepId, rawValue) => {
     const numVal = rawValue === '' ? 0 : Number(rawValue)
-    const newEditData = {
-      ...editData,
-      [groupId]: { ...editData[groupId], [stepId]: rawValue === '' ? 0 : numVal },
-    }
-    setEditData(newEditData)
+    setEditData((prev) => {
+      const newGroupData = { ...prev[groupId], [stepId]: numVal }
+      const newEditData = { ...prev, [groupId]: newGroupData }
 
-    const groupErrors = validateFunnelData(steps, newEditData[groupId])
-    const newErrors = { ...errors }
-    if (Object.keys(groupErrors).length > 0) {
-      newErrors[groupId] = groupErrors
-    } else {
-      delete newErrors[groupId]
-    }
-    setErrors(newErrors)
+      const groupErrors = validateFunnelData(steps, newGroupData)
+      setErrors((prevErrors) => {
+        const newErrors = { ...prevErrors }
+        if (Object.keys(groupErrors).length > 0) {
+          newErrors[groupId] = groupErrors
+        } else {
+          delete newErrors[groupId]
+        }
+        return newErrors
+      })
 
-    if (Object.keys(groupErrors).length === 0) {
-      onGroupDataChange(groupId, stepId, numVal)
-    }
+      if (Object.keys(groupErrors).length === 0) {
+        onGroupDataChange(groupId, stepId, numVal)
+      }
+
+      return newEditData
+    })
   }
 
   const hasErrors = Object.keys(errors).length > 0
@@ -597,7 +618,6 @@ export default function FunnelAnalysisPage() {
 
           {editMode && (
             <DataEditorPanel
-              key={groups.map((g) => g.id + JSON.stringify(g.data)).join('|')}
               steps={steps}
               groups={groups}
               onGroupDataChange={handleGroupDataChange}

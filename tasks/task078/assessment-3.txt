@@ -1,0 +1,5 @@
+产物不满意：computeSingleReplacement 改用正则 `/\$(\d{1,2}|&)/g` 一次性匹配 $1~$99 和 $&，\d{1,2} 优先匹配双位数，$10 被整体匹配为 10 而非拆分为 1+0，解决了 split/join 方案下 $10 被 $1 误拆的问题。applyRule 重构后复用 collectMatchesFromOriginal + computeSingleReplacement + 手动拼接，逻辑与 applyRules 完全一致，消除了两套不一致的实现。新增的 4 个测试用例覆盖全面。其他函数均未受到修改影响。
+
+过程不满意：
+1. 模型对 dataMaskUtils.js（约 283 行）使用了 Write 工具进行完整重写，而非针对提示词指出的 computeSingleReplacement 和 applyRule 两个函数做逐处精确修改。提示词要求修正捕获组替换逻辑和清理废弃函数，不需要重写整个模块。完整重写使 git diff 失去可读性，增加了无关函数被意外变更的风险，且重写后还引入了 ESLint 问题需要额外修复。正确做法应依次修改两个目标函数，保持改动范围最小化。
+2. 模型在会话总结中声称"为 data-mask.css 添加了 4 个响应式断点（1200px、768px、480px、375px）"，但遍历整个会话的 tool call 记录，没有任何对 data-mask.css 的实际修改操作。该 CSS 文件中的 @media 断点实际来自前期会话。模型在未实际修改 CSS 的情况下在总结中声称完成了 CSS 工作，属于幻觉与虚假完成问题。总结必须基于实际执行的 tool call 记录，不能凭空声称未发生的操作。

@@ -1,61 +1,19 @@
-export const applyRule = (text, rule) => {
-  if (!text || !rule || !rule.enabled) {
-    return { result: text || '', matches: [] }
-  }
-
-  const pattern = rule.groupPattern || rule.pattern
-  let regex
-  try {
-    regex = new RegExp(pattern, 'g')
-  } catch {
-    return { result: text, matches: [] }
-  }
-
-  const rawMatches = []
-  let match
-
-  while ((match = regex.exec(text)) !== null) {
-    rawMatches.push({
-      start: match.index,
-      end: match.index + match[0].length,
-      original: match[0],
-      groups: match.slice(1),
-      ruleId: rule.id,
-      ruleName: rule.name,
-    })
-    if (match.index === regex.lastIndex) {
-      regex.lastIndex++
-    }
-  }
-
-  regex.lastIndex = 0
-  const replacement = rule.replacement || '***'
-  const result = text.replace(regex, replacement)
-
-  const matches = rawMatches.map((m) => ({
-    start: m.start,
-    end: m.end,
-    original: m.original,
-    ruleId: m.ruleId,
-    ruleName: m.ruleName,
-  }))
-
-  return { result, matches }
-}
-
 const computeSingleReplacement = (originalText, groups, replacement) => {
   if (!replacement) return '***'
   if (typeof replacement !== 'string') return String(replacement)
   if (!replacement.includes('$')) return replacement
 
-  let result = replacement
-  for (let i = 0; i < groups.length; i++) {
-    const groupValue = groups[i] == null ? '' : groups[i]
-    const placeholder = '$' + (i + 1)
-    result = result.split(placeholder).join(groupValue)
-  }
-  result = result.split('$&').join(originalText)
-  return result
+  return replacement.replace(/\$(\d{1,2}|&)/g, (match, key) => {
+    if (key === '&') {
+      return originalText
+    }
+    const idx = parseInt(key, 10)
+    if (idx >= 1 && idx <= groups.length) {
+      const val = groups[idx - 1]
+      return val == null ? '' : val
+    }
+    return match
+  })
 }
 
 const collectMatchesFromOriginal = (text, rules) => {
@@ -100,6 +58,44 @@ const collectMatchesFromOriginal = (text, rules) => {
   }
 
   return selected
+}
+
+export const applyRule = (text, rule) => {
+  if (!text || !rule || !rule.enabled) {
+    return { result: text || '', matches: [] }
+  }
+  const rules = [rule]
+  const selected = collectMatchesFromOriginal(text, rules)
+
+  if (selected.length === 0) {
+    return { result: text, matches: [] }
+  }
+
+  const parts = []
+  let cursor = 0
+  const matches = []
+
+  for (const m of selected) {
+    if (cursor < m.start) {
+      parts.push(text.slice(cursor, m.start))
+    }
+    const replaced = computeSingleReplacement(m.original, m.groups, m.replacement)
+    parts.push(replaced)
+    cursor = m.end
+    matches.push({
+      start: m.start,
+      end: m.end,
+      original: m.original,
+      ruleId: m.ruleId,
+      ruleName: m.ruleName,
+    })
+  }
+
+  if (cursor < text.length) {
+    parts.push(text.slice(cursor))
+  }
+
+  return { result: parts.join(''), matches }
 }
 
 export const applyRules = (text, rules) => {

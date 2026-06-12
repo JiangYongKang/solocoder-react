@@ -116,6 +116,58 @@ describe('applyRule', () => {
     const { result } = applyRule('编号123-4567', customRule)
     expect(result).toBe('编号***-4567')
   })
+
+  it('双位数捕获组$10应该正确处理，不被$1误替换', () => {
+    const manyGroupsRule = {
+      id: 'many',
+      name: '多组捕获',
+      pattern: '^(A)(B)(C)(D)(E)(F)(G)(H)(I)(J)$',
+      groupPattern: '^(A)(B)(C)(D)(E)(F)(G)(H)(I)(J)$',
+      replacement: '[$10][$1]',
+      enabled: true,
+    }
+    const { result } = applyRule('ABCDEFGHIJ', manyGroupsRule)
+    expect(result).toBe('[J][A]')
+  })
+
+  it('$1和$10混合应该正确解析', () => {
+    const rule = {
+      id: 'mix',
+      name: '混合',
+      pattern: '^(x)(y)(z)(w)(v)(u)(t)(s)(r)(q)$',
+      groupPattern: '^(x)(y)(z)(w)(v)(u)(t)(s)(r)(q)$',
+      replacement: '$10-$1',
+      enabled: true,
+    }
+    const { result } = applyRule('xyzwvutsrq', rule)
+    expect(result).toBe('q-x')
+  })
+
+  it('不存在的捕获组引用应该保留原字符串', () => {
+    const rule = {
+      id: 't',
+      name: 'test',
+      pattern: '^(a)(b)$',
+      groupPattern: '^(a)(b)$',
+      replacement: '$1-$3-$50',
+      enabled: true,
+    }
+    const { result } = applyRule('ab', rule)
+    expect(result).toBe('a-$3-$50')
+  })
+
+  it('$&应该替换为完整匹配文本', () => {
+    const rule = {
+      id: 'amp',
+      name: 'amp测试',
+      pattern: 'hello',
+      groupPattern: 'hello',
+      replacement: '[$&]',
+      enabled: true,
+    }
+    const { result } = applyRule('say hello world', rule)
+    expect(result).toBe('say [hello] world')
+  })
 })
 
 describe('applyRules', () => {

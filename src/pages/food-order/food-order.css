@@ -428,6 +428,17 @@
   animation: fo-fade-in 0.2s ease;
 }
 
+.fo-preview-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fo-fade-in 0.2s ease;
+}
+
 .fo-spec-popup {
   width: 100%;
   max-width: 480px;

@@ -136,6 +136,12 @@
   color: var(--jtt-text);
 }
 
+.jtt-panel-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
 .jtt-panel-body {
   padding: 0;
   flex: 1;
@@ -749,6 +755,11 @@
   .jtt-panel-header {
     padding: 8px 10px;
     flex-wrap: wrap;
+  }
+
+  .jtt-panel-actions {
+    flex-wrap: wrap;
+    gap: 4px;
   }
 
   .jtt-line-numbers {

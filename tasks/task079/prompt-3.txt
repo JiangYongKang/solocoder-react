@@ -1,0 +1,7 @@
+你实现的 CSS 动画生成器还存在以下问题，需要进行修复：
+
+1. generateKeyframesCSS 函数中新增了 animation-timing-function 输出逻辑和配套的 getEasingAtTime 辅助函数，这些是在修复 animation 简写 easing 时额外添加的功能，不属于之前要求修复的范围。需要移除 generateKeyframesCSS 中在每个关键帧块内插入 animation-timing-function 的逻辑以及 getEasingAtTime 函数，保持 keyframes 输出为不含 timing-function 的原始格式。generateAnimationCSS 中 animation 简写的 easing 修复需要保留。
+
+2. 确保所有子页面在 375px 移动端宽度下布局不崩坏，使用 pnpm run dev 启动后在实际浏览器中将视口设为 375px 宽度进行验证。
+
+3. 重新运行 pnpm run test，需要让所有测试通过。

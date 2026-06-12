@@ -885,3 +885,243 @@
     width: 95%;
   }
 }
+
+@media (max-width: 375px) {
+  .rpg-page {
+    padding: 8px;
+  }
+
+  .rpg-header {
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+
+  .rpg-back-btn {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  .rpg-title {
+    font-size: 16px;
+  }
+
+  .rpg-info-section {
+    padding: 10px;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .rpg-info-label {
+    font-size: 10px;
+  }
+
+  .rpg-info-input {
+    font-size: 13px;
+    padding: 6px 10px;
+  }
+
+  .rpg-info-textarea {
+    font-size: 13px;
+    padding: 6px 10px;
+    min-height: 32px;
+  }
+
+  .rpg-gender-btn {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  .rpg-main-layout {
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .rpg-card {
+    padding: 10px;
+    border-radius: 8px;
+  }
+
+  .rpg-card-title {
+    font-size: 14px;
+    margin-bottom: 8px;
+  }
+
+  .rpg-option-item {
+    width: 36px;
+    height: 36px;
+    font-size: 10px;
+    padding: 1px;
+  }
+
+  .rpg-color-swatch {
+    width: 22px;
+    height: 22px;
+  }
+
+  .rpg-option-item.outfit-option {
+    min-width: 48px;
+    height: 32px;
+    font-size: 11px;
+    padding: 3px 6px;
+  }
+
+  .rpg-attr-row {
+    gap: 3px;
+    margin-bottom: 6px;
+    padding: 3px 0;
+  }
+
+  .rpg-attr-icon {
+    font-size: 16px;
+    width: 24px;
+  }
+
+  .rpg-attr-name {
+    width: 36px;
+    font-size: 12px;
+  }
+
+  .rpg-attr-bar-wrapper {
+    height: 16px;
+  }
+
+  .rpg-attr-value {
+    width: 20px;
+    font-size: 14px;
+  }
+
+  .rpg-attr-btn {
+    width: 28px;
+    height: 28px;
+    font-size: 16px;
+  }
+
+  .rpg-points-remaining {
+    font-size: 12px;
+  }
+
+  .rpg-points-warning {
+    font-size: 11px;
+    margin-left: 4px;
+  }
+
+  .rpg-derived-stats {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+    margin-top: 8px;
+    padding-top: 8px;
+  }
+
+  .rpg-derived-item {
+    padding: 6px 4px;
+  }
+
+  .rpg-derived-label {
+    font-size: 10px;
+  }
+
+  .rpg-derived-value {
+    font-size: 14px;
+  }
+
+  .rpg-skill-points-display {
+    font-size: 12px;
+    margin-bottom: 6px;
+  }
+
+  .rpg-skill-layer-title {
+    font-size: 11px;
+    margin: 8px 0 6px 0;
+    padding-left: 6px;
+  }
+
+  .rpg-skill-nodes {
+    gap: 8px;
+    padding-left: 0;
+    margin-bottom: 2px;
+  }
+
+  .rpg-skill-node {
+    width: 110px;
+    padding: 8px;
+  }
+
+  .rpg-skill-icon {
+    font-size: 18px;
+    margin-bottom: 2px;
+  }
+
+  .rpg-skill-name {
+    font-size: 12px;
+  }
+
+  .rpg-skill-desc {
+    font-size: 9px;
+  }
+
+  .rpg-skill-req {
+    font-size: 9px;
+    margin-top: 3px;
+  }
+
+  .rpg-connector-line {
+    height: 10px;
+    margin-left: 0;
+  }
+
+  .rpg-actions-bar {
+    gap: 6px;
+    padding: 12px 0;
+  }
+
+  .rpg-action-btn {
+    padding: 7px 10px;
+    font-size: 12px;
+    gap: 4px;
+  }
+
+  .rpg-preview-canvas-wrapper {
+    padding: 6px;
+  }
+
+  .rpg-modal {
+    padding: 14px;
+    width: 96%;
+    max-height: 90vh;
+  }
+
+  .rpg-modal-title {
+    font-size: 16px;
+    margin-bottom: 12px;
+  }
+
+  .rpg-card-canvas {
+    max-width: 100%;
+    height: auto;
+  }
+
+  .rpg-char-list-item {
+    padding: 10px;
+  }
+
+  .rpg-char-item-name {
+    font-size: 14px;
+  }
+
+  .rpg-char-item-meta {
+    font-size: 11px;
+  }
+
+  .rpg-char-item-btn {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+
+  .rpg-toast {
+    top: 12px;
+    right: 12px;
+    left: 12px;
+    padding: 10px 14px;
+    font-size: 13px;
+  }
+}

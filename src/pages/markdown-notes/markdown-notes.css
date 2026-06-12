@@ -624,11 +624,6 @@
     flex-wrap: wrap;
   }
 
-  .sidebar {
-    width: 220px;
-    min-width: 200px;
-  }
-
   .markdown-notes-body {
     flex-direction: column;
   }

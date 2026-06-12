@@ -583,10 +583,8 @@ function drawRadarChart(ctx, attrs) {
 }
 
 export function drawCardCanvas(ctx, character, createCanvas) {
-  const outfitData = OUTFITS.find(o => o.key === character.appearance.outfit) || OUTFITS[5]
-  const bgColor = outfitData.primaryColor
-  const borderColor = outfitData.accent
-  const secondaryColor = outfitData.secondaryColor
+  const cardData = getCardData(character)
+  const { bgColor, borderColor, secondaryColor, name, subtitle, unlockedSkills, createdAt } = cardData
 
   ctx.fillStyle = bgColor
   ctx.fillRect(0, 0, CARD_W, CARD_H)
@@ -602,17 +600,19 @@ export function drawCardCanvas(ctx, character, createCanvas) {
   ctx.fillStyle = '#ffd700'
   ctx.font = 'bold 24px sans-serif'
   ctx.textAlign = 'center'
-  ctx.fillText(character.name || '未命名角色', CARD_W / 2, 44)
+  ctx.fillText(name, CARD_W / 2, 44)
 
   ctx.fillStyle = '#ccc'
   ctx.font = '12px sans-serif'
-  const genderLabel = character.gender === 'male' ? '男' : character.gender === 'female' ? '女' : '其他'
-  ctx.fillText(
-    `${getOutfitName(character.appearance.outfit)} · ${genderLabel} · Lv.${character.level}`,
-    CARD_W / 2, 64
-  )
+  ctx.fillText(subtitle, CARD_W / 2, 64)
 
-  const makeCanvas = createCanvas || (() => document.createElement('canvas'))
+  const defaultCreateCanvas = (w, h) => {
+    const c = document.createElement('canvas')
+    c.width = w
+    c.height = h
+    return c
+  }
+  const makeCanvas = createCanvas || defaultCreateCanvas
   const miniCanvas = makeCanvas(200, 280)
   const miniCtx = miniCanvas.getContext('2d')
   drawCharacter(miniCtx, character.appearance)
@@ -629,12 +629,7 @@ export function drawCardCanvas(ctx, character, createCanvas) {
 
   drawRadarChart(ctx, character.attributes)
 
-  const skills = SKILL_TREES[character.appearance.outfit] || []
-  const unlockedNames = skills
-    .filter(s => character.unlockedSkills.includes(s.id))
-    .map(s => `${s.icon}${s.name}`)
-
-  if (unlockedNames.length > 0) {
+  if (unlockedSkills.length > 0) {
     ctx.fillStyle = '#ffd700'
     ctx.font = 'bold 12px sans-serif'
     ctx.textAlign = 'center'
@@ -642,14 +637,14 @@ export function drawCardCanvas(ctx, character, createCanvas) {
 
     ctx.fillStyle = '#ccc'
     ctx.font = '11px sans-serif'
-    const skillText = unlockedNames.join('  ')
+    const skillText = unlockedSkills.join('  ')
     ctx.fillText(skillText, CARD_W / 2, 498)
   }
 
   ctx.fillStyle = '#666'
   ctx.font = '10px sans-serif'
   ctx.textAlign = 'center'
-  ctx.fillText(`创建于 ${formatDateTime(character.createdAt)}`, CARD_W / 2, CARD_H - 24)
+  ctx.fillText(`创建于 ${createdAt}`, CARD_W / 2, CARD_H - 24)
 }
 
 export function getCardData(character) {

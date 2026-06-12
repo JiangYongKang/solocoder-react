@@ -837,3 +837,191 @@
     left: 14px;
   }
 }
+
+@media (max-width: 375px) {
+  .fa-page {
+    padding: 12px 10px 30px;
+  }
+
+  .fa-header {
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .fa-back-btn {
+    padding: 5px 10px;
+    font-size: 12px;
+  }
+
+  .fa-title {
+    font-size: 20px;
+  }
+
+  .fa-toolbar {
+    padding: 8px 10px;
+    gap: 6px;
+  }
+
+  .fa-toolbar-group {
+    gap: 4px;
+  }
+
+  .fa-date-input {
+    padding: 5px 6px;
+    font-size: 11px;
+    width: auto;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .fa-preset-btn {
+    padding: 4px 8px;
+    font-size: 11px;
+    flex-shrink: 0;
+  }
+
+  .fa-btn {
+    padding: 5px 10px;
+    font-size: 12px;
+  }
+
+  .fa-btn-sm {
+    padding: 3px 6px;
+    font-size: 11px;
+  }
+
+  .fa-sidebar {
+    gap: 10px;
+  }
+
+  .fa-panel {
+    padding: 10px;
+    border-radius: 8px;
+  }
+
+  .fa-panel-title {
+    font-size: 13px;
+    margin-bottom: 8px;
+    gap: 6px;
+  }
+
+  .fa-step-item {
+    padding: 5px 6px;
+    gap: 5px;
+  }
+
+  .fa-step-name-input {
+    font-size: 12px;
+    padding: 3px 5px;
+  }
+
+  .fa-funnel-container {
+    padding: 10px;
+    border-radius: 8px;
+  }
+
+  .fa-funnel-title {
+    font-size: 13px;
+    margin-bottom: 10px;
+  }
+
+  .fa-bar {
+    height: 34px;
+    padding: 0 8px;
+    gap: 5px;
+    min-width: 50px;
+  }
+
+  .fa-bar-label {
+    font-size: 11px;
+  }
+
+  .fa-bar-count {
+    font-size: 10px;
+  }
+
+  .fa-bar-rate {
+    font-size: 10px;
+  }
+
+  .fa-bar-row {
+    gap: 8px;
+  }
+
+  .fa-step-info {
+    min-width: 50px;
+    font-size: 10px;
+  }
+
+  .fa-step-info .overall {
+    font-size: 9px;
+  }
+
+  .fa-dropoff-row {
+    padding: 2px 0;
+  }
+
+  .fa-dropoff-connector {
+    width: 18px;
+    height: 14px;
+    margin-left: 3px;
+  }
+
+  .fa-dropoff-info {
+    font-size: 10px;
+    padding: 2px 6px;
+    gap: 3px;
+  }
+
+  .fa-dropoff-tooltip {
+    min-width: 160px;
+    padding: 8px 10px;
+    font-size: 11px;
+    line-height: 1.5;
+  }
+
+  .fa-group-section {
+    padding: 10px;
+    border-radius: 8px;
+  }
+
+  .fa-group-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .fa-group-name-input {
+    font-size: 12px;
+    width: 90px;
+  }
+
+  .fa-group-actions {
+    gap: 3px;
+    width: 100%;
+  }
+
+  .fa-data-table {
+    font-size: 11px;
+  }
+
+  .fa-data-table th,
+  .fa-data-table td {
+    padding: 5px 6px;
+  }
+
+  .fa-data-input {
+    width: 54px;
+    font-size: 11px;
+    padding: 2px 4px;
+  }
+
+  .fa-data-error {
+    font-size: 10px;
+  }
+
+  .fa-switch {
+    font-size: 11px;
+    gap: 5px;
+  }
+}

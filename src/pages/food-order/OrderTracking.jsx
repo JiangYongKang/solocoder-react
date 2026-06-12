@@ -4,6 +4,16 @@ import { formatPrice, formatDateTime, buildOrderTimeline, advanceOrderStatus, ge
 
 export default function OrderTracking({ order, onBack, onOrderUpdate }) {
   const timerRef = useRef(null);
+  const onOrderUpdateRef = useRef(onOrderUpdate);
+  const orderRef = useRef(order);
+
+  useEffect(() => {
+    onOrderUpdateRef.current = onOrderUpdate;
+  }, [onOrderUpdate]);
+
+  useEffect(() => {
+    orderRef.current = order;
+  }, [order]);
 
   const isTerminal = order.status === ORDER_STATUSES.DELIVERED || order.status === ORDER_STATUSES.CANCELLED;
   const timeline = buildOrderTimeline(order);
@@ -21,9 +31,10 @@ export default function OrderTracking({ order, onBack, onOrderUpdate }) {
     if (isTerminal) return;
 
     const checkAndAdvance = () => {
-      const advanced = advanceOrderStatus(order);
-      if (advanced && advanced.status !== order.status) {
-        onOrderUpdate(advanced);
+      const currentOrder = orderRef.current;
+      const advanced = advanceOrderStatus(currentOrder);
+      if (advanced && advanced.status !== currentOrder.status) {
+        onOrderUpdateRef.current(advanced);
       }
     };
 
@@ -42,7 +53,7 @@ export default function OrderTracking({ order, onBack, onOrderUpdate }) {
     }, checkInterval);
 
     return clearOrderTimer;
-  }, [order, isTerminal, onOrderUpdate]);
+  }, [order.status, isTerminal]);
 
   useEffect(() => {
     return clearOrderTimer;

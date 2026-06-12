@@ -1,0 +1,3 @@
+产物不满意：strokeToPathData 的修复正确适配了二次贝塞尔格式，使用 `Q ${p.cpX} ${p.cpY}, ${p.x} ${p.y}` 替换了旧的三次贝塞尔命令，cpX/cpY 字段名与 getBezierPoints 返回值一致。修复还增加了无平滑分支的 L 命令路径，逻辑清晰。新增的 5 个测试用例覆盖了正则格式验证、无 undefined/NaN 检查、Q 命令控制点合法性、无 C 命令残留、M 命令起始，能有效捕获字段名不一致导致的坐标丢失问题，不再仅是简单的 toContain 断言。但测试中 `should start with M command` 用例固定断言 `path.startsWith('M 5 10')`，如果后续坐标值小数点精度变化这个硬编码断言会误报，应该改为正则 `toMatch(/^M [\d.e+-]+ [\d.e+-]+/)` 与前面的格式测试保持一致风格。
+
+过程不满意：模型在搜索 strokeToPathData 时先用了 `search_by_regex` 定位了函数位置，然后才用 `view_files` 打开文件查看具体代码，流程合理。但修复过程过于简短——模型看完代码后直接执行了一次 edit_file_search_replace 就完成了全部修改，中间没有停下来思考 bezierPoints 数组最后一个元素的 cpX/cpY 是否一定存在。虽然最终结果正确（getBezierPoints 确实为所有非首元素填充了 cpX/cpY），但这种"看一遍就改"的做法风险较高，应该在修改前先确认 getBezierPoints 的返回结构再确定 loop 边界。

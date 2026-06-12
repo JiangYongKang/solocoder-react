@@ -1,37 +1,36 @@
 import { ANIMATION_PROPERTIES, STORAGE_KEY } from '@/pages/css-animation/constants.js'
 import {
-    addKeyframe,
-    addPropertyTrack,
-    createAnimation,
-    createKeyframe,
-    createPropertyTrack,
-    cubicBezierToString,
-    deleteAnimationFromList,
-    exportAnimationJSON,
-    formatDate,
-    formatValue,
-    generateAnimationCSS,
-    generateFullCSS,
-    generateId,
-    generateKeyframesCSS,
-    getDominantEasing,
-    getEasingAtTime,
-    getSurroundingKeyframes,
-    isColorProperty,
-    isColorValue,
-    loadAnimations,
-    moveKeyframe,
-    parseCubicBezier,
-    removeKeyframe,
-    removePropertyTrack,
-    renameAnimationInList,
-    saveAnimations,
-    saveAnimationToList,
-    toggleTrackVisibility,
-    updateAnimationSettings,
-    updateEasing,
-    updateKeyframeValue,
-    validateAnimationJSON,
+  addKeyframe,
+  addPropertyTrack,
+  createAnimation,
+  createKeyframe,
+  createPropertyTrack,
+  cubicBezierToString,
+  deleteAnimationFromList,
+  exportAnimationJSON,
+  formatDate,
+  formatValue,
+  generateAnimationCSS,
+  generateFullCSS,
+  generateId,
+  generateKeyframesCSS,
+  getDominantEasing,
+  getSurroundingKeyframes,
+  isColorProperty,
+  isColorValue,
+  loadAnimations,
+  moveKeyframe,
+  parseCubicBezier,
+  removeKeyframe,
+  removePropertyTrack,
+  renameAnimationInList,
+  saveAnimations,
+  saveAnimationToList,
+  toggleTrackVisibility,
+  updateAnimationSettings,
+  updateEasing,
+  updateKeyframeValue,
+  validateAnimationJSON,
 } from '@/pages/css-animation/cssAnimationCore.js'
 import { beforeEach, describe, expect, it } from 'vitest'
 
@@ -606,6 +605,30 @@ describe('cssAnimationCore', () => {
         expect(css).toContain('opacity: 1')
         expect(css).toContain('opacity: 0')
       })
+
+      it('should not include animation-timing-function in keyframes output', () => {
+        const easingAnim = {
+          ...createAnimation('easingTest'),
+          tracks: [
+            {
+              id: 't1',
+              property: 'translateX',
+              visible: true,
+              unit: 'px',
+              keyframes: [
+                { id: 'k1', time: 0, value: 0, easing: 'ease-in' },
+                { id: 'k2', time: 50, value: 50, easing: 'ease-out' },
+                { id: 'k3', time: 100, value: 100, easing: 'linear' },
+              ],
+            },
+          ],
+        }
+        const css = generateKeyframesCSS(easingAnim)
+        expect(css).not.toContain('animation-timing-function')
+        expect(css).toContain('translateX(0px)')
+        expect(css).toContain('translateX(50px)')
+        expect(css).toContain('translateX(100px)')
+      })
     })
 
     describe('generateAnimationCSS', () => {
@@ -1165,68 +1188,6 @@ describe('cssAnimationCore', () => {
           ],
         }
         expect(getDominantEasing(anim)).toBe('cubic-bezier(0.25, 0.1, 0.25, 1)')
-      })
-    })
-
-    describe('getEasingAtTime', () => {
-      it('should return null when no matching keyframes at given time', () => {
-        const tracks = [
-          {
-            id: 't1',
-            keyframes: [
-              { id: 'k1', time: 0, value: 0, easing: 'linear' },
-              { id: 'k2', time: 100, value: 100, easing: 'linear' },
-            ],
-          },
-        ]
-        expect(getEasingAtTime(tracks, 50)).toBeNull()
-      })
-
-      it('should return the easing when all tracks agree at given time', () => {
-        const tracks = [
-          {
-            id: 't1',
-            keyframes: [
-              { id: 'k1', time: 0, value: 0, easing: 'ease-in' },
-              { id: 'k2', time: 100, value: 100, easing: 'linear' },
-            ],
-          },
-          {
-            id: 't2',
-            keyframes: [
-              { id: 'k3', time: 0, value: 1, easing: 'ease-in' },
-              { id: 'k4', time: 100, value: 0, easing: 'ease-in' },
-            ],
-          },
-        ]
-        expect(getEasingAtTime(tracks, 0)).toBe('ease-in')
-      })
-
-      it('should return most frequent easing when tracks differ at given time', () => {
-        const tracks = [
-          {
-            id: 't1',
-            keyframes: [
-              { id: 'k1', time: 0, value: 0, easing: 'ease-in' },
-              { id: 'k2', time: 100, value: 100, easing: 'linear' },
-            ],
-          },
-          {
-            id: 't2',
-            keyframes: [
-              { id: 'k3', time: 0, value: 1, easing: 'ease-in' },
-              { id: 'k4', time: 100, value: 0, easing: 'linear' },
-            ],
-          },
-          {
-            id: 't3',
-            keyframes: [
-              { id: 'k5', time: 0, value: 50, easing: 'ease-out' },
-              { id: 'k6', time: 100, value: 100, easing: 'linear' },
-            ],
-          },
-        ]
-        expect(getEasingAtTime(tracks, 0)).toBe('ease-in')
       })
     })
   })

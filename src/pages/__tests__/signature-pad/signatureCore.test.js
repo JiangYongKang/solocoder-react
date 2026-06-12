@@ -391,7 +391,7 @@ describe('signatureCore', () => {
       expect(strokeToPathData({ points: [{ x: 0, y: 0 }] })).toBe('')
     })
 
-    it('should generate valid SVG path data', () => {
+    it('should generate valid SVG path with line commands for no smoothing', () => {
       const stroke = {
         points: [
           { x: 0, y: 0 },
@@ -400,9 +400,72 @@ describe('signatureCore', () => {
         ],
       }
       const path = strokeToPathData(stroke, 0)
-      expect(path).toContain('M')
-      expect(path).toContain('0')
-      expect(path).toContain('20')
+      expect(path).toMatch(/^M [\d.e+-]+ [\d.e+-]+( L [\d.e+-]+ [\d.e+-]+)+$/)
+      expect(path).not.toContain('undefined')
+      expect(path).not.toContain('NaN')
+    })
+
+    it('should generate valid SVG path with Q commands for smoothed strokes', () => {
+      const stroke = {
+        points: [
+          { x: 0, y: 0 },
+          { x: 10, y: 10 },
+          { x: 20, y: 5 },
+        ],
+      }
+      const path = strokeToPathData(stroke, 5)
+      expect(path).toMatch(/^M [\d.e+-]+ [\d.e+-]+( Q [\d.e+-]+ [\d.e+-]+, [\d.e+-]+ [\d.e+-]+)+$/)
+      expect(path).not.toContain('undefined')
+      expect(path).not.toContain('NaN')
+    })
+
+    it('should have numeric control point coordinates in Q commands', () => {
+      const stroke = {
+        points: [
+          { x: 0, y: 0 },
+          { x: 10, y: 10 },
+          { x: 20, y: 5 },
+          { x: 30, y: 15 },
+        ],
+      }
+      const path = strokeToPathData(stroke, 5)
+      const qCommands = path.split(' Q ').slice(1)
+      for (const cmd of qCommands) {
+        const parts = cmd.split(', ')
+        expect(parts.length).toBe(2)
+        const cpParts = parts[0].trim().split(' ')
+        const endParts = parts[1].trim().split(' ')
+        expect(cpParts.length).toBe(2)
+        expect(endParts.length).toBe(2)
+        expect(Number.isFinite(Number(cpParts[0]))).toBe(true)
+        expect(Number.isFinite(Number(cpParts[1]))).toBe(true)
+        expect(Number.isFinite(Number(endParts[0]))).toBe(true)
+        expect(Number.isFinite(Number(endParts[1]))).toBe(true)
+      }
+    })
+
+    it('should not use C (cubic bezier) commands', () => {
+      const stroke = {
+        points: [
+          { x: 0, y: 0 },
+          { x: 10, y: 10 },
+          { x: 20, y: 5 },
+          { x: 30, y: 15 },
+        ],
+      }
+      const path = strokeToPathData(stroke, 5)
+      expect(path).not.toContain(' C ')
+    })
+
+    it('should start with M command', () => {
+      const stroke = {
+        points: [
+          { x: 5, y: 10 },
+          { x: 15, y: 20 },
+        ],
+      }
+      const path = strokeToPathData(stroke, 0)
+      expect(path.startsWith('M 5 10')).toBe(true)
     })
   })
 

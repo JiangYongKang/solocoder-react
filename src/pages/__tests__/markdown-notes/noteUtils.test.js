@@ -643,6 +643,46 @@ describe('noteUtils', () => {
       const html = renderMarkdown('普通文本行', data)
       expect(html).toContain('<p>普通文本行</p>')
     })
+
+    it('inline code content should not be processed by bold/italic regex', () => {
+      const html = renderMarkdown('`**粗体**`', data)
+      expect(html).toContain('<code class="inline-code">**粗体**</code>')
+      expect(html).not.toContain('<strong>粗体</strong>')
+    })
+
+    it('inline code with italic markers should not be converted', () => {
+      const html = renderMarkdown('`*斜体*`', data)
+      expect(html).toContain('<code class="inline-code">*斜体*</code>')
+      expect(html).not.toContain('<em>斜体</em>')
+    })
+
+    it('inline code with strikethrough markers should not be converted', () => {
+      const html = renderMarkdown('`~~删除~~`', data)
+      expect(html).toContain('<code class="inline-code">~~删除~~</code>')
+      expect(html).not.toContain('<del>删除</del>')
+    })
+
+    it('inline code with header markers should not be converted', () => {
+      const html = renderMarkdown('`# 标题`', data)
+      expect(html).toContain('<code class="inline-code"># 标题</code>')
+      expect(html).not.toContain('<h1>')
+    })
+
+    it('inline code should coexist with normal bold outside', () => {
+      const html = renderMarkdown('`**code**` and **real bold**', data)
+      expect(html).toContain('<code class="inline-code">**code**</code>')
+      expect(html).toContain('<strong>real bold</strong>')
+    })
+
+    it('multiple inline codes should all be protected', () => {
+      const html = renderMarkdown('`**a**` and `*b*` and `~~c~~`', data)
+      expect(html).toContain('<code class="inline-code">**a**</code>')
+      expect(html).toContain('<code class="inline-code">*b*</code>')
+      expect(html).toContain('<code class="inline-code">~~c~~</code>')
+      expect(html).not.toContain('<strong>')
+      expect(html).not.toContain('<em>')
+      expect(html).not.toContain('<del>')
+    })
   })
 
   describe('import/export', () => {

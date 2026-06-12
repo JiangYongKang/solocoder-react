@@ -28,6 +28,9 @@ import {
   mergeModifiedLines,
   buildReleaseDiff,
   getDiffStats,
+  isDiffTooLarge,
+  truncateTextForDiff,
+  MAX_DIFF_LINES,
   formatDate,
   formatDateOnly,
   getTimelineColor,
@@ -505,6 +508,121 @@ describe('performApprovalAction', () => {
     expect(result.success).toBe(false)
     expect(result.error).toContain('不允许')
   })
+
+  it('乐观锁校验：expectedUpdatedAt 不匹配返回错误', () => {
+    const release = makeRelease({ id: 'r1', status: RELEASE_STATUS.DRAFT, updatedAt: 1000 })
+    const result = performApprovalAction(
+      [release],
+      'r1',
+      APPROVAL_ACTION.SUBMIT,
+      '',
+      CURRENT_USER,
+      999
+    )
+    expect(result.success).toBe(false)
+    expect(result.error).toContain('已被修改')
+  })
+
+  it('乐观锁校验：expectedUpdatedAt 匹配时操作成功', () => {
+    const release = makeRelease({ id: 'r1', status: RELEASE_STATUS.DRAFT, updatedAt: 1000 })
+    const result = performApprovalAction(
+      [release],
+      'r1',
+      APPROVAL_ACTION.SUBMIT,
+      '',
+      CURRENT_USER,
+      1000
+    )
+    expect(result.success).toBe(true)
+    expect(result.release.status).toBe(RELEASE_STATUS.PENDING)
+  })
+
+  it('乐观锁校验：expectedUpdatedAt 为 undefined 时跳过校验', () => {
+    const release = makeRelease({ id: 'r1', status: RELEASE_STATUS.DRAFT, updatedAt: 1000 })
+    const result = performApprovalAction(
+      [release],
+      'r1',
+      APPROVAL_ACTION.SUBMIT,
+      '',
+      CURRENT_USER,
+      undefined
+    )
+    expect(result.success).toBe(true)
+  })
+
+  it('操作人信息正确记录到审批记录中', () => {
+    const operator = { id: 'u_test', name: '测试用户' }
+    const release = makeRelease({ id: 'r1', status: RELEASE_STATUS.DRAFT })
+    const result = performApprovalAction(
+      [release],
+      'r1',
+      APPROVAL_ACTION.SUBMIT,
+      '测试备注',
+      operator
+    )
+    expect(result.success).toBe(true)
+    expect(result.record.operatorId).toBe('u_test')
+    expect(result.record.operator).toBe('测试用户')
+    expect(result.record.remark).toBe('测试备注')
+  })
+
+  it('默认操作人为 CURRENT_USER', () => {
+    const release = makeRelease({ id: 'r1', status: RELEASE_STATUS.DRAFT })
+    const result = performApprovalAction([release], 'r1', APPROVAL_ACTION.SUBMIT)
+    expect(result.record.operatorId).toBe(CURRENT_USER.id)
+    expect(result.record.operator).toBe(CURRENT_USER.name)
+  })
+
+  it('操作成功后 updatedAt 更新', () => {
+    const oldTime = Date.now() - 10000
+    const release = makeRelease({ id: 'r1', status: RELEASE_STATUS.DRAFT, updatedAt: oldTime })
+    const result = performApprovalAction([release], 'r1', APPROVAL_ACTION.SUBMIT)
+    expect(result.release.updatedAt).toBeGreaterThan(oldTime)
+  })
+
+  it('已回滚状态不能再操作', () => {
+    const release = makeRelease({ id: 'r1', status: RELEASE_STATUS.ROLLED_BACK })
+    const result = performApprovalAction([release], 'r1', APPROVAL_ACTION.ROLLBACK, '原因')
+    expect(result.success).toBe(false)
+  })
+
+  it('审批记录追加到已有记录之后', () => {
+    const existingRecord = { id: 'ar_old', action: APPROVAL_ACTION.SUBMIT, fromStatus: RELEASE_STATUS.DRAFT, toStatus: RELEASE_STATUS.PENDING, operator: 'old', operatorId: 'old_id', timestamp: 1000, remark: '' }
+    const release = makeRelease({
+      id: 'r1',
+      status: RELEASE_STATUS.PENDING,
+      approvalRecords: [existingRecord],
+    })
+    const result = performApprovalAction([release], 'r1', APPROVAL_ACTION.APPROVE, '')
+    expect(result.release.approvalRecords.length).toBe(2)
+    expect(result.release.approvalRecords[0].id).toBe('ar_old')
+    expect(result.release.approvalRecords[1].id).toBe(result.record.id)
+  })
+
+  it('驳回操作记录驳回原因', () => {
+    const release = makeRelease({ id: 'r1', status: RELEASE_STATUS.PENDING })
+    const result = performApprovalAction([release], 'r1', APPROVAL_ACTION.REJECT, '测试驳回原因详细说明')
+    expect(result.success).toBe(true)
+    expect(result.record.remark).toBe('测试驳回原因详细说明')
+    expect(result.record.fromStatus).toBe(RELEASE_STATUS.PENDING)
+    expect(result.record.toStatus).toBe(RELEASE_STATUS.DRAFT)
+  })
+
+  it('回滚操作记录回滚原因', () => {
+    const release = makeRelease({ id: 'r1', status: RELEASE_STATUS.PUBLISHED })
+    const result = performApprovalAction([release], 'r1', APPROVAL_ACTION.ROLLBACK, '测试回滚原因')
+    expect(result.success).toBe(true)
+    expect(result.record.remark).toBe('测试回滚原因')
+    expect(result.record.fromStatus).toBe(RELEASE_STATUS.PUBLISHED)
+    expect(result.record.toStatus).toBe(RELEASE_STATUS.ROLLED_BACK)
+  })
+
+  it('提交审核备注为可选', () => {
+    const release = makeRelease({ id: 'r1', status: RELEASE_STATUS.DRAFT })
+    const result = performApprovalAction([release], 'r1', APPROVAL_ACTION.SUBMIT, '')
+    expect(result.success).toBe(true)
+    expect(result.record.remark).toBe('')
+  })
 })
 
 describe('filterReleasesByStatus', () => {
@@ -702,6 +820,85 @@ describe('getDiffStats', () => {
   it('处理无效输入', () => {
     const stats = getDiffStats(null)
     expect(stats).toEqual({ added: 0, removed: 0, modified: 0, equal: 0 })
+  })
+})
+
+describe('isDiffTooLarge', () => {
+  it('短文本不超限', () => {
+    const text = 'line1\nline2\nline3'
+    expect(isDiffTooLarge(text, text)).toBe(false)
+  })
+
+  it('空文本不超限', () => {
+    expect(isDiffTooLarge('', '')).toBe(false)
+    expect(isDiffTooLarge(null, undefined)).toBe(false)
+  })
+
+  it('超过默认最大行数返回 true', () => {
+    const lines = Array.from({ length: MAX_DIFF_LINES + 10 }, (_, i) => `line ${i + 1}`)
+    const longText = lines.join('\n')
+    expect(isDiffTooLarge(longText, '')).toBe(true)
+    expect(isDiffTooLarge('', longText)).toBe(true)
+  })
+
+  it('两个都超限时返回 true', () => {
+    const lines = Array.from({ length: MAX_DIFF_LINES + 50 }, (_, i) => `line ${i + 1}`)
+    const longText = lines.join('\n')
+    expect(isDiffTooLarge(longText, longText)).toBe(true)
+  })
+
+  it('支持自定义 maxLines 参数', () => {
+    const text = 'a\nb\nc\nd\ne'
+    expect(isDiffTooLarge(text, text, 3)).toBe(true)
+    expect(isDiffTooLarge(text, text, 10)).toBe(false)
+  })
+
+  it('单行刚好在限值内返回 false', () => {
+    const lines = Array.from({ length: MAX_DIFF_LINES }, (_, i) => `line ${i + 1}`)
+    const text = lines.join('\n')
+    expect(isDiffTooLarge(text, text)).toBe(false)
+  })
+})
+
+describe('truncateTextForDiff', () => {
+  it('短文本不截断', () => {
+    const text = 'line1\nline2'
+    expect(truncateTextForDiff(text)).toBe(text)
+  })
+
+  it('空字符串返回空', () => {
+    expect(truncateTextForDiff('')).toBe('')
+  })
+
+  it('非字符串返回空字符串', () => {
+    expect(truncateTextForDiff(null)).toBe('')
+    expect(truncateTextForDiff(undefined)).toBe('')
+    expect(truncateTextForDiff(123)).toBe('')
+  })
+
+  it('超长文本截断并添加提示', () => {
+    const lines = Array.from({ length: MAX_DIFF_LINES + 10 }, (_, i) => `line ${i + 1}`)
+    const longText = lines.join('\n')
+    const result = truncateTextForDiff(longText)
+    expect(result).toContain('... (已截断')
+    expect(result).toContain(`原文共 ${MAX_DIFF_LINES + 10} 行`)
+    expect(result).toContain(`仅显示前 ${MAX_DIFF_LINES} 行`)
+    expect(result.split('\n').length).toBeLessThan(MAX_DIFF_LINES + 5)
+  })
+
+  it('支持自定义 maxLines', () => {
+    const text = 'a\nb\nc\nd\ne'
+    const result = truncateTextForDiff(text, 3)
+    expect(result).toContain('原文共 5 行')
+    expect(result).toContain('仅显示前 3 行')
+    expect(result.split('\n')[0]).toBe('a')
+    expect(result.split('\n')[2]).toBe('c')
+  })
+
+  it('刚好在限值内不截断', () => {
+    const lines = Array.from({ length: MAX_DIFF_LINES }, (_, i) => `line ${i + 1}`)
+    const text = lines.join('\n')
+    expect(truncateTextForDiff(text)).toBe(text)
   })
 })
 

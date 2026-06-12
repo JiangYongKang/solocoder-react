@@ -1066,3 +1066,420 @@
   color: #991b1b;
   border: 1px solid #fca5a5;
 }
+
+.rm-user-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rm-user-select {
+  width: auto;
+  min-width: 120px;
+  font-size: 13px;
+}
+
+@media (max-width: 768px) {
+  .release-manager-page {
+    padding: 16px;
+  }
+
+  .rm-page-title {
+    font-size: 22px;
+  }
+
+  .rm-stats-cards {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+
+  .rm-stats-card {
+    padding: 16px;
+  }
+
+  .rm-stats-value {
+    font-size: 22px;
+  }
+
+  .rm-filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .rm-filter-left {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .rm-filter-tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+  }
+
+  .rm-filter-tab {
+    flex-shrink: 0;
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+
+  .rm-filter-right {
+    justify-content: space-between;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .rm-user-selector {
+    flex: 1;
+  }
+
+  .rm-user-select {
+    flex: 1;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .rm-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .rm-table {
+    min-width: 600px;
+    font-size: 12px;
+  }
+
+  .rm-table th,
+  .rm-table td {
+    padding: 10px 12px;
+  }
+
+  .rm-actions {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .rm-action-btn {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+
+  .rm-pagination {
+    flex-direction: column;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .rm-pagination-controls {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .rm-page-btn {
+    padding: 6px 10px;
+    font-size: 12px;
+    min-width: 32px;
+  }
+
+  .rm-modal {
+    width: calc(100vw - 32px);
+    max-width: calc(100vw - 32px);
+    margin: 16px;
+    max-height: calc(100vh - 32px);
+  }
+
+  .rm-modal-lg,
+  .rm-modal-xl,
+  .rm-modal-xxl {
+    width: calc(100vw - 32px);
+    max-width: calc(100vw - 32px);
+  }
+
+  .rm-modal-body {
+    max-height: calc(100vh - 180px);
+    overflow-y: auto;
+  }
+
+  .rm-form-row {
+    flex-direction: column;
+  }
+
+  .rm-form-row .rm-form-item {
+    flex: 1 1 100% !important;
+  }
+
+  .rm-diff-selectors {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .rm-diff-selector-item {
+    width: 100%;
+  }
+
+  .rm-diff-swap-btn {
+    justify-content: center;
+  }
+
+  .rm-diff-container {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .rm-diff-panel {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .rm-diff-code {
+    max-height: 200px;
+  }
+
+  .rm-diff-stats {
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: 12px;
+  }
+
+  .rm-diff-legend {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .rm-detail-meta {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .rm-modal-footer {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .rm-modal-footer .rm-btn {
+    flex: 1 1 auto;
+    min-width: 100px;
+  }
+
+  .rm-changelog-toggle {
+    gap: 4px;
+  }
+
+  .rm-toggle-btn {
+    padding: 4px 10px;
+    font-size: 12px;
+  }
+
+  .rm-toast {
+    width: calc(100vw - 48px);
+    max-width: calc(100vw - 48px);
+    top: 12px;
+    left: 24px;
+    transform: none;
+    font-size: 13px;
+    padding: 10px 16px;
+  }
+
+  @keyframes rm-toast-in {
+    from {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .release-manager-page {
+    padding: 12px;
+  }
+
+  .rm-page-title {
+    font-size: 20px;
+  }
+
+  .rm-page-desc {
+    font-size: 13px;
+  }
+
+  .rm-stats-cards {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .rm-stats-card {
+    padding: 14px 12px;
+  }
+
+  .rm-stats-label {
+    font-size: 12px;
+  }
+
+  .rm-stats-value {
+    font-size: 20px;
+  }
+
+  .rm-filter-bar {
+    margin-bottom: 16px;
+  }
+
+  .rm-table {
+    min-width: 560px;
+  }
+
+  .rm-table th,
+  .rm-table td {
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+
+  .rm-version {
+    font-size: 13px;
+  }
+
+  .rm-title-link {
+    font-size: 13px;
+    line-height: 1.4;
+  }
+
+  .rm-status-tag {
+    font-size: 11px;
+    padding: 2px 8px;
+  }
+
+  .rm-actions {
+    gap: 4px;
+  }
+
+  .rm-action-btn {
+    padding: 3px 6px;
+    font-size: 11px;
+  }
+
+  .rm-pagination-info {
+    font-size: 12px;
+  }
+
+  .rm-page-btn {
+    padding: 5px 8px;
+    font-size: 11px;
+    min-width: 28px;
+  }
+
+  .rm-modal {
+    width: calc(100vw - 24px);
+    max-width: calc(100vw - 24px);
+    margin: 12px;
+    border-radius: 8px;
+  }
+
+  .rm-modal-lg,
+  .rm-modal-xl,
+  .rm-modal-xxl {
+    width: calc(100vw - 24px);
+    max-width: calc(100vw - 24px);
+  }
+
+  .rm-modal-header {
+    padding: 14px 16px;
+  }
+
+  .rm-modal-header h3 {
+    font-size: 16px;
+  }
+
+  .rm-modal-body {
+    padding: 14px 16px;
+    max-height: calc(100vh - 160px);
+  }
+
+  .rm-modal-footer {
+    padding: 12px 16px;
+  }
+
+  .rm-btn {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  .rm-form-label {
+    font-size: 13px;
+  }
+
+  .rm-input,
+  .rm-textarea {
+    font-size: 14px;
+    padding: 8px 10px;
+  }
+
+  .rm-form-help {
+    font-size: 11px;
+  }
+
+  .rm-diff-code {
+    font-size: 12px;
+    max-height: 180px;
+  }
+
+  .rm-diff-line {
+    padding: 2px 6px;
+  }
+
+  .rm-diff-line-num {
+    min-width: 28px;
+    font-size: 10px;
+  }
+
+  .rm-diff-panel-header {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+
+  .rm-diff-subtitle {
+    font-size: 11px;
+  }
+
+  .rm-detail-header h3 {
+    font-size: 16px;
+  }
+
+  .rm-version-lg {
+    font-size: 18px;
+  }
+
+  .rm-detail-title {
+    font-size: 14px;
+  }
+
+  .rm-status-tag-lg {
+    font-size: 12px;
+    padding: 3px 10px;
+  }
+
+  .rm-section-title {
+    font-size: 14px;
+  }
+
+  .rm-md-preview {
+    font-size: 13px;
+  }
+
+  .rm-toast {
+    width: calc(100vw - 32px);
+    max-width: calc(100vw - 32px);
+    top: 8px;
+    left: 16px;
+    font-size: 13px;
+    padding: 10px 14px;
+  }
+
+  .rm-empty-block {
+    min-height: 120px;
+    font-size: 13px;
+  }
+}

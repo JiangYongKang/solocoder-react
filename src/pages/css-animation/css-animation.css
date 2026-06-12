@@ -905,14 +905,17 @@ select {
   .main-content {
     flex: none;
     height: auto;
+    overflow-y: auto;
   }
 
   .content-area {
     flex-direction: column;
+    height: auto;
   }
 
   .editor-area {
     padding: 12px;
+    overflow-y: visible;
   }
 
   .properties-panel {
@@ -920,6 +923,7 @@ select {
     border-left: none;
     border-top: 1px solid #0f3460;
     padding: 12px;
+    overflow-y: visible;
   }
 
   .toolbar {
@@ -968,9 +972,15 @@ select {
     min-width: 60px;
   }
 
+  .speed-btn {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+
   .timeline-container {
     padding: 10px;
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .timeline-header,
@@ -996,6 +1006,19 @@ select {
     height: 14px;
   }
 
+  .add-track-container {
+    flex-wrap: wrap;
+  }
+
+  .add-track-select {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .add-track-btn {
+    padding: 8px 12px;
+  }
+
   .code-header {
     flex-wrap: wrap;
   }
@@ -1009,6 +1032,7 @@ select {
     font-size: 11px;
     padding: 10px;
     max-height: 250px;
+    -webkit-overflow-scrolling: touch;
   }
 
   .bezier-editor {
@@ -1045,6 +1069,19 @@ select {
     padding-bottom: 14px;
   }
 
+  .property-value input[type="number"] {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .iterations-input {
+    flex-wrap: wrap;
+  }
+
+  .iterations-input input[type="number"] {
+    width: 60px;
+  }
+
   .error-toast {
     top: 10px;
     right: 10px;
@@ -1068,6 +1105,11 @@ select {
   .animation-item-meta {
     font-size: 11px;
     gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .animation-item-actions {
+    flex-wrap: wrap;
   }
 
   .section-title {

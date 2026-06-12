@@ -1,0 +1,11 @@
+你实现的外卖点餐页面还存在以下问题，需要进行修复：
+
+1. OrderTracking.jsx 的定时器逻辑在修复后 useEffect 依赖数组包含了来自父组件的 onOrderUpdate 函数引用，每次父组件渲染都会销毁旧定时器并创建新定时器，造成不必要的频繁重建。需要确保定时器的生命周期不受父组件渲染频率影响。
+
+2. ShopDetail.jsx 中 handleProductImgPressEnd 函数声明了 product 形参但函数体内从未使用该参数，ESLint 会报告 no-unused-vars 警告。需要移除这个未使用的形参。
+
+3. ShopDetail.jsx 中的图片预览弹窗蒙层 div 直接复用了 fo-spec-overlay 类名，该类原本是为规格选择弹窗设计的。需要为预览弹窗的蒙层使用独立的类名，避免两种不同用途的弹窗共用同一个样式类。
+
+4. 确保所有子页面在 375px 移动端宽度下布局不崩坏，使用 pnpm run dev 启动后手动验证关键页面。
+
+5. 重新运行 pnpm run test，需要让所有测试通过。

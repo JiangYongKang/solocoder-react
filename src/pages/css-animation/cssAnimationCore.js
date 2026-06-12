@@ -241,20 +241,6 @@ export function updateAnimationSettings(animation, settings) {
   }
 }
 
-export function getEasingAtTime(visibleTracks, time) {
-  const easings = []
-  visibleTracks.forEach((track) => {
-    const kf = track.keyframes.find((k) => k.time === time)
-    if (kf && kf.easing) easings.push(kf.easing)
-  })
-  if (easings.length === 0) return null
-  const unique = new Set(easings)
-  if (unique.size === 1) return easings[0]
-  const counts = {}
-  easings.forEach((e) => { counts[e] = (counts[e] || 0) + 1 })
-  return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0]
-}
-
 export function getDominantEasing(animation) {
   const visibleTracks = animation.tracks.filter((t) => t.visible)
   if (visibleTracks.length === 0) return 'ease'
@@ -308,13 +294,6 @@ export function generateKeyframesCSS(animation, name = animation.name) {
 
     if (transformParts.length > 0) {
       css += `    transform: ${transformParts.join(' ')};\n`
-    }
-
-    if (time < 100) {
-      const easing = getEasingAtTime(visibleTracks, time)
-      if (easing && easing !== 'ease') {
-        css += `    animation-timing-function: ${easing};\n`
-      }
     }
 
     css += `  }\n`

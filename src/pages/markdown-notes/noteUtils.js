@@ -602,8 +602,11 @@ export function renderMarkdown(content, data) {
 
     let html = escapeHtml(seg.content)
 
+    const inlineCodeSlots = []
     html = html.replace(/`([^`]+)`/g, (match, code) => {
-      return `<code class="inline-code">${code}</code>`
+      const slotIndex = inlineCodeSlots.length
+      inlineCodeSlots.push(`<code class="inline-code">${code}</code>`)
+      return `\x00INLINE_CODE_${slotIndex}\x00`
     })
 
     html = html.replace(/^### (.*$)/gm, '<h3>$1</h3>')
@@ -614,6 +617,10 @@ export function renderMarkdown(content, data) {
     html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
     html = html.replace(/\*(.*?)\*/g, '<em>$1</em>')
     html = html.replace(/~~(.*?)~~/g, '<del>$1</del>')
+
+    for (let si = 0; si < inlineCodeSlots.length; si++) {
+      html = html.replace(`\x00INLINE_CODE_${si}\x00`, inlineCodeSlots[si])
+    }
 
     const htmlLines = html.split('\n')
     const processed = []

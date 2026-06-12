@@ -132,7 +132,7 @@ export default function ShopDetail({ shop, cart, onAddToCart, onBack }) {
     }, 500);
   };
 
-  const handleProductImgPressEnd = (product) => {
+  const handleProductImgPressEnd = () => {
     if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
@@ -201,10 +201,10 @@ export default function ShopDetail({ shop, cart, onAddToCart, onBack }) {
                   style={{ backgroundColor: generateProductColor(product.name), cursor: 'pointer' }}
                   onClick={() => handleProductImgClick(product)}
                   onMouseDown={() => handleProductImgPressStart(product)}
-                  onMouseUp={() => handleProductImgPressEnd(product)}
-                  onMouseLeave={() => handleProductImgPressEnd(product)}
+                  onMouseUp={() => handleProductImgPressEnd()}
+                  onMouseLeave={() => handleProductImgPressEnd()}
                   onTouchStart={() => handleProductImgPressStart(product)}
-                  onTouchEnd={() => handleProductImgPressEnd(product)}
+                  onTouchEnd={() => handleProductImgPressEnd()}
                   title="点击或长按查看大图"
                 >
                   {product.name.charAt(0)}
@@ -287,7 +287,7 @@ export default function ShopDetail({ shop, cart, onAddToCart, onBack }) {
       )}
 
       {previewProduct && (
-        <div className="fo-spec-overlay" onClick={() => setPreviewProduct(null)}>
+        <div className="fo-preview-overlay" onClick={() => setPreviewProduct(null)}>
           <div className="fo-preview-popup" onClick={(e) => e.stopPropagation()}>
             <div className="fo-spec-header">
               <div className="fo-spec-title">商品详情</div>

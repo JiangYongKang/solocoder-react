@@ -1,0 +1,6 @@
+产物不满意：
+1. release-manager.css 768px 断点中 .rm-diff-container 设置了 flex-direction: column（第 1225 行），但该元素的基础样式（第 889 行）使用 display: grid 和 grid-template-columns: 1fr 1fr。flex-direction 是 Flexbox 属性，对 Grid 容器完全不生效。导致 375px 移动端下 Diff 面板仍然左右并排显示，不会变为上下堆叠，提示词第 1 条"Diff 面板在移动端改为上下布局"的核心需求未实现。正确做法是同时覆写 display: flex 或将 grid-template-columns 改为 1fr。
+2. buildReleaseDiff 测试用例（第 788-802 行）只验证了 leftRows/rightRows/lineDiff 的长度是否大于 0 或等于 0，从未断言 diff 的具体内容——没有检查哪些行被标记为新增/删除/修改、左右面板行号是否正确、lineDiff 中各行的 type 字段是否准确。提示词要求为 buildReleaseDiff 补充测试，现有测试只是浅层长度校验，完全无法覆盖 diff 算法的核心逻辑。
+3. truncateTextForDiff 截断测试在第 886 行使用 expect(result.split('\n').length).toBeLessThan(MAX_DIFF_LINES + 5) 作为断言。输入 510 行时正确截断结果应为 503 行，而 <505 的条件允许 0 到 504 行全部通过，边界过于宽松无法有效验证截断行数。
+
+过程不满意：模型在编写 .rm-diff-container 移动端覆写 CSS 时直接使用了 flex-direction: column，但没有检查该元素基础样式中 display 属性是 grid。暴露了 CSS 布局模型理解的缺失——对 grid 容器设置 flex 属性是无效的。此外，模型多次在 Shell 命令尾部拼接了字面量 undefined（如 npm test ... 2>&1 undefined），说明构造命令时某变量值为 undefined 但未做空值处理就直接字符串化，参数处理缺少防御性校验。

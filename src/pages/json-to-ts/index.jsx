@@ -406,7 +406,7 @@ const JsonToTsPage = () => {
             <div className="jtt-panel">
               <div className="jtt-panel-header">
                 <h3 className="jtt-panel-title">TypeScript 输出</h3>
-                <div style={{ display: 'flex', gap: '6px' }}>
+                <div className="jtt-panel-actions">
                   <button
                     className="jtt-btn jtt-btn-sm"
                     onClick={handleCopy}

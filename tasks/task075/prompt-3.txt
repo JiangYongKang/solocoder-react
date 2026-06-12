@@ -1,0 +1,9 @@
+你实现的电子签名板还存在以下问题，需要进行修复：
+
+1. signatureCore.js 中 getBezierPoints 函数的返回值结构在被改为二次贝塞尔格式（字段 cpX、cpY）后，同文件中的 strokeToPathData 函数仍然使用旧的三次贝塞尔格式（字段 cp1x、cp1y、cp2x、cp2y）读取控制点坐标。这导致 strokeToPathData 生成的 SVG 路径字符串中所有控制点坐标均为 undefined，输出形如 `M 0 0 C undefined undefined, undefined undefined, 10 10`。需要将 strokeToPathData 适配为新的控制点字段名，并确认生成的 SVG 路径有效。
+
+2. strokeToPathData 的现有测试用例仅通过 `toContain` 断言路径字符串中包含特定字母和数字字符，未检验控制点坐标是否为合法数值，导致上述回归被测试通过状态掩盖。需要加强测试断言使其能捕获此类字段名不一致导致的 undefined 输出。
+
+3. 确保所有子页面在 375px 移动端宽度下布局不崩坏，使用 pnpm run dev 启动后手动验证关键页面。
+
+4. 重新运行 pnpm run test，需要让所有测试通过。

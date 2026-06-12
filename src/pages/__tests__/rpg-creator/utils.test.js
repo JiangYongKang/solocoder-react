@@ -668,13 +668,20 @@ describe('drawCardCanvas', () => {
 
   function createMockCanvasFactory() {
     const { ctx: miniCtx, calls: miniCalls } = createMockCtx()
+    let receivedWidth = null
+    let receivedHeight = null
     return {
-      factory: () => ({
-        width: 200,
-        height: 280,
-        getContext: () => miniCtx,
-      }),
+      factory: (w, h) => {
+        receivedWidth = w
+        receivedHeight = h
+        return {
+          width: 200,
+          height: 280,
+          getContext: () => miniCtx,
+        }
+      },
       miniCalls,
+      getReceivedSize: () => ({ width: receivedWidth, height: receivedHeight }),
     }
   }
 
@@ -684,6 +691,40 @@ describe('drawCardCanvas', () => {
     const c = createDefaultCharacter()
     c.name = '测试'
     expect(() => drawCardCanvas(ctx, c, factory)).not.toThrow()
+  })
+
+  it('createCanvas 工厂函数接收正确的宽高参数', () => {
+    const { ctx } = createMockCtx()
+    const { factory, getReceivedSize } = createMockCanvasFactory()
+    const c = createDefaultCharacter()
+    drawCardCanvas(ctx, c, factory)
+    const size = getReceivedSize()
+    expect(size.width).toBe(200)
+    expect(size.height).toBe(280)
+  })
+
+  it('默认工厂函数创建指定尺寸的 canvas（模拟验证参数传递', () => {
+    const { ctx } = createMockCtx()
+    const receivedArgs = []
+    const trackingFactory = (w, h) => {
+      receivedArgs.push({ w, h })
+      return {
+        width: w,
+        height: h,
+        getContext: () => ({
+          clearRect: () => {}, fillStyle: '', fillRect: () => {}, beginPath: () => {},
+          arc: () => {}, fill: () => {}, stroke: () => {}, strokeStyle: '', lineWidth: 0,
+          fillText: () => {}, moveTo: () => {}, lineTo: () => {}, closePath: () => {},
+          strokeRect: () => {}, drawImage: () => {}, font: '', textAlign: '', textBaseline: '',
+          getImageData: () => ({ data: [] }),
+        }),
+      }
+    }
+    const c = createDefaultCharacter()
+    drawCardCanvas(ctx, c, trackingFactory)
+    expect(receivedArgs.length).toBeGreaterThan(0)
+    expect(receivedArgs[0].w).toBe(200)
+    expect(receivedArgs[0].h).toBe(280)
   })
 
   it('调用了 fillRect 绘制背景', () => {

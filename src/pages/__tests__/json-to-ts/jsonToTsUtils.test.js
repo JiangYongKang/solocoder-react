@@ -697,6 +697,62 @@ describe('递归深度限制', () => {
     expect(lines.length).toBeGreaterThan(0)
     expect(lines.length).toBeLessThan(200)
   })
+
+  it('深层嵌套中的数组字段应保留 any[] 类型而非退化为 any', () => {
+    const buildDeepWithArray = (depth) => {
+      let obj = { items: [1, 2, 3] }
+      for (let i = 0; i < depth; i++) {
+        obj = { nested: obj }
+      }
+      return obj
+    }
+    const deepObj = buildDeepWithArray(60)
+    const result = generateTypeScript(deepObj, { rootName: 'Deep' })
+    expect(result).toBeDefined()
+    const arrayFields = result.code.split('\n').filter((line) => line.includes('items:'))
+    if (arrayFields.length > 0) {
+      expect(arrayFields[0]).toContain('[]')
+      expect(arrayFields[0]).not.toMatch(/items:\s*any\s*$/)
+    }
+  })
+
+  it('深层嵌套中的数组字段在 inferObjectFieldSchemas 中应保留 hasArray 标记和 [] 类型', () => {
+    const obj = { items: [1, 2, 3] }
+    const result = inferObjectFieldSchemas([obj], 'Test', 200)
+    expect(result.items).toBeDefined()
+    expect(result.items.hasArray).toBe(true)
+    expect(result.items.type).toContain('[]')
+    expect(result.items.type).not.toBe('any')
+  })
+
+  it('inferArrayItemType 在深度限制附近嵌套数组应正确处理', () => {
+    const arrays = [[[1, 2]]]
+    const result = inferArrayItemType(arrays, 'Test', 49)
+    expect(result).toContain('[]')
+    expect(result).not.toBe('any')
+  })
+
+  it('inferArrayItemType 深度超限时应返回 any（无法推断元素类型）', () => {
+    const arrays = [[[1, 2]]]
+    const result = inferArrayItemType(arrays, 'Test', 200)
+    expect(result).toBe('any')
+  })
+
+  it('collectNestedObjects 深度限制提前返回时 buildTypeDefinitions 应正常工作', () => {
+    const buildDeepObject = (depth) => {
+      let obj = { value: 'leaf' }
+      for (let i = 0; i < depth; i++) {
+        obj = { nested: obj }
+      }
+      return obj
+    }
+    const deepObj = buildDeepObject(300)
+    const result = buildTypeDefinitions(deepObj, 'Deep')
+    expect(result).toBeDefined()
+    expect(Array.isArray(result.typeDefs)).toBe(true)
+    expect(typeof result.listTypeName).toBeDefined()
+    expect(typeof result.topLevelListName).toBeDefined()
+  })
 })
 
 describe('generateTypeScript - rootListName', () => {

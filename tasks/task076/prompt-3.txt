@@ -1,0 +1,7 @@
+你实现的版本发布管理系统还存在以下问题，需要进行修复：
+
+1. 整个页面在 375px 移动端宽度下布局仍然崩坏：版本列表的表格在窄屏下横向溢出、Diff 左右分栏在小屏幕上未做堆叠适配、审批弹窗的宽度超出移动端屏幕边界。需要为窄屏设备补充媒体查询响应式样式，让表格可横向滚动、Diff 面板在移动端改为上下布局、弹窗宽度自适应视口。
+
+2. 版本发布管理页面缺少纯 JS 函数的单元测试，测试目录下没有任何为 utils.js 中工具函数编写的测试用例。需要为 buildReleaseDiff、getDiffStats、isDiffTooLarge、truncateTextForDiff、performApprovalAction 等核心工具函数补充测试。测试代码放在 src/pages/__tests__/release-manager/ 下。
+
+3. 重新运行 pnpm run test，需要让所有测试通过。

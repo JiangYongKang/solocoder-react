@@ -156,18 +156,23 @@ export const canRedo = (history) => !!(history && history.future && history.futu
 export const strokeToPathData = (stroke, smoothingLevel = DEFAULT_SMOOTHING) => {
   if (!stroke || !stroke.points || stroke.points.length < 2) return ''
 
+  if (smoothingLevel === 0 || stroke.points.length < 3) {
+    let path = `M ${stroke.points[0].x} ${stroke.points[0].y}`
+    for (let i = 1; i < stroke.points.length; i++) {
+      path += ` L ${stroke.points[i].x} ${stroke.points[i].y}`
+    }
+    return path
+  }
+
   const bezierPoints = getBezierPoints(stroke.points, smoothingLevel)
   if (bezierPoints.length < 2) return ''
 
   let path = `M ${bezierPoints[0].x} ${bezierPoints[0].y}`
 
-  for (let i = 1; i < bezierPoints.length - 1; i++) {
+  for (let i = 1; i < bezierPoints.length; i++) {
     const p = bezierPoints[i]
-    path += ` C ${p.cp2x} ${p.cp2y}, ${p.cp1x} ${p.cp1y}, ${p.x} ${p.y}`
+    path += ` Q ${p.cpX} ${p.cpY}, ${p.x} ${p.y}`
   }
-
-  const last = bezierPoints[bezierPoints.length - 1]
-  path += ` L ${last.x} ${last.y}`
 
   return path
 }

@@ -1,0 +1,10 @@
+产物不满意：
+1. annotatorCore.js 的 createAnnotation 函数为每个标注元素生成的 id 使用了 Date.now().toString(36) + Math.random().toString(36).substr(2)，其中 Math.random() 仅生成约 2^53 种可能值，在同一毫秒内连续快速创建多个标注时存在 ID 碰撞风险。测试文件 annotatorCore.test.js 的"多个标注创建"用例虽然在独立时序下不会触发，但在实际交互中用户可能通过双击快速连续创建标注导致 ID 重复，之后的选择、删除等操作会误操作到错误的标注元素。应该使用递增计数器或 crypto.randomUUID() 确保 ID 全局唯一。
+2. annotatorCore.js 的 pushHistory 函数历史栈截断逻辑使用了 history.length >= MAX_HISTORY(50) 时 shift() 删除最早条目。但当用户执行撤销操作后（historyIndex 回退到中间位置），再执行新操作时需要截断撤销点之后的历史。修复后的代码通过 slice(0, historyIndex + 1) 做了截断但逻辑有两个分支——撤销后和普通添加，两个分支的截断和添加逻辑不统一，增加了维护复杂度。应该统一为：在 historyIndex < history.length - 1 时始终截断 future 历史再 push 新状态。
+3. storage.js 的 saveAnnotation 函数使用 localStorage.setItem(key, JSON.stringify(annotationData)) 直接写入。当 annotationData 中的图片 Base64 数据超过 localStorage 的 5MB 单键限制时，JSON.stringify 会成功但 setItem 会静默失败（不抛异常），导致用户以为保存成功但实际数据已丢失。提示词要求图片大于 2MB 时分键存储，但代码中只在 saveAnnotation 做了简单大小判断后用单独的 imageKey 存储图片数据，没有处理 annotationData 整体序列化后仍可能超限的情况。应该在 setItem 后用 try-catch 捕获 QuotaExceededError 并提示用户。
+4. index.jsx 的 Canvas 鼠标事件处理使用了 e.clientX - canvas.getBoundingClientRect().left 计算鼠标在 Canvas 上的位置。当 Canvas 应用了 CSS transform（如缩放）或页面发生滚动时，getBoundingClientRect 的值可能不准确导致鼠标和标注元素的交互偏移——用户点击的位置与实际被操作的元素产生位置偏差。应该使用 canvas.width 和 canvas.height（Canvas 内部分辨率）配合 offsetX/offsetY 或计算 scale 因子来做坐标转换。
+5. index.jsx 的 handleKeyDown 处理了 Delete 和 Backspace 键删除选中元素，但没有根据标注的 selectedTool 做区分处理——当用户当前选中的是画笔工具而非选择工具时，按 Delete 键应该是删除画笔绘制的最后一个路径段而非删除选中的标注元素。当前实现无视工具状态统一执行标注元素删除，导致画笔绘制过程中误触 Delete 会意外删除之前绘制的完整元素。应该在删除操作中判断当前工具类型，只在选择工具或元素已选中时执行删除。
+
+过程不满意：
+1. 模型在开始实现前读取了 image-editor 和 whiteboard 两个已有模块的代码作为参考。image-editor 确实与截图标注功能有相似之处（Canvas 操作、图层管理），但 whiteboard 是一个在线协作白板，其交互模式（多用户同步、网络层）与截图标注完全无关，读取 whiteboard/index.jsx 是无效参考。模型的探索范围偏大，应该只选择功能最接近的参考模块。
+2. 模型在第一次运行 annotatorCore 测试时遇到 5 个失败，分别涉及 pointNearLine、pointNearRectEdge、resizeAnnotation 和 pushHistory。模型正确地逐函数分析了失败原因并修复，但经历了两轮修改——第一轮修复了 4 个问题后还有一个失败（pushHistory 的截断逻辑），第二轮才修复完。pushHistory 这个失败与第一轮的 4 个不同，它本质上是对提示词需求中"撤销后再做新操作应截断后续历史"这一行为逻辑的理解偏差，而非纯计算错误。模型在第一轮修复时就应该更仔细地分析所有 5 个失败的根本原因，统一设计方案而非分批处理。

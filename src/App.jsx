@@ -2,6 +2,7 @@ import '@/App.css'
 import { Route, Routes, useNavigate } from 'react-router-dom'
 
 import ApiDebuggerPage from '@/pages/api-debugger/index.jsx'
+import AuditLogPage from '@/pages/audit-log/index.jsx'
 import AuthPage from '@/pages/auth/index.jsx'
 import BudgetTrackerPage from '@/pages/budget-tracker/index.jsx'
 import CalendarPage from '@/pages/calendar/index.jsx'
@@ -9,6 +10,7 @@ import ChatPage from '@/pages/chat/index.jsx'
 import CouponPage from '@/pages/coupon/index.jsx'
 import CSSAnimationPage from '@/pages/css-animation/index.jsx'
 import CurrencyConverterPage from '@/pages/currency-converter/index.jsx'
+import DanmakuPlayerPage from '@/pages/danmaku-player/index.jsx'
 import Dashboard from '@/pages/dashboard/Dashboard.jsx'
 import DataImporterPage from '@/pages/data-importer/index.jsx'
 import DataMaskPage from '@/pages/data-mask/index.jsx'
@@ -25,6 +27,7 @@ import FunnelAnalysisPage from '@/pages/funnel-analysis/index.jsx'
 import GanttChartPage from '@/pages/gantt-chart/index.jsx'
 import GeometryBoardPage from '@/pages/geometry-board/index.jsx'
 import GitBrowserPage from '@/pages/git-browser/index.jsx'
+import GradeManagerPage from '@/pages/grade-manager/index.jsx'
 import HabitTrackerPage from '@/pages/habit-tracker/index.jsx'
 import I18nManagerPage from '@/pages/i18n-manager/index.jsx'
 import InfiniteListPage from '@/pages/infinite-list/index.jsx'
@@ -67,6 +70,8 @@ import WsDebuggerPage from '@/pages/websocket-debugger/index.jsx'
 import WhiteboardPage from '@/pages/whiteboard/index.jsx'
 import Wizard from '@/pages/wizard/Wizard.jsx'
 import WorkflowPage from '@/pages/workflow/index.jsx'
+import VideoMeetingPage from '@/pages/video-meeting/index.jsx'
+import ScreenshotAnnotatorPage from '@/pages/screenshot-annotator/index.jsx'
 
 const TASKS = [
     { id: 1, title: '用户认证系统', route: 'auth', description: '登录、注册、找回密码、修改密码完整的认证流程，基于 localStorage 存储。' },
@@ -136,6 +141,11 @@ const TASKS = [
     { id: 66, title: '外卖点餐', route: 'food-order', description: '完整外卖点餐流程，店铺列表与品类筛选、商品分组与规格选择加购、购物车管理、地址备注填写、订单状态实时跟踪、历史订单查看，基于 localStorage 持久化。' },
     { id: 65, title: 'RPG 角色创建器', route: 'rpg-creator', description: '可视化RPG角色创建工具，CSS/Canvas绘制角色形象、外观定制、30点属性分配、树形技能解锁、角色保存加载与卡片导出，基于 localStorage 持久化。' },
     { id: 67, title: '路线记录器', route: 'route-recorder', description: 'Canvas自绘地图路线规划工具，标记起终点和途经点、拖拽排序、距离时间计算、海拔剖面图、收藏与分享路线，基于 localStorage 持久化。' },
+    { id: 69, title: '成绩管理系统', route: 'grade-manager', description: '教学场景成绩管理工具，支持学生/科目双视图切换、批量粘贴录入、统计分析与直方图、排名展示、CSV导出，基于 localStorage 持久化。' },
+    { id: 72, title: '代码执行沙箱', route: 'code-sandbox', description: '在线代码运行环境，支持 JavaScript 和 Python（前端模拟）代码编写与执行、语法高亮、输出控制台、代码片段保存加载、执行历史记录，基于 localStorage 持久化。' },
+    { id: 73, title: '视频会议模拟', route: 'video-meeting', description: 'Canvas 模拟视频会议界面，画廊/演讲者双视图切换，静音/摄像头/屏幕共享/举手控制，聊天面板和参会人列表，所有状态前端维护。' },
+    { id: 70, title: '审计日志系统', route: 'audit-log', description: '企业级操作审计日志管理，支持分页列表、多维度筛选、JSON 详情、CSV 导出、保留策略配置、操作趋势图与异常标记，基于 localStorage 持久化。' },
+    { id: 71, title: '弹幕播放器', route: 'danmaku-player', description: 'Canvas 弹幕渲染的视频播放器模拟，支持弹幕发送（位置/颜色/字号）、滚动/固定弹幕渲染、弹幕开关与透明度、弹幕列表与防重叠密度调节。' },
 ]
 
 function HomePage() {
@@ -171,6 +181,7 @@ function App() {
         <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/auth" element={<AuthPage />} />
+            <Route path="/audit-log" element={<AuditLogPage />} />
             <Route path="/products" element={<ProductsPage />} />
             <Route path="/kanban" element={<KanbanPage />} />
             <Route path="/dashboard" element={<Dashboard />} />
@@ -203,6 +214,7 @@ function App() {
             <Route path="/mind-map" element={<MindMapPage />} />
             <Route path="/media-player" element={<MediaPlayerPage />} />
             <Route path="/api-debugger" element={<ApiDebuggerPage />} />
+            <Route path="/danmaku-player" element={<DanmakuPlayerPage />} />
             <Route path="/regex-tester" element={<RegexTesterPage />} />
             <Route path="/db-designer" element={<DBDesignerPage />} />
             <Route path="/coupon" element={<CouponPage />} />
@@ -236,6 +248,10 @@ function App() {
             <Route path="/food-order" element={<FoodOrderPage />} />
             <Route path="/rpg-creator" element={<RpgCreatorPage />} />
             <Route path="/route-recorder" element={<RouteRecorderPage />} />
+            <Route path="/grade-manager" element={<GradeManagerPage />} />
+            <Route path="/code-sandbox" element={<CodeSandboxPage />} />
+            <Route path="/video-meeting" element={<VideoMeetingPage />} />
+            <Route path="/screenshot-annotator" element={<ScreenshotAnnotatorPage />} />
         </Routes>
     )
 }

@@ -1,0 +1,10 @@
+产物不满意：
+1. addStudent 和 addSubject 函数在成功路径上返回了 `{ ...data, error: null }`，而 React 组件通过 setData(result) 将返回值直接设为 data 状态，导致 `error: null` 属性被混入数据模型中持续存在。后续所有通过 `...data` 展开的操作都会携带这个冗余的 error 属性，污染了 localStorage 持久化数据。正确做法是将错误信息和数据分离，函数只返回纯数据对象，错误通过异常或独立的 error 状态管理。
+2. saveGradeData 在每次数据变更时都将当前 STORAGE_KEY 的数据写入 PREVIOUS_STORAGE_KEY，而 useEffect 在每次 data 变化时都触发 saveGradeData。这意味着用户每做一次编辑操作，PREVIOUS_STORAGE_KEY 就被覆盖一次。排名面板中的"与上次保存数据对比"实际上始终只对比紧邻一次编辑前后的状态，排名变化标注在连续多步编辑后已无实际语义价值，等同于功能不可用。根本原因是历史数据快照的保存时机设计错误——应在页面加载时做一次快照，而非每次数据变更都更新。
+3. GradeTable 组件中定义了 `editingCell` 状态变量，所有 ScoreCell 的 onBlur 回调都调用了 `setEditingCell(null)` 来更新它，但 editingCell 在整个组件中从未被读取或用于任何条件判断。这是一个完全无用的死状态，每次 ScoreCell 失焦都会触发一次无意义的 setState，造成额外的渲染开销。
+4. exportToCSV 函数在生成 CSV 内容时直接使用 `row.join(',')` 拼接列值，没有对值中可能包含的逗号、双引号或换行符做 CSV 标准转义处理。如果学生姓名包含逗号，导出的 CSV 文件在 Excel 中打开时列数会错位，导致整行数据错乱。正确做法是使用 CSV 标准双引号转义规则包裹含特殊字符的字段。
+5. calculateRankChanges 函数内部硬编码了 `calculateRankings(previousData, 'total')`，无论用户在排名面板中通过点击科目表头切换到哪个科目的排名，排名变化列始终展示的是按总分排序的变化值。用户切换到按"数学"排名时，看到的排名变化仍然是总分维度的升降，与当前排名依据不一致，产生误导。
+
+过程不满意：
+1. 模型在读取 gradeCore.js、index.jsx 等文件后，直接在思考过程中写道"我看到 grade-manager 目录下已经有了完整的实现"，然后调整 plan 从 8 个 TODO 缩减为 4 个，进入了"验证－修复"模式。但模型始终没有对照提示词逐条检查需求是否全部落实，比如提示词要求"表格底部显示每个学生的总分和平均分汇总行"，而实际代码中总分和平均分是作为表格的行内列展示而非独立的底部汇总行。模型因为预设"代码已完整"而跳过了需求对照环节，导致遗漏了需求偏差。正确做法是先对照提示词逐条走查已有实现，确认所有需求点都已满足后再进入修复阶段。
+2. 模型修复了测试中发现的两个问题后，运行了 `npm run lint --quiet` 检查代码质量，但思考过程中对 lint 命令的调用使用了 `--quiet` 参数后，终端可能只输出了错误而不输出警告。模型在回复中声称"lint 无错误"，但没有展示或核实是否有警告被抑制。考虑到 GradeTable 中 editingCell 未使用的 dead state 应该被 ESLint no-unused-vars 规则捕获，模型的 lint 结论可能存在遗漏。正确做法是在 lint 时不要用 --quiet 抑制警告，或者在测试通过后完整审阅终端输出确认无任何级别的诊断残留。

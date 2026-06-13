@@ -1,0 +1,10 @@
+产物不满意：
+1. danmakuCore.js 的 findAvailableScrollTrack 函数在查找空闲轨道时使用了 danmakuList.filter(d => d.track === track) 检查轨道占用情况。但当弹幕密度模式切换时（如从高密度 8 轨道切换到低密度 3 轨道），被分配到第 4-8 轨道的弹幕仍在播放中但对应轨道已不存在，这些弹幕变为"无轨道幽灵弹幕"——它们仍在 Canvas 上渲染但轨道号超出当前模式的轨道总数，filter 循环中以 track < trackCount 跳过它们导致这些弹幕的位置计算使用了无效的 track 值，弹幕的 Y 坐标可能越界或与其它弹幕重叠。应该在切换密度模式时清理超出新轨道数的所有弹幕。
+2. danmakuCore.js 的 generateDanmakuId 函数使用了 Date.now() + counter 作为 ID 生成方式。模型在修复时将 Date.now() 替换为 performance.now() 以获得更高精度，但 performance.now() 在页面后台时精度降低（浏览器节流），同一毫秒内快速发送多条弹幕时 counter 递增不足以区分——如果用户在恢复前台标签页后立即连发多条弹幕，多个弹幕可能获得相同的 performance.now() 基值且 counter 不足以区分。应该使用 crypto.randomUUID() 或 Date.now() + performance.now() + counter 三维组合确保唯一性。
+3. danmakuCore.js 的 calculateScrollPosition 函数计算滚动弹幕位置时使用 (videoWidth + textWidth) * (1 - elapsed / DURATION) 公式。当视频暂停时 elapsed 时间停止增长但 requestAnimationFrame 仍在运行（drawDanmaku 持续调用），函数中仍会基于暂停的 elapsed 计算位置得到与上一帧相同的结果，但每次调用都在 Canvas 上重复绘制同一帧——这是无意义的重复渲染浪费 GPU 资源。应该在暂停状态下跳过整个 drawDanmaku 的渲染逻辑直接 return。
+4. index.jsx 的 handleFullscreen 函数使用 document.documentElement.requestFullscreen() 触发全屏，但没有检查 document.fullscreenElement 或 document.fullscreenEnabled 判断当前是否已处于全屏状态。如果用户已经在全屏模式（例如通过浏览器的 F11 快捷键进入），再次点击全屏按钮会尝试重复请求全屏——Chrome 会静默忽略但 Firefox 会抛出 TypeError。应该在调用前判断已全屏则执行 exitFullscreen 实现切换行为。
+5. 提示词要求"视频停止或重新加载时清除所有弹幕"。index.jsx 在视频停止时（handleStop）调用了 clearDanmakuList 清除弹幕列表，但 handleReload 函数（重新加载按钮）只重置了播放进度和 paused 状态，没有调用清除弹幕的逻辑。用户点击重新加载后旧弹幕仍在列表中，与提示词要求的重新加载清除弹幕行为不符。
+
+过程不满意：
+1. 模型在修复 localStorage 测试失败时，将代码中的 window.localStorage 替换为 globalThis.localStorage 以兼容测试环境。这个修改属于"生产代码向测试妥协"的典型反模式——正确的做法是在测试文件中 mock 或 polyfill localStorage 让 window.localStorage 可用，而不是修改生产代码中原本正确的 window.localStorage 访问方式。模型为了方便测试通过而改变了生产代码的运行时引用方式，这可能导致在特殊运行环境（如 web worker 或沙箱 iframe）中行为不一致。
+2. 模型修复了 7 个测试失败后声称"所有测试通过"，但 session-cot 的最后几行显示模型还在反复编辑 danmakuCore.js 的同一个文件修改 localStorage 相关的代码——先改代码再跑测试、再改再跑，经历了至少 3 轮迭代才让所有测试通过。模型呈现了"试错式调试"的行为模式：遇到测试失败→盲目修改代码→再跑测试→再失败→再改，而非先系统分析 7 个失败用例的根本原因、整理出统一的修复方案、一次性修改后验证。每轮只修 1-2 个问题导致开发效率低下。

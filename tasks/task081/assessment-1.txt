@@ -1,0 +1,19 @@
+产物不满意：
+
+1. videoMeetingCore.js 中导出的 drawParticipantCanvas 函数完全没有被测试覆盖，测试文件 videoMeetingCore.test.js 中既没有 import 该函数也没有为其编写任何测试用例。该函数是 Canvas 画面模拟的核心逻辑入口，内部根据参会者的 isVideoOff、isScreenSharing 等状态走不同的绘制分支（drawAnimatedBackground、drawVideoOffState、drawScreenShareState），包含大量的条件路由逻辑。提示词第6条明确要求"还需要为该页面编写纯 JS 函数的单元测试"，模型虽然写了 70 个测试覆盖了大部分工具函数，却遗漏了这个最重要的导出函数。即使 Canvas 上下文需要 mock，也至少应该验证不同参与者状态下 drawParticipantCanvas 是否调用了正确的绘制路径。
+
+2. index.jsx 的聊天消息自动模拟 effect 中在第 261 行设置了 `if (meetingEnded || !sidePanelOpen) return`，导致只有聊天侧边栏打开时才会调度定时器发送模拟消息。当用户关闭侧边栏后，整个定时器被清除不再有消息产生。这与提示词第 4 条"新消息用定时器模拟（每 5-15 秒随机一条来自其他参会者的消息）"的需求不符——提示词并未限定聊天面板必须打开才有消息。同时第 4 条还提到"未展开时有未读消息数角标"，但按当前逻辑面板关闭时消息根本不会产生，未读角标永远无法增长，形成功能死码。
+
+3. index.jsx 中 handleToggleMute 和 handleToggleHand 都通过调用 videoMeetingCore.js 的 toggleParticipantProperty 纯函数实现状态切换，但 handleToggleScreenShare 在 288-293 行直接内联了 `prev.map(p => p.id === 'self' ? { ...p, isScreenSharing: !p.isScreenSharing } : p)`，完全没使用 toggleParticipantProperty。这不仅导致代码风格不一致，如果未来 toggleParticipantProperty 有不可变性防护等增强逻辑，屏幕共享切换将无法受益。
+
+4. index.jsx 中 ParticipantCanvas 组件的函数签名只解构了 `{ participant, animFrame, onClick }`，但在 380、398、412 行的三次调用中都传入了一个 `isSelf={p.isSelf}` 的额外 prop。这个 prop 在组件内部从未被解构或使用——组件通过 participant 对象中的 isSelf 字段在 drawParticipantCanvas 内部判断，单独传入的 isSelf prop 是完全冗余的传递，属于死代码残留。
+
+5. index.jsx 头部的聊天按钮和参会人按钮（handleOpenChat 和 handleOpenParticipants）调用的回调只执行了 setSidePanelOpen(true)，没有实现开关切换逻辑。当侧边栏已打开时，再次点击聊天按钮不会关闭面板，用户只能通过面板内的 `✕` 按钮关闭。这种单向打开的不对称行为是明显的 UX 缺陷。
+
+过程不满意：
+
+1. 模型在修复构建错误时，编辑了 data-importer/components/StepIndicator.jsx 文件并尝试修复 screenshot-annotator/index.jsx 的导入问题。这两个文件完全不属于 video-meeting 包的范围。项目规则明确要求"只关注当前任务所在包的代码"，模型超出任务边界修改其他包的代码属于越界操作。正确做法是只确保 video-meeting 包自身没有编译错误和 lint 警告，其他包的构建问题不应在本次任务中处理。
+
+2. 模型在总结中声称"70 个单元测试全部通过"，但对 videoMeetingCore.js 中导出的 drawParticipantCanvas 函数完全未编写测试，甚至连 import 该函数都没有。模型的总结声称与代码实际内容存在不一致，要么是遗漏后在总结中未自查到位，要么是对测试覆盖率的判断过于草率。应该在总结前逐项检查所有导出函数是否都有对应的测试覆盖。
+
+3. 模型在原始代码中存在多个拆分的子组件文件（VideoCanvas.jsx、ControlBar.jsx、ChatPanel.jsx 等共 11 个），模型通过批量 delete 操作将这些文件全部删除，将所有功能合并到 index.jsx 一个文件中。虽然最终的 index.jsx 功能正常，但模型在没有分析原有组件拆分理由的情况下直接全量删除重建，属于粗暴重构。正确做法是先逐个分析哪些组件值得保留、哪些确实冗余，再选择性删除。

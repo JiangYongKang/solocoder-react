@@ -1,0 +1,9 @@
+产物不满意：
+1. index.jsx 的 scheduleNext 函数在对比模式下存在调度缺陷：B侧 setTimeout 回调中只执行了 stepGeneratorOnce("B") 而没有递归调用 scheduleNext()，导致调度循环完全由A侧驱动。当A侧先完成排序而B侧仍在运行时，A侧回调中的 scheduleNext() 检测到 aRunning=false 只设置了B侧定时器，但B侧回调执行后不会继续调度自己，B侧只能执行额外一步就停止，对比模式下算法B无法独立完成排序。根本原因是调度逻辑不对称——A侧承担了循环调度职责但B侧被设计为被动执行。应该在B侧回调中也根据运行状态判断是否继续调度，使两侧的调度逻辑对称。
+2. index.jsx 的 scheduleNext 函数在对比模式下设置定时器时未清除旧的定时器句柄：第一次 scheduleNext 同时设置了 timerRef.current 和 timerBRef.current，A侧定时器触发后在回调中递归调用 scheduleNext，第二次 scheduleNext 直接覆盖了 timerBRef.current，但第一次设置的B侧定时器可能尚未触发处于 pending 状态，导致B侧同时有两个定时器存在，B会因旧定时器额外触发而执行多余步骤，使两个算法在视觉上执行步调不一致。应该在每次 scheduleNext 调用开头同时清除 timerRef.current 和 timerBRef.current 两个旧定时器再设置新的。
+3. index.jsx 的 stepGeneratorOnce 函数长达125行（第217行至第342行），在一个函数内混杂了IDLE状态到RUNNING状态的转换、generator创建与初始化、DONE状态处理、COMPLETE步骤的特殊处理（与DONE逻辑重复）、普通步骤的状态更新、日志生成与过滤、算法名称查找等六种不同职责。当需要调试或修改某一种状态转换逻辑时，必须在同一个大函数中定位。应该按状态转换维度拆分为多个小函数，如 initGenerator、advanceStep、handleComplete 等，降低单函数复杂度。
+
+过程不满意：
+1. 模型在收到任务后的第一步操作就是创建TodoList（10个items），此时还没阅读测试文件 sortAlgorithms.test.js、还没打开需求文档 prompt-1.txt、还没查看项目目录结构。按照项目标注规范明确要求"不能刚收到任务就直接创建 TodoList，应先分析问题再规划"，模型违反了这一过程规范。过早制定计划导致后续计划反复调整——从最初的10个 items 调整到12个再调整到11个，说明初始规划缺乏信息基础。正确做法是先通读测试文件和需求文档，在理解了功能边界、需要实现哪些纯函数以及测试的预期行为之后，再根据分析结果制定分阶段计划。
+2. 模型在探索阶段读取了大量与本任务包无关的文件。为"了解项目结构和代码风格"，先后读取了 PasswordChecker.jsx、minesweeperCore.js、minesweeper/index.jsx、minesweeper/constants.js、cssAnimationCore.js 等5个不相关任务包的文件。这些文件与排序可视化任务没有任何功能关联，读取它们不能为开发提供有用参考，属于探索效率低下。应该直接聚焦到本任务的测试文件和需求文档。
+3. 模型只运行了 sortAlgorithms.test.js 的文件内测试来验证排序算法正确性，在完成 index.jsx 主组件开发后仅运行了 npm run build 确认编译通过，没有运行 pnpm run dev 启动项目在浏览器中手动验证对比模式的双算法同步调度是否正确、暂停/继续的交互流程是否完整、自定义输入校验的错误提示是否按预期展示等运行时行为。仅靠单元测试和编译检查无法发现 scheduleNext 函数中的调度逻辑缺陷。应该启动开发服务器对关键交互路径做一次完整的走查。

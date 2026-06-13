@@ -1,4 +1,4 @@
-import { STEPS } from './constants.js'
+import { STEPS } from '../constants.js'
 
 export default function StepIndicator({ currentStep }) {
   return (

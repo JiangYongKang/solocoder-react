@@ -1,0 +1,8 @@
+产物不满意：
+模型新增的 5 个 elif 测试用例全部通过 executePythonCode 集成执行来验证代码运行结果，但没有直接验证 transformPythonToJs 的 JS 转换输出。提示词第 2 条明确要求"补充包含 elif 的 Python 代码转换用例，确保产出正确的 JS 语法"，但现有测试仅断言了 `small positive`、`positive even` 等最终打印值，没有验证转换后的 JS 字符串中花括号数量是否正确。transformPythonToJs 虽未导出，但可以通过检查 executePythonCode 返回的 error 字段是否包含 SyntaxError 或 Unexpected token 来间接验证 JS 语法正确性。当前测试只依赖代码执行结果的语义正确性，无法直接证明 elif 转换不会产生多余闭合花括号。
+
+过程不满意：
+1. 模型收到提示词后第一动作是创建 TodoList，没有先读取 code-sandbox 包的当前代码确认问题现状。提示词声称 findMatchingClose 存在、elif 全局替换冲突未修复，模型应先阅读代码文件核对这些问题的实际状态，再根据实际情况规划修复步骤，而非在没有上下文的情况下直接制定计划。
+2. 模型对 findMatchingClose 的处理缺乏审慎验证。提示词明确声称该函数存在于 codeSandboxUtils.js 中，模型用 grep 搜索未找到后直接判定"可能之前已经被移除了"，没有通过 git log 或 git diff 查看该函数是否曾被删除、是否被改名为 findOperandEnd，也没有把搜索结果与 assessment-2.txt 中记录的函数位置做对比。对提示词明确指出的问题不做二次确认就直接跳过，暴露出边界意识薄弱。正确做法是用 git 历史确认函数的存在与移除记录后再做判断。
+3. 模型在验证 elif 转换逻辑时，直接在 codeSandboxUtils.js 中添加了临时 console.log 调试语句来输出 JS 转换中间结果，验证通过后再删除。将调试代码写入生产代码文件是一种不良习惯，如果遗忘清理就会污染最终产物。应使用独立的测试脚本或在单元测试中通过断言来验证转换正确性，而非污染正在被修复的源代码文件。
+4. 模型对 codeSandboxUtils.js 使用了三次分段读取来查看不同行范围，且对 findMatchingClose 执行了两次完全相同的 grep 搜索。这种零散分次读取加上重复搜索的模式说明模型没有先规划好需要查看的关联信息，导致在同一个文件上反复切换读取区域。应该先通读整个文件把握全局结构，再按需回溯特定区域，减少无意义的重复工具调用。

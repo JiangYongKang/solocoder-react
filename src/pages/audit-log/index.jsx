@@ -291,12 +291,15 @@ const AuditLogPage = () => {
   })
 
   const debounceRef = useRef(null)
+  const draftRef = useRef(draftFilters)
 
   const updateDraftFilter = useCallback((key, value) => {
-    setDraftFilters((prev) => ({ ...prev, [key]: value }))
+    const next = { ...draftRef.current, [key]: value }
+    draftRef.current = next
+    setDraftFilters(next)
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => {
-      setFilters((prev) => ({ ...prev, [key]: value }))
+      setFilters(draftRef.current)
       setPage(1)
     }, 300)
   }, [])
@@ -327,6 +330,7 @@ const AuditLogPage = () => {
       endDate: '',
       resource: '',
     }
+    draftRef.current = resetValue
     setDraftFilters(resetValue)
     setFilters(resetValue)
     if (debounceRef.current) clearTimeout(debounceRef.current)

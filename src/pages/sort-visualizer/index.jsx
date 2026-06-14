@@ -54,20 +54,20 @@ function createVisualizerState() {
   }
 }
 
-function resolveAlgorithmName(stateKey, isCompareMode, algorithmA, algorithmB, singleAlgorithm) {
-  if (isCompareMode) {
+function resolveAlgorithmName(stateKey, opts) {
+  if (opts.isCompareMode) {
     return stateKey === 'A'
-      ? ALGORITHM_NAMES[algorithmA]
-      : ALGORITHM_NAMES[algorithmB]
+      ? ALGORITHM_NAMES[opts.algorithmA]
+      : ALGORITHM_NAMES[opts.algorithmB]
   }
-  return ALGORITHM_NAMES[singleAlgorithm]
+  return ALGORITHM_NAMES[opts.singleAlgorithm]
 }
 
-function resolveAlgorithm(stateKey, isCompareMode, algorithmA, algorithmB, singleAlgorithm) {
-  if (isCompareMode) {
-    return stateKey === 'A' ? algorithmA : algorithmB
+function resolveAlgorithm(stateKey, opts) {
+  if (opts.isCompareMode) {
+    return stateKey === 'A' ? opts.algorithmA : opts.algorithmB
   }
-  return singleAlgorithm
+  return opts.singleAlgorithm
 }
 
 function computeStepVisualState(curState, step) {
@@ -153,13 +153,7 @@ function makeNormalStepState(curState, step, algoName) {
 
 function initializeGeneratorIfIdle(state, stateKey, setState, stateRef, opts) {
   if (state.status !== RUN_STATUS.IDLE) return state
-  const algo = resolveAlgorithm(
-    stateKey,
-    opts.isCompareMode,
-    opts.algorithmA,
-    opts.algorithmB,
-    opts.singleAlgorithm
-  )
+  const algo = resolveAlgorithm(stateKey, opts)
   const gen = getSortGenerator(algo, [...state.array])
   const newState = {
     ...state,
@@ -356,13 +350,7 @@ export default function SortVisualizer() {
     }
 
     const step = next.value
-    const algoName = resolveAlgorithmName(
-      stateKey,
-      algoOpts.isCompareMode,
-      algoOpts.algorithmA,
-      algoOpts.algorithmB,
-      algoOpts.singleAlgorithm
-    )
+    const algoName = resolveAlgorithmName(stateKey, algoOpts)
 
     let finalState
     if (step.type === OPERATION_TYPES.COMPLETE) {

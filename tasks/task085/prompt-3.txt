@@ -1,0 +1,5 @@
+你实现的排序算法可视化页面还存在一些问题，需要进行修复：
+
+1. index.jsx 中 resolveAlgorithmName 和 resolveAlgorithm 两个函数签名接收五个独立参数（stateKey, isCompareMode, algorithmA, algorithmB, singleAlgorithm），而 initializeGeneratorIfIdle 采用 opts 对象形式接收相同信息，同一个文件内三种函数对相同数据使用两种不同的参数传递风格。需要统一为一种参数传递方式。
+
+2. 修复后重新运行 pnpm run test，需要让所有测试通过。

@@ -173,17 +173,12 @@ const DanmakuPlayerPage = () => {
     const dpr = window.devicePixelRatio || 1
 
     const renderFrame = (timestamp) => {
-      if (!isPlaying && lastFrameTimeRef.current === 0) {
-        animFrameRef.current = requestAnimationFrame(renderFrame)
-        return
-      }
-
       const canvasW = canvas.width / dpr
       const canvasH = canvas.height / dpr
       const speed = calculateScrollSpeed(canvasW)
       const now = Date.now()
-      const activeIds = activeDanmakus.map((d) => `${d.id}:${d.startTime}`).join('|')
-      const renderSignature = `${isPlaying}|${settings.danmakuEnabled}|${settings.danmakuOpacity}|${settings.density}|${activeIds}|${canvasW}x${canvasH}|${now - (isPlaying ? 0 : now)}`
+      const activeIds = activeDanmakus.map((d) => `${d.id}:${d.startTime}:${d.opacity}`).join('|')
+      const renderSignature = `${isPlaying}|${settings.danmakuEnabled}|${settings.danmakuOpacity}|${settings.density}|${activeIds}|${canvasW}x${canvasH}|${isPlaying ? now : 'paused'}`
 
       if (!isPlaying && lastRenderSignatureRef.current === renderSignature) {
         animFrameRef.current = requestAnimationFrame(renderFrame)
@@ -427,7 +422,7 @@ const DanmakuPlayerPage = () => {
       nativeFullscreenRef.current = false
       setIsFullscreen(false)
       if (exitFullscreen && document.fullscreenElement) {
-        try { exitFullscreen.call(document) } catch (_) { /* noop */ }
+        try { exitFullscreen.call(document).catch(() => {}) } catch (_) { /* noop */ }
       }
     } else {
       nativeFullscreenRef.current = true
@@ -435,11 +430,15 @@ const DanmakuPlayerPage = () => {
       if (requestFullscreen) {
         try {
           requestFullscreen.call(container).catch(() => {
-            nativeFullscreenRef.current = true
+            nativeFullscreenRef.current = false
+            setIsFullscreen(false)
           })
         } catch (_) {
-          nativeFullscreenRef.current = true
+          nativeFullscreenRef.current = false
+          setIsFullscreen(false)
         }
+      } else {
+        nativeFullscreenRef.current = false
       }
     }
   }, [])

@@ -1,0 +1,7 @@
+你实现的弹幕播放器模拟页面还存在一些问题，需要进行修复：
+
+1. index.jsx 的 renderFrame 函数中，为解决暂停时重复渲染新增的 renderSignature 跳过逻辑是死代码。因为函数入口处存在旧版守卫 `if (!isPlaying && lastFrameTimeRef.current === 0)`，而 lastFrameTimeRef 从未被修改为非零值，暂停态下该守卫恒为真，总是在 renderSignature 计算之前就 return 了。需要清理旧守卫并让新增的跳过逻辑真正生效。
+
+2. index.jsx 的 toggleFullscreen 函数在 requestFullscreen 返回的 Promise 被拒绝时，catch 回调中没有调用 setIsFullscreen(false) 回退 UI 状态。请求失败后按钮文案与实际状态不一致。需要在请求被拒绝时将 fullscreen 状态回退为 false。
+
+3. 修复后重新运行 pnpm run test，需要让所有测试通过。

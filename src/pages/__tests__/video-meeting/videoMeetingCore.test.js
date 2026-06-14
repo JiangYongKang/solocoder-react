@@ -1,29 +1,27 @@
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import {
-  getInitials,
-  generateAvatarColor,
-  calculateGridLayout,
-  createParticipant,
-  generateInitialParticipants,
-  toggleParticipantProperty,
-  sortParticipantsSelfFirst,
-  filterParticipants,
-  formatTimestamp,
-  createChatMessage,
-  generateRandomChatMessage,
-  getRandomChatInterval,
-  parseMentions,
-  insertMention,
-  getMentionSuggestions,
-  calculateCanvasCellSize,
-  drawParticipantCanvas,
-} from '../../video-meeting/videoMeetingCore.js'
-import {
-  AVATAR_COLORS,
-  CHAT_SIMULATE_INTERVAL_MAX,
-  CHAT_SIMULATE_INTERVAL_MIN,
-  SIMULATED_CHAT_MESSAGES,
+    AVATAR_COLORS,
+    SIMULATED_CHAT_MESSAGES
 } from '../../video-meeting/constants.js'
+import {
+    calculateCanvasCellSize,
+    calculateGridLayout,
+    createChatMessage,
+    createParticipant,
+    drawParticipantCanvas,
+    filterParticipants,
+    formatTimestamp,
+    generateAvatarColor,
+    generateInitialParticipants,
+    generateRandomChatMessage,
+    getInitials,
+    getMentionSuggestions,
+    getRandomChatInterval,
+    insertMention,
+    parseMentions,
+    sortParticipantsSelfFirst,
+    toggleParticipantProperty,
+} from '../../video-meeting/videoMeetingCore.js'
 
 describe('getInitials', () => {
   it('should return initials for two-character names', () => {
@@ -561,20 +559,36 @@ describe('drawParticipantCanvas', () => {
     const ctx = createMockCtx()
     const p = createParticipant('p1', '张伟')
     drawParticipantCanvas(ctx, W, H, p, 10)
-    const fillRectCalls = ctx.calls.filter((c) => c.method === 'fillRect')
-    expect(fillRectCalls.length).toBeGreaterThan(0)
-    const arcCalls = ctx.calls.filter((c) => c.method === 'arc')
-    expect(arcCalls.length).toBeGreaterThan(0)
+    const gradientCalls = ctx.calls.filter((c) => c.method === 'createRadialGradient')
+    expect(gradientCalls.length).toBeGreaterThan(0)
+    const saveCalls = ctx.calls.filter((c) => c.method === 'save')
+    expect(saveCalls.length).toBeGreaterThan(0)
+    const restoreCalls = ctx.calls.filter((c) => c.method === 'restore')
+    expect(restoreCalls.length).toBeGreaterThan(0)
+    const strokeRectCalls = ctx.calls.filter((c) => c.method === 'strokeRect')
+    expect(strokeRectCalls.length).toBe(0)
+    const fillTextCalls = ctx.calls.filter((c) => c.method === 'fillText')
+    const hasCameraOffText = fillTextCalls.some(
+      (c) => typeof c.args[0] === 'string' && c.args[0].includes('摄像头已关闭')
+    )
+    expect(hasCameraOffText).toBe(false)
   })
 
   it('should draw video off state when isVideoOff is true', () => {
     const ctx = createMockCtx()
     const p = { ...createParticipant('p1', '张伟'), isVideoOff: true }
     drawParticipantCanvas(ctx, W, H, p, 0)
-    const fillRectCalls = ctx.calls.filter((c) => c.method === 'fillRect')
-    expect(fillRectCalls.length).toBeGreaterThan(0)
     const strokeRectCalls = ctx.calls.filter((c) => c.method === 'strokeRect')
     expect(strokeRectCalls.length).toBeGreaterThan(0)
+    const fillTextCalls = ctx.calls.filter((c) => c.method === 'fillText')
+    const hasCameraOffText = fillTextCalls.some(
+      (c) => typeof c.args[0] === 'string' && c.args[0].includes('摄像头已关闭')
+    )
+    expect(hasCameraOffText).toBe(true)
+    const gradientCalls = ctx.calls.filter((c) => c.method === 'createRadialGradient')
+    expect(gradientCalls.length).toBe(0)
+    const saveCalls = ctx.calls.filter((c) => c.method === 'save')
+    expect(saveCalls.length).toBe(0)
   })
 
   it('should draw mute indicator when isMuted is true and not screen sharing', () => {

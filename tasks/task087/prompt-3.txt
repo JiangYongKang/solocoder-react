@@ -1,0 +1,7 @@
+你实现的设备管理控制台还存在一些问题，需要进行修复：
+
+1. deviceUtils.js 的 generateNextDataPoint 函数新增渐变趋势逻辑后，声明了 maxDrift 变量但没有在任何地方使用。这是重构过程中遗留的废弃变量，需要从函数中清理掉。
+
+2. confirmAlertRecords 和 resolveAlertRecords 两个工具函数内部直接调用了 saveAlertRecords 写入 localStorage。原本持久化由 index.jsx 的 useEffect 在对 alertRecords 状态变更时统一完成，修改后每次操作会触发两次写入。同时工具函数从纯函数变成了有副作用的函数，破坏了可测试性。需要移除这两个函数内部的 saveAlertRecords 调用，保持函数纯净，让持久化由已有的 useEffect 统一处理。
+
+3. 修复后重新运行 pnpm run test，需要让所有测试通过。

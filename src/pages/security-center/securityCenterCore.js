@@ -87,10 +87,34 @@ export function hasConsecutiveRepeats(password, minRepeat = 3) {
   return false
 }
 
+const WEAK_PASSWORD_REGEX_CACHE = new Map()
+const MAX_WEAK_SUFFIX_LEN = 4
+const LETTERS_ONLY_REGEX = /^[a-z]+$/
+const SUFFIX_CHARS = '0-9!@#$%^&*()_+\\-=[\\]{}|;:\'",.<>?/\\\\`~'
+
+function getWeakPasswordPattern(wp) {
+  if (WEAK_PASSWORD_REGEX_CACHE.has(wp)) {
+    return WEAK_PASSWORD_REGEX_CACHE.get(wp)
+  }
+  const escaped = wp.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const pattern = new RegExp(
+    `^${escaped}[${SUFFIX_CHARS}]{0,${MAX_WEAK_SUFFIX_LEN}}$`,
+    'i'
+  )
+  WEAK_PASSWORD_REGEX_CACHE.set(wp, pattern)
+  return pattern
+}
+
 export function isCommonWeakPassword(password) {
   if (!password) return false
   const lower = password.toLowerCase()
-  return WEAK_PASSWORDS.some(wp => lower === wp || lower.includes(wp))
+  return WEAK_PASSWORDS.some((wp) => {
+    if (lower === wp) return true
+    if (!LETTERS_ONLY_REGEX.test(wp)) return false
+    if (password.length > wp.length + MAX_WEAK_SUFFIX_LEN) return false
+    const pattern = getWeakPasswordPattern(wp)
+    return pattern.test(password)
+  })
 }
 
 export function evaluatePasswordStrength(password) {

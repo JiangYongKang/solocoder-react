@@ -1,0 +1,7 @@
+你实现的代码执行沙箱模拟页面还存在一些问题，需要进行修复：
+
+1. codeSandboxUtils.js 中存在一个完整的 findMatchingClose 函数（约 25 行），但在整个 code-sandbox 包内没有任何一处调用它。这是调试过程中遗留的死代码，需要从文件中移除。
+
+2. codeSandboxUtils.js 的 transformPythonToJs 函数在处理 elif 时存在逻辑冲突：先用全局正则替换将所有 elif 行转为 JS 的 `} else if` 语法（插入了闭合花括号），然后在逐行缩进分析阶段又定义了匹配原始 elif 语法的处理逻辑。全局替换插入的 `}` 会与缩进栈自动插入的 `}` 冲突，对包含 elif 的代码产生的 JS 输出会多出闭合花括号。需要在测试文件中补充包含 elif 的 Python 代码转换用例，确保产出正确的 JS 语法。
+
+3. 修复后重新运行 pnpm run test，需要让所有测试通过。

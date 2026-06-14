@@ -60,6 +60,16 @@ export function saveGradeData(data) {
 export function snapshotPreviousData() {
   if (typeof window === 'undefined' || !window.localStorage) return false
   try {
+    const existingRaw = window.localStorage.getItem(PREVIOUS_STORAGE_KEY)
+    if (existingRaw) {
+      try {
+        const existing = JSON.parse(existingRaw)
+        if (existing && existing.students && existing.subjects && existing.scores) {
+          return false
+        }
+      } catch {
+      }
+    }
     const current = loadGradeData()
     window.localStorage.setItem(PREVIOUS_STORAGE_KEY, JSON.stringify(current))
     return true
@@ -142,7 +152,7 @@ export function removeSubject(data, subjectName) {
   const newScores = { ...data.scores }
   for (const student of data.students) {
     if (newScores[student]) {
-      const { [subjectName]: _removed, ...rest } = newScores[student]
+      const { [subjectName]: _, ...rest } = newScores[student]
       newScores[student] = rest
     }
   }

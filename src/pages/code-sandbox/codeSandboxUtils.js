@@ -659,32 +659,6 @@ const processFStrings = (code) => {
   })
 }
 
-const findMatchingClose = (str, startIdx, openChar, closeChar) => {
-  let depth = 1
-  let i = startIdx
-  let inString = null
-  while (i < str.length && depth > 0) {
-    const ch = str[i]
-    const prevChar = i > 0 ? str[i - 1] : ''
-    if (inString) {
-      if (ch === inString && prevChar !== '\\') {
-        inString = null
-      }
-      i++
-      continue
-    }
-    if (ch === '"' || ch === "'" || ch === '`') {
-      inString = ch
-      i++
-      continue
-    }
-    if (ch === openChar) depth++
-    if (ch === closeChar) depth--
-    i++
-  }
-  return i
-}
-
 const findOperandEnd = (str, startIdx) => {
   let i = startIdx
   let inString = null
@@ -981,10 +955,6 @@ const transformPythonToJs = (code) => {
   transformed = replaceOutsideStrings(transformed, /\brange\s*\(/, 'range(')
   transformed = replaceOutsideStrings(transformed, /\bprint\s*\(/, 'print(')
   transformed = replaceOutsideStrings(transformed, /\binput\s*\(/, 'input(')
-
-  transformed = transformed.replace(/elif\s+.*:/g, (match) => {
-    return match.replace(/^elif/, '} else if').replace(/:\s*$/, ' {')
-  })
 
   const lines = transformed.split('\n')
   const jsLines = []

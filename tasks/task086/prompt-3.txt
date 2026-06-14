@@ -1,0 +1,5 @@
+你实现的截图标注工具还存在一些问题，需要进行修复：
+
+1. index.jsx 的 renderHandles 函数手柄渲染修复的正确性依赖于 HANDLE_SIZE 常量与 getHandles 函数的默认参数 handleSize 都恰好等于 10 这一巧合。如果将来修改任意一方的值而不同步修改另一方，手柄位置和命中区域就会错位。应该在 renderHandles 和 handleMouseDown 中显式传入 HANDLE_SIZE 作为 getHandles 的参数，消除隐式依赖。
+
+2. 修复后重新运行 pnpm run test，需要让所有测试通过。

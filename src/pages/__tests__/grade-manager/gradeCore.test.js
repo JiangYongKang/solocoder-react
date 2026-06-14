@@ -751,6 +751,37 @@ describe('snapshotPreviousData', () => {
     })
     expect(snapshotPreviousData()).toBe(false)
   })
+
+  it('should NOT overwrite when valid previous snapshot already exists', () => {
+    const initialData = { ...createMockData(), students: ['首次快照'] }
+    saveGradeData(initialData)
+    expect(snapshotPreviousData()).toBe(true)
+
+    const newData = { ...createMockData(), students: ['新数据'] }
+    saveGradeData(newData)
+    expect(snapshotPreviousData()).toBe(false)
+
+    const previous = loadPreviousData()
+    expect(previous.students).toEqual(['首次快照'])
+  })
+
+  it('should overwrite when previous snapshot contains invalid JSON', () => {
+    mockStorage.setItem('grade_manager_previous_data', 'not valid json')
+    const data = { ...createMockData(), students: ['有效数据'] }
+    saveGradeData(data)
+    expect(snapshotPreviousData()).toBe(true)
+    const previous = loadPreviousData()
+    expect(previous.students).toEqual(['有效数据'])
+  })
+
+  it('should overwrite when previous snapshot is missing required fields', () => {
+    mockStorage.setItem('grade_manager_previous_data', JSON.stringify({ foo: 'bar' }))
+    const data = { ...createMockData(), students: ['正确数据'] }
+    saveGradeData(data)
+    expect(snapshotPreviousData()).toBe(true)
+    const previous = loadPreviousData()
+    expect(previous.students).toEqual(['正确数据'])
+  })
 })
 
 describe('localStorage functions', () => {

@@ -65,38 +65,55 @@ const PieChart = forwardRef(function PieChart({ data, size = 240 }, ref) {
         sliceAngle,
         pct: ((d.count / total) * 100).toFixed(0) + '%',
         idx,
+        color: CHART_COLORS[idx % CHART_COLORS.length],
       })
 
       startAngle = endAngle
     })
 
     const labelRadius = radius + 18
+    ctx.font = 'bold 11px sans-serif'
+    const labelHeight = 14
     const labelPositions = slices.map((s) => {
       const lx = cx + Math.cos(s.midAngle) * labelRadius
       const ly = cy + Math.sin(s.midAngle) * labelRadius
-      return { x: lx, y: ly, midAngle: s.midAngle, sliceAngle: s.sliceAngle, pct: s.pct, idx: s.idx }
+      const textW = ctx.measureText(s.pct).width
+      return {
+        x: lx,
+        y: ly,
+        midAngle: s.midAngle,
+        sliceAngle: s.sliceAngle,
+        pct: s.pct,
+        idx: s.idx,
+        color: s.color,
+        width: textW,
+      }
     })
 
-    ctx.font = 'bold 11px sans-serif'
-    const labelHeight = 14
-    for (let iteration = 0; iteration < 20; iteration++) {
+    for (let iteration = 0; iteration < 30; iteration++) {
       let moved = false
       for (let i = 0; i < labelPositions.length; i++) {
         for (let j = i + 1; j < labelPositions.length; j++) {
           const a = labelPositions[i]
           const b = labelPositions[j]
-          const textW = Math.max(
-            ctx.measureText(a.pct).width,
-            ctx.measureText(b.pct).width
-          )
-          const dx = a.x - b.x
-          const dy = a.y - b.y
-          const minDistX = textW + 4
-          const minDistY = labelHeight + 2
+          const maxWidth = Math.max(a.width, b.width)
+          const minDistX = maxWidth + 6
+          const minDistY = labelHeight + 4
+          let dx = a.x - b.x
+          let dy = a.y - b.y
           if (Math.abs(dx) < minDistX && Math.abs(dy) < minDistY) {
-            const pushY = dy === 0 ? (a.y < cy ? -1 : 1) * 2 : (dy > 0 ? 1 : -1) * 2
-            a.y += pushY
-            b.y -= pushY
+            const overlapX = minDistX - Math.abs(dx)
+            const overlapY = minDistY - Math.abs(dy)
+            let dirX = dx === 0 ? (Math.random() - 0.5) : dx
+            let dirY = dy === 0 ? (a.y < cy ? -1 : 1) : dy
+            const len = Math.sqrt(dirX * dirX + dirY * dirY) || 1
+            dirX /= len
+            dirY /= len
+            const pushFactor = Math.max(overlapX, overlapY) / 2 + 1
+            a.x += dirX * pushFactor
+            a.y += dirY * pushFactor
+            b.x -= dirX * pushFactor
+            b.y -= dirY * pushFactor
             moved = true
           }
         }
@@ -118,9 +135,12 @@ const PieChart = forwardRef(function PieChart({ data, size = 240 }, ref) {
         cx + Math.cos(lp.midAngle) * lineStartR,
         cy + Math.sin(lp.midAngle) * lineStartR
       )
+      const midLineX = cx + Math.cos(lp.midAngle) * lineEndR
+      const midLineY = cy + Math.sin(lp.midAngle) * lineEndR
+      ctx.lineTo(midLineX, midLineY)
       ctx.lineTo(lp.x, lp.y)
-      ctx.strokeStyle = '#9ca3af'
-      ctx.lineWidth = 0.8
+      ctx.strokeStyle = lp.color
+      ctx.lineWidth = 1.2
       ctx.stroke()
     })
   }, [data, size])

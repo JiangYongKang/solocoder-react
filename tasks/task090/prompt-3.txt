@@ -1,0 +1,5 @@
+你实现的安全中心页面还存在一些问题，需要进行修复：
+
+1. securityCenterCore.js 的 isCommonWeakPassword 函数使用子串匹配（includes）来检测常见弱密码，导致大量合法强密码被错误降级。"accessibility2024!@#"因包含"access"被误判，"passwordlessAuth1!@"因包含"password"被误报，"helloWorld2024!"因包含"hello"被误报。应用改为全量匹配或至少限制匹配方式，避免子串误伤。测试文件中也需要补充包含弱密码词根的合法密码不被误判的用例。
+
+2. 修复后重新运行 pnpm run test，需要让所有测试通过。

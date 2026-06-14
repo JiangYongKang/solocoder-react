@@ -437,6 +437,91 @@ print(result)`
       expect(result.output.some((o) => o.content === 'True')).toBe(true)
     })
 
+    it('should handle if-elif-else correctly', () => {
+      const code = `x = 5
+if x < 0:
+    print("negative")
+elif x == 0:
+    print("zero")
+elif x < 10:
+    print("small positive")
+else:
+    print("large positive")`
+      const result = executePythonCode(code)
+      expect(result.success).toBe(true)
+      const logs = result.output.filter((o) => o.type === 'log').map((o) => o.content)
+      expect(logs).toContain('small positive')
+    })
+
+    it('should handle elif with multiple branches', () => {
+      const code = `grade = 75
+if grade >= 90:
+    print("A")
+elif grade >= 80:
+    print("B")
+elif grade >= 70:
+    print("C")
+elif grade >= 60:
+    print("D")
+else:
+    print("F")`
+      const result = executePythonCode(code)
+      expect(result.success).toBe(true)
+      const logs = result.output.filter((o) => o.type === 'log').map((o) => o.content)
+      expect(logs).toContain('C')
+    })
+
+    it('should handle elif with in operator condition', () => {
+      const code = `fruit = "banana"
+if fruit in ["apple", "pear"]:
+    print("pome fruit")
+elif fruit in ["banana", "mango"]:
+    print("tropical fruit")
+elif fruit in ["strawberry", "blueberry"]:
+    print("berry")
+else:
+    print("unknown")`
+      const result = executePythonCode(code)
+      expect(result.success).toBe(true)
+      const logs = result.output.filter((o) => o.type === 'log').map((o) => o.content)
+      expect(logs).toContain('tropical fruit')
+    })
+
+    it('should handle elif with logical operators', () => {
+      const code = `x = 15
+if x > 0 and x < 10:
+    print("between 0 and 10")
+elif x > 10 and x < 20:
+    print("between 10 and 20")
+elif x > 20 or x < 0:
+    print("out of range")
+else:
+    print("exactly 10 or 20")`
+      const result = executePythonCode(code)
+      expect(result.success).toBe(true)
+      const logs = result.output.filter((o) => o.type === 'log').map((o) => o.content)
+      expect(logs).toContain('between 10 and 20')
+    })
+
+    it('should handle nested if-elif correctly', () => {
+      const code = `x = 12
+if x > 0:
+    if x % 2 == 0:
+        print("positive even")
+    elif x % 3 == 0:
+        print("positive odd divisible by 3")
+    else:
+        print("positive other")
+elif x < 0:
+    print("negative")
+else:
+    print("zero")`
+      const result = executePythonCode(code)
+      expect(result.success).toBe(true)
+      const logs = result.output.filter((o) => o.type === 'log').map((o) => o.content)
+      expect(logs).toContain('positive even')
+    })
+
     it('should handle stdin with empty lines correctly', () => {
       const code = `a = input()
 b = input()

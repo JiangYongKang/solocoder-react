@@ -511,7 +511,7 @@ function ScreenshotAnnotatorPage() {
         for (const selId of selectedIds) {
           const ann = annotations.find((a) => a.id === selId)
           if (!ann) continue
-          const handles = getHandles(ann)
+          const handles = getHandles(ann, HANDLE_SIZE)
           const hit = hitTestHandle(handles, x, y)
           if (hit) {
             handleHit = { handle: hit.type, annotationId: selId }
@@ -924,7 +924,7 @@ function ScreenshotAnnotatorPage() {
           />
         )
       }
-      const handles = getHandles(ann)
+      const handles = getHandles(ann, HANDLE_SIZE)
       handles.forEach((h) => {
         items.push(
           <div

@@ -85,13 +85,12 @@ export default function SurveyAnalysisPage() {
 
   const crossMatrix = useMemo(() => {
     if (!rowQId || !colQId) return null
-    if (rowQId === colQId) return null
     const rowQ = questions.find((q) => q.id === rowQId)
     const colQ = questions.find((q) => q.id === colQId)
     return buildCrossAnalysisMatrix(rowQ, colQ, filteredResponses)
   }, [rowQId, colQId, questions, filteredResponses])
 
-  const crossError = rowQId && colQId && rowQId === colQId
+  const crossError = rowQId && colQId && rowQId === colQId && multipleChoiceQuestions.length >= 2
 
   const handleFilterChange = (key, value) => {
     setFilters((prev) => ({ ...prev, [key]: value }))
@@ -330,13 +329,12 @@ export default function SurveyAnalysisPage() {
                   </select>
                 </div>
               </div>
-              {crossError ? (
+              {crossError && (
                 <div className="sa-cross-error">
-                  ⚠️ 请选择不同的题目进行交叉分析
+                  ⚠️ 您选择了同一题目进行交叉分析（对角线为该选项的被选中次数）
                 </div>
-              ) : crossMatrix ? (
-                <CrossMatrix matrix={crossMatrix} />
-              ) : null}
+              )}
+              {crossMatrix && <CrossMatrix matrix={crossMatrix} />}
             </div>
           )}
 

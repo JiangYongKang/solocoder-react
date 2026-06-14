@@ -1,54 +1,54 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import {
-  PASSWORD_STRENGTH,
-  SCORE_WEIGHTS,
-  SCORE_COLORS,
-  OPERATION_TYPES,
-  OPERATION_RESULTS,
-  STORAGE_KEY_DEVICES,
-  STORAGE_KEY_TWOFA,
-  STORAGE_KEY_OPERATIONS,
-  STORAGE_KEY_FREQUENT_LOCATIONS,
-  FREQUENT_CITY,
-  DEFAULT_FREQUENT_LOCATIONS,
-  DEFAULT_PAGE_SIZE,
-  PAGE_SIZE_OPTIONS,
-  WEAK_PASSWORDS,
+    DEFAULT_FREQUENT_LOCATIONS,
+    DEFAULT_PAGE_SIZE,
+    FREQUENT_CITY,
+    OPERATION_RESULTS,
+    OPERATION_TYPES,
+    PAGE_SIZE_OPTIONS,
+    PASSWORD_STRENGTH,
+    SCORE_COLORS,
+    SCORE_WEIGHTS,
+    STORAGE_KEY_DEVICES,
+    STORAGE_KEY_FREQUENT_LOCATIONS,
+    STORAGE_KEY_OPERATIONS,
+    STORAGE_KEY_TWOFA,
+    WEAK_PASSWORDS,
 } from '../../security-center/constants'
 import {
-  generateId,
-  formatDateTime,
-  formatRelativeTime,
-  generateIpAddress,
-  generateBase32Secret,
-  checkPasswordCharTypes,
-  hasConsecutiveRepeats,
-  isCommonWeakPassword,
-  evaluatePasswordStrength,
-  getPasswordScore,
-  generateMockDevices,
-  removeDevice,
-  hasRemoteLogin,
-  isDeviceRemote,
-  loadFrequentLocations,
-  saveFrequentLocations,
-  loadDevices,
-  saveDevices,
-  loadTwoFAStatus,
-  saveTwoFAStatus,
-  validateVerificationCode,
-  createOperationRecord,
-  generateMockOperations,
-  loadOperations,
-  saveOperations,
-  appendOperation,
-  hasRecentAnomaly,
-  paginateOperations,
-  calculateScoreBreakdown,
-  getScoreColor,
-  getScoreLabel,
-  generateSecurityAdvice,
-  copyToClipboardMock,
+    appendOperation,
+    calculateScoreBreakdown,
+    checkPasswordCharTypes,
+    copyToClipboardMock,
+    createOperationRecord,
+    evaluatePasswordStrength,
+    formatDateTime,
+    formatRelativeTime,
+    generateBase32Secret,
+    generateId,
+    generateIpAddress,
+    generateMockDevices,
+    generateMockOperations,
+    generateSecurityAdvice,
+    getPasswordScore,
+    getScoreColor,
+    getScoreLabel,
+    hasConsecutiveRepeats,
+    hasRecentAnomaly,
+    hasRemoteLogin,
+    isCommonWeakPassword,
+    isDeviceRemote,
+    loadDevices,
+    loadFrequentLocations,
+    loadOperations,
+    loadTwoFAStatus,
+    paginateOperations,
+    removeDevice,
+    saveDevices,
+    saveFrequentLocations,
+    saveOperations,
+    saveTwoFAStatus,
+    validateVerificationCode,
 } from '../../security-center/securityCenterCore'
 
 const createMockLocalStorage = () => {
@@ -331,12 +331,50 @@ describe('isCommonWeakPassword', () => {
     expect(isCommonWeakPassword('Qwerty')).toBe(true)
   })
 
-  it('检测包含常见弱密码的密码', () => {
-    expect(isCommonWeakPassword('Password123!')).toBe(true)
-    expect(isCommonWeakPassword('myadmin2024')).toBe(true)
+  it('弱密码后跟较短数字/符号后缀仍判定为弱（≤4 字符后缀）', () => {
+    expect(isCommonWeakPassword('Password1')).toBe(true)
+    expect(isCommonWeakPassword('password123')).toBe(true)
+    expect(isCommonWeakPassword('qwerty12!')).toBe(true)
+    expect(isCommonWeakPassword('hello1!')).toBe(true)
+    expect(isCommonWeakPassword('admin@20')).toBe(true)
+    expect(isCommonWeakPassword('dragon!@#')).toBe(true)
   })
 
-  it('正常密码返回 false', () => {
+  it('弱密码后跟超过 4 字符后缀不判定为弱', () => {
+    expect(isCommonWeakPassword('password12345')).toBe(false)
+    expect(isCommonWeakPassword('qwerty123456')).toBe(false)
+    expect(isCommonWeakPassword('admin@2024')).toBe(false)
+  })
+
+  it('包含弱密码词根但为其他合法单词不误判', () => {
+    expect(isCommonWeakPassword('accessibility2024!@#')).toBe(false)
+    expect(isCommonWeakPassword('passwordlessAuth1!@')).toBe(false)
+    expect(isCommonWeakPassword('helloWorld2024!')).toBe(false)
+    expect(isCommonWeakPassword('administratorSecure!')).toBe(false)
+    expect(isCommonWeakPassword('monkeyBusiness2024')).toBe(false)
+    expect(isCommonWeakPassword('dragonSlayerHero!')).toBe(false)
+    expect(isCommonWeakPassword('masterChief2024!')).toBe(false)
+    expect(isCommonWeakPassword('princessDiana@')).toBe(false)
+    expect(isCommonWeakPassword('footballPlayer99')).toBe(false)
+    expect(isCommonWeakPassword('shadowHunter_123')).toBe(false)
+    expect(isCommonWeakPassword('sunshineState!')).toBe(false)
+    expect(isCommonWeakPassword('trustno1Verify$')).toBe(false)
+    expect(isCommonWeakPassword('iloveyouForever!')).toBe(false)
+    expect(isCommonWeakPassword('batmanBegins2024')).toBe(false)
+    expect(isCommonWeakPassword('loginAttempt@123')).toBe(false)
+    expect(isCommonWeakPassword('welcomePage2024!')).toBe(false)
+    expect(isCommonWeakPassword('charlieBrown_99')).toBe(false)
+    expect(isCommonWeakPassword('donaldTrump2024!')).toBe(false)
+    expect(isCommonWeakPassword('abc123Verify!')).toBe(false)
+  })
+
+  it('弱密码后跟随字母字符不误判', () => {
+    expect(isCommonWeakPassword('passwordabc')).toBe(false)
+    expect(isCommonWeakPassword('adminUser')).toBe(false)
+    expect(isCommonWeakPassword('loginScreen')).toBe(false)
+  })
+
+  it('正常强密码返回 false', () => {
     expect(isCommonWeakPassword('Kx9#mP2$vL5')).toBe(false)
     expect(isCommonWeakPassword('Zf8!nQ4@wR7')).toBe(false)
   })

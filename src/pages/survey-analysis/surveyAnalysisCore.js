@@ -169,15 +169,8 @@ export function calculateRatingStats(question, responses) {
     })
   }
   sortedRatings.sort((a, b) => a - b)
-  let median = 0
-  if (sortedRatings.length > 0) {
-    const mid = Math.floor(sortedRatings.length / 2)
-    median =
-      sortedRatings.length % 2 === 0
-        ? (sortedRatings[mid - 1] + sortedRatings[mid]) / 2
-        : sortedRatings[mid]
-  }
-  return { type: QUESTION_TYPES.RATING, total, data, average, median }
+  const medianVal = median(sortedRatings)
+  return { type: QUESTION_TYPES.RATING, total, data, average, median: medianVal }
 }
 
 export function calculateTextStats(question, responses, topN = 10) {

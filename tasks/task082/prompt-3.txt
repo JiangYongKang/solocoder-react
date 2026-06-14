@@ -1,0 +1,7 @@
+你实现的成绩管理系统还存在一些问题，需要进行修复：
+
+1. gradeCore.js 的 snapshotPreviousData 函数在 index.jsx 的 useEffect(() => {}, []) 中每次页面挂载时被调用，无条件将当前数据覆盖写入 PREVIOUS_STORAGE_KEY。用户刷新页面后，排名面板中的变化列全部显示为 0，历史对比功能在刷新后完全失效。历史快照应仅在 PREVIOUS_STORAGE_KEY 无有效数据时才写入，已存在快照时不应覆写。
+
+2. gradeCore.js 的 removeSubject 函数中解构排除键值时声明了 _removed 变量但从未使用。需要清理掉未使用的变量，确保代码干净无 lint 告警。
+
+3. 修复后重新运行 pnpm run test，需要让所有测试通过。

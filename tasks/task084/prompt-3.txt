@@ -1,0 +1,5 @@
+你实现的审计日志系统还存在一些问题，需要进行修复：
+
+1. index.jsx 的 updateDraftFilter 函数将全部六个筛选字段的变更都路由到同一个 debounceRef 计时器，setTimeout 回调中只做单键写入 setFilters({...prev, [key]: value})。当用户在 300ms 内先后修改两个不同字段时，前一个字段的值停留在 draftFilters 中永远不会同步到 filters，导致前一个字段的筛选不生效。需要确保任意两个字段在防抖窗口内连续变更时，两者的值都能最终写入 filters。
+
+2. 修复后重新运行 pnpm run test，需要让所有测试通过。

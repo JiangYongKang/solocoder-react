@@ -283,7 +283,6 @@ export function generateNextDataPoint(device) {
   const maxTrend = rangeSpan * 0.03
   trend = Math.max(-maxTrend, Math.min(maxTrend, trend))
 
-  const maxDrift = rangeSpan * 0.4
   const mid = (range.min + range.max) / 2
   const drift = -(lastValue - mid) * 0.015
 
@@ -625,7 +624,6 @@ export function confirmAlertRecords(records, ids) {
     }
     return r
   })
-  saveAlertRecords(updated)
   return { success: true, records: updated }
 }
 
@@ -642,7 +640,6 @@ export function resolveAlertRecords(records, ids) {
     }
     return r
   })
-  saveAlertRecords(updated)
   return { success: true, records: updated }
 }
 

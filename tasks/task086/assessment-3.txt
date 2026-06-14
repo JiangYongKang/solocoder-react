@@ -1,0 +1,5 @@
+产物不满意：
+模型在 handleMouseDown 和 renderHandles 两处将 getHandles(ann) 改为 getHandles(ann, HANDLE_SIZE)，显式传入常量消除了对默认参数值的隐式依赖。修复精确且最小化，164 个测试全部通过。改动本身无缺陷。
+
+过程不满意：
+模型在定位 getHandles 调用点时使用了 `search_by_regex` 搜索 `getHandles\(`，这在本次小文件中能找到所有调用点，但如果在更大代码库中函数名被注释或文档字符串引用时会产生误报。正确做法是同时搜索调用模式和函数定义位置，确认调用点数量后再逐个修改。

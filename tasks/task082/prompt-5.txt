@@ -1,0 +1,7 @@
+你实现的成绩管理系统还存在一些问题，需要进行修复：
+
+1. gradeCore.js 的 snapshotPreviousData 函数对 scores 字段的类型校验存在防护缺口：数组也会通过当前校验，如果损坏数据中 scores 变成了数组，函数会误判为有效快照。需要让 scores 字段的校验能排除数组类型。
+
+2. snapshotPreviousData 的单元测试中，subjects 字段只覆盖了为字符串的损坏场景，没有测试其为普通对象的情况；scores 字段也没有测试其为数组的损坏场景。需要补充这两个缺少的边界测试用例。
+
+3. 修复后重新运行 pnpm run test，需要让所有测试通过。

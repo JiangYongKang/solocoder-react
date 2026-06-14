@@ -90,21 +90,18 @@ export function hasConsecutiveRepeats(password, minRepeat = 3) {
 const WEAK_PASSWORD_REGEX_CACHE = new Map()
 const MAX_WEAK_SUFFIX_LEN = 4
 
-const SUFFIX_CHARS = [
-  '0-9',
-  '!@#$%',
-  '^&*()',
-  '_+',
-  '\\-',
-  '=',
-  '\\[\\]',
-  '{}',
-  '|;:',
-  "'\"",
-  ',.<>?/',
-  '\\\\',
-  '`~',
-].join('')
+const SUFFIX_SPECIAL_CHARS = [
+  '!', '@', '#', '$', '%', '^', '&', '*', '(', ')',
+  '_', '+', '-', '=', '[', ']', '{', '}', '|', ';',
+  ':', "'", '"', ',', '.', '<', '>', '?', '/', '`', '~', '\\',
+]
+
+function escapeForRegexCharClass(ch) {
+  if (ch === '\\' || ch === ']' || ch === '-' || ch === '^') return '\\' + ch
+  return ch
+}
+
+const SUFFIX_CHARS = '0-9' + SUFFIX_SPECIAL_CHARS.map(escapeForRegexCharClass).join('')
 
 function getWeakPasswordPattern(wp) {
   if (WEAK_PASSWORD_REGEX_CACHE.has(wp)) {

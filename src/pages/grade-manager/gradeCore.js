@@ -69,7 +69,8 @@ export function snapshotPreviousData() {
           Array.isArray(existing.students) &&
           Array.isArray(existing.subjects) &&
           existing.scores &&
-          typeof existing.scores === 'object'
+          typeof existing.scores === 'object' &&
+          !Array.isArray(existing.scores)
         ) {
           return false
         }

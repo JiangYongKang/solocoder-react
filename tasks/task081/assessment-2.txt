@@ -1,7 +1,7 @@
 产物不满意：
-drawParticipantCanvas 测试套件中正常参与者状态测试用例（"should draw animated background + avatar for normal participant"）仅验证了 fillRect 和 arc 方法被调用，未区分正常绘制路径与视频关闭绘制路径。drawVideoOffState 内部同样调用了 fillRect 绘制暗色背景和 arc 绘制圆形，因此当代码回归导致正常参与者错误渲染为视频关闭态时该测试仍会通过。根本原因是测试断言粒度过粗，未利用两个绘制路径的差异化行为做区分。应该增加对 drawAnimatedBackground 特有方法 createRadialGradient 的调用验证，或检验 videoOffState 路径独有的 strokeRect 调用数量是否为零，使测试能精确识别当前走的是哪条绘制路径。
+drawParticipantCanvas 测试套件中正常状态测试仅验证了 fillRect 和 arc 被调用，未区分正常绘制路径与视频关闭路径。drawVideoOffState 内部同样调用了 fillRect 和 arc，当代码回归导致正常参与者错误渲染为视频关闭态时测试仍会通过。原因是断言粒度过粗，未利用两路径的差异化行为区分。应增加对 drawAnimatedBackground 特有方法 createRadialGradient 的验证，或检验 videoOffState 独有的 strokeRect 调用数量是否为零，使测试能精确识别走的哪条路径。
 
 过程不满意：
-1. 模型在阅读完所有相关文件后于 COT 中声称 drawParticipantCanvas 的测试"已经包含在测试文件中"（原文"测试文件已经包含该函数的 import 和测试用例"），但 git diff 显示 import 行、createMockCtx 函数和 drawParticipantCanvas 整组测试都是本轮新增内容。模型误判测试为预存代码，未主动验证 mock 功能的正确性，运行测试后才发现 createMockCtx 中 createRadialGradient、createLinearGradient、measureText 返回对象的处理方法缺失导致 16 个测试全部失败，被迫回头修复。如果模型正确识别测试是自己新编写的，应在写完测试的第一时间就验证 mock 的正确性，而非误以为它们是已有的、经过验证的代码。
-2. 模型执行 pnpm run test 全量测试后因 grade-manager/gradeCore.js 测试失败，连续三次查看 gradeCore.js 并对该文件进行了大规模修改，包括重构 loadGradeData 返回值形状、拆分 saveGradeData 并新增 snapshotPreviousData 函数、修改 addStudent 等函数的返回值结构（移除 error 字段）等十余处改动。视频会议任务的提示词仅授权修复 src/pages/video-meeting/ 和 src/pages/__tests__/video-meeting/ 两个目录下的代码，模型缺乏任务边界意识，擅自修改了属于不同标注任务包的代码，违反了本项目任务包隔离的核心原则。正确做法是确认 grade-manager 测试失败与视频会议修改无关后将此情况报告即可。
+1. 模型在 COT 中声称 drawParticipantCanvas 的测试"已经包含在测试文件中"，但 git diff 显示 import、createMockCtx 和整组测试都是本轮新增。模型误判测试为预存代码，未主动验证 mock 正确性，运行后才发现 createMockCtx 缺少 createRadialGradient 等方法处理导致 16 个测试全失败。如果模型识别测试是自己新写的，应在写完第一时间验证 mock 正确性，而非误以为它们已经过验证。
+2. 模型执行 pnpm run test 后因 gradeCore.js 测试失败，连续三次查看该文件并做了大规模修改，包括重构 loadGradeData 返回值、拆分 saveGradeData 并新增 snapshotPreviousData、修改 addStudent 等函数返回值结构等十余处改动。视频会议任务仅授权修复 video-meeting 包，模型缺乏边界意识，擅自修改了不同任务包的代码，违反任务隔离原则。应确认 grade-manager 测试失败与本次无关后报告即可。
 3. 模型在收到任务后立即创建 TodoList 进行任务规划，在尚未阅读任何相关文件源码的情况下就制定了修复步骤，不符合先分析问题再规划执行的流程规范。应在通读相关源文件、理解当前代码状态和问题边界后再制定修复计划。

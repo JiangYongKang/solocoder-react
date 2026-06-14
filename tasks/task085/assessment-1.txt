@@ -1,6 +1,6 @@
 产物不满意：
-1. index.jsx 的 scheduleNext 函数在对比模式下存在调度缺陷：B侧 setTimeout 回调中只执行了 stepGeneratorOnce("B") 而没有递归调用 scheduleNext()，导致调度循环完全由A侧驱动。当A侧先完成排序而B侧仍在运行时，A侧回调中的 scheduleNext() 检测到 aRunning=false 只设置了B侧定时器，但B侧回调执行后不会继续调度自己，B侧只能执行额外一步就停止，对比模式下算法B无法独立完成排序。根本原因是调度逻辑不对称——A侧承担了循环调度职责但B侧被设计为被动执行。应该在B侧回调中也根据运行状态判断是否继续调度，使两侧的调度逻辑对称。
-2. index.jsx 的 scheduleNext 函数在对比模式下设置定时器时未清除旧的定时器句柄：第一次 scheduleNext 同时设置了 timerRef.current 和 timerBRef.current，A侧定时器触发后在回调中递归调用 scheduleNext，第二次 scheduleNext 直接覆盖了 timerBRef.current，但第一次设置的B侧定时器可能尚未触发处于 pending 状态，导致B侧同时有两个定时器存在，B会因旧定时器额外触发而执行多余步骤，使两个算法在视觉上执行步调不一致。应该在每次 scheduleNext 调用开头同时清除 timerRef.current 和 timerBRef.current 两个旧定时器再设置新的。
+1. index.jsx 的 scheduleNext 在对比模式下存在调度缺陷：B 侧 setTimeout 回调只执行 stepGeneratorOnce("B") 而没有递归调用 scheduleNext()。当 A 侧先完成而 B 侧仍在运行时，A 侧回调检测到 aRunning=false 只设 B 侧定时器，但 B 侧回调执行后不继续调度自己，B 只能多执行一步就停止，算法 B 无法独立完成排序。原因是调度不对称——A 承担循环调度但 B 被动执行。应在 B 侧回调中也判断是否继续调度，使两侧对称。
+2. scheduleNext 在对比模式下设置定时器时未清除旧句柄：首次同时设了 timerRef 和 timerBRef，A 侧触发后递归调用，第二次直接覆盖 timerBRef，但旧 B 侧定时器可能仍 pending，导致 B 同时有两个定时器执行多余步骤，两算法视觉步调不一致。应在每次 scheduleNext 开头同时清除两个旧定时器再设新的。
 3. index.jsx 的 stepGeneratorOnce 函数长达125行（第217行至第342行），在一个函数内混杂了IDLE状态到RUNNING状态的转换、generator创建与初始化、DONE状态处理、COMPLETE步骤的特殊处理（与DONE逻辑重复）、普通步骤的状态更新、日志生成与过滤、算法名称查找等六种不同职责。当需要调试或修改某一种状态转换逻辑时，必须在同一个大函数中定位。应该按状态转换维度拆分为多个小函数，如 initGenerator、advanceStep、handleComplete 等，降低单函数复杂度。
 
 过程不满意：

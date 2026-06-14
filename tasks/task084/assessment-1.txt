@@ -2,7 +2,7 @@
 1. index.jsx 中 MultiSelect 组件的 handleDeselectAll 函数调用 onChange([]) 清空全部选中项，但触发按钮的文本标签是"反选"。用户点击"反选"期望的是将每个选项的选中状态取反（已选的取消、未选的勾上），实际执行的是"取消全选"，功能和 UI 标签完全不符。这是操作类型多选下拉的核心交互逻辑错误，会导致使用者在筛选场景下产生困惑。
 2. index.jsx 中操作人输入框和操作对象输入框使用了 defaultValue 而非 value 作为受控属性。当用户点击"重置筛选"按钮后，handleResetFilters 将 filters.operator 和 filters.resource 设为空字符串，但输入框因使用的 defaultValue（非受控）不会跟随状态更新而清空。结果是筛选逻辑已重置、列表已刷新，但输入框中仍残留旧文本，用户感知到的是筛选似乎没有生效，需要手动删除输入框内容后才能验证重置成功。
 3. 提示词要求"筛选条件变更后列表实时刷新（300ms 防抖）"，但 index.jsx 中仅操作人和操作对象两个文本输入框通过 handleDebouncedInput 实现了 300ms 防抖，操作类型多选、操作结果下拉、起始日期、结束日期这四项筛选条件在 onChange 中直接调用 updateFilter，完全没有防抖处理。当用户快速切换多个日期或反复勾选操作类型时，每次变更都立即触发 filterLogs 遍历全量日志，在 200 条数据量下性能影响不大但不符合需求规范。
-4. utils.js 的 buildTrendData 函数在计算 thirtyDaysAgo 边界时使用了 new Date(days[0].date).getTime()。days[0].date 是 formatDateKey 用本地时间生成的"yyyy-MM-dd"字符串，而 new Date("yyyy-MM-dd") 按 ECMAScript 规范按 UTC 零点解析。在 UTC+8 时区下，firstDay 对应的实际本地时间为当日早上 8 点，会导致操作时间在 0:00-7:59 之间的日志被错误排除在 30 天趋势统计之外。测试用例通过是因为测试数据用的时间戳都接近现在，不涉及边界天凌晨时段。
+4. utils.js 的 buildTrendData 计算 thirtyDaysAgo 边界时用了 new Date(days[0].date)，days[0].date 是本地时间字符串而 new Date("yyyy-MM-dd") 按 UTC 零点解析。在 UTC+8 下 firstDay 实际为早上 8 点，导致 0:00-7:59 的日志被错误排除在 30 天趋势外。测试通过因用例时间戳不涉及边界天凌晨时段。
 5. utils.js 的 exportToCsv 函数中 CSV 表头数组定义为 ['操作时间', '操作人', '操作类型', '操作对象', '操作结果', 'IP地址']，IP 列名无空格。而 index.jsx 表格渲染中 `<th>IP 地址</th>` 使用了带空格的写法。同一列在页面展示和导出文件中的列名不一致，用户看到表格和下载的 CSV 表头会产生混淆。虽然不影响导出数据的正确性，但属于产品细节上的不严谨，导出文件的表头应与页面表格表头保持完全一致。
 
 过程不满意：

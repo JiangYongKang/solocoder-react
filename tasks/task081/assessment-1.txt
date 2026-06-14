@@ -1,10 +1,10 @@
 产物不满意：
 
-1. videoMeetingCore.js 中导出的 drawParticipantCanvas 函数完全没有被测试覆盖，测试文件 videoMeetingCore.test.js 中既没有 import 该函数也没有为其编写任何测试用例。该函数是 Canvas 画面模拟的核心逻辑入口，内部根据参会者的 isVideoOff、isScreenSharing 等状态走不同的绘制分支（drawAnimatedBackground、drawVideoOffState、drawScreenShareState），包含大量的条件路由逻辑。提示词第6条明确要求"还需要为该页面编写纯 JS 函数的单元测试"，模型虽然写了 70 个测试覆盖了大部分工具函数，却遗漏了这个最重要的导出函数。即使 Canvas 上下文需要 mock，也至少应该验证不同参与者状态下 drawParticipantCanvas 是否调用了正确的绘制路径。
+1. videoMeetingCore.js 的 drawParticipantCanvas 函数完全没有被测试覆盖，测试文件中既没有 import 也未编写任何用例。该函数是 Canvas 画面模拟的核心入口，根据 isVideoOff、isScreenSharing 等状态走不同的绘制分支，包含大量条件路由逻辑。提示词第6条要求为该页面编写纯 JS 函数单测，模型写了 70 个测试却遗漏了这个最重要的导出函数。即使 Canvas 上下文需 mock，也应验证不同参与者状态下是否调用了正确的绘制路径。
 
 2. index.jsx 的聊天消息自动模拟 effect 中在第 261 行设置了 `if (meetingEnded || !sidePanelOpen) return`，导致只有聊天侧边栏打开时才会调度定时器发送模拟消息。当用户关闭侧边栏后，整个定时器被清除不再有消息产生。这与提示词第 4 条"新消息用定时器模拟（每 5-15 秒随机一条来自其他参会者的消息）"的需求不符——提示词并未限定聊天面板必须打开才有消息。同时第 4 条还提到"未展开时有未读消息数角标"，但按当前逻辑面板关闭时消息根本不会产生，未读角标永远无法增长，形成功能死码。
 
-3. index.jsx 中 handleToggleMute 和 handleToggleHand 都通过调用 videoMeetingCore.js 的 toggleParticipantProperty 纯函数实现状态切换，但 handleToggleScreenShare 在 288-293 行直接内联了 `prev.map(p => p.id === 'self' ? { ...p, isScreenSharing: !p.isScreenSharing } : p)`，完全没使用 toggleParticipantProperty。这不仅导致代码风格不一致，如果未来 toggleParticipantProperty 有不可变性防护等增强逻辑，屏幕共享切换将无法受益。
+3. index.jsx 中 handleToggleMute 和 handleToggleHand 都调用 toggleParticipantProperty 纯函数实现状态切换，但 handleToggleScreenShare 直接内联了 map 逻辑，完全没使用 toggleParticipantProperty。这导致代码风格不一致，若未来 toggleParticipantProperty 有增强逻辑，屏幕共享切换将无法受益。
 
 4. index.jsx 中 ParticipantCanvas 组件的函数签名只解构了 `{ participant, animFrame, onClick }`，但在 380、398、412 行的三次调用中都传入了一个 `isSelf={p.isSelf}` 的额外 prop。这个 prop 在组件内部从未被解构或使用——组件通过 participant 对象中的 isSelf 字段在 drawParticipantCanvas 内部判断，单独传入的 isSelf prop 是完全冗余的传递，属于死代码残留。
 

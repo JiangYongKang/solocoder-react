@@ -1,5 +1,5 @@
 产物不满意：
-1. gradeCore.js 的 snapshotPreviousData 函数被 index.jsx 的 useEffect(() => {}, []) 在每次页面挂载时调用，函数内部无条件调用 loadGradeData 读取当前 STORAGE_KEY 数据后覆盖写入 PREVIOUS_STORAGE_KEY。用户刷新页面后历史基准数据被当前数据覆盖，排名面板 change 列全部显示为 0，排名变化对比功能在刷新后完全失效。根本原因是 snapshotPreviousData 未检查 PREVIOUS_STORAGE_KEY 是否已存在有效数据就覆写。应仅在 loadPreviousData 返回 null 时才写入快照，已存在快照时跳过覆写以保留历史基线。
+gradeCore.js 的 snapshotPreviousData 在页面挂载时无条件调用 loadGradeData 读取当前数据后覆盖写入 PREVIOUS_STORAGE_KEY。用户刷新后历史基准被当前数据覆盖，排名变化对比功能完全失效。原因是未检查 PREVIOUS_STORAGE_KEY 是否已有有效数据就覆写。应仅在 loadPreviousData 返回 null 时才写入快照，已存在时跳过覆写保留历史基线。
 2. gradeCore.js 的 removeSubject 函数中使用解构 `const { [subjectName]: _removed, ...rest }` 排除科目键值时声明了变量 _removed 但从未读取使用。尽管以下划线前缀标记为意图丢弃，但在开启了 no-unused-vars 规则的 lint 工具下会触发警告，产物不够干净。可直接使用 `_` 作为丢弃变量名或将 `newScores[student]` 展开为浅拷贝后用 `delete` 删除对应键，避免引入未使用变量。
 
 过程不满意：

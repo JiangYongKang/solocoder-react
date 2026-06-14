@@ -1,5 +1,5 @@
 产物不满意：
-1. 模型在 toggleFullscreen 函数中自行增加了 else 分支处理浏览器不支持 requestFullscreen API 的情况，但该 else 分支只将 nativeFullscreenRef.current 重置为 false，没有同步调用 setIsFullscreen(false) 回退 UI 状态。而在此之前的第 428-429 行已经调用了 setIsFullscreen(true)，导致当浏览器不支持全屏 API 时，全屏按钮文本一直显示"退出全屏"但页面实际未进入全屏，按钮文案与实际状态不一致。这恰好是提示词第 2 条指出的同类型 UI 状态残留问题，模型修了 Promise 拒绝分支却在新增的 else 分支中复现了相同缺陷。根本原因是增加新分支时只考虑了 ref 的清理而遗漏了 setState 的同步回退。正确做法是在 else 分支中也调用 setIsFullscreen(false)。
-2. 模型在 renderFrame 函数中成功移除了旧版守卫 if (!isPlaying && lastFrameTimeRef.current === 0) 并让 renderSignature 跳过逻辑正常生效，但移除旧守卫后第 73 行声明的 lastFrameTimeRef = useRef(0) 在整份 index.jsx 中已完全不被读取或写入，成为无用的废弃声明。模型修改完成后没有对整个任务包做一次搜索来清理新旧逻辑切换后遗留的无用变量，产物不干净。根本原因是只关注了要删除的代码段，没有检查删除后是否产生了孤立引用。正确做法是修复完成后用 grep 搜索 lastFrameTimeRef 确认只剩下声明行，然后将其一并删除。
+1. 模型在 toggleFullscreen 中自行增加 else 分支处理不支持全屏 API 的情况，但 else 只重置 ref 为 false，未调用 setIsFullscreen(false) 回退 UI。此前已调用了 setIsFullscreen(true)，导致不支持时按钮一直显示"退出全屏"但实际未进入全屏。这是提示词第 2 条指出的同类 UI 状态残留，修了 Promise 拒绝分支却在 else 中复现了相同缺陷。原因是只清理 ref 遗漏了 setState 回退。应在 else 中也调用 setIsFullscreen(false)。
+2. 模型移除旧守卫后让 renderSignature 跳过逻辑生效，但 lastFrameTimeRef 声明在整份 index.jsx 中已完全不被读写，成为废弃变量。修改完成后没有对整个包搜索清理遗留变量，产物不干净。原因是只关注删除的代码段，未检查删除后是否产生孤立引用。应修复完成后搜索 lastFrameTimeRef 确认只剩声明行并一并删除。
 过程不满意：
 模型在收到任务后先说"让我先读取当前的代码，了解最新的实现情况"，但紧接着在尚未读取任何代码文件时就创建了 4 项 TodoList 开始规划，然后再去读取 index.jsx 查看代码。这违反了"不能在刚收到任务时就直接创建 TodoList，应先分析问题再规划"的规范。虽然提示词中已经提供了具体的行号和问题描述，但合理做法仍是先读取代码确认当前实际状态和上下文后，再根据实际情况制定修复计划。先规划后读代码的做法容易导致计划与实际代码状态脱节，如果代码已经有其它修改，TodoList 就需要推翻重来。

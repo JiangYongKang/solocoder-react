@@ -1,8 +1,8 @@
 产物不满意：
-1. buildCrossAnalysisMatrix 函数被整体重写：使用 Set 替代 Array.includes 提取了 rowId 和 colId 局部变量，将内外层循环顺序改为按答卷遍历。但与旧代码相比，矩阵单元格的行列总计计算逻辑完全等价，函数对外行为无任何变化。提示词描述的「当行和列为同一个题目时矩阵对角线数据全部为零」问题并未在此修复中解决。根本原因是 index.jsx 第 88 行的 `if (rowQId === colQId) return null` 守卫直接禁止了相同题目做交叉分析，构建矩阵前就返回了 null。模型应该移除或修改 index.jsx 中的这个守卫，而不是重写一个功能等价的工具函数。
-2. surveyAnalysisCore.js 新增的 median 函数（第 255-262 行）被提取为独立导出函数，替代了 calculateDurationDistribution 中原有的中位数内联计算。但原有旧代码 `n % 2 === 0 ? (durations[mid - 1] + durations[mid]) / 2 : durations[mid]` 在偶数长度下已经取了中间两位的平均，公式完全正确。新增的 median 函数与之完全等价，calculateRatingStats 中已有的中位数内联计算也未统一替换为 median 调用。这次修改没有解决任何实际缺陷，只增加了代码量。
+1. buildCrossAnalysisMatrix 被整体重写：使用 Set 替代 Array.includes、调整循环顺序，但矩阵计算逻辑完全等价，对外行为无变化。提示词描述的「同行题对角线数据为零」问题并未修复。原因是 index.jsx 中 rowQId === colQId return null 守卫直接禁止了相同题目的交叉分析。应移除 index.jsx 中的守卫，而非重写功能等价的工具函数。
+2. 新增 median 函数被提取为独立导出函数代替 calculateDurationDistribution 中的内联中位数计算。但旧代码在偶数长度下已取中间两位平均，公式完全正确，新增函数等价。calculateRatingStats 中已有的中位数计算也未统一替换。此修改没有解决任何实际缺陷，只增加了代码量。
 3. PieChart.jsx 将 Canvas 尺寸从 size 扩展到 size + 80（默认 300x300），饼圆半径不变但中心点偏移到了扩展后 Canvas 的中心，标签从环内移到外环并使用引导线连接。标签碰撞检测仅沿 Y 轴推开标签对，完全忽略了水平方向的重叠。当扇区较多时，不同扇区的标签在 Y 轴上分布足够远但 X 轴上可能严重重叠，导致多个标签文字挤压在一起无法辨认。此外 20 轮碰撞迭代中推开的累积位移可能使标签超出 Canvas 上下边界，造成裁剪。
 
 过程不满意：
-1. 模型在修复 buildCrossAnalysisMatrix 之前，session-cot 中用了约 40 行篇幅（第 223-287 行）反复分析「当 rowQuestion 和 colQuestion 是同一个对象时 rowAns 和 colAns 指向相同数组、对角线计算在数学上是否正确」，来回推敲了三四次"实际上代码是正确的""但用户说是 bug""再仔细看看"，最终得出结论代码没有问题，但仍然决定对函数做全面重写。模型始终没有发现 index.jsx 中 `rowQId === colQId return null` 才是导致对角线为零的真正原因。正确做法是先定位到调用方 index.jsx 的守卫逻辑，确认矩阵构建前就被短路返回 null 才是问题根源，然后移除该守卫并验证函数在相同题目场景下的行为。
+1. 模型在修复 buildCrossAnalysisMatrix 前用约 40 行 COT 反复分析「同行题情况下对角线计算是否正确」，来回推敲最终认为代码没问题，但仍对函数做了全面重写。始终没有发现 index.jsx 中 rowQId === colQId return null 才是导致对角线为零的根本原因。应先定位到 index.jsx 的守卫逻辑，确认矩阵构建前就被短路，然后移除守卫并验证相同题目场景下的行为。
 2. 模型在修复 calculateDurationDistribution 的中位数计算时，阅读旧代码后已在思考记录第 129 行明确写下「偶数情况下的中位数计算确实已经通过 `(durations[mid - 1] + durations[mid]) / 2` 正确处理」，但随后又声称「为了绝对安全和清晰，重构为独立的 median 函数」。模型明知提示词描述的 bug 不存在、旧代码已经正确，仍为了形式上"显得更清晰"而进行了不必要的重构。这既没有修复任何实际缺陷，还引入了 median 函数与 calculateRatingStats 中未统一替换的内联中位数计算之间的代码不一致。

@@ -1,6 +1,6 @@
 产物不满意：
-1. index.jsx 的 renderFrame 函数中，模型为解决暂停时重复渲染浪费 GPU 的问题新增了 renderSignature 跳过逻辑（第 185-192 行），但该逻辑是死代码。因为同一函数入口处存在旧版守卫 `if (!isPlaying && lastFrameTimeRef.current === 0)`，而 lastFrameTimeRef 在整个组件中只在初始化时设为 0、从未被修改为其他值，导致暂停态下该守卫恒为真、始终在 renderSignature 计算之前就 return。后果是模型新增的 renderSignature 跳过逻辑在暂停时永远执行不到，且播放时每帧仍在拼接包含 activeDanmakus.map 和 join 的字符串浪费 CPU。根本原因是模型添加新逻辑前没有分析已有控制流，未发现旧守卫已经阻断了新逻辑的执行路径。正确做法是先移除或修改旧守卫（例如改为仅在首帧时跳过以等待 Canvas 就绪），再将 renderSignature 作为暂停态下是否重绘的判定条件。
-2. index.jsx 的 toggleFullscreen 函数中，当 requestFullscreen 返回的 Promise 被拒绝时（第 437-439 行），catch 回调仅将 nativeFullscreenRef.current 保持为 true，未调用 setIsFullscreen(false) 回退 UI 状态。导致请求失败后按钮文案仍显示"退出全屏"，容器实际未进入全屏但 React 状态与 DOM 实际不一致。根本原因是对全屏 API 的异步失败路径只考虑了 ref 状态的保持，遗漏了 setIsFullscreen 的回退。正确做法是在 catch 中调用 setIsFullscreen(false) 并将 nativeFullscreenRef.current 置为 false。
+1. index.jsx 的 renderFrame 中新增了 renderSignature 跳过逻辑，但该逻辑是死代码。入口处存在旧守卫 if (!isPlaying && lastFrameTimeRef.current === 0)，lastFrameTimeRef 只在初始化时设为 0 从未被修改，暂停态下该守卫恒为真，始终在 renderSignature 计算前就 return。新增逻辑永远执行不到。原因是添加新逻辑前未分析已有控制流，未发现旧守卫已阻断新逻辑路径。应先移除旧守卫再将 renderSignature 作为暂停判定条件。
+2. toggleFullscreen 中 requestFullscreen Promise 被拒绝时 catch 回调仅保持 nativeFullscreenRef 为 true，未调用 setIsFullscreen(false) 回退 UI。失败后按钮仍显示"退出全屏"，React 状态与 DOM 不一致。原因是只考虑了 ref 状态保持，遗漏了 setState 回退。应在 catch 中调用 setIsFullscreen(false) 并重置 ref 为 false。
 
 过程不满意：
 1. 模型在运行 pnpm run build 时遇到 gradeCore.js（成绩管理器任务包）的编译错误后，花费大量步骤读取、分析和重写 gradeCore.js 文件（思考过程第 659-869 行），最终重写了 25+ 个纯函数并额外修复了 parsePastedData 和 saveGradeData 的逻辑。这完全超出了当前任务（弹幕播放器）的修复范围，违反了任务隔离原则。正确做法是报告构建中的第三方包错误但不修改，或仅修复弹幕播放器相关文件后确认自身代码不变即可。

@@ -1,5 +1,5 @@
 产物不满意：
-snapshotPreviousData 的修复正确：写入前检查 PREVIOUS_STORAGE_KEY 中是否有包含 students、subjects、scores 三字段的有效 JSON，若无或解析失败才写入，已有有效快照时不覆写。removeSubject 中将 _removed 改为解构键名 removedId 消除未使用变量告警也正确。新增的 3 个测试用例覆盖了有效快照不覆写、非法 JSON 覆盖写入、缺少字段覆盖写入三个边界场景。但 snapshotPreviousData 对有效性的校验仅检查字段 keys 存在性，不验证 values 是否为合法数组。如果上一轮保存的快照因写入中断导致 students 字段为 null 或非数组，函数仍会判定为有效并拒绝覆写，导致刷新后使用损坏的快照数据。应该在校验中对 students、subjects、scores 做 Array.isArray 类型检查。
+snapshotPreviousData 修复后写入前检查 PREVIOUS_STORAGE_KEY 是否有 students、subjects、scores 三字段的有效 JSON，若无才写入。removeSubject 消除未使用变量告警也正确。新增 3 个测试覆盖了有效不覆写、非法 JSON 覆盖、缺字段覆盖三个场景。但有效性校验仅检查字段 keys 存在，不验证 values 是否为合法数组。如果快照因写入中断导致 students 为 null 或非数组，函数仍判定有效并拒绝覆写，导致刷新后使用损坏数据。应对三字段做 Array.isArray 类型检查。
 
 过程不满意：
 无。

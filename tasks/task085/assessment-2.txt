@@ -1,6 +1,6 @@
 产物不满意：
-1. scheduleSide 函数在对比模式下解决了 B 侧独立调度的问题，每次递归调用 scheduleSide(side) 使两侧完全对称独立运转，修复了旧版 B 侧 setTimeout 回调不递归导致无法独立完成排序的缺陷。scheduleSide 开头调用 clearSingleTimer(timerKey) 先清理同侧 pending 定时器再设置新定时器，确保同一侧不会同时存在两个定时器句柄，解决了旧版直接覆盖 timerBRef.current 导致双定时器叠加执行多余步骤的问题。stepGeneratorOnce 从 125 行拆分为 resolveAlgorithmName、resolveAlgorithm、computeStepVisualState、buildLogEntry、shouldSkipLogging、makeDoneState、makeGeneratorDoneState、makeNormalStepState、initializeGeneratorIfIdle 共 9 个小函数，每个函数职责单一，调度逻辑清晰。68 个单元测试全部通过。
-2. resolveAlgorithmName 和 resolveAlgorithm 两个函数签名完全一致，都是接收 stateKey、isCompareMode、algorithmA、algorithmB、singleAlgorithm 五个独立参数，但 initializeGeneratorIfIdle 却采用 opts 对象形式接收这些参数，同一文件内三种函数对相同信息采用了两种不同的参数传递风格。在 stepGeneratorOnce 中调用 resolveAlgorithmName 时先将参数组装到 algoOpts 对象再逐个解构传入，增加了不必要的中间层。正确做法是统一使用 opts 对象传递，或让 resolveAlgorithmName 和 resolveAlgorithm 也接收 opts 参数。
+1. scheduleSide 函数解决了 B 侧独立调度的问题，每次递归调用 scheduleSide(side) 使两侧对称运转，修复了旧版 B 侧不递归无法独立完成排序的缺陷。scheduleSide 开头先清同侧 pending 定时器再设新的，解决旧版直接覆盖 ref 导致双定时器叠加的问题。stepGeneratorOnce 从 125 行拆分为 resolveAlgorithmName、resolveAlgorithm 等 9 个小函数，每个职责单一，调度逻辑清晰。68 个单元测试全部通过。
+2. resolveAlgorithmName 和 resolveAlgorithm 都接收五个独立参数，但 initializeGeneratorIfIdle 却用 opts 对象形式，同一文件内对相同信息采用了两种参数风格。调用时先将参数组装到 algoOpts 再逐个解构，增加了不必要的中间层。应统一使用 opts 对象传递参数。
 
 过程不满意：
 1. 模型在阅读 index.jsx 后直接决定重写整个 870 行文件，写操作一次性覆盖了整个组件的主入口文件，而不是对三个具体问题做逐一定位和最小化编辑。diff 显示新旧文件之间有大量无关代码行的逐行对比噪声，审查时需要排除非变更区域的干扰才能确认修改范围。问题的根本原因是模型倾向于全量重写而非增量修复，在缺陷修复场景下这种操作方式可能引入新问题且不利于审查。正确做法是针对 scheduleNext 的调度逻辑、定时器清理逻辑、stepGeneratorOnce 的函数拆分三处做精准替换，保持未变更代码的行号和历史完整不变。

@@ -259,14 +259,41 @@ export function generateNextDataPoint(device) {
   if (!device) return null
   const metricType = device.metricType
   const range = DEFAULT_METRIC_RANGES[metricType] || { min: 0, max: 100 }
+  const rangeSpan = range.max - range.min
   const lastValue = device.currentValue ?? (range.min + range.max) / 2
-  const fluctuation = (range.max - range.min) * 0.05
-  let newValue = lastValue + randomInRange(-fluctuation, fluctuation)
-  newValue = Math.max(range.min, Math.min(range.max, newValue))
 
   if (metricType === METRIC_TYPES.ACCESS_STATE || metricType === METRIC_TYPES.CAMERA_STATUS) {
-    newValue = Math.random() < 0.9 ? lastValue : (lastValue === range.min ? range.max : range.min)
+    const newValue = Math.random() < 0.9 ? lastValue : (lastValue === range.min ? range.max : range.min)
+    const point = { timestamp: Date.now(), value: Number(newValue.toFixed(2)) }
+    const dataPoints = [...(device.dataPoints || []), point]
+    if (dataPoints.length > DATA_POINT_COUNT) {
+      dataPoints.splice(0, dataPoints.length - DATA_POINT_COUNT)
+    }
+    return {
+      ...device,
+      currentValue: point.value,
+      dataPoints,
+      lastOnline: device.status === DEVICE_STATUS.ONLINE ? Date.now() : device.lastOnline,
+    }
   }
+
+  const prevTrend = typeof device.trend === 'number' ? device.trend : 0
+  const trendStep = rangeSpan * 0.008
+  let trend = prevTrend + randomInRange(-trendStep, trendStep)
+  const maxTrend = rangeSpan * 0.03
+  trend = Math.max(-maxTrend, Math.min(maxTrend, trend))
+
+  const maxDrift = rangeSpan * 0.4
+  const mid = (range.min + range.max) / 2
+  const drift = -(lastValue - mid) * 0.015
+
+  const noise = randomInRange(-rangeSpan * 0.015, rangeSpan * 0.015)
+
+  let newValue = lastValue + trend + drift + noise
+  newValue = Math.max(range.min, Math.min(range.max, newValue))
+
+  if (newValue >= range.max - rangeSpan * 0.02) trend = -Math.abs(trend) * 0.5
+  if (newValue <= range.min + rangeSpan * 0.02) trend = Math.abs(trend) * 0.5
 
   const point = {
     timestamp: Date.now(),
@@ -281,6 +308,7 @@ export function generateNextDataPoint(device) {
   return {
     ...device,
     currentValue: point.value,
+    trend,
     dataPoints,
     lastOnline: device.status === DEVICE_STATUS.ONLINE ? Date.now() : device.lastOnline,
   }
@@ -299,6 +327,8 @@ export function updateRandomDeviceStatuses(devices, options = {}) {
     else if (d.status === DEVICE_STATUS.OFFLINE) offlineIndices.push(i)
   })
 
+  let switchedCount = 0
+
   const offlineCount = Math.min(randomInt(minOffline, maxOffline), onlineIndices.length)
   for (let i = 0; i < offlineCount; i++) {
     if (onlineIndices.length === 0) break
@@ -307,6 +337,7 @@ export function updateRandomDeviceStatuses(devices, options = {}) {
     result[deviceIdx].status = DEVICE_STATUS.OFFLINE
     result[deviceIdx].statusChangeAt = Date.now()
     onlineIndices.splice(randIdx, 1)
+    switchedCount++
   }
 
   offlineIndices.forEach((idx) => {
@@ -314,8 +345,24 @@ export function updateRandomDeviceStatuses(devices, options = {}) {
       result[idx].status = DEVICE_STATUS.ONLINE
       result[idx].statusChangeAt = Date.now()
       result[idx].lastOnline = Date.now()
+      switchedCount++
     }
   })
+
+  if (switchedCount === 0) {
+    if (onlineIndices.length > 0) {
+      const randIdx = randomInt(0, onlineIndices.length - 1)
+      const deviceIdx = onlineIndices[randIdx]
+      result[deviceIdx].status = DEVICE_STATUS.OFFLINE
+      result[deviceIdx].statusChangeAt = Date.now()
+    } else if (offlineIndices.length > 0) {
+      const randIdx = randomInt(0, offlineIndices.length - 1)
+      const deviceIdx = offlineIndices[randIdx]
+      result[deviceIdx].status = DEVICE_STATUS.ONLINE
+      result[deviceIdx].statusChangeAt = Date.now()
+      result[deviceIdx].lastOnline = Date.now()
+    }
+  }
 
   return result
 }
@@ -366,6 +413,7 @@ export function checkAlertCondition(rule, value) {
   const threshold = Number(rule.threshold)
   if (isNaN(threshold)) return false
   const numValue = Number(value)
+  if (isNaN(numValue)) return false
 
   switch (condition) {
     case ALERT_CONDITIONS.GREATER_THAN:
@@ -393,13 +441,17 @@ export function evaluateDeviceAlerts(device, rules) {
   if (!device || !Array.isArray(rules)) {
     return { isAlerting: false, triggeredRules: [], alertLevel: null }
   }
+  const currentValue = device.currentValue
+  if (currentValue === null || currentValue === undefined || isNaN(Number(currentValue))) {
+    return { isAlerting: false, triggeredRules: [], alertLevel: null }
+  }
   const applicable = getApplicableRules(rules, device)
   const triggered = []
   let maxLevel = null
   const levelOrder = { [ALERT_LEVELS.INFO]: 1, [ALERT_LEVELS.WARNING]: 2, [ALERT_LEVELS.CRITICAL]: 3 }
 
   applicable.forEach((rule) => {
-    if (checkAlertCondition(rule, device.currentValue)) {
+    if (checkAlertCondition(rule, currentValue)) {
       triggered.push(rule)
       const level = levelOrder[rule.level] || 0
       const currentMax = maxLevel ? levelOrder[maxLevel] : 0
@@ -573,6 +625,7 @@ export function confirmAlertRecords(records, ids) {
     }
     return r
   })
+  saveAlertRecords(updated)
   return { success: true, records: updated }
 }
 
@@ -589,6 +642,7 @@ export function resolveAlertRecords(records, ids) {
     }
     return r
   })
+  saveAlertRecords(updated)
   return { success: true, records: updated }
 }
 

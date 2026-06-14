@@ -118,11 +118,12 @@ const CodeSandboxPage = () => {
 
   const handleLanguageChange = useCallback((e) => {
     const newLang = e.target.value
+    const oldLang = language
     setLanguage(newLang)
-    if (code === DEFAULT_CODE[LANGUAGES.JAVASCRIPT] || code === DEFAULT_CODE[LANGUAGES.PYTHON]) {
+    if (code === DEFAULT_CODE[oldLang]) {
       setCode(DEFAULT_CODE[newLang])
     }
-  }, [code])
+  }, [code, language])
 
   const handleRun = useCallback(() => {
     if (isRunning) return

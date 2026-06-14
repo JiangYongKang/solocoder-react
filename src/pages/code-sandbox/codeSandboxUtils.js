@@ -102,7 +102,7 @@ export const handleBracketCompletion = (e) => {
   const value = textarea.value
   const key = e.key
 
-  const brackets = {
+  const openBrackets = {
     '(': ')',
     '[': ']',
     '{': '}',
@@ -111,14 +111,33 @@ export const handleBracketCompletion = (e) => {
     '`': '`',
   }
 
-  if (brackets[key]) {
+  const closeBrackets = {
+    ')': '(',
+    ']': '[',
+    '}': '{',
+  }
+
+  if (openBrackets[key]) {
     e.preventDefault()
     const selectedText = value.substring(start, end)
-    const newValue = value.substring(0, start) + key + selectedText + brackets[key] + value.substring(end)
+    const newValue = value.substring(0, start) + key + selectedText + openBrackets[key] + value.substring(end)
     const newCursorStart = start + 1
     const newCursorEnd = selectedText ? newCursorStart + selectedText.length : newCursorStart
     return { newValue, newCursorStart, newCursorEnd }
   }
+
+  if (closeBrackets[key] && start === end) {
+    const nextChar = value[start]
+    if (nextChar === key) {
+      e.preventDefault()
+      return {
+        newValue: value,
+        newCursorStart: start + 1,
+        newCursorEnd: start + 1,
+      }
+    }
+  }
+
   return null
 }
 
@@ -126,7 +145,7 @@ class PythonInterpreter {
   constructor(stdin = '') {
     this.output = []
     this.variables = {}
-    this.stdinLines = stdin.split('\n').filter((l) => l !== '')
+    this.stdinLines = stdin.split('\n')
     this.stdinIndex = 0
     this.unsupportedFunctions = new Set()
   }
@@ -498,8 +517,6 @@ const isValidJsIdentifier = (name) => {
 const extractPythonVariables = (code) => {
   const varAssignRegex = /^(\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*=/gm
   const forVarRegex = /for\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+in/g
-  const defRegex = /def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g
-  const classRegex = /class\s+([a-zA-Z_][a-zA-Z0-9_]*)/g
   const importAsRegex = /import\s+([a-zA-Z_][a-zA-Z0-9_]*)(?:\s+as\s+([a-zA-Z_][a-zA-Z0-9_]*))?/g
   const fromImportRegex = /from\s+[a-zA-Z_][a-zA-Z0-9_.]*\s+import\s+([a-zA-Z_][a-zA-Z0-9_,\s*]+)/g
 
@@ -512,16 +529,6 @@ const extractPythonVariables = (code) => {
   }
 
   while ((match = forVarRegex.exec(code)) !== null) {
-    const name = match[1]
-    if (isValidJsIdentifier(name)) variables[name] = null
-  }
-
-  while ((match = defRegex.exec(code)) !== null) {
-    const name = match[1]
-    if (isValidJsIdentifier(name)) variables[name] = null
-  }
-
-  while ((match = classRegex.exec(code)) !== null) {
     const name = match[1]
     if (isValidJsIdentifier(name)) variables[name] = null
   }
@@ -652,23 +659,328 @@ const processFStrings = (code) => {
   })
 }
 
+const findMatchingClose = (str, startIdx, openChar, closeChar) => {
+  let depth = 1
+  let i = startIdx
+  let inString = null
+  while (i < str.length && depth > 0) {
+    const ch = str[i]
+    const prevChar = i > 0 ? str[i - 1] : ''
+    if (inString) {
+      if (ch === inString && prevChar !== '\\') {
+        inString = null
+      }
+      i++
+      continue
+    }
+    if (ch === '"' || ch === "'" || ch === '`') {
+      inString = ch
+      i++
+      continue
+    }
+    if (ch === openChar) depth++
+    if (ch === closeChar) depth--
+    i++
+  }
+  return i
+}
+
+const findOperandEnd = (str, startIdx) => {
+  let i = startIdx
+  let inString = null
+  let parenDepth = 0
+  let foundNonSpace = false
+
+  while (i < str.length) {
+    const ch = str[i]
+    const prevChar = i > 0 ? str[i - 1] : ''
+
+    if (inString) {
+      if (ch === inString && prevChar !== '\\') {
+        inString = null
+      }
+      i++
+      continue
+    }
+
+    if (ch === '"' || ch === "'" || ch === '`') {
+      inString = ch
+      foundNonSpace = true
+      i++
+      continue
+    }
+
+    if (ch === '(' || ch === '[' || ch === '{') {
+      parenDepth++
+      foundNonSpace = true
+      i++
+      continue
+    }
+
+    if (ch === ')' || ch === ']' || ch === '}') {
+      if (parenDepth === 0) {
+        return i
+      }
+      parenDepth--
+      foundNonSpace = true
+      i++
+      continue
+    }
+
+    if (parenDepth > 0) {
+      if (ch !== ' ' && ch !== '\t') foundNonSpace = true
+      i++
+      continue
+    }
+
+    if (ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r') {
+      if (foundNonSpace) {
+        return i
+      }
+      i++
+      continue
+    }
+
+    if (ch === ';' || ch === ',') {
+      return i
+    }
+
+    const logicalOp = str.slice(i).match(/^(and\b|or\b|&&|\|\||==|!=|<=|>=|<|>)/)
+    if (logicalOp) {
+      return i
+    }
+
+    foundNonSpace = true
+    i++
+  }
+  return i
+}
+
+const findOperandStart = (str, endIdx) => {
+  let i = endIdx - 1
+  let inString = null
+  let parenDepth = 0
+  let foundNonSpace = false
+
+  while (i >= 0) {
+    const ch = str[i]
+    const nextChar = i < str.length - 1 ? str[i + 1] : ''
+
+    if (inString) {
+      if (ch === inString && nextChar !== '\\') {
+        inString = null
+      }
+      i--
+      continue
+    }
+
+    if (ch === '"' || ch === "'" || ch === '`') {
+      inString = ch
+      foundNonSpace = true
+      i--
+      continue
+    }
+
+    if (ch === ')' || ch === ']' || ch === '}') {
+      parenDepth++
+      foundNonSpace = true
+      i--
+      continue
+    }
+
+    if (ch === '(' || ch === '[' || ch === '{') {
+      if (parenDepth === 0) {
+        return i + 1
+      }
+      parenDepth--
+      foundNonSpace = true
+      i--
+      continue
+    }
+
+    if (parenDepth > 0) {
+      if (ch !== ' ' && ch !== '\t') foundNonSpace = true
+      i--
+      continue
+    }
+
+    if (ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r') {
+      if (foundNonSpace) {
+        return i + 1
+      }
+      i--
+      continue
+    }
+
+    if (ch === ';' || ch === ',') {
+      return i + 1
+    }
+
+    if (i >= 1) {
+      const twoChar = str.slice(i - 1, i + 1)
+      if (twoChar === '&&' || twoChar === '||' || twoChar === '==' || twoChar === '!=' || twoChar === '<=' || twoChar === '>=') {
+        return i + 1
+      }
+    }
+
+    if (ch === '<' || ch === '>' || ch === '!') {
+      return i + 1
+    }
+
+    const andOrMatch = str.slice(Math.max(0, i - 3), i + 1).match(/(^|\s)(and|or)$/)
+    if (andOrMatch) {
+      return i + 1
+    }
+
+    foundNonSpace = true
+    i--
+  }
+  return Math.max(0, i + 1)
+}
+
+const replacePythonInOperator = (expr) => {
+  const tokens = []
+  const positions = []
+  let i = 0
+  let inString = null
+  let parenDepth = 0
+
+  while (i < expr.length) {
+    const ch = expr[i]
+    const prevChar = i > 0 ? expr[i - 1] : ''
+
+    if (inString) {
+      tokens.push(ch)
+      if (ch === inString && prevChar !== '\\') {
+        inString = null
+      }
+      i++
+      continue
+    }
+
+    if (ch === '"' || ch === "'" || ch === '`') {
+      inString = ch
+      tokens.push(ch)
+      i++
+      continue
+    }
+
+    if (ch === '(' || ch === '[' || ch === '{') {
+      parenDepth++
+      tokens.push(ch)
+      i++
+      continue
+    }
+    if (ch === ')' || ch === ']' || ch === '}') {
+      parenDepth--
+      tokens.push(ch)
+      i++
+      continue
+    }
+
+    const notInMatch = expr.slice(i).match(/^not\s+in\b/)
+    if (notInMatch) {
+      positions.push({ type: 'not_in', start: tokens.length, length: notInMatch[0].length })
+      tokens.push(...notInMatch[0].split(''))
+      i += notInMatch[0].length
+      continue
+    }
+
+    const inMatch = expr.slice(i).match(/^in\b/)
+    if (inMatch) {
+      positions.push({ type: 'in', start: tokens.length, length: inMatch[0].length })
+      tokens.push(...inMatch[0].split(''))
+      i += inMatch[0].length
+      continue
+    }
+
+    tokens.push(ch)
+    i++
+  }
+
+  let result = tokens.join('')
+
+  for (let j = positions.length - 1; j >= 0; j--) {
+    const pos = positions[j]
+    const opStart = pos.start
+    const opEnd = pos.start + pos.length
+
+    const leftStart = findOperandStart(result, opStart)
+    const left = result.slice(leftStart, opStart).trim()
+
+    const rightEnd = findOperandEnd(result, opEnd)
+    const right = result.slice(opEnd, rightEnd).trim()
+
+    if (left && right) {
+      const replacement = pos.type === 'not_in'
+        ? `!list(${right}).includes(${left})`
+        : `list(${right}).includes(${left})`
+      result = result.slice(0, leftStart) + replacement + result.slice(rightEnd)
+    }
+  }
+
+  return result
+}
+
+const replaceOutsideStrings = (code, pattern, replacement) => {
+  let result = ''
+  let i = 0
+  let inString = null
+
+  const globalPattern = new RegExp(pattern.source, pattern.flags.includes('g') ? pattern.flags : pattern.flags + 'g')
+
+  while (i < code.length) {
+    const ch = code[i]
+    const prevChar = i > 0 ? code[i - 1] : ''
+
+    if (inString) {
+      result += ch
+      if (ch === inString && prevChar !== '\\') {
+        inString = null
+      }
+      i++
+      continue
+    }
+
+    if (ch === '"' || ch === "'" || ch === '`') {
+      inString = ch
+      result += ch
+      i++
+      continue
+    }
+
+    globalPattern.lastIndex = i
+    const match = globalPattern.exec(code)
+    if (match && match.index === i) {
+      result += typeof replacement === 'function' ? replacement(match[0]) : replacement
+      i = globalPattern.lastIndex
+      continue
+    }
+
+    result += ch
+    i++
+  }
+
+  return result
+}
+
 const transformPythonToJs = (code) => {
   let transformed = removePythonComments(code)
   transformed = processFStrings(transformed)
 
-  transformed = transformed.replace(/\.format\s*\(/g, '.format(')
+  transformed = replaceOutsideStrings(transformed, /\.format\s*\(/, '.format(')
 
-  transformed = transformed.replace(/\band\b/g, '&&')
-  transformed = transformed.replace(/\bor\b/g, '||')
-  transformed = transformed.replace(/\bnot\b/g, '!')
-  transformed = transformed.replace(/\bTrue\b/g, 'true')
-  transformed = transformed.replace(/\bFalse\b/g, 'false')
-  transformed = transformed.replace(/\bNone\b/g, 'null')
+  transformed = replaceOutsideStrings(transformed, /\band\b/, '&&')
+  transformed = replaceOutsideStrings(transformed, /\bor\b/, '||')
+  transformed = replaceOutsideStrings(transformed, /\bnot(?!\s+in\b)\b/, '!')
+  transformed = replaceOutsideStrings(transformed, /\bTrue\b/, 'true')
+  transformed = replaceOutsideStrings(transformed, /\bFalse\b/, 'false')
+  transformed = replaceOutsideStrings(transformed, /\bNone\b/, 'null')
 
-  transformed = transformed.replace(/\blen\s*\(/g, 'len(')
-  transformed = transformed.replace(/\brange\s*\(/g, 'range(')
-  transformed = transformed.replace(/\bprint\s*\(/g, 'print(')
-  transformed = transformed.replace(/\binput\s*\(/g, 'input(')
+  transformed = replaceOutsideStrings(transformed, /\blen\s*\(/, 'len(')
+  transformed = replaceOutsideStrings(transformed, /\brange\s*\(/, 'range(')
+  transformed = replaceOutsideStrings(transformed, /\bprint\s*\(/, 'print(')
+  transformed = replaceOutsideStrings(transformed, /\binput\s*\(/, 'input(')
 
   transformed = transformed.replace(/elif\s+.*:/g, (match) => {
     return match.replace(/^elif/, '} else if').replace(/:\s*$/, ' {')
@@ -687,13 +999,27 @@ const transformPythonToJs = (code) => {
 
     const indent = line.match(/^(\s*)/)[1]
     const indentLevel = Math.floor(indent.length / 4)
-
-    while (blockStack.length > 0 && indentLevel <= blockStack[blockStack.length - 1]) {
-      blockStack.pop()
-      jsLines.push(' '.repeat(Math.max(0, blockStack.length) * 2) + '}')
-    }
-
     const trimmed = line.trim()
+
+    const isElseOrElif = trimmed.startsWith('else') || trimmed.startsWith('elif')
+
+    while (blockStack.length > 0) {
+      const topIndent = blockStack[blockStack.length - 1]
+      if (indentLevel < topIndent) {
+        blockStack.pop()
+        jsLines.push(' '.repeat(Math.max(0, blockStack.length) * 2) + '}')
+      } else if (indentLevel === topIndent) {
+        if (isElseOrElif) {
+          blockStack.pop()
+        } else {
+          blockStack.pop()
+          jsLines.push(' '.repeat(Math.max(0, blockStack.length) * 2) + '}')
+        }
+        break
+      } else {
+        break
+      }
+    }
 
     const defMatch = trimmed.match(/^def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\((.*)\)\s*:$/)
     if (defMatch) {
@@ -714,14 +1040,16 @@ const transformPythonToJs = (code) => {
 
     const ifMatch = trimmed.match(/^if\s+(.*)\s*:$/)
     if (ifMatch) {
-      jsLines.push(' '.repeat(indentLevel * 2) + `if (${ifMatch[1]}) {`)
+      const condition = replacePythonInOperator(ifMatch[1])
+      jsLines.push(' '.repeat(indentLevel * 2) + `if (${condition}) {`)
       blockStack.push(indentLevel)
       continue
     }
 
-    const elseIfMatch = trimmed.match(/^}\s*else\s+if\s+(.*)\s*\{$/)
+    const elseIfMatch = trimmed.match(/^elif\s+(.*)\s*:$/)
     if (elseIfMatch) {
-      jsLines.push(' '.repeat(indentLevel * 2) + trimmed)
+      const condition = replacePythonInOperator(elseIfMatch[1])
+      jsLines.push(' '.repeat(indentLevel * 2) + `} else if (${condition}) {`)
       blockStack.push(indentLevel)
       continue
     }
@@ -744,7 +1072,8 @@ const transformPythonToJs = (code) => {
 
     const whileMatch = trimmed.match(/^while\s+(.*)\s*:$/)
     if (whileMatch) {
-      jsLines.push(' '.repeat(indentLevel * 2) + `while (${whileMatch[1]}) {`)
+      const condition = replacePythonInOperator(whileMatch[1])
+      jsLines.push(' '.repeat(indentLevel * 2) + `while (${condition}) {`)
       blockStack.push(indentLevel)
       continue
     }
@@ -766,12 +1095,12 @@ const transformPythonToJs = (code) => {
 
     const returnMatch = trimmed.match(/^return\s*(.*)$/)
     if (returnMatch) {
-      const retVal = returnMatch[1] || ''
+      const retVal = returnMatch[1] ? replacePythonInOperator(returnMatch[1]) : ''
       jsLines.push(' '.repeat(indentLevel * 2) + `return ${retVal};`)
       continue
     }
 
-    let processedLine = trimmed
+    let processedLine = replacePythonInOperator(trimmed)
     if (!processedLine.endsWith(';') && !processedLine.endsWith('{') && !processedLine.endsWith('}')) {
       processedLine = processedLine + ';'
     }

@@ -31,6 +31,7 @@ import {
     formatDate,
     formatDateOnly,
     formatDuration,
+    median,
     paginateResponses,
     responsesToCSV,
     sortResponses,
@@ -596,9 +597,21 @@ describe('buildCrossAnalysisMatrix', () => {
     expect(matrix.colTotals[searchIdx].count).toBe(1)
   })
 
-  it('相同题目 ID 应该让主页面逻辑给出错误提示（此处返回 null）', () => {
-    const m = buildCrossAnalysisMatrix(q3, q3, [])
+  it('相同题目交叉分析对角线应该有值', () => {
+    const responses = [
+      { answers: { q3: ['movie', 'music'] } },
+      { answers: { q3: ['movie', 'reading'] } },
+      { answers: { q3: ['music', 'sports'] } },
+    ]
+    const m = buildCrossAnalysisMatrix(q3, q3, responses)
     expect(m).not.toBe(null)
+    expect(m.totalResponses).toBe(3)
+    const movieIdx = q3.options.findIndex((o) => o.value === 'movie')
+    const musicIdx = q3.options.findIndex((o) => o.value === 'music')
+    expect(m.matrix[movieIdx][movieIdx].count).toBe(2)
+    expect(m.matrix[movieIdx][musicIdx].count).toBe(1)
+    expect(m.matrix[musicIdx][movieIdx].count).toBe(1)
+    expect(m.matrix[musicIdx][musicIdx].count).toBe(2)
   })
 
   it('非多选题应该返回 null', () => {
@@ -679,6 +692,26 @@ describe('sortResponses', () => {
 
   it('null 应该返回空数组', () => {
     expect(sortResponses(null, 'submittedAt', 'asc')).toEqual([])
+  })
+})
+
+describe('median', () => {
+  it('奇数个值应该返回中间值', () => {
+    expect(median([1, 2, 3])).toBe(2)
+    expect(median([10, 20, 30, 40, 50])).toBe(30)
+  })
+
+  it('偶数个值应该返回中间两个的平均', () => {
+    expect(median([1, 2])).toBe(1.5)
+    expect(median([10, 20, 30, 40])).toBe(25)
+  })
+
+  it('单个值应该返回该值', () => {
+    expect(median([5])).toBe(5)
+  })
+
+  it('空数组应该返回 0', () => {
+    expect(median([])).toBe(0)
   })
 })
 
@@ -857,6 +890,55 @@ describe('mockData 生成器', () => {
     for (let i = 1; i < responses.length; i += 1) {
       expect(responses[i].submittedAt).toBeGreaterThanOrEqual(responses[i - 1].submittedAt)
     }
+  })
+
+  it('单选题每个选项至少获得1票', () => {
+    const survey = getMockSurvey()
+    const responses = generateMockResponses(survey.questions, 150)
+    const singleQuestions = survey.questions.filter((q) => q.type === QUESTION_TYPES.SINGLE)
+    singleQuestions.forEach((q) => {
+      const stats = calculateSingleChoiceStats(q, responses)
+      stats.data.forEach((d) => {
+        expect(d.count).toBeGreaterThan(0)
+      })
+    })
+  })
+
+  it('多选题每个选项至少获得1票', () => {
+    const survey = getMockSurvey()
+    const responses = generateMockResponses(survey.questions, 150)
+    const multiQuestions = survey.questions.filter((q) => q.type === QUESTION_TYPES.MULTIPLE)
+    multiQuestions.forEach((q) => {
+      const stats = calculateMultipleChoiceStats(q, responses)
+      stats.data.forEach((d) => {
+        expect(d.count).toBeGreaterThan(0)
+      })
+    })
+  })
+
+  it('评分题每个分值至少获得1票', () => {
+    const survey = getMockSurvey()
+    const responses = generateMockResponses(survey.questions, 150)
+    const ratingQuestions = survey.questions.filter((q) => q.type === QUESTION_TYPES.RATING)
+    ratingQuestions.forEach((q) => {
+      const stats = calculateRatingStats(q, responses)
+      stats.data.forEach((d) => {
+        expect(d.count).toBeGreaterThan(0)
+      })
+    })
+  })
+
+  it('填写时长应该呈现长尾分布（大部分在合理范围内）', () => {
+    const survey = getMockSurvey()
+    const responses = generateMockResponses(survey.questions, 200)
+    const durations = responses.map((r) => r.duration)
+    const avg = durations.reduce((a, b) => a + b, 0) / durations.length
+    expect(avg).toBeGreaterThan(0)
+    expect(avg).toBeLessThan(1800)
+    durations.forEach((d) => {
+      expect(d).toBeGreaterThanOrEqual(5)
+      expect(d).toBeLessThanOrEqual(3600)
+    })
   })
 })
 

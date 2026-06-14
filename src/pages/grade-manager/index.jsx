@@ -5,6 +5,7 @@ import {
   loadGradeData,
   saveGradeData,
   loadPreviousData,
+  snapshotPreviousData,
   addStudent,
   removeStudent,
   addSubject,
@@ -29,7 +30,7 @@ const TABS = [
   { key: VIEWS.SUBJECT, label: '科目视图' },
 ]
 
-function ScoreCell({ value, onChange, onBlur }) {
+function ScoreCell({ value, onChange }) {
   const [editingValue, setEditingValue] = useState(value ?? '')
   const [isInvalid, setIsInvalid] = useState(false)
 
@@ -51,7 +52,6 @@ function ScoreCell({ value, onChange, onBlur }) {
   const handleBlur = () => {
     if (editingValue === '' || editingValue === null || editingValue === undefined) {
       onChange(null)
-      onBlur()
       return
     }
     const validation = validateScore(editingValue)
@@ -61,7 +61,6 @@ function ScoreCell({ value, onChange, onBlur }) {
     } else {
       setIsInvalid(true)
     }
-    onBlur()
   }
 
   const handleKeyDown = (e) => {
@@ -91,8 +90,6 @@ function ScoreCell({ value, onChange, onBlur }) {
 }
 
 function GradeTable({ data, view, onUpdateScore, onRemoveStudent, onRemoveSubject }) {
-  const [editingCell, setEditingCell] = useState(null)
-
   if (view === VIEWS.STUDENT) {
     return (
       <div className="grade-table-container">
@@ -136,7 +133,6 @@ function GradeTable({ data, view, onUpdateScore, onRemoveStudent, onRemoveSubjec
                     <ScoreCell
                       value={data.scores[student]?.[subject]}
                       onChange={(score) => onUpdateScore(student, subject, score)}
-                      onBlur={() => setEditingCell(null)}
                     />
                   </td>
                 ))}
@@ -198,7 +194,6 @@ function GradeTable({ data, view, onUpdateScore, onRemoveStudent, onRemoveSubjec
                   <ScoreCell
                     value={data.scores[student]?.[subject]}
                     onChange={(score) => onUpdateScore(student, subject, score)}
-                    onBlur={() => setEditingCell(null)}
                   />
                 </td>
               ))}
@@ -324,7 +319,7 @@ function Histogram({ data }) {
 function RankingPanel({ data, previousData }) {
   const [sortBy, setSortBy] = useState('total')
   const rankings = calculateRankings(data, sortBy)
-  const rankingsWithChanges = calculateRankChanges(rankings, previousData)
+  const rankingsWithChanges = calculateRankChanges(rankings, previousData, sortBy)
 
   const getRankChangeDisplay = (change) => {
     if (change === null || change === undefined) {
@@ -376,7 +371,7 @@ function RankingPanel({ data, previousData }) {
             </tr>
           </thead>
           <tbody>
-            {rankingsWithChanges.map((student, index) => (
+            {rankingsWithChanges.map((student) => (
               <tr key={student.name} className={getRowClass(student.rank)}>
                 <td>{student.rank}</td>
                 <td>{getRankChangeDisplay(student.change)}</td>
@@ -474,6 +469,7 @@ export default function GradeManagerPage() {
   const [previousData, setPreviousData] = useState(null)
 
   useEffect(() => {
+    snapshotPreviousData()
     setPreviousData(loadPreviousData())
   }, [])
 
@@ -540,7 +536,6 @@ export default function GradeManagerPage() {
       subjects: parsedData.subjects,
       scores: parsedData.scores,
     })
-    setPreviousData(loadGradeData())
   }, [])
 
   const handleExportCSV = useCallback(() => {
@@ -555,7 +550,8 @@ export default function GradeManagerPage() {
         subjects: ['语文', '数学', '英语', '物理', '化学'],
         scores: {},
       })
-      setPreviousData(null)
+      snapshotPreviousData()
+      setPreviousData(loadPreviousData())
       setError('')
     }
   }, [])

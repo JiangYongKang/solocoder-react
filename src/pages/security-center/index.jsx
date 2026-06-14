@@ -19,6 +19,8 @@ import {
   calculateScoreBreakdown,
   generateSecurityAdvice,
   generateIpAddress,
+  loadFrequentLocations,
+  saveFrequentLocations,
 } from './securityCenterCore.js'
 import {
   OPERATION_TYPES,
@@ -32,6 +34,7 @@ function SecurityCenterPage() {
   const [twoFAStatus, setTwoFAStatus] = useState(() => loadTwoFAStatus())
   const [operations, setOperations] = useState(() => loadOperations())
   const [password, setPassword] = useState('')
+  const [frequentLocations, setFrequentLocations] = useState(() => loadFrequentLocations())
 
   useEffect(() => {
     saveDevices(devices)
@@ -45,14 +48,19 @@ function SecurityCenterPage() {
     saveOperations(operations)
   }, [operations])
 
+  useEffect(() => {
+    saveFrequentLocations(frequentLocations)
+  }, [frequentLocations])
+
   const scoreBreakdown = useMemo(() => {
     return calculateScoreBreakdown(
       password,
       twoFAStatus.enabled,
       devices,
-      operations
+      operations,
+      frequentLocations
     )
-  }, [password, twoFAStatus.enabled, devices, operations])
+  }, [password, twoFAStatus.enabled, devices, operations, frequentLocations])
 
   const securityAdvice = useMemo(() => {
     return generateSecurityAdvice(scoreBreakdown)
@@ -88,6 +96,10 @@ function SecurityCenterPage() {
     handleRecordOperation(typeKey, detail)
   }, [handleRecordOperation])
 
+  const handleFrequentLocationsChange = useCallback((newLocations) => {
+    setFrequentLocations(newLocations)
+  }, [])
+
   const handleBack = useCallback(() => {
     navigate('/')
   }, [navigate])
@@ -120,6 +132,8 @@ function SecurityCenterPage() {
           <DeviceList
             devices={devices}
             onRemoveDevice={handleRemoveDevice}
+            frequentLocations={frequentLocations}
+            onFrequentLocationsChange={handleFrequentLocationsChange}
           />
         </section>
 

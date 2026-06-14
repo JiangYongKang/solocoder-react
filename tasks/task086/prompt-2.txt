@@ -1,0 +1,13 @@
+你实现的截图标注工具还存在一些问题，需要进行修复：
+
+1. annotatorCore.js 的 getAnnotationBounds 函数返回的对象字段是 {x, y, width, height}，但 index.jsx 中消费该结果时访问的是 minX、maxX、minY、maxY。字段名完全不匹配，导致选中标注元素时高亮虚线框和调整手柄都无法正确渲染。消费侧应使用 getAnnotationBounds 实际返回的字段名。
+
+2. storage.js 的 saveAnnotation 函数签名为 saveAnnotation(key, annotations, imageData) 接收三个独立参数，但 index.jsx 中调用时传入的是一个对象 { name, annotations, imageData }。参数传递方式不匹配，保存功能完全失效，所有标注数据实际未写入 localStorage。
+
+3. annotatorCore.js 的 hitTestHandle 函数接收的第二个参数应为手柄坐标数组，但 index.jsx 中调用时传入的是标注元素数组。传参错误导致手柄拖拽调整缩放功能完全失效。
+
+4. storage.js 的 loadAnnotation 函数返回的对象中 Base64 图片字段名为 imageDataUrl，但 index.jsx 中读取的是 imageData。字段名不一致导致加载标注时原始底图无法恢复显示。
+
+5. annotatorCore.js 的 createText 函数签名是 createText(x, y, text, color, fontSize)，但 index.jsx 中调用时参数顺序为 createText(text, x, y, color, fontSize)。参数位置颠倒，导致所有文字标注的位置坐标与内容被互换，文字显示在错误的位置且内容错乱。
+
+6. 修复后重新运行 pnpm run test，需要让所有测试通过。

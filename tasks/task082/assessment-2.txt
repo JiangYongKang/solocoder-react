@@ -1,0 +1,10 @@
+产物不满意：
+1. gradeCore.js 的 snapshotPreviousData 函数被 index.jsx 的 useEffect(() => {}, []) 在每次页面挂载时调用，函数内部无条件调用 loadGradeData 读取当前 STORAGE_KEY 数据后覆盖写入 PREVIOUS_STORAGE_KEY。用户刷新页面后历史基准数据被当前数据覆盖，排名面板 change 列全部显示为 0，排名变化对比功能在刷新后完全失效。根本原因是 snapshotPreviousData 未检查 PREVIOUS_STORAGE_KEY 是否已存在有效数据就覆写。应仅在 loadPreviousData 返回 null 时才写入快照，已存在快照时跳过覆写以保留历史基线。
+2. gradeCore.js 的 removeSubject 函数中使用解构 `const { [subjectName]: _removed, ...rest }` 排除科目键值时声明了变量 _removed 但从未读取使用。尽管以下划线前缀标记为意图丢弃，但在开启了 no-unused-vars 规则的 lint 工具下会触发警告，产物不够干净。可直接使用 `_` 作为丢弃变量名或将 `newScores[student]` 展开为浅拷贝后用 `delete` 删除对应键，避免引入未使用变量。
+
+过程不满意：
+1. 模型在 session-cot-2.md 第 3 步还未读取任何文件时就创建了 7 项 TodoList。在完全不了解当前代码结构和问题范围的情况下预先制定任务计划，违反了先分析问题再规划的原则。正确做法是先通读相关文件掌握代码现状，再根据每个问题的实际影响范围和修复难度制定有序的执行计划。
+2. 模型在第 15-76 步用 view_files 两次读取 gradeCore.js 只看到部分内容后，未尝试使用 Read 工具或分段读取来验证完整性，直接判断"gradeCore.js 文件被严重破坏了（编码问题 + 内容截断）"并决定完整重写。其实原文件是正常的 463 行 JavaScript 文件，工具输出截断不等于文件损坏。模型因证据不足就误判文件损坏并执行全量重写，属于对工具行为的错误归因。
+3. 模型对 gradeCore.js、index.jsx、gradeCore.test.js 三个文件均使用 Write 全量覆写，而非用 StrReplace 针对每项修复做最小化代码变更。全量覆写不仅使修改点难以追溯，还增加了在重写过程中意外引入新缺陷的风险。对于已知 6 个具体问题的缺陷修复任务，应逐一定位到具体代码行做精准编辑。
+4. 模型在第 214 行用 `pnpm run test -- src/pages/__tests__/grade-manager/gradeCore.test.js` 运行测试，该格式与 vitest CLI 不兼容导致测试范围未正确限制。第二次仍用同样命令失败后才改用 `npx vitest run` 成功。模型在测试命令格式上反复试错两轮才找到正确方式，应在首次执行前检查 vitest 版本的 CLI 参数格式避免无效试错。
+5. 模型在第 288-320 步使用 GetDiagnostics 检查三个文件的 IDE 诊断信息后声称"所有文件都没有 lint 错误"。GetDiagnostics 返回的是 IDE 层面实时诊断，不等同于 ESLint 命令行输出。模型未执行实际 lint 命令就下 lint 无错的结论，属于以 IDE 诊断替代工具验证的虚假确认。应在完成代码后运行一次完整的 lint 命令行检查。

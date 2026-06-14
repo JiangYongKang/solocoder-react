@@ -217,7 +217,8 @@ function MultiSelect({ options, selected, onChange }) {
   }
 
   const handleDeselectAll = () => {
-    onChange([])
+    const inverted = options.filter((opt) => !selected.includes(opt))
+    onChange(inverted)
   }
 
   const handleToggle = (option) => {
@@ -271,6 +272,15 @@ const AuditLogPage = () => {
   const [configMsg, setConfigMsg] = useState(null)
   const [retentionInput, setRetentionInput] = useState(String(config.retentionDays))
 
+  const [draftFilters, setDraftFilters] = useState({
+    operator: '',
+    operationTypes: [...OPERATION_TYPES],
+    result: 'all',
+    startDate: '',
+    endDate: '',
+    resource: '',
+  })
+
   const [filters, setFilters] = useState({
     operator: '',
     operationTypes: [...OPERATION_TYPES],
@@ -282,17 +292,14 @@ const AuditLogPage = () => {
 
   const debounceRef = useRef(null)
 
-  const updateFilter = useCallback((key, value) => {
-    setFilters((prev) => ({ ...prev, [key]: value }))
-    setPage(1)
-  }, [])
-
-  const handleDebouncedInput = useCallback((key, value) => {
+  const updateDraftFilter = useCallback((key, value) => {
+    setDraftFilters((prev) => ({ ...prev, [key]: value }))
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => {
-      updateFilter(key, value)
+      setFilters((prev) => ({ ...prev, [key]: value }))
+      setPage(1)
     }, 300)
-  }, [updateFilter])
+  }, [])
 
   useEffect(() => {
     return () => {
@@ -312,14 +319,17 @@ const AuditLogPage = () => {
   const showAnomalyBanner = recentFailures > 10
 
   const handleResetFilters = () => {
-    setFilters({
+    const resetValue = {
       operator: '',
       operationTypes: [...OPERATION_TYPES],
       result: 'all',
       startDate: '',
       endDate: '',
       resource: '',
-    })
+    }
+    setDraftFilters(resetValue)
+    setFilters(resetValue)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
     setPage(1)
   }
 
@@ -451,24 +461,24 @@ const AuditLogPage = () => {
               className="form-input"
               type="text"
               placeholder="模糊匹配..."
-              defaultValue={filters.operator}
-              onChange={(e) => handleDebouncedInput('operator', e.target.value)}
+              value={draftFilters.operator}
+              onChange={(e) => updateDraftFilter('operator', e.target.value)}
             />
           </div>
           <div className="audit-filter-group">
             <span className="audit-filter-label">操作类型</span>
             <MultiSelect
               options={OPERATION_TYPES}
-              selected={filters.operationTypes}
-              onChange={(val) => updateFilter('operationTypes', val)}
+              selected={draftFilters.operationTypes}
+              onChange={(val) => updateDraftFilter('operationTypes', val)}
             />
           </div>
           <div className="audit-filter-group">
             <span className="audit-filter-label">操作结果</span>
             <select
               className="form-select"
-              value={filters.result}
-              onChange={(e) => updateFilter('result', e.target.value)}
+              value={draftFilters.result}
+              onChange={(e) => updateDraftFilter('result', e.target.value)}
             >
               <option value="all">全部</option>
               <option value={OPERATION_RESULTS.SUCCESS}>成功</option>
@@ -480,8 +490,8 @@ const AuditLogPage = () => {
             <input
               className="form-input"
               type="date"
-              value={filters.startDate}
-              onChange={(e) => updateFilter('startDate', e.target.value)}
+              value={draftFilters.startDate}
+              onChange={(e) => updateDraftFilter('startDate', e.target.value)}
             />
           </div>
           <div className="audit-filter-group">
@@ -489,8 +499,8 @@ const AuditLogPage = () => {
             <input
               className="form-input"
               type="date"
-              value={filters.endDate}
-              onChange={(e) => updateFilter('endDate', e.target.value)}
+              value={draftFilters.endDate}
+              onChange={(e) => updateDraftFilter('endDate', e.target.value)}
             />
           </div>
           <div className="audit-filter-group">
@@ -499,8 +509,8 @@ const AuditLogPage = () => {
               className="form-input"
               type="text"
               placeholder="模糊匹配..."
-              defaultValue={filters.resource}
-              onChange={(e) => handleDebouncedInput('resource', e.target.value)}
+              value={draftFilters.resource}
+              onChange={(e) => updateDraftFilter('resource', e.target.value)}
             />
           </div>
           <span className="audit-filter-count">匹配 {filteredLogs.length} 条</span>

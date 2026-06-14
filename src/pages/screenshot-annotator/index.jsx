@@ -381,8 +381,12 @@ function ScreenshotAnnotatorPage() {
           ctx.setLineDash([4 * scale, 4 * scale])
           ctx.lineWidth = 1 * scale
           ctx.fillStyle = 'rgba(64, 158, 255, 0.05)'
-          ctx.fillRect(bounds.minX - 2, bounds.minY - 2, bounds.maxX - bounds.minX + 4, bounds.maxY - bounds.minY + 4)
-          ctx.strokeRect(bounds.minX - 2, bounds.minY - 2, bounds.maxX - bounds.minX + 4, bounds.maxY - bounds.minY + 4)
+          const minX = bounds.x
+          const minY = bounds.y
+          const maxX = bounds.x + bounds.width
+          const maxY = bounds.y + bounds.height
+          ctx.fillRect(minX - 2, minY - 2, maxX - minX + 4, maxY - minY + 4)
+          ctx.strokeRect(minX - 2, minY - 2, maxX - minX + 4, maxY - minY + 4)
           ctx.restore()
         }
       }
@@ -503,7 +507,17 @@ function ScreenshotAnnotatorPage() {
       const shiftPressed = e.shiftKey
 
       if (currentTool === TOOL_TYPES.SELECT) {
-        const handleHit = hitTestHandle(annotations, selectedIds, x, y, HIT_TOLERANCE)
+        let handleHit = null
+        for (const selId of selectedIds) {
+          const ann = annotations.find((a) => a.id === selId)
+          if (!ann) continue
+          const handles = getHandles(ann)
+          const hit = hitTestHandle(handles, x, y)
+          if (hit) {
+            handleHit = { handle: hit.type, annotationId: selId }
+            break
+          }
+        }
         if (handleHit) {
           setDrawingState({
             isDrawing: false,
@@ -767,7 +781,7 @@ function ScreenshotAnnotatorPage() {
       setDraggingTextInput(null)
       setTextInputPos(null)
       if (!text || !pos) return
-      const ann = createText(text, pos.x, pos.y, colorRef.current, fontSizeRef.current)
+      const ann = createText(pos.x, pos.y, text, colorRef.current, fontSizeRef.current)
       const after = addAnnotation(annotations, ann)
       setAnnotations(after)
       pushNewHistory(after)
@@ -815,20 +829,15 @@ function ScreenshotAnnotatorPage() {
       alert('请输入标注名称')
       return
     }
-    const success = saveAnnotations({
-      name: saveName.trim(),
-      annotations,
-      imageData,
-      imageInfo,
-    })
+    const saved = saveAnnotations(saveName.trim(), annotations, imageData)
     setShowSaveModal(false)
-    if (!success) {
+    if (!saved) {
       alert('保存失败，可能是数据过大，请尝试减小图片大小或清理已保存的标注')
     } else {
       setSavedList(listSavedAnnotations())
       alert('保存成功')
     }
-  }, [saveName, annotations, imageData, imageInfo])
+  }, [saveName, annotations, imageData])
 
   const openLoadModal = useCallback(() => {
     setSavedList(listSavedAnnotations())
@@ -842,12 +851,12 @@ function ScreenshotAnnotatorPage() {
         alert('加载失败')
         return
       }
-      if (data.imageData) {
+      if (data.imageDataUrl) {
         try {
-          const img = await loadImageFromDataUrl(data.imageData)
-          const info = data.imageInfo || calculateImageFit(img.naturalWidth, img.naturalHeight, DEFAULT_CANVAS_WIDTH, DEFAULT_CANVAS_HEIGHT)
+          const img = await loadImageFromDataUrl(data.imageDataUrl)
+          const info = calculateImageFit(img.naturalWidth, img.naturalHeight, DEFAULT_CANVAS_WIDTH, DEFAULT_CANVAS_HEIGHT)
           setImageInfo({ naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight, ...info })
-          setImageData(data.imageData)
+          setImageData(data.imageDataUrl)
           if (canvasRef.current) canvasRef.current._loadedImg = img
         } catch {
           alert('图片加载失败')
@@ -898,15 +907,19 @@ function ScreenshotAnnotatorPage() {
       if (!ann) return
       const bounds = getAnnotationBounds(ann)
       if (bounds) {
+        const minX = bounds.x
+        const minY = bounds.y
+        const maxX = bounds.x + bounds.width
+        const maxY = bounds.y + bounds.height
         items.push(
           <div
             key={`box-${id}`}
             className="sa-selection-box"
             style={{
-              left: bounds.minX - 2,
-              top: bounds.minY - 2,
-              width: bounds.maxX - bounds.minX + 4,
-              height: bounds.maxY - bounds.minY + 4,
+              left: minX - 2,
+              top: minY - 2,
+              width: maxX - minX + 4,
+              height: maxY - minY + 4,
             }}
           />
         )
@@ -918,10 +931,10 @@ function ScreenshotAnnotatorPage() {
             key={`h-${id}-${h.type}`}
             className={`sa-handle ${h.type}`}
             style={{
-              left: h.x - HANDLE_SIZE / 2,
-              top: h.y - HANDLE_SIZE / 2,
-              width: HANDLE_SIZE,
-              height: HANDLE_SIZE,
+              left: h.x,
+              top: h.y,
+              width: h.size,
+              height: h.size,
             }}
           />
         )

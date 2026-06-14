@@ -1,8 +1,10 @@
 export const STORAGE_KEY_DEVICES = 'security_center_devices'
 export const STORAGE_KEY_TWOFA = 'security_center_twofa'
 export const STORAGE_KEY_OPERATIONS = 'security_center_operations'
+export const STORAGE_KEY_FREQUENT_LOCATIONS = 'security_center_frequent_locations'
 
 export const FREQUENT_CITY = '北京市'
+export const DEFAULT_FREQUENT_LOCATIONS = ['北京市']
 
 export const PASSWORD_STRENGTH = {
   VERY_WEAK: { label: '弱', level: 1, stars: 1, color: '#ef4444' },
@@ -63,6 +65,15 @@ export const BROWSER_LIST = [
 
 export const DEFAULT_PAGE_SIZE = 10
 export const PAGE_SIZE = 10
+export const PAGE_SIZE_OPTIONS = [10, 20, 50]
+
+export const WEAK_PASSWORDS = [
+  'password', '123456', '12345678', 'qwerty', 'abc123',
+  'monkey', 'master', 'dragon', 'login', 'princess',
+  'football', 'shadow', 'sunshine', 'trustno1', 'iloveyou',
+  'batman', 'access', 'hello', 'charlie', 'donald',
+  'password1', 'qwerty123', 'letmein', 'welcome', 'admin',
+]
 
 export const OPERATION_TYPE_LABEL = {
   LOGIN: '登录',

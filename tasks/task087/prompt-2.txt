@@ -1,0 +1,13 @@
+你实现的设备管理控制台还存在一些问题，需要进行修复：
+
+1. deviceUtils.js 的 simulateDeviceStatusChange 函数在模拟设备离线在线切换时，对选中的每个设备再调用一次随机判断是否切换。如果所有随机数都命中"不切换"路径，则该周期内没有任何设备状态变化。提示词要求每 10-30 秒随机将 1-2 个设备切换为离线状态，需要保证每次调用至少切换 1 个设备。应在随机过程后检查实际切换数量，不足时强制选择一个设备切换。
+
+2. chartUtils.js 的 generateDataPoint 函数生成模拟传感器数据时使用纯随机波动，数据点之间没有任何关联，呈尖锐锯齿状。真实传感器数据具有渐变性，应在生成数据时以上一数据点为基准施加受约束的增量模拟渐变趋势。
+
+3. AlertRulePanel.jsx 的 checkAlertRules 函数在比较设备数值与告警阈值时，未对 undefined 或 NaN 的设备数值做防御处理。首次加载时设备数据尚未生成，currentValue 为 undefined，undefined > threshold 和 undefined < threshold 均返回 false，所有告警规则被静默跳过。
+
+4. DeviceDetail.jsx 中折线图的 Y 轴范围使用了固定的 baseValue ± 10，当设备数值波动超过 ±10 时折线会超出画布边界无法完整显示。Y 轴范围应根据实际数据的最大最小值动态计算并预留边距。
+
+5. AlertRecordPanel.jsx 的批量操作按钮只在前端修改了 alerts 状态数组中的 status 字段，没有将变更持久化到 localStorage。用户批量确认或标记已解决后刷新页面，所有告警记录恢复为原始状态。
+
+6. 修复后重新运行 pnpm run test，需要让所有测试通过。

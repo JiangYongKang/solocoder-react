@@ -17,12 +17,29 @@ import {
 } from './constants.js'
 
 let danmakuIdCounter = 0
-let danmakuIdSalt = 0
+let danmakuIdRandomSuffix = 0
+
+function getRandomSuffix() {
+  danmakuIdRandomSuffix++
+  const hasCrypto =
+    typeof crypto !== 'undefined' &&
+    crypto !== null &&
+    typeof crypto.getRandomValues === 'function'
+  if (hasCrypto) {
+    const buf = new Uint32Array(1)
+    crypto.getRandomValues(buf)
+    return buf[0].toString(36)
+  }
+  return (
+    Math.floor(Math.random() * 0xffffffff).toString(36) +
+    danmakuIdRandomSuffix.toString(36)
+  )
+}
 
 export function generateDanmakuId() {
   danmakuIdCounter++
-  danmakuIdSalt++
-  return 'danmaku_' + (Date.now() + danmakuIdSalt).toString(36) + '_' + danmakuIdCounter
+  const randomPart = getRandomSuffix()
+  return 'danmaku_' + randomPart + '_' + danmakuIdCounter
 }
 
 export function resetDanmakuIdCounter() {
@@ -400,7 +417,6 @@ export function evictOldestIfOverCapacity(activeDanmakus, maxCapacity) {
   if (activeDanmakus.length <= maxCapacity) return activeDanmakus
 
   const scrollDanmakus = activeDanmakus.filter((d) => d.position === DANMAKU_POSITIONS.SCROLL && !d.removed)
-  const fixedDanmakus = activeDanmakus.filter((d) => d.position !== DANMAKU_POSITIONS.SCROLL && !d.removed)
 
   if (scrollDanmakus.length > maxCapacity) {
     const toRemove = scrollDanmakus.length - maxCapacity
@@ -410,4 +426,24 @@ export function evictOldestIfOverCapacity(activeDanmakus, maxCapacity) {
   }
 
   return activeDanmakus
+}
+
+export function cleanupOutOfRangeScrollDanmakus(activeDanmakus, newTrackCount) {
+  if (!Array.isArray(activeDanmakus)) return []
+  const count = Number(newTrackCount)
+  if (!isFinite(count) || count < 0) return activeDanmakus
+
+  let changed = false
+  const result = activeDanmakus.map((d) => {
+    if (d.position === DANMAKU_POSITIONS.SCROLL && !d.removed) {
+      const trackIdx = Number(d.trackIndex)
+      if (!isNaN(trackIdx) && (trackIdx < 0 || trackIdx >= count)) {
+        changed = true
+        return { ...d, removed: true }
+      }
+    }
+    return d
+  })
+
+  return changed ? result : activeDanmakus
 }

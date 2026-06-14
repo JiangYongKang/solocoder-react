@@ -242,6 +242,38 @@ describe('codeSandboxUtils', () => {
       const e = createMockEvent('a', 'hello', 5, 5)
       expect(handleBracketCompletion(e)).toBeNull()
     })
+
+    it('should skip closing bracket when next char is same closing bracket', () => {
+      const e = createMockEvent(')', 'hello()', 6, 6)
+      const result = handleBracketCompletion(e)
+      expect(result.newValue).toBe('hello()')
+      expect(result.newCursorStart).toBe(7)
+      expect(result.newCursorEnd).toBe(7)
+    })
+
+    it('should skip closing square bracket when next char is same', () => {
+      const e = createMockEvent(']', 'arr[ ]', 5, 5)
+      const result = handleBracketCompletion(e)
+      expect(result.newValue).toBe('arr[ ]')
+      expect(result.newCursorStart).toBe(6)
+    })
+
+    it('should skip closing curly brace when next char is same', () => {
+      const e = createMockEvent('}', 'obj{ }', 5, 5)
+      const result = handleBracketCompletion(e)
+      expect(result.newValue).toBe('obj{ }')
+      expect(result.newCursorStart).toBe(6)
+    })
+
+    it('should not skip closing bracket when there is selection', () => {
+      const e = createMockEvent(')', 'hello()', 5, 6)
+      expect(handleBracketCompletion(e)).toBeNull()
+    })
+
+    it('should not skip closing bracket when next char is different', () => {
+      const e = createMockEvent(')', 'hello( )', 6, 6)
+      expect(handleBracketCompletion(e)).toBeNull()
+    })
   })
 
   describe('executeJavaScriptCode', () => {
@@ -344,6 +376,107 @@ describe('codeSandboxUtils', () => {
       const result = executePythonCode('open("file.txt")')
       expect(result.success).toBe(true)
       expect(result.output.some((o) => o.content.includes('暂不支持'))).toBe(true)
+    })
+
+    it('should handle Python in operator for list membership', () => {
+      const result = executePythonCode('print(3 in [1, 2, 3])')
+      expect(result.success).toBe(true)
+      expect(result.output.some((o) => o.content === 'True')).toBe(true)
+    })
+
+    it('should handle Python in operator returning false', () => {
+      const result = executePythonCode('print(5 in [1, 2, 3])')
+      expect(result.success).toBe(true)
+      expect(result.output.some((o) => o.content === 'False')).toBe(true)
+    })
+
+    it('should handle Python not in operator', () => {
+      const result = executePythonCode('print(5 not in [1, 2, 3])')
+      expect(result.success).toBe(true)
+      expect(result.output.some((o) => o.content === 'True')).toBe(true)
+    })
+
+    it('should handle in operator in if condition', () => {
+      const code = `x = 3
+if x in [1, 2, 3]:
+    print("found")
+else:
+    print("not found")`
+      const result = executePythonCode(code)
+      expect(result.success).toBe(true)
+      expect(result.output.some((o) => o.content === 'found')).toBe(true)
+    })
+
+    it('should handle in operator in while condition', () => {
+      const code = `nums = [1, 2, 3]
+i = 0
+while i in nums:
+    print(i)
+    i += 1`
+      const result = executePythonCode(code)
+      expect(result.success).toBe(true)
+    })
+
+    it('should handle in operator in return statement', () => {
+      const code = `def check(x):
+    return x in [1, 2, 3]
+print(check(3))
+print(check(5))`
+      const result = executePythonCode(code)
+      expect(result.success).toBe(true)
+      expect(result.output.some((o) => o.content === 'True')).toBe(true)
+      expect(result.output.some((o) => o.content === 'False')).toBe(true)
+    })
+
+    it('should handle in operator in variable assignment', () => {
+      const code = `nums = [1, 2, 3]
+result = 3 in nums
+print(result)`
+      const result = executePythonCode(code)
+      expect(result.success).toBe(true)
+      expect(result.output.some((o) => o.content === 'True')).toBe(true)
+    })
+
+    it('should handle stdin with empty lines correctly', () => {
+      const code = `a = input()
+b = input()
+c = input()
+print(a)
+print(b)
+print(c)`
+      const stdin = 'hello\n\nworld'
+      const result = executePythonCode(code, stdin)
+      expect(result.success).toBe(true)
+      const logs = result.output.filter((o) => o.type === 'log').map((o) => o.content)
+      expect(logs).toContain('hello')
+      expect(logs).toContain('')
+      expect(logs).toContain('world')
+    })
+
+    it('should handle multiple empty lines in stdin', () => {
+      const code = `for i in range(4):
+    x = input()
+    print(f"got: {x}")`
+      const stdin = 'a\n\n\nb'
+      const result = executePythonCode(code, stdin)
+      expect(result.success).toBe(true)
+      const logs = result.output.filter((o) => o.type === 'log').map((o) => o.content)
+      expect(logs).toContain('got: a')
+      expect(logs).toContain('got: ')
+      expect(logs).toContain('got: b')
+    })
+
+    it('should return empty string for input when stdin is exhausted', () => {
+      const code = `a = input()
+b = input()
+print(a)
+print(b)`
+      const stdin = 'only_one'
+      const result = executePythonCode(code, stdin)
+      expect(result.success).toBe(true)
+      const logs = result.output.filter((o) => o.type === 'log').map((o) => o.content)
+      expect(logs).toContain('only_one')
+      expect(logs).toContain('')
     })
   })
 

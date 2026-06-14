@@ -41,6 +41,7 @@ import {
   sortDanmakuListByTime,
   getDanmakuPositionIcon,
   evictOldestIfOverCapacity,
+  cleanupOutOfRangeScrollDanmakus,
 } from './danmakuCore.js'
 
 const DanmakuPlayerPage = () => {
@@ -70,6 +71,8 @@ const DanmakuPlayerPage = () => {
   const progressTrackRef = useRef(null)
   const isDraggingRef = useRef(false)
   const lastFrameTimeRef = useRef(0)
+  const lastRenderSignatureRef = useRef(null)
+  const nativeFullscreenRef = useRef(false)
 
   useEffect(() => {
     setSettings((prev) => {
@@ -86,6 +89,7 @@ const DanmakuPlayerPage = () => {
   useEffect(() => {
     const config = getDensityConfig(settings.density)
     scrollTracksRef.current = initializeScrollTracks(config.trackCount)
+    setActiveDanmakus((prev) => cleanupOutOfRangeScrollDanmakus(prev, config.trackCount))
   }, [settings.density])
 
   useEffect(() => {
@@ -176,6 +180,16 @@ const DanmakuPlayerPage = () => {
 
       const canvasW = canvas.width / dpr
       const canvasH = canvas.height / dpr
+      const speed = calculateScrollSpeed(canvasW)
+      const now = Date.now()
+      const activeIds = activeDanmakus.map((d) => `${d.id}:${d.startTime}`).join('|')
+      const renderSignature = `${isPlaying}|${settings.danmakuEnabled}|${settings.danmakuOpacity}|${settings.density}|${activeIds}|${canvasW}x${canvasH}|${now - (isPlaying ? 0 : now)}`
+
+      if (!isPlaying && lastRenderSignatureRef.current === renderSignature) {
+        animFrameRef.current = requestAnimationFrame(renderFrame)
+        return
+      }
+      lastRenderSignatureRef.current = renderSignature
 
       ctx.save()
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
@@ -186,9 +200,6 @@ const DanmakuPlayerPage = () => {
         animFrameRef.current = requestAnimationFrame(renderFrame)
         return
       }
-
-      const speed = calculateScrollSpeed(canvasW)
-      const now = Date.now()
 
       const updated = updateAllDanmakus(activeDanmakus, now, canvasW, speed, canvasH)
       const cleaned = removeExpiredDanmakus(updated)
@@ -390,8 +401,58 @@ const DanmakuPlayerPage = () => {
   }, [])
 
   const toggleFullscreen = useCallback(() => {
-    setIsFullscreen((prev) => !prev)
+    const container = containerRef.current
+    if (!container) {
+      setIsFullscreen((prev) => !prev)
+      return
+    }
+
+    const isCurrentlyFull =
+      !!document.fullscreenElement ||
+      !!document.webkitFullscreenElement ||
+      !!document.msFullscreenElement ||
+      nativeFullscreenRef.current
+
+    const exitFullscreen =
+      document.exitFullscreen ||
+      document.webkitExitFullscreen ||
+      document.msExitFullscreen
+
+    const requestFullscreen =
+      container.requestFullscreen ||
+      container.webkitRequestFullscreen ||
+      container.msRequestFullscreen
+
+    if (isCurrentlyFull) {
+      nativeFullscreenRef.current = false
+      setIsFullscreen(false)
+      if (exitFullscreen && document.fullscreenElement) {
+        try { exitFullscreen.call(document) } catch (_) { /* noop */ }
+      }
+    } else {
+      nativeFullscreenRef.current = true
+      setIsFullscreen(true)
+      if (requestFullscreen) {
+        try {
+          requestFullscreen.call(container).catch(() => {
+            nativeFullscreenRef.current = true
+          })
+        } catch (_) {
+          nativeFullscreenRef.current = true
+        }
+      }
+    }
   }, [])
+
+  const handleReload = useCallback(() => {
+    setIsPlaying(false)
+    setCurrentTime(0)
+    setActiveDanmakus([])
+    scrollTracksRef.current = initializeScrollTracks(
+      getDensityConfig(settings.density).trackCount
+    )
+    lastRenderSignatureRef.current = null
+  }, [settings.density])
 
   const handleDensityChange = useCallback((density) => {
     setSettings((prev) => ({ ...prev, density }))
@@ -412,7 +473,28 @@ const DanmakuPlayerPage = () => {
     scrollTracksRef.current = initializeScrollTracks(
       getDensityConfig(settings.density).trackCount
     )
+    lastRenderSignatureRef.current = null
   }, [settings.density])
+
+  useEffect(() => {
+    const handleFsChange = () => {
+      const isFs =
+        !!document.fullscreenElement ||
+        !!document.webkitFullscreenElement ||
+        !!document.msFullscreenElement
+      setIsFullscreen(isFs)
+      nativeFullscreenRef.current = isFs
+      lastRenderSignatureRef.current = null
+    }
+    document.addEventListener('fullscreenchange', handleFsChange)
+    document.addEventListener('webkitfullscreenchange', handleFsChange)
+    document.addEventListener('msfullscreenchange', handleFsChange)
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFsChange)
+      document.removeEventListener('webkitfullscreenchange', handleFsChange)
+      document.removeEventListener('msfullscreenchange', handleFsChange)
+    }
+  }, [])
 
   const progressPercent = useMemo(
     () => calculateProgressPercent(currentTime, VIDEO_DURATION),
@@ -530,6 +612,9 @@ const DanmakuPlayerPage = () => {
                   </button>
                   <button className="control-btn" onClick={handleStop} title="停止">
                     ■
+                  </button>
+                  <button className="control-btn" onClick={handleReload} title="重新加载">
+                    ⟳
                   </button>
                 </div>
 

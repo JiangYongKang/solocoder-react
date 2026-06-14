@@ -175,7 +175,7 @@ function TextContent({ stats, wordRef }) {
   const maxCount = Math.max(1, ...stats.frequentWords.map((w) => w.count))
   return (
     <>
-      <WordCloud ref={wordRef} data={stats.frequentWords} />
+      <WordCloud ref={wordRef} data={stats.frequentWords} width={480} height={240} />
       {stats.frequentWords.length > 0 && (
         <div className="sa-freq-list">
           <div className="sa-freq-title">高频词 TOP {stats.frequentWords.length}</div>

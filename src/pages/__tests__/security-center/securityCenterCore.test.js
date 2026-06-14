@@ -8,8 +8,12 @@ import {
   STORAGE_KEY_DEVICES,
   STORAGE_KEY_TWOFA,
   STORAGE_KEY_OPERATIONS,
+  STORAGE_KEY_FREQUENT_LOCATIONS,
   FREQUENT_CITY,
+  DEFAULT_FREQUENT_LOCATIONS,
   DEFAULT_PAGE_SIZE,
+  PAGE_SIZE_OPTIONS,
+  WEAK_PASSWORDS,
 } from '../../security-center/constants'
 import {
   generateId,
@@ -18,11 +22,16 @@ import {
   generateIpAddress,
   generateBase32Secret,
   checkPasswordCharTypes,
+  hasConsecutiveRepeats,
+  isCommonWeakPassword,
   evaluatePasswordStrength,
   getPasswordScore,
   generateMockDevices,
   removeDevice,
   hasRemoteLogin,
+  isDeviceRemote,
+  loadFrequentLocations,
+  saveFrequentLocations,
   loadDevices,
   saveDevices,
   loadTwoFAStatus,
@@ -251,6 +260,86 @@ describe('checkPasswordCharTypes', () => {
       expect(result.special).toBe(true)
     }
   })
+
+  it('识别波浪号 ~ 为特殊字符', () => {
+    expect(checkPasswordCharTypes('~').special).toBe(true)
+    expect(checkPasswordCharTypes('abc~def').special).toBe(true)
+  })
+
+  it('识别反引号 ` 为特殊字符', () => {
+    expect(checkPasswordCharTypes('`').special).toBe(true)
+    expect(checkPasswordCharTypes('abc`def').special).toBe(true)
+  })
+})
+
+describe('hasConsecutiveRepeats', () => {
+  it('空密码返回 false', () => {
+    expect(hasConsecutiveRepeats('')).toBe(false)
+    expect(hasConsecutiveRepeats(null)).toBe(false)
+    expect(hasConsecutiveRepeats(undefined)).toBe(false)
+  })
+
+  it('密码长度小于 minRepeat 返回 false', () => {
+    expect(hasConsecutiveRepeats('aa', 3)).toBe(false)
+  })
+
+  it('检测 3 个连续重复字符', () => {
+    expect(hasConsecutiveRepeats('AAA')).toBe(true)
+    expect(hasConsecutiveRepeats('111')).toBe(true)
+    expect(hasConsecutiveRepeats('aaa')).toBe(true)
+  })
+
+  it('4 个连续重复字符', () => {
+    expect(hasConsecutiveRepeats('AAAA1234')).toBe(true)
+    expect(hasConsecutiveRepeats('1111abcd')).toBe(true)
+  })
+
+  it('无连续重复返回 false', () => {
+    expect(hasConsecutiveRepeats('Abcdefg123')).toBe(false)
+    expect(hasConsecutiveRepeats('aabbcc')).toBe(false)
+  })
+
+  it('连续重复在中间位置也能检测', () => {
+    expect(hasConsecutiveRepeats('AbBBBcdef')).toBe(true)
+    expect(hasConsecutiveRepeats('abc111def')).toBe(true)
+  })
+
+  it('自定义 minRepeat 参数', () => {
+    expect(hasConsecutiveRepeats('aa', 2)).toBe(true)
+    expect(hasConsecutiveRepeats('aa', 3)).toBe(false)
+    expect(hasConsecutiveRepeats('aaaa', 4)).toBe(true)
+  })
+})
+
+describe('isCommonWeakPassword', () => {
+  it('空密码返回 false', () => {
+    expect(isCommonWeakPassword('')).toBe(false)
+    expect(isCommonWeakPassword(null)).toBe(false)
+    expect(isCommonWeakPassword(undefined)).toBe(false)
+  })
+
+  it('检测完全匹配的常见弱密码', () => {
+    expect(isCommonWeakPassword('password')).toBe(true)
+    expect(isCommonWeakPassword('123456')).toBe(true)
+    expect(isCommonWeakPassword('qwerty')).toBe(true)
+    expect(isCommonWeakPassword('admin')).toBe(true)
+  })
+
+  it('大小写不敏感', () => {
+    expect(isCommonWeakPassword('Password')).toBe(true)
+    expect(isCommonWeakPassword('PASSWORD')).toBe(true)
+    expect(isCommonWeakPassword('Qwerty')).toBe(true)
+  })
+
+  it('检测包含常见弱密码的密码', () => {
+    expect(isCommonWeakPassword('Password123!')).toBe(true)
+    expect(isCommonWeakPassword('myadmin2024')).toBe(true)
+  })
+
+  it('正常密码返回 false', () => {
+    expect(isCommonWeakPassword('Kx9#mP2$vL5')).toBe(false)
+    expect(isCommonWeakPassword('Zf8!nQ4@wR7')).toBe(false)
+  })
 })
 
 describe('evaluatePasswordStrength', () => {
@@ -309,6 +398,28 @@ describe('evaluatePasswordStrength', () => {
     expect(result.stars).toBe(4)
   })
 
+  it('连续重复字符降低强度等级', () => {
+    const result = evaluatePasswordStrength('AAAA1234!')
+    expect(result.level).toBeLessThanOrEqual(PASSWORD_STRENGTH.MEDIUM.level)
+    expect(result.suggestions.some((s) => s.includes('连续重复'))).toBe(true)
+  })
+
+  it('常见弱密码被降级为弱', () => {
+    const result = evaluatePasswordStrength('Password123!')
+    expect(result.level).toBe(PASSWORD_STRENGTH.WEAK.level)
+    expect(result.suggestions.some((s) => s.includes('常见弱密码'))).toBe(true)
+  })
+
+  it('连续重复字符建议', () => {
+    const result = evaluatePasswordStrength('AAAAbcdefgh1!')
+    expect(result.suggestions.some((s) => s.includes('连续重复'))).toBe(true)
+  })
+
+  it('常见弱密码建议', () => {
+    const result = evaluatePasswordStrength('qwerty123!')
+    expect(result.suggestions.some((s) => s.includes('常见弱密码'))).toBe(true)
+  })
+
   it('包含密码长度建议', () => {
     const result = evaluatePasswordStrength('abc')
     expect(result.suggestions.some((s) => s.includes('长度'))).toBe(true)
@@ -334,7 +445,7 @@ describe('evaluatePasswordStrength', () => {
     expect(result.suggestions.some((s) => s.includes('12 位以上'))).toBe(true)
   })
 
-  it('很强密码的建议不包含"建议包含"类建议', () => {
+  it('很强密码且无异常模式的建议不包含"建议包含"类建议', () => {
     const result = evaluatePasswordStrength('Abcdefg123!@#')
     const hasTypeSuggestion = result.suggestions.some(
       (s) => s.includes('建议包含') || s.includes('大写字母') || s.includes('小写字母')
@@ -348,24 +459,36 @@ describe('getPasswordScore', () => {
     expect(getPasswordScore('')).toBe(0)
   })
 
-  it('弱密码得分低于 30% 的满分', () => {
+  it('弱密码得分低于满分的 50%', () => {
     const score = getPasswordScore('abc')
     expect(score).toBeLessThan(SCORE_WEIGHTS.PASSWORD * 0.5)
   })
 
-  it('中等密码约为满分的 50%', () => {
-    const score = getPasswordScore('Abcdefg')
-    expect(score).toBeCloseTo(SCORE_WEIGHTS.PASSWORD * 0.5, -1)
-  })
-
-  it('强密码约为满分的 85%', () => {
-    const score = getPasswordScore('Abcdefg12')
-    expect(score).toBeCloseTo(SCORE_WEIGHTS.PASSWORD * 0.85, -1)
-  })
-
-  it('很强密码得满分', () => {
+  it('很强密码得满分 30', () => {
     const score = getPasswordScore('Abcdefg123!@#')
     expect(score).toBe(SCORE_WEIGHTS.PASSWORD)
+  })
+
+  it('进度为 100 时密码得分等于维度满分', () => {
+    const score = getPasswordScore('Abcdefg123!@#')
+    expect(score).toBe(30)
+  })
+
+  it('进度为 50 时密码得分约为维度满分的 50%', () => {
+    const score = getPasswordScore('Abcdefg12')
+    expect(score).toBeGreaterThan(0)
+    expect(score).toBeLessThan(SCORE_WEIGHTS.PASSWORD)
+  })
+
+  it('常见弱密码得分很低', () => {
+    const score = getPasswordScore('Password123!')
+    expect(score).toBeLessThanOrEqual(Math.round(0.2 * SCORE_WEIGHTS.PASSWORD))
+  })
+
+  it('连续重复字符降低密码得分', () => {
+    const normalScore = getPasswordScore('Abcdefg123!@')
+    const repeatScore = getPasswordScore('AAAAefg123!@')
+    expect(repeatScore).toBeLessThan(normalScore)
   })
 })
 
@@ -382,10 +505,10 @@ describe('generateMockDevices', () => {
     expect(currentDevices[0].location).toBe(FREQUENT_CITY)
   })
 
-  it('当前设备不标记为异地', () => {
-    const devices = generateMockDevices()
+  it('当前设备不在异地', () => {
+    const devices = generateMockDevices(['北京市'])
     const current = devices.find((d) => d.isCurrent)
-    expect(current.isRemote).toBe(false)
+    expect(isDeviceRemote(current, ['北京市'])).toBe(false)
   })
 
   it('每台设备包含所有必需字段', () => {
@@ -399,7 +522,6 @@ describe('generateMockDevices', () => {
       expect(typeof device.loginTime).toBe('number')
       expect(device.location).toBeTruthy()
       expect(typeof device.isCurrent).toBe('boolean')
-      expect(typeof device.isRemote).toBe('boolean')
     })
   })
 
@@ -410,11 +532,10 @@ describe('generateMockDevices', () => {
     }
   })
 
-  it('异地登录设备数量在 1-2 台之间', () => {
-    const devices = generateMockDevices()
-    const remoteCount = devices.filter((d) => d.isRemote && !d.isCurrent).length
-    expect(remoteCount).toBeGreaterThanOrEqual(1)
-    expect(remoteCount).toBeLessThanOrEqual(2)
+  it('使用自定义常用城市生成设备', () => {
+    const devices = generateMockDevices(['上海市', '杭州市'])
+    const current = devices.find((d) => d.isCurrent)
+    expect(current.location).toBe('上海市')
   })
 })
 
@@ -453,30 +574,123 @@ describe('removeDevice', () => {
 describe('hasRemoteLogin', () => {
   it('存在异地登录时返回 true', () => {
     const devices = [
-      { id: '1', isRemote: false, isCurrent: true },
-      { id: '2', isRemote: true, isCurrent: false },
+      { id: '1', location: '北京市', isCurrent: true },
+      { id: '2', location: '上海市', isCurrent: false },
     ]
-    expect(hasRemoteLogin(devices)).toBe(true)
+    expect(hasRemoteLogin(devices, ['北京市'])).toBe(true)
   })
 
   it('无异地登录时返回 false', () => {
     const devices = [
-      { id: '1', isRemote: false, isCurrent: true },
-      { id: '2', isRemote: false, isCurrent: false },
+      { id: '1', location: '北京市', isCurrent: true },
+      { id: '2', location: '北京市', isCurrent: false },
     ]
-    expect(hasRemoteLogin(devices)).toBe(false)
+    expect(hasRemoteLogin(devices, ['北京市'])).toBe(false)
   })
 
   it('当前设备标记为异地时不计入', () => {
     const devices = [
-      { id: '1', isRemote: true, isCurrent: true },
-      { id: '2', isRemote: false, isCurrent: false },
+      { id: '1', location: '上海市', isCurrent: true },
+      { id: '2', location: '北京市', isCurrent: false },
     ]
-    expect(hasRemoteLogin(devices)).toBe(false)
+    expect(hasRemoteLogin(devices, ['北京市'])).toBe(false)
   })
 
   it('空列表返回 false', () => {
     expect(hasRemoteLogin([])).toBe(false)
+  })
+
+  it('多常用城市时正确检测', () => {
+    const devices = [
+      { id: '1', location: '北京市', isCurrent: true },
+      { id: '2', location: '上海市', isCurrent: false },
+      { id: '3', location: '广州市', isCurrent: false },
+    ]
+    expect(hasRemoteLogin(devices, ['北京市', '上海市'])).toBe(true)
+    expect(hasRemoteLogin(devices, ['北京市', '上海市', '广州市'])).toBe(false)
+  })
+
+  it('默认使用 DEFAULT_FREQUENT_LOCATIONS', () => {
+    const devices = [
+      { id: '1', location: '北京市', isCurrent: true },
+      { id: '2', location: '北京市', isCurrent: false },
+    ]
+    expect(hasRemoteLogin(devices)).toBe(false)
+  })
+})
+
+describe('isDeviceRemote', () => {
+  it('当前设备返回 false', () => {
+    const device = { id: '1', location: '上海市', isCurrent: true }
+    expect(isDeviceRemote(device, ['北京市'])).toBe(false)
+  })
+
+  it('非当前设备位置不在常用城市返回 true', () => {
+    const device = { id: '1', location: '上海市', isCurrent: false }
+    expect(isDeviceRemote(device, ['北京市'])).toBe(true)
+  })
+
+  it('非当前设备位置在常用城市返回 false', () => {
+    const device = { id: '1', location: '北京市', isCurrent: false }
+    expect(isDeviceRemote(device, ['北京市'])).toBe(false)
+  })
+
+  it('多常用城市匹配', () => {
+    const device = { id: '1', location: '上海市', isCurrent: false }
+    expect(isDeviceRemote(device, ['北京市', '上海市'])).toBe(false)
+    expect(isDeviceRemote(device, ['北京市', '广州市'])).toBe(true)
+  })
+})
+
+describe('localStorage - frequentLocations', () => {
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  it('saveFrequentLocations 保存到 localStorage', () => {
+    const locations = ['北京市', '上海市']
+    const result = saveFrequentLocations(locations)
+    expect(result).toBe(true)
+    expect(localStorage.getItem(STORAGE_KEY_FREQUENT_LOCATIONS)).toBe(JSON.stringify(locations))
+  })
+
+  it('loadFrequentLocations 从 localStorage 读取', () => {
+    const locations = ['北京市', '上海市']
+    localStorage.setItem(STORAGE_KEY_FREQUENT_LOCATIONS, JSON.stringify(locations))
+    expect(loadFrequentLocations()).toEqual(locations)
+  })
+
+  it('loadFrequentLocations localStorage 为空时返回默认值', () => {
+    const result = loadFrequentLocations()
+    expect(result).toEqual(DEFAULT_FREQUENT_LOCATIONS)
+  })
+
+  it('loadFrequentLocations 数据损坏时返回默认值', () => {
+    localStorage.setItem(STORAGE_KEY_FREQUENT_LOCATIONS, 'invalid-json')
+    expect(loadFrequentLocations()).toEqual(DEFAULT_FREQUENT_LOCATIONS)
+  })
+
+  it('loadFrequentLocations 非数组时返回默认值', () => {
+    localStorage.setItem(STORAGE_KEY_FREQUENT_LOCATIONS, JSON.stringify({ not: 'array' }))
+    expect(loadFrequentLocations()).toEqual(DEFAULT_FREQUENT_LOCATIONS)
+  })
+
+  it('loadFrequentLocations 空数组时返回默认值', () => {
+    localStorage.setItem(STORAGE_KEY_FREQUENT_LOCATIONS, '[]')
+    expect(loadFrequentLocations()).toEqual(DEFAULT_FREQUENT_LOCATIONS)
+  })
+
+  it('loadFrequentLocations 过滤非字符串项', () => {
+    localStorage.setItem(STORAGE_KEY_FREQUENT_LOCATIONS, JSON.stringify(['北京市', 123, null, '']))
+    const result = loadFrequentLocations()
+    expect(result).toEqual(['北京市'])
+  })
+
+  it('返回新数组而非默认引用', () => {
+    const result1 = loadFrequentLocations()
+    const result2 = loadFrequentLocations()
+    expect(result1).toEqual(result2)
+    expect(result1).not.toBe(result2)
   })
 })
 
@@ -841,12 +1055,19 @@ describe('paginateOperations', () => {
     const result = paginateOperations(operations, 1)
     expect(result.pageSize).toBe(DEFAULT_PAGE_SIZE)
   })
+
+  it('自定义每页条数', () => {
+    const result = paginateOperations(operations, 1, 20)
+    expect(result.pageSize).toBe(20)
+    expect(result.items.length).toBe(20)
+    expect(result.totalPage).toBe(2)
+  })
 })
 
 describe('calculateScoreBreakdown', () => {
   it('全项满分总分为 100', () => {
     const devices = [
-      { id: '1', isRemote: false, isCurrent: true },
+      { id: '1', location: '北京市', isCurrent: true },
     ]
     const operations = [
       { id: '1', timestamp: Date.now(), isAnomaly: false },
@@ -855,75 +1076,76 @@ describe('calculateScoreBreakdown', () => {
       'Abcdefg123!@#',
       true,
       devices,
-      operations
+      operations,
+      ['北京市']
     )
     expect(breakdown.total).toBe(100)
   })
 
   it('密码强度得分正确', () => {
-    const devices = [{ id: '1', isRemote: false, isCurrent: true }]
+    const devices = [{ id: '1', location: '北京市', isCurrent: true }]
     const operations = [{ id: '1', timestamp: Date.now(), isAnomaly: false }]
-    const breakdown = calculateScoreBreakdown('', true, devices, operations)
+    const breakdown = calculateScoreBreakdown('', true, devices, operations, ['北京市'])
     expect(breakdown.password.score).toBe(0)
     expect(breakdown.password.max).toBe(SCORE_WEIGHTS.PASSWORD)
   })
 
   it('两步验证开启得满分', () => {
-    const devices = [{ id: '1', isRemote: false, isCurrent: true }]
+    const devices = [{ id: '1', location: '北京市', isCurrent: true }]
     const operations = [{ id: '1', timestamp: Date.now(), isAnomaly: false }]
-    const breakdown = calculateScoreBreakdown('Abcdefg123!@#', true, devices, operations)
+    const breakdown = calculateScoreBreakdown('Abcdefg123!@#', true, devices, operations, ['北京市'])
     expect(breakdown.twoFA.score).toBe(SCORE_WEIGHTS.TWOFA)
   })
 
   it('两步验证关闭得 0 分', () => {
-    const devices = [{ id: '1', isRemote: false, isCurrent: true }]
+    const devices = [{ id: '1', location: '北京市', isCurrent: true }]
     const operations = [{ id: '1', timestamp: Date.now(), isAnomaly: false }]
-    const breakdown = calculateScoreBreakdown('Abcdefg123!@#', false, devices, operations)
+    const breakdown = calculateScoreBreakdown('Abcdefg123!@#', false, devices, operations, ['北京市'])
     expect(breakdown.twoFA.score).toBe(0)
   })
 
   it('无异地登录得满分', () => {
     const devices = [
-      { id: '1', isRemote: false, isCurrent: true },
-      { id: '2', isRemote: false, isCurrent: false },
+      { id: '1', location: '北京市', isCurrent: true },
+      { id: '2', location: '北京市', isCurrent: false },
     ]
     const operations = [{ id: '1', timestamp: Date.now(), isAnomaly: false }]
-    const breakdown = calculateScoreBreakdown('Abcdefg123!@#', true, devices, operations)
+    const breakdown = calculateScoreBreakdown('Abcdefg123!@#', true, devices, operations, ['北京市'])
     expect(breakdown.remoteLogin.score).toBe(SCORE_WEIGHTS.REMOTE_LOGIN)
   })
 
   it('有异地登录得 0 分', () => {
     const devices = [
-      { id: '1', isRemote: false, isCurrent: true },
-      { id: '2', isRemote: true, isCurrent: false },
+      { id: '1', location: '北京市', isCurrent: true },
+      { id: '2', location: '上海市', isCurrent: false },
     ]
     const operations = [{ id: '1', timestamp: Date.now(), isAnomaly: false }]
-    const breakdown = calculateScoreBreakdown('Abcdefg123!@#', true, devices, operations)
+    const breakdown = calculateScoreBreakdown('Abcdefg123!@#', true, devices, operations, ['北京市'])
     expect(breakdown.remoteLogin.score).toBe(0)
   })
 
   it('无异常操作得满分', () => {
-    const devices = [{ id: '1', isRemote: false, isCurrent: true }]
+    const devices = [{ id: '1', location: '北京市', isCurrent: true }]
     const operations = [
       { id: '1', timestamp: Date.now(), isAnomaly: false },
     ]
-    const breakdown = calculateScoreBreakdown('Abcdefg123!@#', true, devices, operations)
+    const breakdown = calculateScoreBreakdown('Abcdefg123!@#', true, devices, operations, ['北京市'])
     expect(breakdown.anomaly.score).toBe(SCORE_WEIGHTS.ANOMALY)
   })
 
   it('有异常操作得 0 分', () => {
-    const devices = [{ id: '1', isRemote: false, isCurrent: true }]
+    const devices = [{ id: '1', location: '北京市', isCurrent: true }]
     const operations = [
       { id: '1', timestamp: Date.now(), isAnomaly: true },
     ]
-    const breakdown = calculateScoreBreakdown('Abcdefg123!@#', true, devices, operations)
+    const breakdown = calculateScoreBreakdown('Abcdefg123!@#', true, devices, operations, ['北京市'])
     expect(breakdown.anomaly.score).toBe(0)
   })
 
   it('各维度标签正确', () => {
-    const devices = [{ id: '1', isRemote: false, isCurrent: true }]
+    const devices = [{ id: '1', location: '北京市', isCurrent: true }]
     const operations = [{ id: '1', timestamp: Date.now(), isAnomaly: false }]
-    const breakdown = calculateScoreBreakdown('', false, devices, operations)
+    const breakdown = calculateScoreBreakdown('', false, devices, operations, ['北京市'])
     expect(breakdown.password.label).toBe('密码强度')
     expect(breakdown.twoFA.label).toBe('两步验证')
     expect(breakdown.remoteLogin.label).toBe('异地登录')
@@ -932,15 +1154,32 @@ describe('calculateScoreBreakdown', () => {
 
   it('总分等于各维度分数之和', () => {
     const devices = [
-      { id: '1', isRemote: true, isCurrent: false },
+      { id: '1', location: '上海市', isCurrent: false },
     ]
     const operations = [
       { id: '1', timestamp: Date.now(), isAnomaly: true },
     ]
-    const breakdown = calculateScoreBreakdown('abc', false, devices, operations)
+    const breakdown = calculateScoreBreakdown('abc', false, devices, operations, ['北京市'])
     const sum = breakdown.password.score + breakdown.twoFA.score +
       breakdown.remoteLogin.score + breakdown.anomaly.score
     expect(breakdown.total).toBe(sum)
+  })
+
+  it('常用城市包含设备城市时不算异地', () => {
+    const devices = [
+      { id: '1', location: '北京市', isCurrent: true },
+      { id: '2', location: '上海市', isCurrent: false },
+    ]
+    const operations = [{ id: '1', timestamp: Date.now(), isAnomaly: false }]
+    const breakdown = calculateScoreBreakdown('Abcdefg123!@#', true, devices, operations, ['北京市', '上海市'])
+    expect(breakdown.remoteLogin.score).toBe(SCORE_WEIGHTS.REMOTE_LOGIN)
+  })
+
+  it('密码维度满分可达 30 分（归一化）', () => {
+    const devices = [{ id: '1', location: '北京市', isCurrent: true }]
+    const operations = [{ id: '1', timestamp: Date.now(), isAnomaly: false }]
+    const breakdown = calculateScoreBreakdown('Abcdefg123!@#', true, devices, operations, ['北京市'])
+    expect(breakdown.password.score).toBe(30)
   })
 })
 
@@ -1094,5 +1333,30 @@ describe('copyToClipboardMock', () => {
     expect(copyToClipboardMock(undefined)).toBe(false)
     expect(copyToClipboardMock(123)).toBe(false)
     expect(copyToClipboardMock({})).toBe(false)
+  })
+})
+
+describe('constants', () => {
+  it('PAGE_SIZE_OPTIONS 包含合理的选项', () => {
+    expect(PAGE_SIZE_OPTIONS).toContain(10)
+    expect(PAGE_SIZE_OPTIONS).toContain(20)
+    expect(PAGE_SIZE_OPTIONS).toContain(50)
+  })
+
+  it('WEAK_PASSWORDS 包含常见的弱密码', () => {
+    expect(WEAK_PASSWORDS).toContain('password')
+    expect(WEAK_PASSWORDS).toContain('123456')
+    expect(WEAK_PASSWORDS).toContain('qwerty')
+    expect(WEAK_PASSWORDS).toContain('admin')
+  })
+
+  it('STORAGE_KEY_FREQUENT_LOCATIONS 已定义', () => {
+    expect(STORAGE_KEY_FREQUENT_LOCATIONS).toBeTruthy()
+    expect(typeof STORAGE_KEY_FREQUENT_LOCATIONS).toBe('string')
+  })
+
+  it('DEFAULT_FREQUENT_LOCATIONS 包含默认常用城市', () => {
+    expect(DEFAULT_FREQUENT_LOCATIONS).toContain('北京市')
+    expect(DEFAULT_FREQUENT_LOCATIONS.length).toBeGreaterThanOrEqual(1)
   })
 })

@@ -1,0 +1,13 @@
+你实现的弹幕播放器模拟页面还存在一些问题，需要进行修复：
+
+1. danmakuCore.js 的 findAvailableScrollTrack 函数在查找空闲轨道时未处理密度模式切换场景。当用户从高密度（8 轨道）切换到低密度（3 轨道）时，已在第 4-8 轨道上的弹幕仍在播放但对应轨道已不存在，这些弹幕变为"幽灵弹幕"，Y 坐标计算使用了无效的轨道值，可能导致越界或重叠。切换密度模式时应清理超出新轨道数的弹幕。
+
+2. danmakuCore.js 的 generateDanmakuId 函数使用了 performance.now() + counter 的组合生成 ID。performance.now() 在页面后台时精度会降低，同一毫秒内快速发送多条弹幕时 counter 不够区分。应使用更可靠的方式确保弹幕 ID 的唯一性。
+
+3. danmakuCore.js 的 calculateScrollPosition 在视频暂停时，elapsed 时间停止增长但 requestAnimationFrame 仍在持续调用该函数。每帧都在 Canvas 上重复绘制完全相同的一帧画面，浪费 GPU 资源。暂停状态下应跳过渲染逻辑直接 return。
+
+4. index.jsx 的 handleFullscreen 函数只调用了 requestFullscreen，未判断当前是否已处于全屏状态。用户通过浏览器 F11 进入全屏后，再次点击全屏按钮会尝试重复请求全屏，在 Firefox 中会抛出 TypeError。应将全屏按钮改为切换行为。
+
+5. 提示词要求"视频停止或重新加载时清除所有弹幕"。index.jsx 的 handleReload 函数仅重置了播放进度和暂停状态，没有清除弹幕列表。用户点击重新加载后旧弹幕仍在画面上。
+
+6. 修复后重新运行 pnpm run test，需要让所有测试通过。

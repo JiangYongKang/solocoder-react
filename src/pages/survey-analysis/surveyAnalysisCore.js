@@ -252,6 +252,16 @@ export function calculateAllStats(questions, responses) {
   return stats
 }
 
+export function median(sortedValues) {
+  const n = sortedValues.length
+  if (n === 0) return 0
+  const mid = Math.floor(n / 2)
+  if (n % 2 === 0) {
+    return (sortedValues[mid - 1] + sortedValues[mid]) / 2
+  }
+  return sortedValues[mid]
+}
+
 export function calculateDurationDistribution(responses) {
   const total = Array.isArray(responses) ? responses.length : 0
   const bucketCounts = DURATION_BUCKETS.map(() => 0)
@@ -285,8 +295,7 @@ export function calculateDurationDistribution(responses) {
     minDur = durations[0]
     maxDur = durations[n - 1]
     avgDur = durations.reduce((a, b) => a + b, 0) / n
-    const mid = Math.floor(n / 2)
-    medianDur = n % 2 === 0 ? (durations[mid - 1] + durations[mid]) / 2 : durations[mid]
+    medianDur = median(durations)
   }
   return {
     total,
@@ -311,28 +320,47 @@ export function buildCrossAnalysisMatrix(rowQuestion, colQuestion, responses) {
   const matrix = []
   const rowTotals = rowOptions.map(() => 0)
   const colTotals = colOptions.map(() => 0)
-  rowOptions.forEach((rowOpt, ri) => {
-    const row = []
-    colOptions.forEach((colOpt, ci) => {
-      let count = 0
-      if (Array.isArray(responses)) {
-        responses.forEach((r) => {
-          const rowAns = r.answers?.[rowQuestion.id]
-          const colAns = r.answers?.[colQuestion.id]
-          const hasRow = Array.isArray(rowAns) && rowAns.includes(rowOpt.value)
-          const hasCol = Array.isArray(colAns) && colAns.includes(colOpt.value)
-          if (hasRow && hasCol) count += 1
+
+  const rowId = rowQuestion.id
+  const colId = colQuestion.id
+
+  if (Array.isArray(responses) && total > 0) {
+    const rowOptValues = rowOptions.map((o) => o.value)
+    const colOptValues = colOptions.map((o) => o.value)
+
+    responses.forEach((r) => {
+      const rowAns = r.answers?.[rowId]
+      const colAns = r.answers?.[colId]
+      const rowSet = Array.isArray(rowAns) ? new Set(rowAns) : null
+      const colSet = Array.isArray(colAns) ? new Set(colAns) : null
+
+      rowOptValues.forEach((rowVal, ri) => {
+        const hasRow = rowSet ? rowSet.has(rowVal) : false
+        colOptValues.forEach((colVal, ci) => {
+          const hasCol = colSet ? colSet.has(colVal) : false
+          if (hasRow && hasCol) {
+            if (!matrix[ri]) matrix[ri] = []
+            if (!matrix[ri][ci]) matrix[ri][ci] = 0
+            matrix[ri][ci] += 1
+            rowTotals[ri] += 1
+            colTotals[ci] += 1
+          }
         })
-      }
-      row.push({
-        count,
-        ratio: total > 0 ? (count / total) * 100 : 0,
       })
-      rowTotals[ri] += count
-      colTotals[ci] += count
     })
-    matrix.push(row)
+  }
+
+  rowOptions.forEach((_, ri) => {
+    if (!matrix[ri]) matrix[ri] = []
+    colOptions.forEach((_, ci) => {
+      if (!matrix[ri][ci]) matrix[ri][ci] = 0
+      matrix[ri][ci] = {
+        count: matrix[ri][ci],
+        ratio: total > 0 ? (matrix[ri][ci] / total) * 100 : 0,
+      }
+    })
   })
+
   const grandTotal = rowTotals.reduce((a, b) => a + b, 0)
   return {
     rowQuestion,

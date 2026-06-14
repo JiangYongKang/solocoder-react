@@ -230,7 +230,7 @@ export function cleanupExpiredLogs(logs, retentionDays) {
 }
 
 export function exportToCsv(logs) {
-  const headers = ['操作时间', '操作人', '操作类型', '操作对象', '操作结果', 'IP地址']
+  const headers = ['操作时间', '操作人', '操作类型', '操作对象', '操作结果', 'IP 地址']
   const rows = logs.map((log) => [
     formatDateTime(log.timestamp),
     log.operator,
@@ -276,7 +276,8 @@ export function buildTrendData(logs) {
     dayMap[d.date] = d
   })
 
-  const thirtyDaysAgo = new Date(days[0].date).getTime()
+  const firstDateParts = days[0].date.split('-').map(Number)
+  const thirtyDaysAgo = new Date(firstDateParts[0], firstDateParts[1] - 1, firstDateParts[2]).getTime()
   logs.forEach((log) => {
     if (log.timestamp < thirtyDaysAgo) return
     const dateKey = formatDateKey(log.timestamp)

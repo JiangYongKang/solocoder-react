@@ -54,6 +54,124 @@ function createVisualizerState() {
   }
 }
 
+function resolveAlgorithmName(stateKey, isCompareMode, algorithmA, algorithmB, singleAlgorithm) {
+  if (isCompareMode) {
+    return stateKey === 'A'
+      ? ALGORITHM_NAMES[algorithmA]
+      : ALGORITHM_NAMES[algorithmB]
+  }
+  return ALGORITHM_NAMES[singleAlgorithm]
+}
+
+function resolveAlgorithm(stateKey, isCompareMode, algorithmA, algorithmB, singleAlgorithm) {
+  if (isCompareMode) {
+    return stateKey === 'A' ? algorithmA : algorithmB
+  }
+  return singleAlgorithm
+}
+
+function computeStepVisualState(curState, step) {
+  const newSorted = new Set(curState.sortedIndices)
+  let newPivot = curState.pivotIndex
+  let newSwapping = new Set()
+
+  if (step.type === OPERATION_TYPES.SORTED) {
+    for (const idx of step.indices) newSorted.add(idx)
+  } else if (step.type === OPERATION_TYPES.PIVOT) {
+    newPivot = step.indices[0]
+  } else if (step.type === OPERATION_TYPES.SWAP) {
+    newSwapping = new Set(step.indices)
+  }
+
+  return { newSorted, newPivot, newSwapping }
+}
+
+function buildLogEntry(stepNum, step, algoName) {
+  return {
+    stepNum,
+    type: step.type,
+    message: getOperationMessage(step, algoName),
+  }
+}
+
+function shouldSkipLogging(step) {
+  return step.type === OPERATION_TYPES.SORTED && step.indices.length > 10
+}
+
+function makeDoneState(curState, step, algoName) {
+  const allSortedFinal = new Set(step.array.map((_, i) => i))
+  return {
+    ...curState,
+    array: [...step.array],
+    compareCount: step.compareCount,
+    swapCount: step.swapCount,
+    status: RUN_STATUS.DONE,
+    sortedIndices: allSortedFinal,
+    currentStep: step,
+    pivotIndex: null,
+    swappingIndices: new Set(),
+    stepCount: curState.stepCount + 1,
+    elapsedMs: Date.now() - curState.startTime,
+    logs: [...curState.logs, buildLogEntry(curState.stepCount + 1, step, algoName)],
+  }
+}
+
+function makeGeneratorDoneState(curState) {
+  const allSorted = new Set(curState.array.map((_, i) => i))
+  return {
+    ...curState,
+    status: RUN_STATUS.DONE,
+    sortedIndices: allSorted,
+    currentStep: null,
+    pivotIndex: null,
+    swappingIndices: new Set(),
+    elapsedMs: Date.now() - curState.startTime,
+  }
+}
+
+function makeNormalStepState(curState, step, algoName) {
+  const { newSorted, newPivot, newSwapping } = computeStepVisualState(curState, step)
+  const nextStepNum = curState.stepCount + 1
+  const newLogs = shouldSkipLogging(step)
+    ? curState.logs
+    : [...curState.logs, buildLogEntry(nextStepNum, step, algoName)]
+
+  return {
+    ...curState,
+    array: [...step.array],
+    currentStep: step,
+    sortedIndices: newSorted,
+    pivotIndex: newPivot,
+    swappingIndices: newSwapping,
+    compareCount: step.compareCount,
+    swapCount: step.swapCount,
+    stepCount: nextStepNum,
+    elapsedMs: Date.now() - curState.startTime,
+    logs: newLogs,
+  }
+}
+
+function initializeGeneratorIfIdle(state, stateKey, setState, stateRef, opts) {
+  if (state.status !== RUN_STATUS.IDLE) return state
+  const algo = resolveAlgorithm(
+    stateKey,
+    opts.isCompareMode,
+    opts.algorithmA,
+    opts.algorithmB,
+    opts.singleAlgorithm
+  )
+  const gen = getSortGenerator(algo, [...state.array])
+  const newState = {
+    ...state,
+    generator: gen,
+    status: RUN_STATUS.RUNNING,
+    startTime: Date.now(),
+  }
+  setState(newState)
+  stateRef.current = newState
+  return newState
+}
+
 function BarVisualizer({
   array,
   step,
@@ -127,7 +245,6 @@ function Legend() {
 function VisualizerCard({
   title,
   state,
-  algorithm,
   isWinner,
   containerWidth,
 }) {
@@ -203,179 +320,100 @@ export default function SortVisualizer() {
 
   const currentDelay = useMemo(() => speedToDelay(speed), [speed])
 
-  const clearTimers = useCallback(() => {
-    if (timerRef.current) {
-      clearTimeout(timerRef.current)
-      timerRef.current = null
-    }
-    if (timerBRef.current) {
-      clearTimeout(timerBRef.current)
-      timerBRef.current = null
+  const clearSingleTimer = useCallback((which) => {
+    const ref = which === 'A' ? timerRef : timerBRef
+    if (ref.current) {
+      clearTimeout(ref.current)
+      ref.current = null
     }
   }, [])
 
+  const clearTimers = useCallback(() => {
+    clearSingleTimer('A')
+    clearSingleTimer('B')
+  }, [clearSingleTimer])
+
   const stepGeneratorOnce = useCallback((stateKey, setState, stateRef) => {
-    const state = stateRef.current
-    if (state.status === RUN_STATUS.DONE) return false
+    const algoOpts = { isCompareMode, algorithmA, algorithmB, singleAlgorithm }
 
-    if (state.status === RUN_STATUS.IDLE) {
-      const algo = isCompareMode
-        ? stateKey === 'A'
-          ? algorithmA
-          : algorithmB
-        : singleAlgorithm
-      const gen = getSortGenerator(algo, [...state.array])
-      const newState = {
-        ...state,
-        generator: gen,
-        status: RUN_STATUS.RUNNING,
-        startTime: Date.now(),
-      }
-      setState(newState)
-      stateRef.current = newState
-    }
+    let curState = initializeGeneratorIfIdle(
+      stateRef.current,
+      stateKey,
+      setState,
+      stateRef,
+      algoOpts
+    )
 
-    const curState = stateRef.current
+    if (curState.status === RUN_STATUS.DONE) return false
     if (!curState.generator) return false
 
     const next = curState.generator.next()
     if (next.done) {
-      const allSorted = new Set(curState.array.map((_, i) => i))
-      const endState = {
-        ...curState,
-        status: RUN_STATUS.DONE,
-        sortedIndices: allSorted,
-        currentStep: null,
-        pivotIndex: null,
-        swappingIndices: new Set(),
-        elapsedMs: Date.now() - curState.startTime,
-      }
+      const endState = makeGeneratorDoneState(curState)
       setState(endState)
       stateRef.current = endState
       return false
     }
 
     const step = next.value
-    const newSorted = new Set(curState.sortedIndices)
-    let newPivot = curState.pivotIndex
-    let newSwapping = new Set()
+    const algoName = resolveAlgorithmName(
+      stateKey,
+      algoOpts.isCompareMode,
+      algoOpts.algorithmA,
+      algoOpts.algorithmB,
+      algoOpts.singleAlgorithm
+    )
 
-    if (step.type === OPERATION_TYPES.SORTED) {
-      for (const idx of step.indices) newSorted.add(idx)
-    } else if (step.type === OPERATION_TYPES.PIVOT) {
-      newPivot = step.indices[0]
-    } else if (step.type === OPERATION_TYPES.SWAP) {
-      newSwapping = new Set(step.indices)
-    } else if (step.type === OPERATION_TYPES.COMPLETE) {
-      const allSortedFinal = new Set(step.array.map((_, i) => i))
-      const doneState = {
-        ...curState,
-        array: [...step.array],
-        compareCount: step.compareCount,
-        swapCount: step.swapCount,
-        status: RUN_STATUS.DONE,
-        sortedIndices: allSortedFinal,
-        currentStep: step,
-        pivotIndex: null,
-        swappingIndices: new Set(),
-        stepCount: curState.stepCount + 1,
-        elapsedMs: Date.now() - curState.startTime,
-        logs: [
-          ...curState.logs,
-          {
-            stepNum: curState.stepCount + 1,
-            type: step.type,
-            message: getOperationMessage(
-              step,
-              ALGORITHM_NAMES[
-                isCompareMode
-                  ? stateKey === 'A'
-                    ? algorithmA
-                    : algorithmB
-                  : singleAlgorithm
-              ]
-            ),
-          },
-        ],
-      }
-      setState(doneState)
-      stateRef.current = doneState
-      return false
+    let finalState
+    if (step.type === OPERATION_TYPES.COMPLETE) {
+      finalState = makeDoneState(curState, step, algoName)
+    } else {
+      finalState = makeNormalStepState(curState, step, algoName)
     }
 
-    const algoName =
-      ALGORITHM_NAMES[
-        isCompareMode
-          ? stateKey === 'A'
-            ? algorithmA
-            : algorithmB
-          : singleAlgorithm
-      ]
-
-    const nextState = {
-      ...curState,
-      array: [...step.array],
-      currentStep: step,
-      sortedIndices: newSorted,
-      pivotIndex: newPivot,
-      swappingIndices: newSwapping,
-      compareCount: step.compareCount,
-      swapCount: step.swapCount,
-      stepCount: curState.stepCount + 1,
-      elapsedMs: Date.now() - curState.startTime,
-      logs:
-        step.type === OPERATION_TYPES.SORTED && step.indices.length > 10
-          ? curState.logs
-          : [
-              ...curState.logs,
-              {
-                stepNum: curState.stepCount + 1,
-                type: step.type,
-                message: getOperationMessage(step, algoName),
-              },
-            ],
-    }
-
-    setState(nextState)
-    stateRef.current = nextState
-    return true
+    setState(finalState)
+    stateRef.current = finalState
+    return step.type !== OPERATION_TYPES.COMPLETE
   }, [isCompareMode, algorithmA, algorithmB, singleAlgorithm])
 
-  const scheduleNext = useCallback(() => {
+  const scheduleSide = useCallback((side) => {
     const delay = speedToDelay(speed)
-    const sA = stateARef.current
-    const sB = stateBRef.current
+    const stateRef = side === 'A' ? stateARef : stateBRef
+    const setState = side === 'A' ? setStateA : setStateB
+    const timerKey = side
 
+    if (stateRef.current.status === RUN_STATUS.DONE) return
+
+    clearSingleTimer(timerKey)
+    const ref = side === 'A' ? timerRef : timerBRef
+
+    ref.current = setTimeout(() => {
+      const hasMore = stepGeneratorOnce(side, setState, stateRef)
+      if (hasMore) {
+        scheduleSide(side)
+      }
+    }, delay)
+  }, [speed, stepGeneratorOnce, clearSingleTimer])
+
+  const scheduleNext = useCallback(() => {
     if (isCompareMode) {
-      const aRunning = sA.status !== RUN_STATUS.DONE
-      const bRunning = sB.status !== RUN_STATUS.DONE
-      if (!aRunning && !bRunning) {
-        return
-      }
-
-      if (aRunning) {
-        timerRef.current = setTimeout(() => {
-          const hasMore = stepGeneratorOnce('A', setStateA, stateARef)
-          if (hasMore || stateBRef.current.status !== RUN_STATUS.DONE) {
-            scheduleNext()
-          }
-        }, delay)
-      }
-
-      if (bRunning) {
-        timerBRef.current = setTimeout(() => {
-          stepGeneratorOnce('B', setStateB, stateBRef)
-        }, delay)
-      }
+      scheduleSide('A')
+      scheduleSide('B')
     } else {
-      timerRef.current = setTimeout(() => {
-        const hasMore = stepGeneratorOnce('A', setStateA, stateARef)
-        if (hasMore) {
-          scheduleNext()
-        }
-      }, delay)
+      scheduleSide('A')
     }
-  }, [speed, isCompareMode, stepGeneratorOnce])
+  }, [isCompareMode, scheduleSide])
+
+  function resetSingle(key) {
+    const freshState = createVisualizerState()
+    if (key === 'A') {
+      setStateA(freshState)
+      stateARef.current = freshState
+    } else {
+      setStateB(freshState)
+      stateBRef.current = freshState
+    }
+  }
 
   const start = useCallback(() => {
     clearTimers()
@@ -396,8 +434,7 @@ export default function SortVisualizer() {
     clearTimers()
     const updateStatus = (s) => {
       if (s.status === RUN_STATUS.RUNNING) {
-        const paused = { ...s, status: RUN_STATUS.PAUSED }
-        return paused
+        return { ...s, status: RUN_STATUS.PAUSED }
       }
       return s
     }
@@ -447,17 +484,6 @@ export default function SortVisualizer() {
       stepGeneratorOnce('A', setStateA, stateARef)
     }
   }, [clearTimers, isCompareMode, stepGeneratorOnce])
-
-  function resetSingle(key) {
-    const freshState = createVisualizerState()
-    if (key === 'A') {
-      setStateA(freshState)
-      stateARef.current = freshState
-    } else {
-      setStateB(freshState)
-      stateBRef.current = freshState
-    }
-  }
 
   const reset = useCallback(() => {
     clearTimers()
@@ -725,7 +751,6 @@ export default function SortVisualizer() {
             <VisualizerCard
               title={ALGORITHM_NAMES[singleAlgorithm]}
               state={stateA}
-              algorithm={singleAlgorithm}
               containerWidth={containerWidth}
             />
           ) : (
@@ -733,14 +758,12 @@ export default function SortVisualizer() {
               <VisualizerCard
                 title={`A · ${ALGORITHM_NAMES[algorithmA]}`}
                 state={stateA}
-                algorithm={algorithmA}
                 isWinner={winnerKey === 'A'}
                 containerWidth={Math.max(300, (containerWidth - 20) / 2)}
               />
               <VisualizerCard
                 title={`B · ${ALGORITHM_NAMES[algorithmB]}`}
                 state={stateB}
-                algorithm={algorithmB}
                 isWinner={winnerKey === 'B'}
                 containerWidth={Math.max(300, (containerWidth - 20) / 2)}
               />

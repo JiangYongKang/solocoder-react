@@ -1,0 +1,13 @@
+你实现的成绩管理系统还存在一些问题，需要进行修复：
+
+1. addStudent 和 addSubject 函数在成功路径上返回的对象中包含了一个 error: null 字段，而 React 组件将返回值通过 setData 直接设为 data 状态。这个冗余的 error 属性会被混入数据模型并通过 localStorage 持久化，后续所有通过 ...data 展开的操作都会携带该字段。应将错误信息和数据分离，成功时只返回纯数据对象。
+
+2. saveGradeData 在每次数据变更时都将当前数据覆盖写入 PREVIOUS_STORAGE_KEY，导致排名面板中"与上次保存数据对比"始终只对比紧邻一次编辑前后的状态。用户连续编辑多步后排名变化对比已无实际语义价值。历史快照应该在页面首次加载时做一次，而非每次数据变更都更新。
+
+3. GradeTable 组件中定义了 editingCell 状态变量，ScoreCell 的 onBlur 回调会设置 setEditingCell(null)，但 editingCell 在组件中从未被读取或用于任何条件判断。这是一个完全无用的死状态，每次单元格失焦都触发一次无意义的 setState。
+
+4. exportToCSV 函数生成 CSV 内容时直接用 row.join(',') 拼接列值，未对值中的逗号、双引号或换行符做标准转义处理。如果学生姓名包含逗号，导出的 CSV 在 Excel 中打开时列数会错位。
+
+5. calculateRankChanges 函数内部硬编码了按总分排序，无论用户当前切换到哪个科目的排名视图，排名变化列展示的始终是总分维度的升降，与当前排名依据不一致。
+
+6. 修复后需要为该页面补充纯 JS 函数的单元测试，只测和页面渲染无关的逻辑。补充后重新运行 pnpm run test，需要让所有测试通过。

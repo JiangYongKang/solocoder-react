@@ -16,6 +16,7 @@ import {
   insertMention,
   getMentionSuggestions,
   calculateCanvasCellSize,
+  drawParticipantCanvas,
 } from '../../video-meeting/videoMeetingCore.js'
 import {
   AVATAR_COLORS,
@@ -471,5 +472,216 @@ describe('calculateCanvasCellSize', () => {
     const result = calculateCanvasCellSize(800, 600, 1, 1)
     expect(result.cellWidth).toBeLessThanOrEqual(800)
     expect(result.cellHeight).toBeLessThanOrEqual(600)
+  })
+})
+
+function createMockCtx() {
+  const calls = []
+  const gradientObj = {
+    addColorStop(...args) {
+      calls.push({ method: 'addColorStop', args })
+    },
+  }
+  const handler = {
+    get(target, prop) {
+      if (prop === 'calls') return calls
+      if (prop === 'canvas') return { width: 300, height: 200 }
+      if (prop === 'createRadialGradient') {
+        return function (...args) {
+          calls.push({ method: 'createRadialGradient', args })
+          return gradientObj
+        }
+      }
+      if (prop === 'createLinearGradient') {
+        return function (...args) {
+          calls.push({ method: 'createLinearGradient', args })
+          return gradientObj
+        }
+      }
+      if (prop === 'measureText') {
+        return function (...args) {
+          calls.push({ method: 'measureText', args })
+          const text = typeof args[0] === 'string' ? args[0] : ''
+          return { width: text.length * 10 }
+        }
+      }
+      const fn = function (...args) {
+        calls.push({ method: prop, args })
+      }
+      fn._isMock = true
+      return fn
+    },
+    set() {
+      return true
+    },
+  }
+  return new Proxy({}, handler)
+}
+
+describe('drawParticipantCanvas', () => {
+  const W = 300
+  const H = 200
+
+  it('should return early when ctx is null', () => {
+    expect(() => drawParticipantCanvas(null, W, H, createParticipant('p1', '张伟'), 0)).not.toThrow()
+  })
+
+  it('should return early when ctx is undefined', () => {
+    expect(() => drawParticipantCanvas(undefined, W, H, createParticipant('p1', '张伟'), 0)).not.toThrow()
+  })
+
+  it('should return early when width is 0', () => {
+    const ctx = createMockCtx()
+    drawParticipantCanvas(ctx, 0, H, createParticipant('p1', '张伟'), 0)
+    expect(ctx.calls.length).toBe(0)
+  })
+
+  it('should return early when width is negative', () => {
+    const ctx = createMockCtx()
+    drawParticipantCanvas(ctx, -10, H, createParticipant('p1', '张伟'), 0)
+    expect(ctx.calls.length).toBe(0)
+  })
+
+  it('should return early when height is 0', () => {
+    const ctx = createMockCtx()
+    drawParticipantCanvas(ctx, W, 0, createParticipant('p1', '张伟'), 0)
+    expect(ctx.calls.length).toBe(0)
+  })
+
+  it('should call clearRect for valid inputs', () => {
+    const ctx = createMockCtx()
+    const p = createParticipant('p1', '张伟')
+    drawParticipantCanvas(ctx, W, H, p, 0)
+    const clearCalls = ctx.calls.filter((c) => c.method === 'clearRect')
+    expect(clearCalls.length).toBeGreaterThan(0)
+    expect(clearCalls[0].args).toEqual([0, 0, W, H])
+  })
+
+  it('should draw animated background + avatar for normal participant (video on)', () => {
+    const ctx = createMockCtx()
+    const p = createParticipant('p1', '张伟')
+    drawParticipantCanvas(ctx, W, H, p, 10)
+    const fillRectCalls = ctx.calls.filter((c) => c.method === 'fillRect')
+    expect(fillRectCalls.length).toBeGreaterThan(0)
+    const arcCalls = ctx.calls.filter((c) => c.method === 'arc')
+    expect(arcCalls.length).toBeGreaterThan(0)
+  })
+
+  it('should draw video off state when isVideoOff is true', () => {
+    const ctx = createMockCtx()
+    const p = { ...createParticipant('p1', '张伟'), isVideoOff: true }
+    drawParticipantCanvas(ctx, W, H, p, 0)
+    const fillRectCalls = ctx.calls.filter((c) => c.method === 'fillRect')
+    expect(fillRectCalls.length).toBeGreaterThan(0)
+    const strokeRectCalls = ctx.calls.filter((c) => c.method === 'strokeRect')
+    expect(strokeRectCalls.length).toBeGreaterThan(0)
+  })
+
+  it('should draw mute indicator when isMuted is true and not screen sharing', () => {
+    const ctx = createMockCtx()
+    const p = { ...createParticipant('p1', '张伟'), isMuted: true }
+    drawParticipantCanvas(ctx, W, H, p, 0)
+    const arcCalls = ctx.calls.filter((c) => c.method === 'arc')
+    const muteCircle = arcCalls.find(
+      (c) => c.args[2] > 10 && c.args[2] < 30
+    )
+    expect(muteCircle).toBeDefined()
+  })
+
+  it('should not draw mute indicator when screen sharing', () => {
+    const ctx1 = createMockCtx()
+    const pSharing = { ...createParticipant('p1', '张伟'), isMuted: true, isScreenSharing: true }
+    drawParticipantCanvas(ctx1, W, H, pSharing, 0)
+    const ctx2 = createMockCtx()
+    const pNormal = { ...createParticipant('p1', '张伟'), isMuted: true }
+    drawParticipantCanvas(ctx2, W, H, pNormal, 0)
+    const arcCalls1 = ctx1.calls.filter((c) => c.method === 'arc')
+    const arcCalls2 = ctx2.calls.filter((c) => c.method === 'arc')
+    expect(arcCalls1.length).toBeLessThan(arcCalls2.length)
+  })
+
+  it('should draw hand raise indicator when isHandRaised is true', () => {
+    const ctx = createMockCtx()
+    const p = { ...createParticipant('p1', '张伟'), isHandRaised: true }
+    drawParticipantCanvas(ctx, W, H, p, 0)
+    const arcCalls = ctx.calls.filter((c) => c.method === 'arc')
+    expect(arcCalls.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('should draw screen share state when isScreenSharing is true', () => {
+    const ctx = createMockCtx()
+    const p = { ...createParticipant('p1', '张伟'), isScreenSharing: true }
+    drawParticipantCanvas(ctx, W, H, p, 10)
+    const fillRectCalls = ctx.calls.filter((c) => c.method === 'fillRect')
+    expect(fillRectCalls.length).toBeGreaterThan(2)
+    const fillTextCalls = ctx.calls.filter((c) => c.method === 'fillText')
+    const hasSlideText = fillTextCalls.some(
+      (c) => typeof c.args[0] === 'string' && c.args[0].includes('第')
+    )
+    expect(hasSlideText).toBe(true)
+  })
+
+  it('should draw name label with (你) suffix for self participant', () => {
+    const ctx = createMockCtx()
+    const p = createParticipant('self', '我', true)
+    drawParticipantCanvas(ctx, W, H, p, 0)
+    const fillTextCalls = ctx.calls.filter((c) => c.method === 'fillText')
+    const nameLabel = fillTextCalls.find(
+      (c) => typeof c.args[0] === 'string' && c.args[0].includes('(你)')
+    )
+    expect(nameLabel).toBeDefined()
+  })
+
+  it('should draw name label without (你) for non-self participant', () => {
+    const ctx = createMockCtx()
+    const p = createParticipant('p1', '张伟')
+    drawParticipantCanvas(ctx, W, H, p, 0)
+    const fillTextCalls = ctx.calls.filter((c) => c.method === 'fillText')
+    const nameLabel = fillTextCalls.find(
+      (c) => typeof c.args[0] === 'string' && c.args[0] === '张伟'
+    )
+    expect(nameLabel).toBeDefined()
+  })
+
+  it('should handle null participant gracefully', () => {
+    const ctx = createMockCtx()
+    expect(() => drawParticipantCanvas(ctx, W, H, null, 0)).not.toThrow()
+    const clearCalls = ctx.calls.filter((c) => c.method === 'clearRect')
+    expect(clearCalls.length).toBeGreaterThan(0)
+  })
+
+  it('should handle undefined participant gracefully', () => {
+    const ctx = createMockCtx()
+    expect(() => drawParticipantCanvas(ctx, W, H, undefined, 0)).not.toThrow()
+  })
+
+  it('should handle combined states: video off + muted + hand raised', () => {
+    const ctx = createMockCtx()
+    const p = {
+      ...createParticipant('p1', '张伟'),
+      isVideoOff: true,
+      isMuted: true,
+      isHandRaised: true,
+    }
+    drawParticipantCanvas(ctx, W, H, p, 0)
+    const arcCalls = ctx.calls.filter((c) => c.method === 'arc')
+    expect(arcCalls.length).toBeGreaterThanOrEqual(2)
+    const fillTextCalls = ctx.calls.filter((c) => c.method === 'fillText')
+    expect(fillTextCalls.length).toBeGreaterThan(0)
+  })
+
+  it('should prioritize screen sharing over video off state', () => {
+    const ctx = createMockCtx()
+    const p = {
+      ...createParticipant('p1', '张伟'),
+      isVideoOff: true,
+      isScreenSharing: true,
+    }
+    drawParticipantCanvas(ctx, W, H, p, 0)
+    const fillTextCalls = ctx.calls.filter((c) => c.method === 'fillText')
+    const hasCameraOffText = fillTextCalls.some(
+      (c) => typeof c.args[0] === 'string' && c.args[0].includes('摄像头已关闭')
+    )
+    expect(hasCameraOffText).toBe(false)
   })
 })

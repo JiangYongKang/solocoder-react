@@ -1,6 +1,7 @@
 import {
     BROWSER_LIST,
     CITIES,
+    DEFAULT_FREQUENT_LOCATIONS,
     DEFAULT_PAGE_SIZE,
     DEVICE_NAMES,
     FREQUENT_CITY,
@@ -11,8 +12,10 @@ import {
     SCORE_COLORS,
     SCORE_WEIGHTS,
     STORAGE_KEY_DEVICES,
+    STORAGE_KEY_FREQUENT_LOCATIONS,
     STORAGE_KEY_OPERATIONS,
     STORAGE_KEY_TWOFA,
+    WEAK_PASSWORDS,
 } from './constants'
 
 export function generateId() {
@@ -46,21 +49,48 @@ export function generateIpAddress() {
 
 export function generateBase32Secret(length = 16) {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
+  const bytes = new Uint8Array(length)
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    crypto.getRandomValues(bytes)
+  } else {
+    for (let i = 0; i < length; i++) bytes[i] = Math.floor(Math.random() * 256)
+  }
   let result = ''
   for (let i = 0; i < length; i++) {
-    result += chars[Math.floor(Math.random() * chars.length)]
+    result += chars[bytes[i] % chars.length]
   }
   return result
 }
+
+const SPECIAL_CHAR_REGEX = /[!@#$%^&*()_+\-=[\]{}|;:'",.<>?/\\`~]/
 
 export function checkPasswordCharTypes(password) {
   if (!password) return { uppercase: false, lowercase: false, number: false, special: false, count: 0 }
   const uppercase = /[A-Z]/.test(password)
   const lowercase = /[a-z]/.test(password)
   const number = /[0-9]/.test(password)
-  const special = /[!@#$%^&*()_+\-=[\]{}|;:'",.<>?/\\`~]/.test(password)
+  const special = SPECIAL_CHAR_REGEX.test(password)
   const count = [uppercase, lowercase, number, special].filter(Boolean).length
   return { uppercase, lowercase, number, special, count }
+}
+
+export function hasConsecutiveRepeats(password, minRepeat = 3) {
+  if (!password || password.length < minRepeat) return false
+  for (let i = 0; i <= password.length - minRepeat; i++) {
+    const ch = password[i]
+    let repeat = 1
+    for (let j = i + 1; j < password.length && password[j] === ch; j++) {
+      repeat++
+    }
+    if (repeat >= minRepeat) return true
+  }
+  return false
+}
+
+export function isCommonWeakPassword(password) {
+  if (!password) return false
+  const lower = password.toLowerCase()
+  return WEAK_PASSWORDS.some(wp => lower === wp || lower.includes(wp))
 }
 
 export function evaluatePasswordStrength(password) {
@@ -75,6 +105,8 @@ export function evaluatePasswordStrength(password) {
   const len = password.length
   const types = checkPasswordCharTypes(password)
   const suggestions = []
+  const hasRepeats = hasConsecutiveRepeats(password)
+  const isWeak = isCommonWeakPassword(password)
 
   if (len < 6) {
     suggestions.push('密码长度至少为 6 位')
@@ -95,6 +127,12 @@ export function evaluatePasswordStrength(password) {
     suggestions.push('建议将密码长度增加到 8 位以上')
   } else if (len >= 8 && len < 12) {
     suggestions.push('建议将密码长度增加到 12 位以上以获得最高强度')
+  }
+  if (hasRepeats) {
+    suggestions.push('避免连续重复字符（如 AAAA、1111）')
+  }
+  if (isWeak) {
+    suggestions.push('避免使用常见弱密码（如 password、123456、qwerty）')
   }
 
   let strength
@@ -138,6 +176,20 @@ export function evaluatePasswordStrength(password) {
     }
   }
 
+  if (hasRepeats) {
+    if (strength.level >= PASSWORD_STRENGTH.STRONG.level) {
+      strength = PASSWORD_STRENGTH.MEDIUM
+      progress = Math.min(progress, 55)
+    } else if (strength.level >= PASSWORD_STRENGTH.MEDIUM.level) {
+      progress = Math.min(progress, 40)
+    }
+  }
+
+  if (isWeak) {
+    strength = PASSWORD_STRENGTH.WEAK
+    progress = Math.min(progress, 20)
+  }
+
   return {
     ...strength,
     progress,
@@ -148,15 +200,13 @@ export function evaluatePasswordStrength(password) {
 export function getPasswordScore(password) {
   if (!password) return 0
   const result = evaluatePasswordStrength(password)
-  if (result.level <= 1) return Math.round(SCORE_WEIGHTS.PASSWORD * 0.2)
-  if (result.level === 2) return Math.round(SCORE_WEIGHTS.PASSWORD * 0.5)
-  if (result.level === 3) return Math.round(SCORE_WEIGHTS.PASSWORD * 0.85)
-  return SCORE_WEIGHTS.PASSWORD
+  return Math.round((result.progress / 100) * SCORE_WEIGHTS.PASSWORD)
 }
 
-export function generateMockDevices() {
+export function generateMockDevices(frequentLocations = DEFAULT_FREQUENT_LOCATIONS) {
   const now = Date.now()
   const devices = []
+  const primaryCity = frequentLocations[0] || FREQUENT_CITY
 
   devices.push({
     id: generateId(),
@@ -165,12 +215,12 @@ export function generateMockDevices() {
     browser: 'Chrome 120',
     ip: '192.168.1.100',
     loginTime: now,
-    location: FREQUENT_CITY,
+    location: primaryCity,
     isCurrent: true,
-    isRemote: false,
   })
 
-  const remoteCities = CITIES.filter(c => c !== FREQUENT_CITY)
+  const remoteCities = CITIES.filter(c => !frequentLocations.includes(c))
+  const localCities = CITIES.filter(c => frequentLocations.includes(c))
   const remoteIndices = new Set()
   while (remoteIndices.size < 2) {
     remoteIndices.add(randomInt(0, 2))
@@ -179,6 +229,9 @@ export function generateMockDevices() {
   for (let i = 0; i < 4; i++) {
     const isRemote = remoteIndices.has(i)
     const hoursAgo = randomInt(1, 720)
+    const location = isRemote
+      ? (remoteCities.length > 0 ? randomItem(remoteCities) : randomItem(CITIES.filter(c => c !== primaryCity)))
+      : (localCities.length > 0 ? randomItem(localCities) : primaryCity)
     devices.push({
       id: generateId(),
       name: randomItem(DEVICE_NAMES),
@@ -186,9 +239,8 @@ export function generateMockDevices() {
       browser: randomItem(BROWSER_LIST),
       ip: generateIpAddress(),
       loginTime: now - hoursAgo * 60 * 60 * 1000,
-      location: isRemote ? randomItem(remoteCities) : FREQUENT_CITY,
+      location,
       isCurrent: false,
-      isRemote,
     })
   }
 
@@ -200,8 +252,34 @@ export function removeDevice(devices, deviceId) {
   return devices.filter(d => d.id !== deviceId)
 }
 
-export function hasRemoteLogin(devices) {
-  return devices.some(d => d.isRemote && !d.isCurrent)
+export function hasRemoteLogin(devices, frequentLocations = DEFAULT_FREQUENT_LOCATIONS) {
+  return devices.some(d => !d.isCurrent && !frequentLocations.includes(d.location))
+}
+
+export function isDeviceRemote(device, frequentLocations = DEFAULT_FREQUENT_LOCATIONS) {
+  if (device.isCurrent) return false
+  return !frequentLocations.includes(device.location)
+}
+
+export function loadFrequentLocations() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_FREQUENT_LOCATIONS)
+    if (!raw) return [...DEFAULT_FREQUENT_LOCATIONS]
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed) || parsed.length === 0) return [...DEFAULT_FREQUENT_LOCATIONS]
+    return parsed.filter(item => typeof item === 'string' && item.trim().length > 0)
+  } catch {
+    return [...DEFAULT_FREQUENT_LOCATIONS]
+  }
+}
+
+export function saveFrequentLocations(locations) {
+  try {
+    localStorage.setItem(STORAGE_KEY_FREQUENT_LOCATIONS, JSON.stringify(locations))
+    return true
+  } catch {
+    return false
+  }
 }
 
 export function loadDevices() {
@@ -364,10 +442,10 @@ export function paginateOperations(operations, page, pageSize = DEFAULT_PAGE_SIZ
   }
 }
 
-export function calculateScoreBreakdown(password, twoFAEnabled, devices, operations) {
+export function calculateScoreBreakdown(password, twoFAEnabled, devices, operations, frequentLocations = DEFAULT_FREQUENT_LOCATIONS) {
   const passwordScore = getPasswordScore(password)
   const twoFAScore = twoFAEnabled ? SCORE_WEIGHTS.TWOFA : 0
-  const remoteScore = hasRemoteLogin(devices) ? 0 : SCORE_WEIGHTS.REMOTE_LOGIN
+  const remoteScore = hasRemoteLogin(devices, frequentLocations) ? 0 : SCORE_WEIGHTS.REMOTE_LOGIN
   const anomalyScore = hasRecentAnomaly(operations) ? 0 : SCORE_WEIGHTS.ANOMALY
 
   const total = passwordScore + twoFAScore + remoteScore + anomalyScore

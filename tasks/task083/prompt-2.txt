@@ -1,0 +1,11 @@
+你实现的代码执行沙箱模拟页面还存在一些问题，需要进行修复：
+
+1. codeSandboxUtils.js 的 transformPythonToJs 函数在转换 Python 控制流时，if 条件语句中的 in 成员运算符被直接保留为 JS 的 in 运算符。JS 的 in 检查的是属性或索引存在性而非值成员关系，例如 3 in [1,2,3] 在 JS 中返回 false（因为索引 3 不存在），而 Python 中应返回 True。这导致 Python 模拟执行的条件判断结果错误。
+
+2. codeSandboxUtils.js 的 handleBracketCompletion 实现了输入 (、[、{ 时自动补全右括号，但没有实现闭合括号跳过逻辑。用户输入 ( 后编辑器自动插入 )，此时用户手动再输入 ) 期望跳过已有右括号继续编写，但实际会在已有 ) 之前再插入一个 )，形成 ()) 的错误括号对。
+
+3. index.jsx 的 handleLanguageChange 函数使用严格相等判断当前代码是否等于默认模板，如果相等才加载新语言的模板。用户只要编辑了任意一个字符，切换语言后永不加载新语言模板，导致在 Python 编辑器中残留 JS 代码。
+
+4. codeSandboxUtils.js 的 PythonInterpreter 构造函数将 stdin 按 \n 分割后过滤掉了所有空行。Python 的 input() 在用户直接按 Enter 时返回空字符串是合法行为，过滤空行会导致多行输入的序列被打乱——空白第二行的数据被跳过，后续的输入调用读到错误的行。
+
+5. 修复后需要为该页面补充纯 JS 函数的单元测试，只测和页面渲染无关的逻辑。补充后重新运行 pnpm run test，需要让所有测试通过。

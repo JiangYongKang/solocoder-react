@@ -202,6 +202,18 @@ function weightedRandom(weights) {
   return weights.length - 1
 }
 
+function boxMullerRandom() {
+  let u = 0
+  let v = 0
+  while (u === 0) u = Math.random()
+  while (v === 0) v = Math.random()
+  return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v)
+}
+
+function logNormalRandom(mu, sigma) {
+  return Math.exp(mu + sigma * boxMullerRandom())
+}
+
 function generateSingleAnswer(options) {
   const weights = options.map((_, i) => Math.max(1, options.length - i) + Math.random() * 5)
   return options[weightedRandom(weights)].value
@@ -240,24 +252,26 @@ function generateRatingAnswer(maxRating = 5) {
 }
 
 function generateDuration() {
-  const bucketWeights = [10, 20, 30, 25, 10, 5]
-  const bucketIdx = weightedRandom(bucketWeights)
-  const buckets = [
-    [10, 30],
-    [35, 60],
-    [65, 120],
-    [130, 300],
-    [310, 600],
-    [620, 1800],
-  ]
-  const [min, max] = buckets[bucketIdx]
-  return Math.floor(min + Math.random() * (max - min))
+  const raw = logNormalRandom(4.5, 0.8)
+  return Math.max(5, Math.min(3600, Math.round(raw)))
 }
 
 export function generateMockResponses(questions, count = 150) {
   const responses = []
   const now = Date.now()
   const dayMs = 86400000
+
+  const answerAccumulators = new Map()
+  questions.forEach((q) => {
+    if (q.type === QUESTION_TYPES.SINGLE) {
+      answerAccumulators.set(q.id, { type: 'single', options: q.options, counts: q.options.map(() => 0) })
+    } else if (q.type === QUESTION_TYPES.MULTIPLE) {
+      answerAccumulators.set(q.id, { type: 'multiple', options: q.options, counts: q.options.map(() => 0) })
+    } else if (q.type === QUESTION_TYPES.RATING) {
+      const maxRating = q.maxRating || 5
+      answerAccumulators.set(q.id, { type: 'rating', maxRating, counts: Array.from({ length: maxRating }, () => 0) })
+    }
+  })
 
   for (let i = 0; i < count; i++) {
     const answers = {}
@@ -288,7 +302,82 @@ export function generateMockResponses(questions, count = 150) {
       submittedAt,
       duration: generateDuration(),
     })
+
+    questions.forEach((q) => {
+      const acc = answerAccumulators.get(q.id)
+      if (!acc) return
+      if (acc.type === 'single') {
+        const idx = acc.options.findIndex((o) => o.value === answers[q.id])
+        if (idx >= 0) acc.counts[idx] += 1
+      } else if (acc.type === 'multiple') {
+        answers[q.id].forEach((v) => {
+          const idx = acc.options.findIndex((o) => o.value === v)
+          if (idx >= 0) acc.counts[idx] += 1
+        })
+      } else if (acc.type === 'rating') {
+        const rating = Number(answers[q.id])
+        if (rating >= 1 && rating <= acc.maxRating) acc.counts[rating - 1] += 1
+      }
+    })
   }
+
+  questions.forEach((q) => {
+    const acc = answerAccumulators.get(q.id)
+    if (!acc) return
+    if (acc.type === 'single') {
+      const zeroIndices = acc.counts.reduce((list, c, i) => (c === 0 ? [...list, i] : list), [])
+      zeroIndices.forEach((zi) => {
+        const donorIdx = acc.counts.findIndex((c, i) => c > 2 && !zeroIndices.includes(i))
+        if (donorIdx >= 0) {
+          const targetRespIdx = responses.findIndex((r) => {
+            const val = r.answers[q.id]
+            return acc.options[donorIdx].value === val
+          })
+          if (targetRespIdx >= 0) {
+            responses[targetRespIdx] = {
+              ...responses[targetRespIdx],
+              answers: { ...responses[targetRespIdx].answers, [q.id]: acc.options[zi].value },
+            }
+            acc.counts[donorIdx] -= 1
+            acc.counts[zi] += 1
+          }
+        }
+      })
+    } else if (acc.type === 'multiple') {
+      const zeroIndices = acc.counts.reduce((list, c, i) => (c === 0 ? [...list, i] : list), [])
+      zeroIndices.forEach((zi) => {
+        const targetRespIdx = responses.findIndex((r) => {
+          const val = r.answers[q.id]
+          return Array.isArray(val) && val.length > 2
+        })
+        if (targetRespIdx >= 0) {
+          const currentAnswers = [...responses[targetRespIdx].answers[q.id]]
+          currentAnswers.push(acc.options[zi].value)
+          responses[targetRespIdx] = {
+            ...responses[targetRespIdx],
+            answers: { ...responses[targetRespIdx].answers, [q.id]: currentAnswers },
+          }
+          acc.counts[zi] += 1
+        }
+      })
+    } else if (acc.type === 'rating') {
+      const zeroIndices = acc.counts.reduce((list, c, i) => (c === 0 ? [...list, i] : list), [])
+      zeroIndices.forEach((zi) => {
+        const donorRating = acc.counts.findIndex((c, i) => c > 2 && !zeroIndices.includes(i))
+        if (donorRating >= 0) {
+          const targetRespIdx = responses.findIndex((r) => Number(r.answers[q.id]) === donorRating + 1)
+          if (targetRespIdx >= 0) {
+            responses[targetRespIdx] = {
+              ...responses[targetRespIdx],
+              answers: { ...responses[targetRespIdx].answers, [q.id]: zi + 1 },
+            }
+            acc.counts[donorRating] -= 1
+            acc.counts[zi] += 1
+          }
+        }
+      })
+    }
+  })
 
   return responses.sort((a, b) => a.submittedAt - b.submittedAt)
 }

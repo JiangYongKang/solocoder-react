@@ -32,7 +32,11 @@ export function loadGradeData() {
     if (!raw) return createInitialState()
     const parsed = JSON.parse(raw)
     if (!parsed.students || !parsed.subjects || !parsed.scores) return createInitialState()
-    return parsed
+    return {
+      students: parsed.students,
+      subjects: parsed.subjects,
+      scores: parsed.scores,
+    }
   } catch {
     return createInitialState()
   }
@@ -41,9 +45,23 @@ export function loadGradeData() {
 export function saveGradeData(data) {
   if (typeof window === 'undefined' || !window.localStorage) return false
   try {
-    const previous = loadGradeData()
-    window.localStorage.setItem(PREVIOUS_STORAGE_KEY, JSON.stringify(previous))
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+    const cleanData = {
+      students: data.students,
+      subjects: data.subjects,
+      scores: data.scores,
+    }
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(cleanData))
+    return true
+  } catch {
+    return false
+  }
+}
+
+export function snapshotPreviousData() {
+  if (typeof window === 'undefined' || !window.localStorage) return false
+  try {
+    const current = loadGradeData()
+    window.localStorage.setItem(PREVIOUS_STORAGE_KEY, JSON.stringify(current))
     return true
   } catch {
     return false
@@ -73,20 +91,21 @@ export function validateScore(score) {
 
 export function addStudent(data, studentName) {
   const name = studentName?.trim()
-  if (!name) return { ...data, error: '学生姓名不能为空' }
-  if (data.students.includes(name)) return { ...data, error: '学生姓名已存在' }
+  if (!name) return { error: '学生姓名不能为空' }
+  if (data.students.includes(name)) return { error: '学生姓名已存在' }
 
   const newScores = { ...data.scores }
+  if (!newScores[name]) newScores[name] = {}
   for (const subject of data.subjects) {
-    if (!newScores[name]) newScores[name] = {}
-    newScores[name][subject] = null
+    if (newScores[name][subject] === undefined) {
+      newScores[name][subject] = null
+    }
   }
 
   return {
-    ...data,
     students: [...data.students, name],
+    subjects: data.subjects,
     scores: newScores,
-    error: null,
   }
 }
 
@@ -95,16 +114,16 @@ export function removeStudent(data, studentName) {
   delete newScores[studentName]
 
   return {
-    ...data,
     students: data.students.filter((s) => s !== studentName),
+    subjects: data.subjects,
     scores: newScores,
   }
 }
 
 export function addSubject(data, subjectName) {
   const name = subjectName?.trim()
-  if (!name) return { ...data, error: '科目名称不能为空' }
-  if (data.subjects.includes(name)) return { ...data, error: '科目已存在' }
+  if (!name) return { error: '科目名称不能为空' }
+  if (data.subjects.includes(name)) return { error: '科目已存在' }
 
   const newScores = { ...data.scores }
   for (const student of data.students) {
@@ -113,10 +132,9 @@ export function addSubject(data, subjectName) {
   }
 
   return {
-    ...data,
+    students: data.students,
     subjects: [...data.subjects, name],
     scores: newScores,
-    error: null,
   }
 }
 
@@ -124,21 +142,36 @@ export function removeSubject(data, subjectName) {
   const newScores = { ...data.scores }
   for (const student of data.students) {
     if (newScores[student]) {
-      const { [subjectName]: _, ...rest } = newScores[student]
+      const { [subjectName]: _removed, ...rest } = newScores[student]
       newScores[student] = rest
     }
   }
 
   return {
-    ...data,
+    students: data.students,
     subjects: data.subjects.filter((s) => s !== subjectName),
     scores: newScores,
   }
 }
 
 export function updateScore(data, studentName, subjectName, score) {
+  if (score === null || score === undefined || score === '') {
+    const newScores = {
+      ...data.scores,
+      [studentName]: {
+        ...data.scores[studentName],
+        [subjectName]: null,
+      },
+    }
+    return {
+      students: data.students,
+      subjects: data.subjects,
+      scores: newScores,
+    }
+  }
+
   const validation = validateScore(score)
-  if (!validation.valid) return { ...data, error: validation.message }
+  if (!validation.valid) return { error: validation.message }
 
   const newScores = {
     ...data.scores,
@@ -149,9 +182,9 @@ export function updateScore(data, studentName, subjectName, score) {
   }
 
   return {
-    ...data,
+    students: data.students,
+    subjects: data.subjects,
     scores: newScores,
-    error: null,
   }
 }
 
@@ -300,12 +333,12 @@ export function calculateRankings(data, sortBy = 'total') {
   return rankings
 }
 
-export function calculateRankChanges(currentRankings, previousData) {
+export function calculateRankChanges(currentRankings, previousData, sortBy = 'total') {
   if (!previousData || !previousData.students || previousData.students.length === 0) {
     return currentRankings.map((r) => ({ ...r, change: 0 }))
   }
 
-  const previousRankings = calculateRankings(previousData, 'total')
+  const previousRankings = calculateRankings(previousData, sortBy)
   const previousRankMap = new Map()
   for (const r of previousRankings) {
     previousRankMap.set(r.name, r.rank)
@@ -376,6 +409,14 @@ export function parsePastedData(text, data) {
   return result
 }
 
+export function escapeCSVValue(value) {
+  const str = value === null || value === undefined ? '' : String(value)
+  if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+    return `"${str.replace(/"/g, '""')}"`
+  }
+  return str
+}
+
 export function exportToCSV(data) {
   const header = ['姓名', ...data.subjects, '总分', '平均分']
   const rows = data.students.map((student) => {
@@ -388,7 +429,9 @@ export function exportToCSV(data) {
     return [student, ...scores, total, average]
   })
 
-  const csvContent = [header, ...rows].map((row) => row.join(',')).join('\n')
+  const csvContent = [header, ...rows]
+    .map((row) => row.map(escapeCSVValue).join(','))
+    .join('\n')
 
   const now = new Date()
   const pad = (n) => String(n).padStart(2, '0')

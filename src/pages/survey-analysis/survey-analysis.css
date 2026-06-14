@@ -592,29 +592,6 @@
   color: var(--text-h);
 }
 
-.sa-wordcloud {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px 16px;
-  padding: 16px;
-  background: var(--bg);
-  border-radius: 8px;
-  align-items: center;
-  justify-content: center;
-  min-height: 160px;
-}
-
-.sa-word-item {
-  display: inline-block;
-  line-height: 1.2;
-  transition: transform 0.15s;
-  cursor: default;
-}
-
-.sa-word-item:hover {
-  transform: scale(1.1);
-}
-
 .sa-wordcloud-empty {
   display: flex;
   align-items: center;

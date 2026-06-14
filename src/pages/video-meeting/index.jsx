@@ -235,8 +235,15 @@ function VideoMeetingPage() {
   const [animFrame, setAnimFrame] = useState(0)
   const [meetingDuration, setMeetingDuration] = useState(0)
   const chatInputRef = useRef(null)
+  const sidePanelOpenRef = useRef(false)
+  const sidePanelTabRef = useRef('chat')
 
   const selfParticipant = participants.find((p) => p.isSelf)
+
+  useEffect(() => {
+    sidePanelOpenRef.current = sidePanelOpen
+    sidePanelTabRef.current = sidePanelTab
+  }, [sidePanelOpen, sidePanelTab])
 
   useEffect(() => {
     if (meetingEnded) return
@@ -258,14 +265,14 @@ function VideoMeetingPage() {
   }, [meetingEnded])
 
   useEffect(() => {
-    if (meetingEnded || !sidePanelOpen) return
+    if (meetingEnded) return
     const scheduleNext = () => {
       const delay = getRandomChatInterval(CHAT_SIMULATE_INTERVAL_MIN, CHAT_SIMULATE_INTERVAL_MAX)
       return setTimeout(() => {
         const msg = generateRandomChatMessage(participants, null, SIMULATED_CHAT_MESSAGES)
         if (msg) {
           setChatMessages((prev) => [...prev, msg])
-          if (!sidePanelOpen || sidePanelTab !== 'chat') {
+          if (!sidePanelOpenRef.current || sidePanelTabRef.current !== 'chat') {
             setUnreadCount((prev) => prev + 1)
           }
         }
@@ -274,7 +281,7 @@ function VideoMeetingPage() {
     }
     let timerRef = scheduleNext()
     return () => clearTimeout(timerRef)
-  }, [meetingEnded, sidePanelOpen, sidePanelTab, participants])
+  }, [meetingEnded, participants])
 
   const handleToggleMute = useCallback(() => {
     setParticipants((prev) => toggleParticipantProperty(prev, 'self', 'isMuted'))
@@ -285,11 +292,7 @@ function VideoMeetingPage() {
   }, [])
 
   const handleToggleScreenShare = useCallback(() => {
-    setParticipants((prev) =>
-      prev.map((p) =>
-        p.id === 'self' ? { ...p, isScreenSharing: !p.isScreenSharing } : p
-      )
-    )
+    setParticipants((prev) => toggleParticipantProperty(prev, 'self', 'isScreenSharing'))
   }, [])
 
   const handleToggleHand = useCallback(() => {
@@ -316,15 +319,23 @@ function VideoMeetingPage() {
   }, [])
 
   const handleOpenChat = useCallback(() => {
-    setSidePanelOpen(true)
-    setSidePanelTab('chat')
-    setUnreadCount(0)
-  }, [])
+    if (sidePanelOpen && sidePanelTab === 'chat') {
+      setSidePanelOpen(false)
+    } else {
+      setSidePanelOpen(true)
+      setSidePanelTab('chat')
+      setUnreadCount(0)
+    }
+  }, [sidePanelOpen, sidePanelTab])
 
   const handleOpenParticipants = useCallback(() => {
-    setSidePanelOpen(true)
-    setSidePanelTab('participants')
-  }, [])
+    if (sidePanelOpen && sidePanelTab === 'participants') {
+      setSidePanelOpen(false)
+    } else {
+      setSidePanelOpen(true)
+      setSidePanelTab('participants')
+    }
+  }, [sidePanelOpen, sidePanelTab])
 
   const handleCloseSidePanel = useCallback(() => {
     setSidePanelOpen(false)

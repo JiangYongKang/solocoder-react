@@ -50,6 +50,7 @@ import {
   sortDanmakuListByTime,
   getDanmakuPositionIcon,
   evictOldestIfOverCapacity,
+  cleanupOutOfRangeScrollDanmakus,
 } from '../../danmaku-player/danmakuCore.js'
 
 const createMockLocalStorage = () => {
@@ -107,6 +108,17 @@ describe('resetDanmakuIdCounter', () => {
     const idPart1 = id1.split('_').pop()
     const idPart2 = id2.split('_').pop()
     expect(idPart1).toBe(idPart2)
+  })
+
+  it('重置后生成的ID依然保持唯一', () => {
+    resetDanmakuIdCounter()
+    const a = generateDanmakuId()
+    resetDanmakuIdCounter()
+    const b = generateDanmakuId()
+    const c = generateDanmakuId()
+    expect(a).not.toBe(b)
+    expect(b).not.toBe(c)
+    expect(new Set([a, b, c]).size).toBe(3)
   })
 })
 
@@ -1078,5 +1090,75 @@ describe('evictOldestIfOverCapacity', () => {
     ]
     const result = evictOldestIfOverCapacity(danmakus, 0)
     expect(result.length).toBe(1)
+  })
+})
+
+describe('cleanupOutOfRangeScrollDanmakus', () => {
+  it('非数组返回空数组', () => {
+    expect(cleanupOutOfRangeScrollDanmakus(null, 3)).toEqual([])
+    expect(cleanupOutOfRangeScrollDanmakus(undefined, 3)).toEqual([])
+  })
+
+  it('空数组返回空数组', () => {
+    expect(cleanupOutOfRangeScrollDanmakus([], 5)).toEqual([])
+  })
+
+  it('轨道数量足够时弹幕都保留', () => {
+    const danmakus = [
+      { id: 'a', position: DANMAKU_POSITIONS.SCROLL, trackIndex: 0, removed: false },
+      { id: 'b', position: DANMAKU_POSITIONS.SCROLL, trackIndex: 2, removed: false },
+    ]
+    const result = cleanupOutOfRangeScrollDanmakus(danmakus, 5)
+    expect(result.every((d) => !d.removed)).toBe(true)
+  })
+
+  it('轨道不足时超轨滚动弹幕被标记移除', () => {
+    const danmakus = [
+      { id: 'a', position: DANMAKU_POSITIONS.SCROLL, trackIndex: 0, removed: false },
+      { id: 'b', position: DANMAKU_POSITIONS.SCROLL, trackIndex: 3, removed: false },
+      { id: 'c', position: DANMAKU_POSITIONS.SCROLL, trackIndex: 7, removed: false },
+    ]
+    const result = cleanupOutOfRangeScrollDanmakus(danmakus, 3)
+    expect(result.find((d) => d.id === 'a').removed).toBe(false)
+    expect(result.find((d) => d.id === 'b').removed).toBe(true)
+    expect(result.find((d) => d.id === 'c').removed).toBe(true)
+  })
+
+  it('固定弹幕不受轨道数影响', () => {
+    const danmakus = [
+      { id: 'a', position: DANMAKU_POSITIONS.TOP, removed: false },
+      { id: 'b', position: DANMAKU_POSITIONS.BOTTOM, removed: false },
+      { id: 'c', position: DANMAKU_POSITIONS.SCROLL, trackIndex: 5, removed: false },
+    ]
+    const result = cleanupOutOfRangeScrollDanmakus(danmakus, 3)
+    expect(result.find((d) => d.id === 'a').removed).toBe(false)
+    expect(result.find((d) => d.id === 'b').removed).toBe(false)
+    expect(result.find((d) => d.id === 'c').removed).toBe(true)
+  })
+
+  it('已移除的弹幕保持不变', () => {
+    const danmakus = [
+      { id: 'a', position: DANMAKU_POSITIONS.SCROLL, trackIndex: 10, removed: true },
+    ]
+    const result = cleanupOutOfRangeScrollDanmakus(danmakus, 3)
+    expect(result[0].removed).toBe(true)
+  })
+
+  it('无效 newTrackCount 返回原数组', () => {
+    const danmakus = [
+      { id: 'a', position: DANMAKU_POSITIONS.SCROLL, trackIndex: 5, removed: false },
+    ]
+    const r1 = cleanupOutOfRangeScrollDanmakus(danmakus, NaN)
+    const r2 = cleanupOutOfRangeScrollDanmakus(danmakus, 'abc')
+    expect(r1).toEqual(danmakus)
+    expect(r2).toEqual(danmakus)
+  })
+
+  it('负数 trackIndex 也视为超轨', () => {
+    const danmakus = [
+      { id: 'a', position: DANMAKU_POSITIONS.SCROLL, trackIndex: -1, removed: false },
+    ]
+    const result = cleanupOutOfRangeScrollDanmakus(danmakus, 3)
+    expect(result[0].removed).toBe(true)
   })
 })

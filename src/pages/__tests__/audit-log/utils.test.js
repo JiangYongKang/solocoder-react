@@ -452,7 +452,7 @@ describe('exportToCsv', () => {
     expect(lines[0]).toContain('操作类型')
     expect(lines[0]).toContain('操作对象')
     expect(lines[0]).toContain('操作结果')
-    expect(lines[0]).toContain('IP地址')
+    expect(lines[0]).toContain('IP 地址')
     expect(lines[1]).toContain('admin')
     expect(lines[1]).toContain('登录')
     expect(lines[1]).toContain('成功')

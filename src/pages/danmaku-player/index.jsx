@@ -70,7 +70,6 @@ const DanmakuPlayerPage = () => {
   const scrollTracksRef = useRef(initializeScrollTracks(DENSITY_CONFIG[settings.density].trackCount))
   const progressTrackRef = useRef(null)
   const isDraggingRef = useRef(false)
-  const lastFrameTimeRef = useRef(0)
   const lastRenderSignatureRef = useRef(null)
   const nativeFullscreenRef = useRef(false)
 
@@ -439,6 +438,7 @@ const DanmakuPlayerPage = () => {
         }
       } else {
         nativeFullscreenRef.current = false
+        setIsFullscreen(false)
       }
     }
   }, [])

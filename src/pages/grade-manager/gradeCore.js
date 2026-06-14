@@ -64,7 +64,13 @@ export function snapshotPreviousData() {
     if (existingRaw) {
       try {
         const existing = JSON.parse(existingRaw)
-        if (existing && existing.students && existing.subjects && existing.scores) {
+        if (
+          existing &&
+          Array.isArray(existing.students) &&
+          Array.isArray(existing.subjects) &&
+          existing.scores &&
+          typeof existing.scores === 'object'
+        ) {
           return false
         }
       } catch {

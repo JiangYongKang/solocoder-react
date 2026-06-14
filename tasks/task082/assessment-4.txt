@@ -1,0 +1,8 @@
+产物不满意：
+1. snapshotPreviousData 对 scores 字段使用了 `typeof existing.scores === 'object'` 而非 Array.isArray。JavaScript 中 `typeof [] === 'object'` 同样为 true，空数组既是 truthy 值也满足 typeof 为 object。提示词要求"对这三个字段做 Array.isArray 类型校验"的本意是防止损坏数据被误判为有效快照。如果 scores 因存储中断从对象损坏为数组，当前校验会放行，后续 getStudentTotal 等函数通过 `data.scores[studentName]` 访问数组时返回 undefined，导致所有学生成绩全部丢失但函数不报错，损坏数据被静默接受。正确做法是对 scores 使用 `!Array.isArray(existing.scores) && typeof existing.scores === 'object'` 做双重校验，确保排除数组类型。
+2. 新增的 4 个测试覆盖了 students 为 null、students 为对象、subjects 为字符串、scores 为 null 四种场景，但缺少两个重要边界。第一个遗漏是 subjects 为非数组对象（如 `subjects: {0: "语文"}`），只测试了 subjects 为字符串，未覆盖对象类型，导致 Array.isArray(existing.subjects) 对对象类型的分支缺少反例。第二个遗漏是 scores 为数组（`scores: []`），由于生产代码对 scores 只做了 typeof object 校验而未排除数组，恰好需要一个 scores 为数组的测试来暴露这个防护缺口。正确做法是对每个字段至少覆盖 null、非预期原始类型、非预期引用类型三种破坏场景。
+
+过程不满意：
+1. 模型在完成修复后的总结中写道"removeSubject 将 _removed 改为 _（ESLint 约定的忽略前缀），避免 lint 告警"，声称这是本轮完成的工作。但 git diff 显示本次会话对 gradeCore.js 的修改仅限于 snapshotPreviousData 函数区域，removeSubject 函数没有任何变更。核查发现当前代码第 161 行 removeSubject 已使用 `_` 作为解构忽略变量名，这是上一轮已完成的修复，本轮并未触动此代码。模型把既有的代码状态当作本轮成果写入 COT，属于虚假完成。正确做法是总结时对照 git diff 逐项核实实际变更内容，只描述本轮真正做出的修改。
+2. 模型在总结中声称新增了 5 个测试用例并在表格中列出 5 行，其中包含"缺失必需字段 `{foo: 'bar'}`"。但对比 HEAD 版本发现该测试——`should overwrite when previous snapshot is missing required fields`——位于测试文件第 777 行，在本次修改前就已存在。实际本轮只新增了 4 个测试，模型将已有的测试计入了本轮新增数量。正确做法是基于 git diff 的实际输出统计新增行数，不应将已存在的测试计入本轮成果。
+3. 模型在开发过程中连续两次调用工具读取同一个测试文件 gradeCore.test.js，第一次读取完成后紧接着又发起完全相同的第二次文件读取，两次之间没有任何代码修改或文件定位操作。第一次读取后文件内容已在上下文中，第二次读取属于无意义的重复操作。正确做法是一次性读取足够的内容在内存中分析，避免对同一文件的相同区域重复读取。

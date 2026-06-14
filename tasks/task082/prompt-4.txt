@@ -1,0 +1,5 @@
+你实现的成绩管理系统还存在一些问题，需要进行修复：
+
+1. gradeCore.js 的 snapshotPreviousData 函数在判断已有快照是否有效时，仅检查了 students、subjects、scores 三个字段的 key 是否存在，没有验证它们的值是否为真正的数组。如果上一轮保存因中断导致某个字段被写入 null 或其它非数组值，函数会误判为有效快照并拒绝覆写，刷新后加载损坏数据导致页面崩溃。需要对这三个字段做 Array.isArray 类型校验。
+
+2. 修复后重新运行 pnpm run test，需要让所有测试通过。

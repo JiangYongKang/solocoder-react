@@ -340,10 +340,26 @@ describe('isCommonWeakPassword', () => {
     expect(isCommonWeakPassword('dragon!@#')).toBe(true)
   })
 
-  it('弱密码后跟超过 4 字符后缀不判定为弱', () => {
-    expect(isCommonWeakPassword('password12345')).toBe(false)
-    expect(isCommonWeakPassword('qwerty123456')).toBe(false)
+  it('含数字弱密码条目的变体也能被检测', () => {
+    expect(isCommonWeakPassword('Trustno1!')).toBe(true)
+    expect(isCommonWeakPassword('Abc123!')).toBe(true)
+    expect(isCommonWeakPassword('trustno1!@')).toBe(true)
+    expect(isCommonWeakPassword('abc123!!')).toBe(true)
+    expect(isCommonWeakPassword('Qwerty123!')).toBe(true)
+    expect(isCommonWeakPassword('Password1!')).toBe(true)
+    expect(isCommonWeakPassword('123456!')).toBe(true)
+    expect(isCommonWeakPassword('12345678!')).toBe(true)
+    expect(isCommonWeakPassword('Letmein!')).toBe(true)
+  })
+
+  it('弱密码条目后跟超过 4 字符后缀不判定为弱', () => {
     expect(isCommonWeakPassword('admin@2024')).toBe(false)
+    expect(isCommonWeakPassword('trustno1!@#$%')).toBe(false)
+  })
+
+  it('弱密码条目长后缀可能被列表中更短条目的后缀匹配捕获', () => {
+    expect(isCommonWeakPassword('password12345')).toBe(true)
+    expect(isCommonWeakPassword('qwerty123456')).toBe(true)
   })
 
   it('包含弱密码词根但为其他合法单词不误判', () => {

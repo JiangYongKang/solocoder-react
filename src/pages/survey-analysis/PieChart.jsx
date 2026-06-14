@@ -104,8 +104,24 @@ const PieChart = forwardRef(function PieChart({ data, size = 240 }, ref) {
           if (Math.abs(dx) < minDistX && Math.abs(dy) < minDistY) {
             const overlapX = minDistX - Math.abs(dx)
             const overlapY = minDistY - Math.abs(dy)
-            let dirX = dx === 0 ? (Math.random() - 0.5) : dx
-            let dirY = dy === 0 ? (a.y < cy ? -1 : 1) : dy
+            let dirX
+            if (dx === 0) {
+              const angleA = Math.atan2(a.y - cy, a.x - cx)
+              const angleB = Math.atan2(b.y - cy, b.x - cx)
+              const diff = ((angleA - angleB + Math.PI * 3) % (Math.PI * 2)) - Math.PI
+              dirX = diff >= 0 ? 1 : -1
+            } else {
+              dirX = dx
+            }
+            let dirY
+            if (dy === 0) {
+              const angleA = Math.atan2(a.y - cy, a.x - cx)
+              const angleB = Math.atan2(b.y - cy, b.x - cx)
+              const avgAngle = (angleA + angleB) / 2
+              dirY = Math.sin(avgAngle) >= 0 ? 1 : -1
+            } else {
+              dirY = dy
+            }
             const len = Math.sqrt(dirX * dirX + dirY * dirY) || 1
             dirX /= len
             dirY /= len

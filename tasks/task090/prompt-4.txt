@@ -1,0 +1,7 @@
+你实现的安全中心页面还存在一些问题，需要进行修复：
+
+1. isCommonWeakPassword 函数的后缀匹配策略只对纯字母词根启用。但 WEAK_PASSWORDS 列表中存在 trustno1 和 abc123 等含数字的弱密码条目，它们的纯字母词根 trustno 和 abc 并未包含在 WEAK_PASSWORDS 中。这导致 Trustno1!（trustno1 加一个感叹号）不会被判定为弱密码，而 Password1!（password 在列表中）却会被判定，不同弱密码条目的派生变体检测存在内部不一致。需要让所有弱密码条目都能覆盖其合理变体。
+
+2. SUFFIX_CHARS 常量字符串在 JavaScript 单引号内包含多层正则转义，字符串中同时混杂了 JS 字符串转义和正则字符类特殊字符转义，可读性和可维护性差。需要改用更清晰的方式构造这个字符集，减少转义层级或添加必要的注释说明。
+
+3. 修复后重新运行 pnpm run test，需要让所有测试通过。

@@ -1,0 +1,7 @@
+你实现的弹幕播放器模拟页面还存在一些问题，需要进行修复：
+
+1. toggleFullscreen 函数在修复 requestFullscreen Promise 拒绝时的 UI 回退后，新增的 else 分支（浏览器不支持全屏 API 的情况）中只重置了 nativeFullscreenRef，没有同步调用 setIsFullscreen(false) 回退 UI 状态。此时页面按钮仍显示"退出全屏"，与实际状态不一致。需要在 else 分支中也回退 UI 状态。
+
+2. renderFrame 函数中移除了旧版暂停守卫后，第 73 行声明的 lastFrameTimeRef 变量在整份 index.jsx 中已完全不被任何代码读取或写入，成为无用的废弃声明。需要将这个变量及其声明一并删除。
+
+3. 修复后重新运行 pnpm run test，需要让所有测试通过。

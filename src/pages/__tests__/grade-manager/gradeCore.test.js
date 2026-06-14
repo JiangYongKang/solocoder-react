@@ -782,6 +782,54 @@ describe('snapshotPreviousData', () => {
     const previous = loadPreviousData()
     expect(previous.students).toEqual(['正确数据'])
   })
+
+  it('should overwrite when students field is not an array', () => {
+    mockStorage.setItem(
+      'grade_manager_previous_data',
+      JSON.stringify({ students: null, subjects: [], scores: {} })
+    )
+    const data = { ...createMockData(), students: ['修复后数据'] }
+    saveGradeData(data)
+    expect(snapshotPreviousData()).toBe(true)
+    const previous = loadPreviousData()
+    expect(previous.students).toEqual(['修复后数据'])
+  })
+
+  it('should overwrite when subjects field is not an array', () => {
+    mockStorage.setItem(
+      'grade_manager_previous_data',
+      JSON.stringify({ students: [], subjects: 'not array', scores: {} })
+    )
+    const data = { ...createMockData(), students: ['修复后数据2'] }
+    saveGradeData(data)
+    expect(snapshotPreviousData()).toBe(true)
+    const previous = loadPreviousData()
+    expect(previous.students).toEqual(['修复后数据2'])
+  })
+
+  it('should overwrite when scores field is not an object', () => {
+    mockStorage.setItem(
+      'grade_manager_previous_data',
+      JSON.stringify({ students: [], subjects: [], scores: null })
+    )
+    const data = { ...createMockData(), students: ['修复后数据3'] }
+    saveGradeData(data)
+    expect(snapshotPreviousData()).toBe(true)
+    const previous = loadPreviousData()
+    expect(previous.students).toEqual(['修复后数据3'])
+  })
+
+  it('should overwrite when students field is an object instead of array', () => {
+    mockStorage.setItem(
+      'grade_manager_previous_data',
+      JSON.stringify({ students: { 0: '张三' }, subjects: [], scores: {} })
+    )
+    const data = { ...createMockData(), students: ['修复后数据4'] }
+    saveGradeData(data)
+    expect(snapshotPreviousData()).toBe(true)
+    const previous = loadPreviousData()
+    expect(previous.students).toEqual(['修复后数据4'])
+  })
 })
 
 describe('localStorage functions', () => {

@@ -1,5 +1,5 @@
 产物不满意：
-模型在snakeCore.js的wrapCoordinate函数末尾新增了`return result === 0 ? 0 : result`这行代码，目的是让新增测试用例`expect(wrapCoordinate(-GRID_SIZE)).toBe(0)`通过，掩盖JavaScript取模运算在入参为负GRID_SIZE整倍数时产生`-0`的行为。在实际游戏中，wrapCoordinate的入参来源于蛇头坐标与移动方向步长±1相加的结果，蛇坐标始终在0到GRID_SIZE-1的整数范围内浮动，仅在穿墙边界溢出时接收-1或GRID_SIZE这类值，永远不会接收到恰好等于`-GRID_SIZE`整倍数的值。因此`-0`在真实游戏逻辑中完全不会出现，这行新增代码是生产代码向测试妥协。正确做法是删除该行，将对应测试断言改为`expect(wrapCoordinate(-GRID_SIZE) === 0).toBe(true)`或直接移除该无实际场景对应的测试。
+模型在 snakeCore.js 的 wrapCoordinate 末尾新增了 `return result === 0 ? 0 : result`，目的是让测试 `expect(wrapCoordinate(-GRID_SIZE)).toBe(0)` 通过，掩盖 JavaScript 取模产生 `-0` 的行为。但游戏中蛇坐标始终在 0 到 GRID_SIZE-1 间浮动，每次移动仅偏移 ±1，永远不会收到恰好等于 `-GRID_SIZE` 整倍数的值，`-0` 在真实逻辑中不会出现。这行代码是生产代码向测试妥协。正确做法是删除该行并移除对应的无实际场景测试。
 
 过程不满意：
-模型在验证测试时，提示词第4条明确要求"重新运行 pnpm run test，需要让所有测试通过"，但模型实际执行的命令是`pnpm run test src/pages/__tests__/snake/snakeCore.test.js`，仅通过参数过滤运行了蛇包路径下的单个测试文件，而非完整测试套件。模型在思考过程中写道"所有 105 个测试全部通过"，这个结论只覆盖了snakeCore.test.js中的105个用例，并未验证项目中其他包的测试状态是否受到本轮代码变更的影响，与提示词"让所有测试通过"要求的验证范围不一致。正确做法是先执行不带过滤参数的`pnpm run test`确认全局测试状态，再针对蛇包内的增量用例做细节验证，确保工作总结中的结论与实际验证操作一一对应。
+模型验证测试时执行了 `pnpm run test src/pages/__tests__/snake/snakeCore.test.js`，仅运行蛇包下的单文件测试，并声称"所有 105 个测试全部通过"。提示词第 4 条明确要求"重新运行 pnpm run test，需要让所有测试通过"，应运行完整测试套件而非单包过滤。该结论未验证其他包的测试状态是否受本轮变更影响。正确做法是先执行不带过滤参数的全量测试确认全局状态。

@@ -1,3 +1,3 @@
-产物不满意：通过。模型在 index.jsx 的 handleMove 函数中，将 setIsAnimating(false) 包裹在嵌套的 setTimeout(() => { setIsAnimating(false) }, ANIMATION_DURATION) 中，使防抖释放从外层 setTimeout 回调执行时刻（t≈200ms）推迟到内层 setTimeout 回调执行时刻（t≈400ms），完整覆盖了外层 200ms 延迟和 CSS 动画 200ms 播放时段。修复逻辑正确，代码改动最小且精准。所有 53 个 game-2048 单元测试通过，ESLint 无错误。
+产物不满意：通过。模型在 index.jsx 的 handleMove 中，将 setIsAnimating(false) 包裹在嵌套的 setTimeout 中，使防抖释放从 t≈200ms 推迟到 t≈400ms，完整覆盖了外层延迟和 CSS 动画播放时段。修复逻辑正确，代码改动最小且精准。所有 53 个 game-2048 单元测试通过，ESLint 无错误。
 
-过程不满意：模型在验证阶段执行的是 npx vitest run src/pages/__tests__/game-2048/game2048Core.test.js，而非提示词第二条明确要求的"重新运行 pnpm run test，需要让所有测试通过"。虽然模型只修改了 game-2048 代码，改动不太可能影响其他模块的测试，但未能严格遵循提示词中运行完整测试套件的指令，只验证了 game-2048 单个测试文件而非项目全部测试。正确做法是执行 pnpm run test 确保项目中所有测试均通过后再确认交付。此外命令末尾出现了一个多余的 undefined 参数，虽不影响运行结果，但暴露出命令构造不够严谨的问题。
+过程不满意：模型验证阶段执行的是 vitest run game-2048 单文件测试，而非提示词第二条要求的 pnpm run test 全量测试。虽然修改仅涉及 game-2048，不太可能影响其他模块，但未能严格遵循运行完整测试套件的指令。正确做法是执行 pnpm run test 确保项目所有测试通过后再交付。此外命令末尾出现多余的 undefined 参数，虽不影响结果但暴露命令构造不够严谨。

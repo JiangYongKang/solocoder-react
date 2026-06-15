@@ -1,7 +1,8 @@
 产物不满意：
-1. 模型在修复 RANDOM 模式方向偏转时，将偏转概率阈值从 `Math.random() < 0.3` 调整为 `Math.random() < 0.4`。提示词只要求将偏转逻辑移入 500ms 决策块内部，未要求修改概率参数。虽然不影响功能正确性，但属于超出修复范围的擅自调整。根本原因是模型在重构代码块时顺带调整了参数而未经谨慎审查。正确做法是保留原始概率值 0.3，仅移动代码位置不做参数变更。
-2. 在 `should change direction when random deflection triggers` 测试用例中，`getRandomDirection` 内部包含一次未 mock 的 `Math.random()` 调用，导致无法精确控制方向输出结果。测试仅断言方向在 DIRECTION_LIST 中且不是反向，缺少对 `result.direction !== 'RIGHT'` 的显式断言来证明方向确实发生了改变。正确做法是为 getRandomDirection 内部的随机调用设置 mock，然后显式验证方向与原方向不同。
+1. 模型在修复 RANDOM 模式方向偏转时将概率阈值从 0.3 调为 0.4。提示词只要求将偏转逻辑移入 500ms 决策块内，未要求修改概率参数。虽不影响功能正确性，但属于超出修复范围的擅自调整。正确做法是保留原始概率值 0.3，仅移动代码位置。
+2. 在"should change direction when random deflection triggers"测试中，getRandomDirection 内部包含一次未 mock 的 Math.random() 调用，导致无法精确控制方向输出。测试仅断言方向在 DIRECTION_LIST 中且不是反向，缺少对结果与原方向不同的显式断言。正确做法是为 getRandomDirection 内部的随机调用设置 mock，显式验证方向确实发生了改变。
+
 过程不满意：
-1. 模型在启动 dev server 后遇到页面加载报错 `CodeSandboxPage is not defined`，错误来源于 src/App.jsx 中与 snake-battle 任务无关的组件引用。模型在未确认该文件是否属于当前任务包的情况下直接修改了 App.jsx 添加 import。App.jsx 不是 snake-battle 任务包内的文件，该修改跨界超出了本任务的修复范围。正确做法是忽略与当前任务无关的全局报错，仅关注 snake-battle 页面的功能验证。
-2. 模型在思考过程末尾声称手动验证了 AI 蛇移动平滑自然，但整个验证环节仅执行了 open_preview 打开预览页面，未在游戏中执行任何操作如启停暂停、切换速度、观察 AI 蛇方向变化，也未截取运行画面作为证据。模型描述的验证结论与实际执行的验证行为严重不匹配，存在幻觉与虚假完成问题。正确做法是在预览页面中实际操作游戏并记录具体观察结果。
-3. 模型在开始阶段连续两次用 view_files 读取 snakeBattleCore.js 全文，随后又连续两次读取 snakeBattleCore.test.js 全文，两次读取之间未做任何代码修改。同一文件的重复读取属于低效的工具使用行为，说明模型在动手修改前缺乏先全局梳理再逐一修改的规划能力。正确做法是每个文件只读取一次，整理出所有需要修改的位置后集中修改。
+1. 模型启动 dev server 后遇到 CodeSandboxPage is not defined 报错，未确认该文件是否属于当前任务包就直接修改了 App.jsx 添加 import。App.jsx 不是 snake-battle 任务包内的文件，该修改超出了本任务修复范围。正确做法是忽略与当前任务无关的全局报错。
+2. 模型在思考过程末尾声称手动验证了 AI 蛇移动平滑自然，但整个验证仅执行了 open_preview 打开页面，未在游戏中执行任何操作如启停暂停、切换速度、观察 AI 方向变化，也未截取运行画面。验证结论与实际验证行为严重不匹配，存在幻觉与虚假完成问题。
+3. 模型在开始阶段连续两次读取 snakeBattleCore.js 全文，随后又连续两次读取测试文件全文，两次读取之间未做任何代码修改。同一文件的重复读取属于低效工具使用，说明缺乏先全局梳理再逐一修改的规划能力。正确做法是每个文件只读取一次，整理出修改位置后集中修改。

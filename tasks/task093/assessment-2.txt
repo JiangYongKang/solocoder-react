@@ -1,7 +1,7 @@
 产物不满意：
-1. index.jsx 的 handleMove 函数中防抖与 CSS 动画的时序错位仍未修复。setIsAnimating(true) 在按键时立即锁定输入，但触发 CSS transition、pop、appear 动画（各 200ms）的 updateGameAndTiles 调用位于 200ms 的 setTimeout 回调内部，动画在 t≈200ms 才实际启动，而 setIsAnimating(false) 紧接着在动画启动的同时同步调用释放了防抖锁，导致 CSS 动画在 t≈200ms 到 t≈400ms 期间播放时防抖已解除，玩家仍可在此期间输入方向键，违反提示词第 1 条"动画期间不允许新的方向键输入"的要求。模型仅将 ANIMATION_DURATION 从 150 改为 200，未发现 setTimeout 的 200ms 延迟与 CSS 动画的 200ms 播放时段是先后叠加关系而非并行关系。正确做法是防抖总时长覆盖 setTimeout 延迟加动画时长共 400ms，或重构时序使动画在按键后立即触发。
+handleMove 中防抖与 CSS 动画的时序错位仍未修复。setIsAnimating(true) 在按键时锁定输入，但触发 CSS 动画（各 200ms）的 updateGameAndTiles 调用位于 200ms 的 setTimeout 回调内部，动画在 t≈200ms 才启动，而 setIsAnimating(false) 紧接着同步调用释放了防抖锁，CSS 动画播放期间防抖已解除，玩家仍可输入方向键。模型仅将 ANIMATION_DURATION 从 150 改为 200，未发现 setTimeout 的 200ms 延迟与 CSS 动画的 200ms 播放时段是先后叠加关系。正确做法是防抖总时长覆盖延迟加动画共 400ms，或重构时序使动画在按键后立即触发。
 
 过程不满意：
-1. 模型在收到提示词后未经过代码分析阶段，直接创建了包含 7 个修复项的 TodoList 并标记首个修复项为进行中，然后才逐一读取 constants.js、game2048Core.js 和 index.jsx 三个源文件。这种先规划再分析的顺序违反了标注规范中"不能在刚收到任务时直接创建 TodoList，应先分析问题再规划"的要求。正确做法是先通读所有相关源文件理解现有实现和问题所在，再基于分析结论制定逐项修复计划。
-2. 模型在修复动画防抖问题（提示词第 1 条）时未追踪 handleMove 函数的完整执行时序链。模型读取提示词中"防抖在 150ms 内解除后弹跳动画还有 50ms 未完成"的表面描述后，直接将 ANIMATION_DURATION 常量从 150 改为 200 并标记该修复项为已完成，未追溯 setIsAnimating(true)、setTimeout 延迟、updateGameAndTiles 触发 CSS 动画、setIsAnimating(false) 四者的先后执行关系。最终导致产物中防抖释放时刻仍早于 CSS 动画结束时刻 200ms，正确做法应从按键到动画结束画出完整时间线再判断修复方案。
-3. 模型在验证阶段先后两次运行测试，每次都只执行了 npx vitest run src/pages/__tests__/game-2048/game2048Core.test.js，仅覆盖了 2048 游戏的 53 个单测用例。提示词第 7 条明确要求"重新运行 pnpm run test，需要让所有测试通过"，模型未按指令执行 pnpm run test 运行全项目测试，未验证改动是否对其他已有测试用例造成回归。
+1. 模型收到提示词后未经过代码分析直接创建了 7 项修复 TodoList 并标记首个为进行中，然后才读取源文件。违反了"不能在刚收到任务时直接创建 TodoList，应先分析问题再规划"的要求。正确做法是先通读相关源文件理解问题所在再制定计划。
+2. 模型在修复动画防抖问题时未追踪完整执行时序。读取提示词描述的"防抖在 150ms 内解除后弹跳动画还有 50ms 未完成"后，直接将常量从 150 改为 200 并标记完成，未追溯 setAnimating、setTimeout 延迟、updateGameAndTiles 触发动画、setAnimating(false) 四者的先后关系，导致防抖释放仍早于动画结束 200ms。
+3. 模型验证阶段两次运行测试都只执行了 vitest run src/pages/__tests__/game-2048/game2048Core.test.js，仅覆盖 53 个单测。提示词第 7 条要求"重新运行 pnpm run test，需要让所有测试通过"，未按指令执行全项目测试，未验证对其他已有测试的影响。

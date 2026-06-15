@@ -1,8 +1,8 @@
 产物不满意：
-1. 在 FrequencyChart.jsx 中，keyFrequency 和 mouseFrequency（第 15-16 行）是每次渲染时由 calculateFrequency 返回的新数组引用，draw 函数的 useCallback 以 [keyFrequency, mouseFrequency] 为依赖项（第 131 行），导致 draw 每次渲染都被重新创建，useCallback 完全失去应有的缓存效果。同时 ResizeObserver 的 useEffect 也依赖 [draw]（第 155 行），每秒 now 状态更新触发组件重渲染时，ResizeObserver 被清理函数 disconnect 后再重新 new 和 observe，造成 DOM 观测对象每秒被销毁重建一次。根本原因是将每次渲染都变化的值放入 useCallback 依赖数组，使缓存机制形同虚设。正确做法是用 useRef 存储频率数据或改为在 useEffect 内部直接计算并绘制，避免依赖数组导致 ResizeObserver 频繁重建。
-2. 在 MouseCapturePanel.jsx 中，模型在第 26 行新增了 throttledMouseMoveRef（useRef），并在 useEffect 的第 97 行通过 throttledMouseMoveRef.current = throttledMouseMove 为其赋值，但该 ref 在整个组件的 JSX 渲染、事件处理函数和 useEffect 清理函数中均未被读取使用。提示词第 2 条只要求用 throttle 替换内联节流逻辑，不要求在组件中额外保留一个不会被任何代码消费的 ref 引用。这导致产物中存在纯粹多余的变量声明和赋值代码，属于新增的死代码。应该移除该 ref 的声明和赋值行。
+1. FrequencyChart.jsx 中 keyFrequency 和 mouseFrequency 是每次渲染由 calculateFrequency 返回的新数组引用，draw 函数的 useCallback 以它们为依赖项，导致 draw 每次渲染都被重建，useCallback 完全失去缓存效果。同时 ResizeObserver 的 useEffect 也依赖 draw，每秒 now 状态更新触发重渲染时 ResizeObserver 被销毁重建一次。正确做法是用 useRef 存储频率数据或改为在 useEffect 内直接计算并绘制。
+2. MouseCapturePanel.jsx 中新增了 throttledMouseMoveRef 的 useRef 声明和 useEffect 内的赋值，但该 ref 在组件的 JSX、事件处理和清理函数中均未被读取使用。提示词第 2 条只要求用 throttle 替换内联节流，不需要保留无人消费的 ref 引用。这属于新增的死代码，应该移除。
 
 过程不满意：
-1. 提示词第 4 条明确要求"手动验证频率波形图在无操作时数据是否随时间自然推移，以及波形图是否每秒更新一次"。模型在启动 dev server 打开预览页面后，在总结中写"你可以在浏览器中手动验证"，且任务总结中直接标记验证为已通过，但整个思考过程未使用 browser_snapshot 或 browser_take_screenshot 等工具实际检查波形图的渲染状态和更新频率。模型将"启动开发服务器并打开页面"等同于"验证已完成"，未向用户报告任何实际验证结果，属于幻觉与虚假完成问题。正确做法是打开页面后至少在不同时间点截取多张截图，确认图表数据随时间推移且每秒仅刷新一次而非每帧刷新。
-2. 模型在收到提示词后的第一个操作就是创建 TodoList（"好的，我来逐一修复这些问题。让我先创建任务列表"），未先阅读相关源文件、分析问题范围和修复方案的可行性。这违反了标注规范中"不能在刚收到任务时就直接创建 TodoList，应先分析问题再规划"的要求。提示词第一条涉及 requestAnimationFrame 改为每秒更新和 useMemo 缓存改为随时间推移刷新的双重改造，第二条涉及 throttle 代码复用与内联逻辑清理的权衡，任务需要先通读 FrequencyChart.jsx 和 MouseCapturePanel.jsx 现有实现后再拆解为可执行的子任务。
-3. 模型对 eventDebuggerUtils.test.js 执行了约十次零散的编辑操作，每次只添加一两个测试用例，而非先规划完整的测试用例清单后集中修改。更严重的是模型先编写了 downloadJsonFile 的测试（该函数内部使用 document.createElement 和 a.click 等 DOM 操作，不属于纯 JS 逻辑），之后才意识到不符合提示词第 3 条"只测和页面渲染无关的逻辑"的要求，又将相关测试和导入全部删除。先添加后删除的反复操作浪费了多轮步骤，反映出模型在编写代码前未充分理解提示词中"纯 JS 函数"的边界定义，应该在写测试前先梳理 eventDebuggerUtils.js 中哪些导出函数不涉及 DOM 操作和 React 渲染逻辑。
+1. 提示词第 4 条要求"手动验证频率波形图在无操作时数据是否随时间自然推移，以及每秒更新一次"。模型启动 dev server 打开预览页面后在总结中写"你可以在浏览器中手动验证"，将"启动服务器打开页面"等同于"验证已完成"，未使用浏览器工具实际检查渲染状态和更新频率。属于幻觉与虚假完成。正确做法是打开页面后至少在不同时间点截取多张截图确认图表数据随时间推移且每秒仅刷新一次。
+2. 模型收到提示词后第一个操作就是创建 TodoList，未先阅读源文件分析问题范围和修复方案可行性。违反"应先分析问题再规划"的规范。提示词涉及 requestAnimationFrame 改为每秒更新和 useMemo 缓存改为随时间刷新的双重改造，需要先通读代码再拆解子任务。
+3. 模型对测试文件执行了约十次零散编辑，每次只添加一两个用例，而非先规划完整测试清单后集中修改。更严重的是模型先编写了 downloadJsonFile 的测试（含 DOM 操作），之后才意识到不符合"只测纯 JS 逻辑"的要求，将相关测试和导入全部删除。反映出编写前未充分理解提示词中"纯 JS 函数"的边界定义。

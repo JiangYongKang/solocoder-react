@@ -133,7 +133,7 @@ function HorizontalMenuItem({ item, openMenuId, setOpenMenuId }) {
           }}
         >
           {item.children.map((child) => (
-            <DropdownItem key={child.id} item={child} />
+            <DropdownItem key={child.id} item={child} level={1} />
           ))}
         </div>
       )}
@@ -141,7 +141,9 @@ function HorizontalMenuItem({ item, openMenuId, setOpenMenuId }) {
   )
 }
 
-function DropdownItem({ item }) {
+function DropdownItem({ item, level = 1 }) {
+  const [showSubmenu, setShowSubmenu] = useState(false)
+
   if (item.type === MENU_TYPES.DIVIDER) {
     return (
       <div
@@ -159,20 +161,47 @@ function DropdownItem({ item }) {
 
   return (
     <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        padding: '8px 16px',
-        cursor: 'pointer',
-        fontSize: '13px',
-        color: '#333',
-      }}
-      onMouseEnter={(e) => (e.currentTarget.style.background = '#f5f5f5')}
-      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+      style={{ position: 'relative' }}
+      onMouseEnter={() => hasChild && setShowSubmenu(true)}
+      onMouseLeave={() => setShowSubmenu(false)}
     >
-      {icon && <span style={{ marginRight: '8px', fontSize: '14px' }}>{icon}</span>}
-      <span style={{ flex: 1 }}>{item.name}</span>
-      {hasChild && <span style={{ fontSize: '10px', color: '#999' }}>▶</span>}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          padding: '8px 16px',
+          cursor: 'pointer',
+          fontSize: '13px',
+          color: '#333',
+          background: showSubmenu ? '#f5f5f5' : 'transparent',
+        }}
+        onMouseEnter={(e) => (e.currentTarget.style.background = '#f5f5f5')}
+        onMouseLeave={(e) => (e.currentTarget.style.background = showSubmenu ? '#f5f5f5' : 'transparent')}
+      >
+        {icon && <span style={{ marginRight: '8px', fontSize: '14px' }}>{icon}</span>}
+        <span style={{ flex: 1 }}>{item.name}</span>
+        {hasChild && <span style={{ fontSize: '10px', color: '#999' }}>▶</span>}
+      </div>
+      {hasChild && showSubmenu && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: '100%',
+            background: 'white',
+            border: '1px solid #e8e8e8',
+            borderRadius: '4px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+            minWidth: '160px',
+            padding: '4px 0',
+            zIndex: 100 + level,
+          }}
+        >
+          {item.children.map((child) => (
+            <DropdownItem key={child.id} item={child} level={level + 1} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }

@@ -149,7 +149,7 @@
   border-radius: 6px;
   font-weight: bold;
   font-size: 45px;
-  transition: transform 150ms ease-in-out;
+  transition: transform 200ms ease-in-out;
   z-index: 1;
 }
 
@@ -241,9 +241,10 @@
 }
 
 .game-2048-tile-2048 {
-  background: #edc22e;
+  background: #ffd700;
   color: #f9f6f2;
   font-size: 35px;
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
 }
 
 .game-2048-tile-super {

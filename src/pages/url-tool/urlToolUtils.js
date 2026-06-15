@@ -137,11 +137,54 @@ export const urlEncode = (text) => {
   if (typeof text !== 'string') {
     return { success: false, error: '输入必须是字符串', result: '' }
   }
-  try {
-    return { success: true, error: null, result: encodeURIComponent(text) }
-  } catch (e) {
-    return { success: false, error: e.message || '编码失败', result: '' }
+  const parsed = parseUrl(text)
+  if (!parsed.success) {
+    try {
+      return { success: true, error: null, result: encodeURIComponent(text) }
+    } catch (e) {
+      return { success: false, error: e.message || '编码失败', result: '' }
+    }
   }
+
+  const encodedPathname = parsed.pathname
+    .split('/')
+    .map((seg) => {
+      try {
+        return encodeURIComponent(decodeURIComponent(seg))
+      } catch {
+        return encodeURIComponent(seg)
+      }
+    })
+    .join('/')
+
+  const params = parseQueryParams(parsed.search)
+  const encodedPairs = params.map((p) => {
+    const ek = encodeURIComponent(p.key || '')
+    const ev = encodeURIComponent(p.value || '')
+    return `${ek}=${ev}`
+  })
+  const encodedSearch = encodedPairs.length > 0 ? `?${encodedPairs.join('&')}` : ''
+
+  let encodedHash = ''
+  if (parsed.hash) {
+    const hashContent = parsed.hash.slice(1)
+    try {
+      encodedHash = `#${encodeURIComponent(decodeURIComponent(hashContent))}`
+    } catch {
+      encodedHash = `#${encodeURIComponent(hashContent)}`
+    }
+  }
+
+  const newUrl = buildUrl({
+    protocol: parsed.protocol,
+    hostname: parsed.hostname,
+    port: parsed.port,
+    pathname: encodedPathname,
+    search: encodedSearch,
+    hash: encodedHash,
+  })
+
+  return { success: true, error: null, result: newUrl }
 }
 
 export const urlDecode = (text) => {
@@ -187,13 +230,31 @@ export const encodeQueryParamsOnly = (url) => {
   return { success: true, error: null, result: newUrl }
 }
 
+const uint8ToBase64 = (bytes) => {
+  let binary = ''
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i])
+  }
+  return btoa(binary)
+}
+
+const base64ToUint8 = (base64) => {
+  const binary = atob(base64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i)
+  }
+  return bytes
+}
+
 export const base64Encode = (text) => {
   if (typeof text !== 'string') {
     return { success: false, error: '输入必须是字符串', result: '' }
   }
   try {
-    const encoded = btoa(unescape(encodeURIComponent(text)))
-    return { success: true, error: null, result: encoded }
+    const encoder = new TextEncoder()
+    const bytes = encoder.encode(text)
+    return { success: true, error: null, result: uint8ToBase64(bytes) }
   } catch (e) {
     return { success: false, error: e.message || 'Base64 编码失败', result: '' }
   }
@@ -207,8 +268,9 @@ export const base64Decode = (text) => {
     return { success: false, error: '请输入 Base64 字符串', result: '' }
   }
   try {
-    const decoded = decodeURIComponent(escape(atob(text.trim())))
-    return { success: true, error: null, result: decoded }
+    const bytes = base64ToUint8(text.trim())
+    const decoder = new TextDecoder()
+    return { success: true, error: null, result: decoder.decode(bytes) }
   } catch {
     return { success: false, error: '非法的 Base64 字符串', result: '' }
   }

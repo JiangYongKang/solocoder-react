@@ -10,9 +10,11 @@ import {
   calculateDurationMs,
   msToHours,
   msToFormattedHours,
+  calculateDurationHours,
   validateManualEntry,
   createRecord,
   createTimerRecord,
+  createTimerRecordWithPause,
   updateRecord,
   deleteRecord,
   loadRecords,
@@ -186,6 +188,33 @@ describe('timeTrackerUtils', () => {
     })
   })
 
+  describe('calculateDurationHours', () => {
+    it('should calculate duration for same day', () => {
+      const hours = calculateDurationHours('2026-06-15', '09:00', '17:00')
+      expect(hours).toBe(8)
+    })
+
+    it('should calculate overnight duration when end < start', () => {
+      const hours = calculateDurationHours('2026-06-15', '22:00', '06:00')
+      expect(hours).toBe(8)
+    })
+
+    it('should handle exactly 24 hours when start and end are same', () => {
+      const hours = calculateDurationHours('2026-06-15', '00:00', '00:00')
+      expect(hours).toBe(24)
+    })
+
+    it('should calculate 23 hours 59 minutes for 00:01 to 00:00', () => {
+      const hours = calculateDurationHours('2026-06-15', '00:01', '00:00')
+      expect(hours).toBeCloseTo(23 + 59 / 60, 4)
+    })
+
+    it('should handle 1 minute duration', () => {
+      const hours = calculateDurationHours('2026-06-15', '09:00', '09:01')
+      expect(hours).toBeCloseTo(1 / 60, 4)
+    })
+  })
+
   describe('validateManualEntry', () => {
     it('should pass for valid data', () => {
       const errors = validateManualEntry({
@@ -237,14 +266,14 @@ describe('timeTrackerUtils', () => {
       expect(errors.endTime).toBe('请输入结束时间')
     })
 
-    it('should reject end time before start time', () => {
+    it('should handle overnight duration correctly', () => {
       const errors = validateManualEntry({
         project: 'frontend',
         date: '2026-06-15',
-        startTime: '17:00',
-        endTime: '09:00',
+        startTime: '22:00',
+        endTime: '06:00',
       })
-      expect(errors.endTime).toBe('结束时间必须晚于开始时间')
+      expect(errors.endTime).toBeUndefined()
     })
 
     it('should reject duration over 24 hours', () => {
@@ -252,7 +281,17 @@ describe('timeTrackerUtils', () => {
         project: 'frontend',
         date: '2026-06-15',
         startTime: '00:00',
-        endTime: '00:01',
+        endTime: '00:00',
+      })
+      expect(errors.endTime).toBe('时长不能超过24小时')
+    })
+
+    it('should accept 23 hours 59 minutes (just under 24 hours)', () => {
+      const errors = validateManualEntry({
+        project: 'frontend',
+        date: '2026-06-15',
+        startTime: '00:00',
+        endTime: '23:59',
       })
       expect(errors.endTime).toBeUndefined()
     })
@@ -273,6 +312,21 @@ describe('timeTrackerUtils', () => {
       expect(record.note).toBe('test note')
       expect(record.id).toBeTruthy()
     })
+
+    it('should handle overnight record when end < start', () => {
+      const data = {
+        project: 'frontend',
+        date: '2026-06-15',
+        startTime: '22:00',
+        endTime: '06:00',
+        note: 'night shift',
+      }
+      const record = createRecord(data)
+      expect(record.durationMs).toBe(8 * 3600000)
+      const startDate = new Date(record.startTime).getDate()
+      const endDate = new Date(record.endTime).getDate()
+      expect(endDate).toBe(startDate + 1)
+    })
   })
 
   describe('createTimerRecord', () => {
@@ -283,6 +337,36 @@ describe('timeTrackerUtils', () => {
       expect(record.project).toBe('frontend')
       expect(record.durationMs).toBe(8 * 3600000)
       expect(record.note).toBe('')
+    })
+  })
+
+  describe('createTimerRecordWithPause', () => {
+    it('should create record with correct duration from elapsed seconds', () => {
+      const end = new Date('2026-06-15T17:00:00')
+      const elapsedSeconds = 7200
+      const record = createTimerRecordWithPause('frontend', end.toISOString(), elapsedSeconds)
+      expect(record.project).toBe('frontend')
+      expect(record.durationMs).toBe(7200 * 1000)
+      expect(record.endTime).toBe(end.toISOString())
+      const expectedStart = new Date(end.getTime() - 7200 * 1000)
+      expect(record.startTime).toBe(expectedStart.toISOString())
+    })
+
+    it('should handle pause → continue → stop scenario', () => {
+      const end = new Date('2026-06-15T18:00:00')
+      const pausedSeconds = 3600
+      const continuedSeconds = 7200
+      const totalSeconds = pausedSeconds + continuedSeconds
+      const record = createTimerRecordWithPause('frontend', end.toISOString(), totalSeconds)
+      expect(record.durationMs).toBe(totalSeconds * 1000)
+      expect(record.durationMs / 3600000).toBe(3)
+    })
+
+    it('should handle zero elapsed seconds', () => {
+      const end = new Date('2026-06-15T17:00:00')
+      const record = createTimerRecordWithPause('frontend', end.toISOString(), 0)
+      expect(record.durationMs).toBe(0)
+      expect(record.startTime).toBe(record.endTime)
     })
   })
 
@@ -312,6 +396,22 @@ describe('timeTrackerUtils', () => {
         note: '',
       })
       expect(updated).toBe(records)
+    })
+
+    it('should handle overnight update when end < start', () => {
+      const original = makeRecord({ id: 'test-1' })
+      const records = [original]
+      const updated = updateRecord(records, 'test-1', {
+        project: 'frontend',
+        date: '2026-06-15',
+        startTime: '22:00',
+        endTime: '06:00',
+        note: 'overnight update',
+      })
+      expect(updated[0].durationMs).toBe(8 * 3600000)
+      const startDate = new Date(updated[0].startTime).getDate()
+      const endDate = new Date(updated[0].endTime).getDate()
+      expect(endDate).toBe(startDate + 1)
     })
   })
 
@@ -498,6 +598,69 @@ describe('timeTrackerUtils', () => {
       const progress = getBudgetProgress([r1], testBudgets)
       const frontendProgress = progress.find((p) => p.projectKey === 'frontend')
       expect(frontendProgress.status).toBe('normal')
+    })
+
+    it('should mark status as warning when exactly 80% (boundary condition)', () => {
+      const now = new Date()
+      const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+      const r1 = makeRecord({
+        project: 'frontend',
+        startTime: new Date(now.getFullYear(), now.getMonth(), 15, 9).toISOString(),
+        endTime: new Date(now.getFullYear(), now.getMonth(), 15, 17).toISOString(),
+        durationMs: 8 * 3600000,
+      })
+      const testBudgets = { [monthKey]: { frontend: 10 } }
+      const progress = getBudgetProgress([r1], testBudgets)
+      const frontendProgress = progress.find((p) => p.projectKey === 'frontend')
+      expect(frontendProgress.percent).toBe(80)
+      expect(frontendProgress.status).toBe('warning')
+    })
+
+    it('should mark status as warning when over 80% but under 100%', () => {
+      const now = new Date()
+      const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+      const r1 = makeRecord({
+        project: 'frontend',
+        startTime: new Date(now.getFullYear(), now.getMonth(), 15, 9).toISOString(),
+        endTime: new Date(now.getFullYear(), now.getMonth(), 15, 17).toISOString(),
+        durationMs: 9 * 3600000,
+      })
+      const testBudgets = { [monthKey]: { frontend: 10 } }
+      const progress = getBudgetProgress([r1], testBudgets)
+      const frontendProgress = progress.find((p) => p.projectKey === 'frontend')
+      expect(frontendProgress.percent).toBe(90)
+      expect(frontendProgress.status).toBe('warning')
+    })
+
+    it('should mark status as over when exactly 100% (boundary condition)', () => {
+      const now = new Date()
+      const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+      const r1 = makeRecord({
+        project: 'frontend',
+        startTime: new Date(now.getFullYear(), now.getMonth(), 15, 9).toISOString(),
+        endTime: new Date(now.getFullYear(), now.getMonth(), 15, 17).toISOString(),
+        durationMs: 10 * 3600000,
+      })
+      const testBudgets = { [monthKey]: { frontend: 10 } }
+      const progress = getBudgetProgress([r1], testBudgets)
+      const frontendProgress = progress.find((p) => p.projectKey === 'frontend')
+      expect(frontendProgress.percent).toBe(100)
+      expect(frontendProgress.status).toBe('over')
+    })
+
+    it('should mark status as over when over 100%', () => {
+      const now = new Date()
+      const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+      const r1 = makeRecord({
+        project: 'frontend',
+        startTime: new Date(now.getFullYear(), now.getMonth(), 15, 9).toISOString(),
+        endTime: new Date(now.getFullYear(), now.getMonth(), 15, 17).toISOString(),
+        durationMs: 12 * 3600000,
+      })
+      const testBudgets = { [monthKey]: { frontend: 10 } }
+      const progress = getBudgetProgress([r1], testBudgets)
+      const frontendProgress = progress.find((p) => p.projectKey === 'frontend')
+      expect(frontendProgress.status).toBe('over')
     })
   })
 

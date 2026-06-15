@@ -35,12 +35,12 @@ import {
   addSubtask,
   calculateProgress,
   toggleTaskCompletion,
-  reorderTasks,
   reorderSubtasks,
+  reorderGroupRootTasks,
   isOverdue,
   getDueDateLabel,
-  countGroupIncomplete,
-  countAllIncomplete,
+  countFilteredGroupIncomplete,
+  countFilteredAllIncomplete,
   filterTasks,
   getOverdueCount,
   sortTasksWithOverdueFirst,
@@ -385,10 +385,14 @@ export default function TodoListPage() {
 
   const handleToggle = useCallback((taskId) => {
     setTasks(prev => {
+      const task = findTaskById(prev, taskId)
+      const wasCompleted = task?.completed
       const updated = toggleTaskCompletion(prev, taskId)
+      if (!wasCompleted) {
+        setCheckins(c => recordCheckin(c))
+      }
       return updated
     })
-    setCheckins(prev => recordCheckin(prev))
   }, [])
 
   const handleDeleteTask = useCallback((taskId) => {
@@ -505,21 +509,7 @@ export default function TodoListPage() {
     const targetIndex = getDropIndex(container, e.clientY)
 
     if (parentId === null) {
-      const currentTasks = selectedGroup === ALL_TASKS_VIEW
-        ? tasks.filter(t => !t.parentId)
-        : tasks.filter(t => t.groupId === selectedGroup && !t.parentId)
-      const fromIndex = currentTasks.findIndex(t => t.id === taskId)
-      if (fromIndex !== -1) {
-        setTasks(prev => {
-          const reordered = reorderTasks(
-            prev.filter(t => !t.parentId),
-            fromIndex,
-            targetIndex
-          )
-          const otherTasks = prev.filter(t => t.parentId)
-          return [...reordered, ...otherTasks]
-        })
-      }
+      setTasks(prev => reorderGroupRootTasks(prev, selectedGroup, taskId, targetIndex))
     } else {
       const parentTask = findTaskById(tasks, parentId)
       if (parentTask) {
@@ -593,7 +583,7 @@ export default function TodoListPage() {
             onClick={() => setSelectedGroup(ALL_TASKS_VIEW)}>
             <div className="tdl-group-color" style={{ background: 'var(--accent)' }} />
             <span className="tdl-group-name">所有任务</span>
-            <span className="tdl-group-badge">{countAllIncomplete(tasks)}</span>
+            <span className="tdl-group-badge">{countFilteredAllIncomplete(tasks, filters)}</span>
           </div>
 
           {groups.map(g => (
@@ -616,7 +606,7 @@ export default function TodoListPage() {
               ) : (
                 <span className="tdl-group-name">{g.name}</span>
               )}
-              <span className="tdl-group-badge">{countGroupIncomplete(tasks, g.id)}</span>
+              <span className="tdl-group-badge">{countFilteredGroupIncomplete(tasks, g.id, filters)}</span>
               <div className="tdl-group-actions">
                 <button className="tdl-group-action-btn" onClick={e => { e.stopPropagation(); handleRenameGroup(g.id) }} title="重命名">✎</button>
                 <button className="tdl-group-action-btn tdl-group-action-btn-danger" onClick={e => { e.stopPropagation(); handleDeleteGroup(g.id) }} title="删除">✕</button>
@@ -682,7 +672,7 @@ export default function TodoListPage() {
                   onDragStart={handleDragStart} onDragEnd={handleDragEnd}
                   draggingTaskId={draggingTaskId} dropIndicator={dropIndicator}
                   onDragOver={handleDragOverTaskList} onDrop={handleDropTaskList}
-                  index={i} parentId={null} />
+                  index={i} />
                 {addingSubtaskFor === task.id && (
                   <SubtaskInput parentId={task.id} onSave={handleAddSubtask}
                     onCancel={() => setAddingSubtaskFor(null)} />

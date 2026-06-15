@@ -1,0 +1,8 @@
+产物不满意：
+1. index.jsx 的 handleCellClick 中，消除成功后 setTimeout 回调通过 stateRef.current 获取状态并调用 calculateScore 时传入了 currentState.steps + 1 作为步数。但 setSteps 已在点击时递增了步数，stateRef 的 useEffect 会在 React 重新渲染后将新值同步到 stateRef.current.steps。导致计算和排行榜记录的步数比实际多 1，玩家得分因多计一步惩罚而偏低。根本原因是模型从闭包切换到 stateRef.current 模式时，未区分两种方式下 steps 的语义差异：闭包中 steps 是旧值需加 1 反映当前点击，stateRef.current.steps 已是新值不应再加 1。正确做法是传参直接使用 currentState.steps。
+2. index.jsx 的 renderBoard 函数中通关覆盖层内 calculateScore 调用（约第490行）仍传入了 difficulty 参数，而 linkGameCore.js 的 calculateScore 函数已移除了 difficulty 参数的解构和 DIFFICULTY_CONFIG 的导入。虽然传递多余参数不会导致运行时错误，但模型在修改 calculateScore 函数签名后未对 index.jsx 做全文件搜索，遗漏了这一调用点的废弃参数清理，代码中残留了无实际语义的传参。正确做法是在修改公共函数签名后使用搜索工具定位所有 calculateScore 调用位置，逐一更新确保参数一致性。
+
+过程不满意：
+1. 模型在会话开始后仅查看了 linkGameCore.js 和 index.jsx 两个文件，便在第3步直接创建了 TodoList 进入编码阶段，未先对提示词的四条需求做系统性分析和方案规划。提示词涉及自动重排次数限制、calculateScore 计分逻辑修正、无用变量清理、补充单元测试四个独立问题，模型应在创建 TodoList 前逐一分析每个问题涉及的函数和变量、修改影响范围以及各修复之间的依赖关系，而非在问题理解未充分的情况下仓促规划。
+2. 模型在完成所有修改后执行测试时，只运行了 pnpm test src/pages/__tests__/link-game/linkGameCore.test.js 单文件测试，未执行提示词第5条要求的 pnpm run test 全量测试。实际全量测试中存在 habit-tracker 的2个失败用例，虽与本次修复无关，但模型仅基于 link-game 单文件通过的51个用例便声称所有测试通过，其验证结论建立在不完整的数据基础上，未满足提示词第5条明确要求的全量测试通过标准。
+3. 模型在修改 calculateScore 函数移除 difficulty 参数后，只更新了 handleCellClick 中 setTimeout 回调内的一处调用，未对 index.jsx 全文搜索 calculateScore 的其他调用点，导致 renderBoard 函数中通关覆盖层的 calculateScore 调用仍遗留 difficulty 参数未被清理。这属于修改公共函数签名后缺少全局搜索和一致性检查的工具使用问题。正确做法是在修改函数签名后使用搜索工具定位所有调用方位置，逐一检查并同步更新，确保代码库中不残留废弃传参。

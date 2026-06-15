@@ -1,0 +1,2 @@
+产物不满意：index.jsx 参数编辑处理器在 setParams 回调中调用 rebuildUrlFromParams，后者又通过 syncUrlAndParams 再次执行 setParams，回调内产生了 side effect。而 handleClearParams 和 handleJsonToParams 不显式调 setParams 只依赖 rebuildUrlFromParams 间接更新，handleUrlEncode 等又直接调 syncUrlAndParams。三类处理器走三条不同的状态更新路径，流转逻辑不统一。正确做法是所有状态变更统一入口，一个函数完成 URL 和 params 的同步。
+过程不满意：模型在验证环节用 `npm run build` 做构建检查，但项目包管理器是 pnpm。测试步骤使用了 pnpm run test，构建验证却切换到 npm。pnpm 工作区下 npm 依赖解析策略与 pnpm 不同，产物不能视为等价验证依据。模型应在所有验证命令中统一使用 pnpm。

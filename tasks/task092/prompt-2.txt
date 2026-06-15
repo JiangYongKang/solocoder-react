@@ -1,0 +1,7 @@
+你实现的团队 Wiki 页面还存在一些问题，需要进行修复：
+
+1. 编辑时自动保存到 localStorage 没有做防抖处理——用户每输入一个字符都会触发一次完整的 JSON 序列化和 localStorage 写入。提示词第 3 条明确要求"编辑时自动保存到 localStorage（防抖 2 秒）"。需将 saveData 的触发纳入防抖逻辑，不能每次 data 变更都立即写入。
+2. 点击搜索结果跳转到对应页面后，Markdown 内容中的关键字高亮消失且无法滚动到首次匹配位置。原因是 searchKeyword 属性与搜索浮层的 showSearchResults 状态强绑定，关闭浮层后 searchKeyword 立即变为空字符串。需将 searchKeyword 独立于搜索浮层的显隐状态管理。
+3. diffContent 函数对包含 HTML 标签的内容做版本对比时，tokenize 方法会把 `<script>` 等标签拆成多个不完整的 token，经 escapeHtml 转义后输出结构被破坏。该问题被测试避开了但代码缺陷仍在，需修复 tokenize 逻辑使其能正确处理 HTML 标签片段。
+4. 修复后需要为该页面补充纯 JS 函数的单元测试，只测和页面渲染无关的逻辑。测试代码放在 src/pages/__tests__/wiki/ 下。
+5. 重新运行 pnpm run test，需要让所有测试通过。

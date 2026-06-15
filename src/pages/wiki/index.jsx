@@ -17,7 +17,6 @@ import {
     getCurrentUser,
     getPageById,
     getPagePath,
-    highlightTextSafe,
     loadData,
     removeTagFromPage,
     saveData,
@@ -42,15 +41,26 @@ export default function WikiPage() {
   const [showMemberPanel, setShowMemberPanel] = useState(false)
   const [newTagInput, setNewTagInput] = useState('')
 
+  const saveTimeoutRef = useRef(null)
   const versionTimeoutRef = useRef(null)
+  const [activeSearchKeyword, setActiveSearchKeyword] = useState('')
 
   const selectedPage = getPageById(data, selectedPageId)
   const currentUser = getCurrentUser(data)
   const pagePath = selectedPage ? getPagePath(data, selectedPageId) : []
 
+  const debouncedSaveData = useCallback((dataToSave) => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current)
+    }
+    saveTimeoutRef.current = setTimeout(() => {
+      saveData(dataToSave)
+    }, DEBOUNCE_DELAY)
+  }, [])
+
   useEffect(() => {
-    saveData(data)
-  }, [data])
+    debouncedSaveData(data)
+  }, [data, debouncedSaveData])
 
   const debouncedSaveVersion = useCallback((pageId) => {
     if (versionTimeoutRef.current) {
@@ -62,9 +72,11 @@ export default function WikiPage() {
   }, [])
 
   useEffect(() => {
-    const timeoutRef = versionTimeoutRef
+    const saveRef = saveTimeoutRef
+    const verRef = versionTimeoutRef
     return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current)
+      if (saveRef.current) clearTimeout(saveRef.current)
+      if (verRef.current) clearTimeout(verRef.current)
     }
   }, [])
 
@@ -155,7 +167,8 @@ export default function WikiPage() {
   const handleSelectSearchResult = (result) => {
     setSelectedSpaceId(result.spaceId)
     setSelectedPageId(result.pageId)
-    setGlobalSearchQuery(globalSearchQuery)
+    setActiveSearchKeyword(globalSearchQuery)
+    setShowSearchResults(false)
   }
 
   const handleAddTag = () => {
@@ -259,8 +272,7 @@ export default function WikiPage() {
                       content={selectedPage.content}
                       onTitleChange={handleTitleChange}
                       onContentChange={handleContentChange}
-                      searchKeyword={showSearchResults ? globalSearchQuery : ''}
-                      highlightTextSafe={highlightTextSafe}
+                      searchKeyword={activeSearchKeyword}
                     />
                     <div className="wiki-tags-section">
                       <div className="wiki-tags-title">标签</div>

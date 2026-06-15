@@ -1,0 +1,7 @@
+你实现的事件调试器页面还存在一些问题，需要进行修复：
+
+1. FrequencyChart.jsx 的频率波形图使用 requestAnimationFrame 递归调用实现约 60fps 的重绘，而提示词要求"波形图每秒更新一次"。同时 keyFrequency 和 mouseFrequency 用 useMemo 缓存计算，依赖项仅有关联事件数组，导致无新事件时频率数据不随时间推移而刷新——即使事件已超出 30 秒窗口，图表仍显示过时分布。需改为每秒触发一次重新计算和 Canvas 重绘。
+2. eventDebuggerUtils.js 中定义并导出了 throttle 通用节流函数，测试文件也为其编写了测试用例，但 MouseCapturePanel.jsx 并未导入使用该函数，而是用 lastMouseMoveRef 自行实现了一套内联节流逻辑。throttle 成为仅存在于工具模块和测试中的死代码。需让 MouseCapturePanel 使用 throttle 替换内联实现，或将未使用的导出和对应测试一并移除。
+3. 修复后需要为该页面补充纯 JS 函数的单元测试，只测和页面渲染无关的逻辑。测试代码放在 src/pages/__tests__/event-debugger/ 下。
+4. 使用 pnpm run dev 启动项目，手动验证频率波形图在无操作时数据是否随时间自然推移，以及波形图是否每秒更新一次而非每帧更新。
+5. 重新运行 pnpm run test，需要让所有测试通过。

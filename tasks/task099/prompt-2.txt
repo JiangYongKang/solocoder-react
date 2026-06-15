@@ -1,0 +1,7 @@
+你实现的 URL 解析编解码工具页面还存在一些问题，需要进行修复：
+
+1. urlToolUtils.js 中 base64Encode 和 base64Decode 分别使用了 escape 和 unescape 全局函数处理 Unicode 字符，这两个函数已在 ECMAScript 规范中被废弃，未来浏览器可能移除支持。需替换为 TextEncoder 和 TextDecoder API 完成字符串与二进制之间的转换。
+2. urlEncode 函数将 encodeURIComponent 直接应用于完整 URL 字符串，会把协议分隔符、路径分隔符、问号等 URL 结构符号也编码为百分号形式。编码结果无法被 new URL() 重新解析，导致 URL 拆解面板全部显示为 `-`。需修复 urlEncode 使其不对 URL 结构符号做编码，或调整 parseUrl 的调用使其能处理编码后的结果。
+3. index.jsx 中引入了 isUpdatingFromUrlRef 和 isUpdatingFromParamsRef 两个 ref 以及 updateUrlAndParams 辅助函数来控制 URL 和参数同步，但最终代码中并无导致循环更新的 useEffect，两个 ref 成为不会被触发的多余防御性代码。需简化状态同步逻辑。
+4. 修复后需要为该页面补充纯 JS 函数的单元测试，只测和页面渲染无关的逻辑。测试代码放在 src/pages/__tests__/url-tool/ 下。
+5. 重新运行 pnpm run test，需要让所有测试通过。

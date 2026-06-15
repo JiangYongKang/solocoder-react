@@ -10,7 +10,7 @@ import {
   getProjectColor,
   validateManualEntry,
   createRecord,
-  createTimerRecord,
+  createTimerRecordWithPause,
   updateRecord,
   deleteRecord,
   loadRecords,
@@ -172,8 +172,17 @@ const TimeTrackerPage = () => {
       intervalRef.current = null
     }
     const end = new Date()
-    const start = new Date(timerStartRef.current)
-    const newRecord = createTimerRecord(timerProject, start.toISOString(), end.toISOString())
+    let totalElapsedSeconds = elapsedBeforeRef.current
+    if (!timerPaused && timerStartRef.current) {
+      const startMs = new Date(timerStartRef.current).getTime()
+      const nowMs = end.getTime()
+      totalElapsedSeconds += Math.floor((nowMs - startMs) / 1000)
+    }
+    const newRecord = createTimerRecordWithPause(
+      timerProject,
+      end.toISOString(),
+      totalElapsedSeconds
+    )
     setRecords((prev) => [newRecord, ...prev])
     setTimerRunning(false)
     setTimerPaused(false)
@@ -182,7 +191,7 @@ const TimeTrackerPage = () => {
     setTimerStart(null)
     clearTimerState()
     resetDocumentTitle()
-  }, [timerProject])
+  }, [timerProject, timerPaused])
 
   const handleManualChange = (field, value) => {
     setManualForm((prev) => ({ ...prev, [field]: value }))

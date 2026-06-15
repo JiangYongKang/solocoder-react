@@ -241,15 +241,14 @@ function SnakeBattlePage() {
     }
     lastMoveRef.current = now
 
-    const allSnakes = [state.player, ...state.aiSnakes]
-
     if (state.player.alive) {
       state.player = moveSnake(state.player)
       let dead = false
       if (checkBoundaryCollision(state.player)) {
         dead = true
       }
-      if (!dead && checkAnySnakeCollision(state.player, allSnakes)) {
+      const playerAllSnakes = [state.player, ...state.aiSnakes]
+      if (!dead && checkAnySnakeCollision(state.player, playerAllSnakes)) {
         dead = true
       }
       if (dead) {
@@ -271,7 +270,8 @@ function SnakeBattlePage() {
     for (let i = 0; i < state.aiSnakes.length; i++) {
       const ai = state.aiSnakes[i]
       if (ai.alive) {
-        const decision = decideAIDirection(ai, allSnakes, state.foods, now)
+        const allSnakesSnapshot = [state.player, ...state.aiSnakes]
+        const decision = decideAIDirection(ai, allSnakesSnapshot, state.foods, now)
         ai.nextDirection = decision.direction
         ai.aiBehavior = decision.behavior
         if (decision.updated) {

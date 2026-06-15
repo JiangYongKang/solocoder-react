@@ -466,7 +466,6 @@ describe('linkGameCore', () => {
   describe('calculateScore', () => {
     it('should return at least 0', () => {
       const score = calculateScore({
-        difficulty: DIFFICULTY.HARD,
         timeSeconds: 999999,
         steps: 999999,
         hintsUsed: 999,
@@ -478,14 +477,12 @@ describe('linkGameCore', () => {
 
     it('should subtract time penalty', () => {
       const baseScore = calculateScore({
-        difficulty: DIFFICULTY.NORMAL,
         timeSeconds: 0,
         steps: 0,
         hintsUsed: 0,
         shufflesUsed: 0,
       })
       const penaltyScore = calculateScore({
-        difficulty: DIFFICULTY.NORMAL,
         timeSeconds: 100,
         steps: 0,
         hintsUsed: 0,
@@ -496,14 +493,12 @@ describe('linkGameCore', () => {
 
     it('should subtract step penalty', () => {
       const baseScore = calculateScore({
-        difficulty: DIFFICULTY.NORMAL,
         timeSeconds: 0,
         steps: 0,
         hintsUsed: 0,
         shufflesUsed: 0,
       })
       const penaltyScore = calculateScore({
-        difficulty: DIFFICULTY.NORMAL,
         timeSeconds: 0,
         steps: 10,
         hintsUsed: 0,
@@ -512,16 +507,14 @@ describe('linkGameCore', () => {
       expect(baseScore - penaltyScore).toBe(10 * STEP_PENALTY)
     })
 
-    it('should give bonus for unused hints', () => {
+    it('should give full hint bonus when hintsUsed is exactly 0', () => {
       const noBonus = calculateScore({
-        difficulty: DIFFICULTY.NORMAL,
         timeSeconds: 0,
         steps: 0,
         hintsUsed: 1,
         shufflesUsed: MAX_SHUFFLES,
       })
       const withBonus = calculateScore({
-        difficulty: DIFFICULTY.NORMAL,
         timeSeconds: 0,
         steps: 0,
         hintsUsed: 0,
@@ -530,16 +523,37 @@ describe('linkGameCore', () => {
       expect(withBonus - noBonus).toBe(BONUS_UNUSED_HINT)
     })
 
+    it('should give no hint bonus when hintsUsed is 1 or more', () => {
+      const scoreWith1Hint = calculateScore({
+        timeSeconds: 0,
+        steps: 0,
+        hintsUsed: 1,
+        shufflesUsed: MAX_SHUFFLES,
+      })
+      const scoreWith2Hints = calculateScore({
+        timeSeconds: 0,
+        steps: 0,
+        hintsUsed: 2,
+        shufflesUsed: MAX_SHUFFLES,
+      })
+      const scoreWith5Hints = calculateScore({
+        timeSeconds: 0,
+        steps: 0,
+        hintsUsed: 5,
+        shufflesUsed: MAX_SHUFFLES,
+      })
+      expect(scoreWith1Hint).toBe(scoreWith2Hints)
+      expect(scoreWith2Hints).toBe(scoreWith5Hints)
+    })
+
     it('should give bonus for unused shuffles', () => {
       const noBonus = calculateScore({
-        difficulty: DIFFICULTY.NORMAL,
         timeSeconds: 0,
         steps: 0,
         hintsUsed: 1,
         shufflesUsed: MAX_SHUFFLES,
       })
       const withBonus = calculateScore({
-        difficulty: DIFFICULTY.NORMAL,
         timeSeconds: 0,
         steps: 0,
         hintsUsed: 1,
@@ -548,15 +562,71 @@ describe('linkGameCore', () => {
       expect(withBonus - noBonus).toBe(MAX_SHUFFLES * BONUS_UNUSED_SHUFFLE)
     })
 
+    it('should give no shuffle bonus when shufflesUsed >= MAX_SHUFFLES', () => {
+      const scoreAtMax = calculateScore({
+        timeSeconds: 0,
+        steps: 0,
+        hintsUsed: 1,
+        shufflesUsed: MAX_SHUFFLES,
+      })
+      const scoreAboveMax = calculateScore({
+        timeSeconds: 0,
+        steps: 0,
+        hintsUsed: 1,
+        shufflesUsed: MAX_SHUFFLES + 1,
+      })
+      const scoreFarAboveMax = calculateScore({
+        timeSeconds: 0,
+        steps: 0,
+        hintsUsed: 1,
+        shufflesUsed: MAX_SHUFFLES + 10,
+      })
+      expect(scoreAtMax).toBe(scoreAboveMax)
+      expect(scoreAboveMax).toBe(scoreFarAboveMax)
+    })
+
+    it('should give partial shuffle bonus when some shuffles used', () => {
+      const scoreFullBonus = calculateScore({
+        timeSeconds: 0,
+        steps: 0,
+        hintsUsed: 1,
+        shufflesUsed: 0,
+      })
+      const scoreOneUsed = calculateScore({
+        timeSeconds: 0,
+        steps: 0,
+        hintsUsed: 1,
+        shufflesUsed: 1,
+      })
+      expect(scoreFullBonus - scoreOneUsed).toBe(BONUS_UNUSED_SHUFFLE)
+    })
+
     it('perfect game should have high score', () => {
       const score = calculateScore({
-        difficulty: DIFFICULTY.NORMAL,
         timeSeconds: 10,
         steps: 32,
         hintsUsed: 0,
         shufflesUsed: 0,
       })
       expect(score).toBeGreaterThan(BASE_SCORE - 10 * 2 - 32 * 5 + BONUS_UNUSED_HINT + MAX_SHUFFLES * BONUS_UNUSED_SHUFFLE - 1)
+    })
+
+    it('should work without difficulty parameter', () => {
+      expect(() =>
+        calculateScore({
+          timeSeconds: 60,
+          steps: 10,
+          hintsUsed: 0,
+          shufflesUsed: 0,
+        })
+      ).not.toThrow()
+      const score = calculateScore({
+        timeSeconds: 60,
+        steps: 10,
+        hintsUsed: 0,
+        shufflesUsed: 0,
+      })
+      expect(typeof score).toBe('number')
     })
   })
 

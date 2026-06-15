@@ -33,6 +33,7 @@ export const PRESET_ICONS = [
   { id: 'chart', emoji: '📈', label: '图表' },
   { id: 'lock', emoji: '🔒', label: '权限' },
   { id: 'logout', emoji: '🚪', label: '退出' },
+  { id: 'help', emoji: '❓', label: '帮助' },
 ]
 
 export const DEFAULT_TITLE = '后台管理系统'

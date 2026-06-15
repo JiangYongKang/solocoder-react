@@ -1,5 +1,5 @@
 import { useRef, useEffect } from 'react'
-import { markdownToHtml } from './wikiUtils.js'
+import { markdownToHtml, highlightHtml } from './wikiUtils.js'
 
 function ToolbarButton({ onClick, title, children }) {
   return (
@@ -20,7 +20,6 @@ export default function MarkdownEditor({
   onTitleChange,
   onContentChange,
   searchKeyword,
-  highlightTextSafe,
 }) {
   const editorRef = useRef(null)
   const previewRef = useRef(null)
@@ -82,9 +81,8 @@ export default function MarkdownEditor({
     }
   }, [searchKeyword, content])
 
-  const renderContent = searchKeyword
-    ? highlightTextSafe(content, searchKeyword)
-    : markdownToHtml(content)
+  const renderedHtml = markdownToHtml(content)
+  const finalHtml = searchKeyword ? highlightHtml(renderedHtml, searchKeyword) : renderedHtml
 
   return (
     <div className="wiki-editor-container">
@@ -143,11 +141,7 @@ export default function MarkdownEditor({
       <div
         className="wiki-preview-panel"
         ref={previewRef}
-        dangerouslySetInnerHTML={{
-          __html: searchKeyword
-            ? renderContent
-            : markdownToHtml(content),
-        }}
+        dangerouslySetInnerHTML={{ __html: finalHtml }}
       />
     </div>
   )

@@ -20,6 +20,7 @@ import {
   toggleTaskCompletion,
   reorderTasks,
   reorderSubtasks,
+  reorderGroupRootTasks,
   isOverdue,
   isDueToday,
   isDueTomorrow,
@@ -28,6 +29,8 @@ import {
   flattenTasks,
   countIncompleteTasks,
   countGroupIncomplete,
+  countFilteredGroupIncomplete,
+  countFilteredAllIncomplete,
   filterTasks,
   getOverdueCount,
   sortTasksWithOverdueFirst,
@@ -53,6 +56,7 @@ import {
   FILTER_DUE_ALL,
   FILTER_DUE_TODAY,
   FILTER_DUE_OVERDUE,
+  ALL_TASKS_VIEW,
   STORAGE_KEY_GROUPS,
   STORAGE_KEY_TASKS,
   STORAGE_KEY_CHECKINS,
@@ -392,6 +396,81 @@ describe('todoUtils', () => {
     })
   })
 
+  describe('reorderGroupRootTasks', () => {
+    it('should reorder root tasks within a specific group', () => {
+      const tasks = [
+        makeTask({ id: 't1', groupId: 'g1', order: 0 }),
+        makeTask({ id: 't2', groupId: 'g2', order: 0 }),
+        makeTask({ id: 't3', groupId: 'g1', order: 1 }),
+        makeTask({ id: 't4', groupId: 'g1', order: 2 }),
+      ]
+      const result = reorderGroupRootTasks(tasks, 'g1', 't1', 2)
+      const g1Tasks = result.filter(t => t.groupId === 'g1' && !t.parentId)
+      expect(g1Tasks.map(t => t.id)).toEqual(['t3', 't4', 't1'])
+      expect(g1Tasks.map(t => t.order)).toEqual([0, 1, 2])
+    })
+
+    it('should move task from middle to beginning', () => {
+      const tasks = [
+        makeTask({ id: 't1', groupId: 'g1', order: 0 }),
+        makeTask({ id: 't2', groupId: 'g1', order: 1 }),
+        makeTask({ id: 't3', groupId: 'g1', order: 2 }),
+      ]
+      const result = reorderGroupRootTasks(tasks, 'g1', 't2', 0)
+      const g1Tasks = result.filter(t => t.groupId === 'g1')
+      expect(g1Tasks.map(t => t.id)).toEqual(['t2', 't1', 't3'])
+      expect(g1Tasks.map(t => t.order)).toEqual([0, 1, 2])
+    })
+
+    it('should handle ALL_TASKS_VIEW', () => {
+      const tasks = [
+        makeTask({ id: 't1', groupId: 'g1', order: 0 }),
+        makeTask({ id: 't2', groupId: 'g2', order: 0 }),
+        makeTask({ id: 't3', groupId: 'g1', order: 1 }),
+      ]
+      const result = reorderGroupRootTasks(tasks, ALL_TASKS_VIEW, 't1', 2)
+      const rootTasks = result.filter(t => !t.parentId)
+      expect(rootTasks.map(t => t.id)).toEqual(['t2', 't3', 't1'])
+      expect(rootTasks.map(t => t.order)).toEqual([0, 1, 2])
+    })
+
+    it('should preserve other group tasks and their order', () => {
+      const tasks = [
+        makeTask({ id: 't1', groupId: 'g1', order: 0 }),
+        makeTask({ id: 't2', groupId: 'g2', order: 0 }),
+        makeTask({ id: 't3', groupId: 'g1', order: 1 }),
+        makeTask({ id: 't4', groupId: 'g2', order: 1 }),
+      ]
+      const result = reorderGroupRootTasks(tasks, 'g1', 't1', 1)
+      const g1Tasks = result.filter(t => t.groupId === 'g1')
+      const g2Tasks = result.filter(t => t.groupId === 'g2')
+      expect(g1Tasks.map(t => t.id)).toEqual(['t3', 't1'])
+      expect(g2Tasks.map(t => t.id)).toEqual(['t2', 't4'])
+      expect(g2Tasks.map(t => t.order)).toEqual([0, 1])
+    })
+
+    it('should preserve subtasks in the result', () => {
+      const sub = makeTask({ id: 's1', parentId: 't1' })
+      const tasks = [
+        makeTask({ id: 't1', groupId: 'g1', order: 0, subtasks: [sub] }),
+        sub,
+        makeTask({ id: 't2', groupId: 'g1', order: 1 }),
+      ]
+      const result = reorderGroupRootTasks(tasks, 'g1', 't1', 1)
+      const subtaskInResult = result.find(t => t.id === 's1')
+      expect(subtaskInResult).toBeDefined()
+      const rootTasks = result.filter(t => !t.parentId)
+      expect(rootTasks[0].id).toBe('t2')
+      expect(rootTasks[1].id).toBe('t1')
+    })
+
+    it('should return original tasks if task not found', () => {
+      const tasks = [makeTask({ id: 't1', groupId: 'g1', order: 0 })]
+      const result = reorderGroupRootTasks(tasks, 'g1', 'non-existent', 0)
+      expect(result).toBe(tasks)
+    })
+  })
+
   describe('due date helpers', () => {
     const today = getTodayKey()
     const tomorrow = addDays(today, 1)
@@ -505,6 +584,137 @@ describe('todoUtils', () => {
         makeTask({ id: 't3', groupId: 'g1', completed: true }),
       ]
       expect(countGroupIncomplete(tasks, 'g1')).toBe(1)
+    })
+  })
+
+  describe('countFilteredGroupIncomplete', () => {
+    it('should count incomplete tasks with no filters', () => {
+      const tasks = [
+        makeTask({ id: 't1', groupId: 'g1', completed: false }),
+        makeTask({ id: 't2', groupId: 'g2', completed: false }),
+        makeTask({ id: 't3', groupId: 'g1', completed: true }),
+      ]
+      expect(countFilteredGroupIncomplete(tasks, 'g1', {
+        priority: FILTER_PRIORITY_ALL,
+        status: FILTER_STATUS_ALL,
+        dueDate: FILTER_DUE_ALL,
+      })).toBe(1)
+    })
+
+    it('should count incomplete tasks with priority filter', () => {
+      const tasks = [
+        makeTask({ id: 't1', groupId: 'g1', completed: false, priority: PRIORITIES.HIGH }),
+        makeTask({ id: 't2', groupId: 'g1', completed: false, priority: PRIORITIES.LOW }),
+        makeTask({ id: 't3', groupId: 'g1', completed: true, priority: PRIORITIES.HIGH }),
+      ]
+      expect(countFilteredGroupIncomplete(tasks, 'g1', {
+        priority: PRIORITIES.HIGH,
+        status: FILTER_STATUS_ALL,
+        dueDate: FILTER_DUE_ALL,
+      })).toBe(1)
+    })
+
+    it('should count incomplete tasks with status filter', () => {
+      const tasks = [
+        makeTask({ id: 't1', groupId: 'g1', completed: false }),
+        makeTask({ id: 't2', groupId: 'g1', completed: true }),
+        makeTask({ id: 't3', groupId: 'g1', completed: false }),
+      ]
+      expect(countFilteredGroupIncomplete(tasks, 'g1', {
+        priority: FILTER_PRIORITY_ALL,
+        status: FILTER_STATUS_DONE,
+        dueDate: FILTER_DUE_ALL,
+      })).toBe(0)
+    })
+
+    it('should count incomplete tasks with due date filter', () => {
+      const today = getTodayKey()
+      const yesterday = addDays(today, -1)
+      const tasks = [
+        makeTask({ id: 't1', groupId: 'g1', completed: false, dueDate: today }),
+        makeTask({ id: 't2', groupId: 'g1', completed: false, dueDate: yesterday }),
+        makeTask({ id: 't3', groupId: 'g1', completed: false, dueDate: null }),
+      ]
+      expect(countFilteredGroupIncomplete(tasks, 'g1', {
+        priority: FILTER_PRIORITY_ALL,
+        status: FILTER_STATUS_ALL,
+        dueDate: FILTER_DUE_OVERDUE,
+      })).toBe(1)
+    })
+
+    it('should handle null filters (no filtering)', () => {
+      const tasks = [
+        makeTask({ id: 't1', groupId: 'g1', completed: false }),
+        makeTask({ id: 't2', groupId: 'g1', completed: true }),
+      ]
+      expect(countFilteredGroupIncomplete(tasks, 'g1', null)).toBe(1)
+    })
+
+    it('should count nested subtasks with filter', () => {
+      const sub = makeTask({ id: 's1', groupId: 'g1', completed: false, priority: PRIORITIES.HIGH })
+      const task = makeTask({ id: 't1', groupId: 'g1', completed: false, priority: PRIORITIES.LOW, subtasks: [sub] })
+      expect(countFilteredGroupIncomplete([task], 'g1', {
+        priority: PRIORITIES.HIGH,
+        status: FILTER_STATUS_ALL,
+        dueDate: FILTER_DUE_ALL,
+      })).toBe(1)
+    })
+
+    it('should handle ALL_TASKS_VIEW group id', () => {
+      const tasks = [
+        makeTask({ id: 't1', groupId: 'g1', completed: false }),
+        makeTask({ id: 't2', groupId: 'g2', completed: false }),
+      ]
+      expect(countFilteredGroupIncomplete(tasks, ALL_TASKS_VIEW, {
+        priority: FILTER_PRIORITY_ALL,
+        status: FILTER_STATUS_ALL,
+        dueDate: FILTER_DUE_ALL,
+      })).toBe(2)
+    })
+  })
+
+  describe('countFilteredAllIncomplete', () => {
+    it('should count all incomplete root tasks with no filters', () => {
+      const tasks = [
+        makeTask({ id: 't1', completed: false }),
+        makeTask({ id: 't2', completed: true }),
+        makeTask({ id: 't3', completed: false }),
+      ]
+      expect(countFilteredAllIncomplete(tasks, {
+        priority: FILTER_PRIORITY_ALL,
+        status: FILTER_STATUS_ALL,
+        dueDate: FILTER_DUE_ALL,
+      })).toBe(2)
+    })
+
+    it('should count with priority filter', () => {
+      const tasks = [
+        makeTask({ id: 't1', completed: false, priority: PRIORITIES.HIGH }),
+        makeTask({ id: 't2', completed: false, priority: PRIORITIES.LOW }),
+      ]
+      expect(countFilteredAllIncomplete(tasks, {
+        priority: PRIORITIES.HIGH,
+        status: FILTER_STATUS_ALL,
+        dueDate: FILTER_DUE_ALL,
+      })).toBe(1)
+    })
+
+    it('should handle null filters', () => {
+      const tasks = [
+        makeTask({ id: 't1', completed: false }),
+        makeTask({ id: 't2', completed: true }),
+      ]
+      expect(countFilteredAllIncomplete(tasks, null)).toBe(1)
+    })
+
+    it('should include subtasks in incomplete count (matching original behavior)', () => {
+      const sub = makeTask({ id: 's1', completed: false, parentId: 't1' })
+      const task = makeTask({ id: 't1', completed: false, subtasks: [sub] })
+      expect(countFilteredAllIncomplete([task], {
+        priority: FILTER_PRIORITY_ALL,
+        status: FILTER_STATUS_ALL,
+        dueDate: FILTER_DUE_ALL,
+      })).toBe(2)
     })
   })
 

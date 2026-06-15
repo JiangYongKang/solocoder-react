@@ -6,6 +6,7 @@ import {
   formatTimestamp,
   exportToJson,
   downloadJsonFile,
+  throttle,
   MOUSE_EVENT_TYPES,
   MOUSE_EVENT_COLORS,
   MOUSE_EVENT_LABELS,
@@ -22,7 +23,7 @@ function MouseCapturePanel({ onEvent }) {
   const logRef = useRef(null)
   const panelRef = useRef(null)
   const sequenceRef = useRef(0)
-  const lastMouseMoveRef = useRef(0)
+  const throttledMouseMoveRef = useRef(null)
 
   const filteredEvents = useMemo(() => {
     const filtered = filterMouseEvents(events, {
@@ -58,12 +59,6 @@ function MouseCapturePanel({ onEvent }) {
       const offsetX = e.clientX - rect.left
       const offsetY = e.clientY - rect.top
 
-      if (e.type === 'mousemove') {
-        const now = Date.now()
-        if (now - lastMouseMoveRef.current < 100) return
-        lastMouseMoveRef.current = now
-      }
-
       sequenceRef.current += 1
       const record = createMouseEventRecord(e, sequenceRef.current, offsetX, offsetY)
       addEvent(record)
@@ -98,10 +93,15 @@ function MouseCapturePanel({ onEvent }) {
     const panel = panelRef.current
     if (!panel) return
 
+    const throttledMouseMove = throttle(handleMouseEvent, 100)
+    throttledMouseMoveRef.current = throttledMouseMove
+
     const handlers = {}
     MOUSE_EVENT_TYPES.forEach((type) => {
       if (type === 'contextmenu') {
         handlers[type] = handleContextMenu
+      } else if (type === 'mousemove') {
+        handlers[type] = throttledMouseMove
       } else {
         handlers[type] = handleMouseEvent
       }

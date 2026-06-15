@@ -25,9 +25,11 @@ import {
   getDescendantPageIds,
   markdownToHtml,
   diffContent,
+  tokenizeLine,
   searchAllPages,
   highlightText,
   highlightTextSafe,
+  highlightHtml,
   addTagToPage,
   removeTagFromPage,
   getAllTagsInSpace,
@@ -612,6 +614,50 @@ describe('Markdown 渲染', () => {
 })
 
 describe('Diff 对比', () => {
+  describe('tokenizeLine', () => {
+    it('应该正确分词普通文本', () => {
+      const tokens = tokenizeLine('Hello World')
+      expect(tokens).toContain('Hello')
+      expect(tokens).toContain(' ')
+      expect(tokens).toContain('World')
+    })
+
+    it('应该把 HTML 标签实体作为完整 token', () => {
+      const tokens = tokenizeLine('<script>')
+      expect(tokens).toContain('&lt;')
+      expect(tokens).toContain('script')
+      expect(tokens).toContain('&gt;')
+      expect(tokens.join('')).toBe('&lt;script&gt;')
+    })
+
+    it('应该正确处理混合内容', () => {
+      const tokens = tokenizeLine('使用 <div> 标签')
+      const joined = tokens.join('')
+      expect(joined).toContain('&lt;div&gt;')
+      expect(joined).toContain('使用')
+      expect(joined).toContain('标签')
+    })
+
+    it('空字符串应该返回空数组', () => {
+      expect(tokenizeLine('')).toEqual([])
+    })
+
+    it('应该正确处理已转义的 HTML 实体作为完整 token', () => {
+      const tokens = tokenizeLine('A &amp; B')
+      expect(tokens).toContain('&amp;')
+      expect(tokens).toContain('A')
+      expect(tokens).toContain('B')
+    })
+
+    it('应该正确处理特殊字符转义', () => {
+      const tokens = tokenizeLine('x < y && z > 0')
+      const joined = tokens.join('')
+      expect(joined).toContain('&lt;')
+      expect(joined).toContain('&gt;')
+      expect(joined).toContain('&amp;&amp;')
+    })
+  })
+
   describe('diffContent', () => {
     it('相同内容应该返回相同的 HTML', () => {
       const content = 'Hello World'
@@ -635,12 +681,38 @@ describe('Diff 对比', () => {
       expect(result.newHtml).toContain('diff-word-added')
     })
 
-    it('应该正确转义 HTML', () => {
+    it('相同 HTML 标签内容应该正确转义', () => {
       const oldContent = '<script>'
       const newContent = '<script>'
       const result = diffContent(oldContent, newContent)
       expect(result.oldHtml).toContain('&lt;script&gt;')
       expect(result.newHtml).toContain('&lt;script&gt;')
+    })
+
+    it('不同 HTML 标签应该不破坏转义结构', () => {
+      const oldContent = '<script>'
+      const newContent = '<div>'
+      const result = diffContent(oldContent, newContent)
+      expect(result.oldHtml).toContain('&lt;')
+      expect(result.oldHtml).toContain('&gt;')
+      expect(result.newHtml).toContain('&lt;')
+      expect(result.newHtml).toContain('&gt;')
+      expect(result.oldHtml).not.toContain('<script>')
+      expect(result.newHtml).not.toContain('<div>')
+    })
+
+    it('HTML 标签内容变化时应该保留完整的实体结构', () => {
+      const oldContent = '查看 <script> 标签'
+      const newContent = '查看 <style> 标签'
+      const result = diffContent(oldContent, newContent)
+      expect(result.oldHtml).toContain('&lt;')
+      expect(result.oldHtml).toContain('&gt;')
+      expect(result.oldHtml).toContain('script')
+      expect(result.newHtml).toContain('&lt;')
+      expect(result.newHtml).toContain('&gt;')
+      expect(result.newHtml).toContain('style')
+      expect(result.oldHtml).not.toContain('<script>')
+      expect(result.newHtml).not.toContain('<style>')
     })
   })
 })
@@ -723,6 +795,48 @@ describe('全文搜索', () => {
       const result = highlightTextSafe('<div>React</div>', 'React')
       expect(result).toContain('&lt;div&gt;')
       expect(result).toContain('<span class="highlight">')
+    })
+  })
+
+  describe('highlightHtml', () => {
+    it('应该在已渲染的 HTML 文本节点中高亮关键词', () => {
+      const html = '<h1>React 开发规范</h1><p>React 是一个前端框架</p>'
+      const result = highlightHtml(html, 'React')
+      expect(result).toContain('<span class="highlight">React</span>')
+      expect(result.match(/<span class="highlight">React<\/span>/g).length).toBe(2)
+    })
+
+    it('不应该修改 HTML 标签中的属性和内容', () => {
+      const html = '<a href="https://react.dev">React 官网</a>'
+      const result = highlightHtml(html, 'React')
+      expect(result).toContain('href="https://react.dev"')
+      expect(result).toContain('<span class="highlight">React</span> 官网')
+    })
+
+    it('空关键词应该返回原 HTML', () => {
+      const html = '<p>test</p>'
+      expect(highlightHtml(html, '')).toBe(html)
+      expect(highlightHtml(html, '   ')).toBe(html)
+      expect(highlightHtml(html, null)).toBe(html)
+    })
+
+    it('空 HTML 应该原样返回', () => {
+      expect(highlightHtml('', 'test')).toBe('')
+      expect(highlightHtml(null, 'test')).toBe(null)
+    })
+
+    it('搜索应该不区分大小写', () => {
+      const html = '<p>React REACT react</p>'
+      const result = highlightHtml(html, 'react')
+      expect(result.match(/<span class="highlight">/g).length).toBe(3)
+    })
+
+    it('关键词包含特殊正则字符时不应该报错', () => {
+      const html = '<p>a.b [c] (d)</p>'
+      expect(() => highlightHtml(html, '.')).not.toThrow()
+      expect(() => highlightHtml(html, '[')).not.toThrow()
+      const result = highlightHtml(html, 'a.b')
+      expect(result).toContain('<span class="highlight">a.b</span>')
     })
   })
 })

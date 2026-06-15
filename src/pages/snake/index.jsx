@@ -11,6 +11,7 @@ import {
   GRID_LINE_COLOR,
   BG_COLOR,
   INITIAL_MOVE_INTERVAL,
+  MOVE_INTERVAL_DECREMENT,
 } from './constants.js'
 import {
   createInitialState,
@@ -271,7 +272,7 @@ function SnakePage() {
   }, [drawGame, handleGameOver])
 
   const handleModeChange = useCallback((mode) => {
-    if (status === GAME_STATUS.PLAYING) return
+    if (status === GAME_STATUS.PLAYING || status === GAME_STATUS.PAUSED) return
     setGameState((prev) => ({
       ...prev,
       gameMode: mode,
@@ -300,14 +301,14 @@ function SnakePage() {
             <button
               className={`snake-mode-btn ${gameState.gameMode === GAME_MODE.WALL_DEATH ? 'active' : ''}`}
               onClick={() => handleModeChange(GAME_MODE.WALL_DEATH)}
-              disabled={status === GAME_STATUS.PLAYING}
+              disabled={status === GAME_STATUS.PLAYING || status === GAME_STATUS.PAUSED}
             >
               边界死亡
             </button>
             <button
               className={`snake-mode-btn ${gameState.gameMode === GAME_MODE.THROUGH_WALL ? 'active' : ''}`}
               onClick={() => handleModeChange(GAME_MODE.THROUGH_WALL)}
-              disabled={status === GAME_STATUS.PLAYING}
+              disabled={status === GAME_STATUS.PLAYING || status === GAME_STATUS.PAUSED}
             >
               穿墙模式
             </button>
@@ -324,7 +325,7 @@ function SnakePage() {
             </div>
             <div className="snake-info-item">
               <span className="snake-info-label">速度</span>
-              <span className="snake-info-value">{INITIAL_MOVE_INTERVAL - (gameState.level - 1) * 10}ms</span>
+              <span className="snake-info-value">{INITIAL_MOVE_INTERVAL - (gameState.level - 1) * MOVE_INTERVAL_DECREMENT}ms</span>
             </div>
             <div className="snake-info-item">
               <span className="snake-info-label">长度</span>

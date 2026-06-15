@@ -214,10 +214,12 @@ export function saveHighScore(score, storage = typeof window !== 'undefined' ? w
   }
 }
 
-export function createUndoState(grid, score) {
+export function createUndoState(grid, score, won, continueAfterWin) {
   return {
     grid: grid.map((row) => [...row]),
     score,
+    won,
+    continueAfterWin,
   }
 }
 

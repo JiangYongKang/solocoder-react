@@ -1,6 +1,5 @@
 import {
   ICONS,
-  DIFFICULTY_CONFIG,
   MAX_SHUFFLES,
   STORAGE_KEY_LEADERBOARD,
   BORDER_PADDING,
@@ -232,19 +231,14 @@ export function formatTime(seconds) {
 
 export function calculateScore(params) {
   const {
-    difficulty,
     timeSeconds,
     steps,
     hintsUsed = 0,
     shufflesUsed = 0,
   } = params
 
-  const config = DIFFICULTY_CONFIG[difficulty]
-  const maxHints = 1
-  const maxShuffles = MAX_SHUFFLES
-
-  const unusedHintsBonus = Math.max(0, maxHints - hintsUsed) * BONUS_UNUSED_HINT
-  const unusedShufflesBonus = Math.max(0, maxShuffles - shufflesUsed) * BONUS_UNUSED_SHUFFLE
+  const unusedHintsBonus = hintsUsed === 0 ? BONUS_UNUSED_HINT : 0
+  const unusedShufflesBonus = Math.max(0, MAX_SHUFFLES - shufflesUsed) * BONUS_UNUSED_SHUFFLE
 
   const score =
     BASE_SCORE -

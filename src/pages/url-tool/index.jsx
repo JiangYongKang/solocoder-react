@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import './url-tool.css'
 import {
@@ -36,8 +36,6 @@ const UrlToolPage = () => {
   const [batchInput, setBatchInput] = useState('')
   const [batchResults, setBatchResults] = useState([])
   const [toast, setToast] = useState(null)
-  const isUpdatingFromUrlRef = useRef(false)
-  const isUpdatingFromParamsRef = useRef(false)
 
   const parsedUrl = useMemo(() => {
     return parseUrl(url)
@@ -54,26 +52,21 @@ const UrlToolPage = () => {
     setToast({ type, message })
   }, [])
 
-  const updateUrlAndParams = useCallback((newUrl) => {
-    if (isUpdatingFromParamsRef.current) return
-    isUpdatingFromUrlRef.current = true
+  const syncUrlAndParams = useCallback((newUrl, newParams) => {
     setUrl(newUrl)
-    const parsed = parseUrl(newUrl)
-    if (parsed.success) {
-      const newParams = parseQueryParams(parsed.search)
-      setParams(newParams)
-    }
-    isUpdatingFromUrlRef.current = false
+    setParams(newParams)
   }, [])
 
-  const updateUrlFromParams = useCallback((newParams) => {
-    if (isUpdatingFromUrlRef.current) return
-    isUpdatingFromParamsRef.current = true
-    const currentParsed = parseUrl(url)
-    if (!currentParsed.success) {
-      isUpdatingFromParamsRef.current = false
-      return
-    }
+  const handleUrlChange = useCallback((e) => {
+    const newUrl = e.target.value
+    const parsed = parseUrl(newUrl)
+    const newParams = parsed.success ? parseQueryParams(parsed.search) : []
+    syncUrlAndParams(newUrl, newParams)
+  }, [syncUrlAndParams])
+
+  const rebuildUrlFromParams = useCallback((newParams, currentUrl) => {
+    const currentParsed = parseUrl(currentUrl)
+    if (!currentParsed.success) return
     const newSearch = buildQueryString(newParams)
     const newUrl = buildUrl({
       protocol: currentParsed.protocol,
@@ -83,84 +76,83 @@ const UrlToolPage = () => {
       search: newSearch,
       hash: currentParsed.hash,
     })
-    if (newUrl !== url) {
-      setUrl(newUrl)
-    }
-    isUpdatingFromParamsRef.current = false
-  }, [url])
-
-  const handleUrlChange = useCallback((e) => {
-    updateUrlAndParams(e.target.value)
-  }, [updateUrlAndParams])
+    syncUrlAndParams(newUrl, newParams)
+  }, [syncUrlAndParams])
 
   const handleParamKeyChange = useCallback((index, value) => {
     setParams((prev) => {
       const newParams = [...prev]
       newParams[index] = { ...newParams[index], key: value }
-      updateUrlFromParams(newParams)
+      rebuildUrlFromParams(newParams, url)
       return newParams
     })
-  }, [updateUrlFromParams])
+  }, [url, rebuildUrlFromParams])
 
   const handleParamValueChange = useCallback((index, value) => {
     setParams((prev) => {
       const newParams = [...prev]
       newParams[index] = { ...newParams[index], value: value }
-      updateUrlFromParams(newParams)
+      rebuildUrlFromParams(newParams, url)
       return newParams
     })
-  }, [updateUrlFromParams])
+  }, [url, rebuildUrlFromParams])
 
   const handleAddParam = useCallback(() => {
     setParams((prev) => {
       const newParams = [...prev, { key: '', value: '' }]
-      updateUrlFromParams(newParams)
+      rebuildUrlFromParams(newParams, url)
       return newParams
     })
-  }, [updateUrlFromParams])
+  }, [url, rebuildUrlFromParams])
 
   const handleDeleteParam = useCallback((index) => {
     setParams((prev) => {
       const newParams = prev.filter((_, i) => i !== index)
-      updateUrlFromParams(newParams)
+      rebuildUrlFromParams(newParams, url)
       return newParams
     })
-  }, [updateUrlFromParams])
+  }, [url, rebuildUrlFromParams])
 
   const handleClearParams = useCallback(() => {
-    setParams([])
-    updateUrlFromParams([])
-  }, [updateUrlFromParams])
+    const newParams = []
+    rebuildUrlFromParams(newParams, url)
+  }, [url, rebuildUrlFromParams])
 
   const handleUrlEncode = useCallback(() => {
     const result = urlEncode(url)
     if (result.success) {
-      updateUrlAndParams(result.result)
+      const parsed = parseUrl(result.result)
+      const newParams = parsed.success ? parseQueryParams(parsed.search) : params
+      syncUrlAndParams(result.result, newParams)
       showToast('success', 'URL 编码完成')
     } else {
       showToast('error', result.error)
     }
-  }, [url, showToast, updateUrlAndParams])
+  }, [url, params, showToast, syncUrlAndParams])
 
   const handleUrlDecode = useCallback(() => {
     const result = urlDecode(url)
     if (result.success) {
-      updateUrlAndParams(result.result)
+      const parsed = parseUrl(result.result)
+      const newParams = parsed.success ? parseQueryParams(parsed.search) : params
+      syncUrlAndParams(result.result, newParams)
       showToast('success', 'URL 解码完成')
     } else {
       showToast('error', result.error)
     }
-  }, [url, showToast, updateUrlAndParams])
+  }, [url, params, showToast, syncUrlAndParams])
 
   const handleEncodeParamsOnly = useCallback(() => {
     const result = encodeQueryParamsOnly(url)
     if (result.success) {
-      updateUrlAndParams(result.result)
+      const parsed = parseUrl(result.result)
+      const newParams = parsed.success ? parseQueryParams(parsed.search) : params
+      syncUrlAndParams(result.result, newParams)
       showToast('success', '参数编码完成')
     } else {
       showToast('error', result.error)
     }
-  }, [url, showToast, updateUrlAndParams])
+  }, [url, params, showToast, syncUrlAndParams])
 
   const handleBase64Encode = useCallback(() => {
     const result = base64Encode(base64Input)
@@ -214,8 +206,7 @@ const UrlToolPage = () => {
   const handleJsonToParams = useCallback(() => {
     const result = jsonToQueryParams(jsonInput)
     if (result.success) {
-      setParams(result.params)
-      updateUrlFromParams(result.params)
+      rebuildUrlFromParams(result.params, url)
       setJsonError(null)
       showToast('success', '转换完成')
     } else {
@@ -225,7 +216,7 @@ const UrlToolPage = () => {
       const colInfo = result.column ? `，第 ${result.column} 列` : ''
       showToast('error', `${lineInfo}${colInfo}${lineInfo || colInfo ? '：' : ''}${result.error}`)
     }
-  }, [jsonInput, showToast, updateUrlFromParams])
+  }, [jsonInput, url, showToast, rebuildUrlFromParams])
 
   const handleCopyJsonOutput = useCallback(async () => {
     if (!jsonOutput) return
@@ -275,8 +266,10 @@ const UrlToolPage = () => {
   }, [])
 
   const handleLoadSample = useCallback(() => {
-    updateUrlAndParams(DEFAULT_URL)
-  }, [updateUrlAndParams])
+    const parsed = parseUrl(DEFAULT_URL)
+    const newParams = parsed.success ? parseQueryParams(parsed.search) : []
+    syncUrlAndParams(DEFAULT_URL, newParams)
+  }, [syncUrlAndParams])
 
   const displayPort = parsedUrl.port || '默认'
 

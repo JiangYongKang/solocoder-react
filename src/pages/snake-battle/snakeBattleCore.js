@@ -317,10 +317,13 @@ export function findSafeDirection(snake, allSnakes) {
 }
 
 export function decideAIDirection(snake, allSnakes, foods, now) {
-  if (!snake.alive) return { direction: snake.direction, behavior: snake.aiBehavior }
+  if (!snake.alive) return { direction: snake.direction, behavior: snake.aiBehavior, updated: false }
 
+  const shouldUpdate = now - snake.lastDecisionAt >= 500
   let behavior = snake.aiBehavior
-  if (now - snake.lastDecisionAt >= 500) {
+  let newDirection = snake.direction
+
+  if (shouldUpdate) {
     const danger = detectDangerAhead(snake, allSnakes, 2)
     if (danger.danger) {
       behavior = AI_BEHAVIOR.AVOID
@@ -334,31 +337,29 @@ export function decideAIDirection(snake, allSnakes, foods, now) {
         behavior = AI_BEHAVIOR.AVOID
       }
     }
-  }
 
-  let newDirection = snake.direction
-
-  if (behavior === AI_BEHAVIOR.AVOID) {
-    newDirection = findSafeDirection(snake, allSnakes)
-  } else if (behavior === AI_BEHAVIOR.FORAGE) {
-    const nearest = findNearestFood(snake, foods)
-    if (nearest) {
-      const desired = directionToTarget(snake.body[0], nearest)
-      if (canChangeDirection(snake.direction, desired)) {
-        newDirection = desired
+    if (behavior === AI_BEHAVIOR.AVOID) {
+      newDirection = findSafeDirection(snake, allSnakes)
+    } else if (behavior === AI_BEHAVIOR.FORAGE) {
+      const nearest = findNearestFood(snake, foods)
+      if (nearest) {
+        const desired = directionToTarget(snake.body[0], nearest)
+        if (canChangeDirection(snake.direction, desired)) {
+          newDirection = desired
+        } else {
+          newDirection = findSafeDirection(snake, allSnakes)
+        }
       } else {
         newDirection = findSafeDirection(snake, allSnakes)
       }
     } else {
-      newDirection = findSafeDirection(snake, allSnakes)
-    }
-  } else {
-    if (Math.random() < 0.3) {
-      newDirection = getRandomDirection(snake.direction)
+      if (Math.random() < 0.4) {
+        newDirection = getRandomDirection(snake.direction)
+      }
     }
   }
 
-  return { direction: newDirection, behavior, updated: now - snake.lastDecisionAt >= 500 }
+  return { direction: newDirection, behavior, updated: shouldUpdate }
 }
 
 export function sortLeaderboard(snakes) {

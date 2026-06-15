@@ -62,6 +62,28 @@ function LinkGamePage() {
   const pathTimeoutRef = useRef(null)
   const hintTimeoutRef = useRef(null)
 
+  const stateRef = useRef({
+    grid,
+    shufflesRemaining,
+    shufflesUsed,
+    hintsUsed,
+    elapsedTime,
+    steps,
+    difficulty,
+  })
+
+  useEffect(() => {
+    stateRef.current = {
+      grid,
+      shufflesRemaining,
+      shufflesUsed,
+      hintsUsed,
+      elapsedTime,
+      steps,
+      difficulty,
+    }
+  }, [grid, shufflesRemaining, shufflesUsed, hintsUsed, elapsedTime, steps, difficulty])
+
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current)
@@ -154,49 +176,49 @@ function LinkGamePage() {
       setEliminating(newEliminating)
 
       pathTimeoutRef.current = setTimeout(() => {
-        setGrid((g) => eliminatePair(g, sr, sc, r, c))
+        const currentState = stateRef.current
+        const newGrid = eliminatePair(currentState.grid, sr, sc, r, c)
+
+        setGrid(newGrid)
         setPathPoints(null)
         setEliminating(new Set())
         setSelected(null)
 
-        setGrid((currentGrid) => {
-          const newGrid = eliminatePair(currentGrid, sr, sc, r, c)
+        if (isGameComplete(newGrid)) {
+          if (timerRef.current) clearInterval(timerRef.current)
 
-          if (isGameComplete(newGrid)) {
-            if (timerRef.current) clearInterval(timerRef.current)
+          const score = calculateScore({
+            timeSeconds: currentState.elapsedTime,
+            steps: currentState.steps + 1,
+            hintsUsed: currentState.hintsUsed,
+            shufflesUsed: currentState.shufflesUsed,
+          })
 
-            const score = calculateScore({
-              difficulty,
-              timeSeconds: elapsedTime,
-              steps: steps + 1,
-              hintsUsed,
-              shufflesUsed,
-            })
-
-            const entry = {
-              score,
-              difficulty,
-              timeSeconds: elapsedTime,
-              steps: steps + 1,
-              date: new Date().toISOString(),
-            }
-
-            const { leaderboard: newLb, rank } = addToLeaderboard(entry)
-            setLeaderboard(newLb)
-            setLeaderboardTab(difficulty)
-            setCurrentEntry(entry)
-            setIsNewRecord(rank <= 3 && rank > 0)
-            setGameStatus(GAME_STATUS.COMPLETE)
-          } else if (!hasAnyValidPair(newGrid)) {
-            const reshuffled = shuffleRemainingIcons(newGrid)
-            return reshuffled
+          const entry = {
+            score,
+            difficulty: currentState.difficulty,
+            timeSeconds: currentState.elapsedTime,
+            steps: currentState.steps + 1,
+            date: new Date().toISOString(),
           }
 
-          return newGrid
-        })
+          const { leaderboard: newLb, rank } = addToLeaderboard(entry)
+          setLeaderboard(newLb)
+          setLeaderboardTab(currentState.difficulty)
+          setCurrentEntry(entry)
+          setIsNewRecord(rank <= 3 && rank > 0)
+          setGameStatus(GAME_STATUS.COMPLETE)
+        } else if (!hasAnyValidPair(newGrid)) {
+          if (currentState.shufflesRemaining > 0) {
+            const reshuffled = shuffleRemainingIcons(newGrid)
+            setGrid(reshuffled)
+            setShufflesRemaining((s) => s - 1)
+            setShufflesUsed((s) => s + 1)
+          }
+        }
       }, 500)
     },
-    [gameStatus, grid, selected, eliminating, difficulty, elapsedTime, steps, hintsUsed, shufflesUsed]
+    [gameStatus, grid, selected, eliminating]
   )
 
   const handleHint = useCallback(() => {

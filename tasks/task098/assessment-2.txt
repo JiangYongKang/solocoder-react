@@ -1,0 +1,9 @@
+产物不满意：
+1. countFilteredGroupIncomplete 使用 flattenTasks 扁平化所有层级任务后逐项筛选，而 getGroupTasks 只对根任务筛选后显示，两者筛选入口不一致。当根任务优先级 LOW 且子任务优先级 HIGH，激活 HIGH 筛选时，角标显示 1（子任务通过），但列表为空（根任务不通过），角标与实际可见任务数不匹配。原因是分组角标直接扁平化全部任务，未与页面渲染逻辑对齐筛选起点。正确做法是按 groupId 过滤根任务，对根任务筛选，再递归统计未完成数。
+2. countFilteredGroupIncomplete 和 countFilteredAllIncomplete 采用不同策略：分组版用 flattenTasks 逐项筛选，全局版按根任务筛选后递归计数。同一数据在相同筛选条件下走不同计数路径，一旦根任务与子任务字段存在差异，两个角标数值逻辑就不一致。根本原因是模型在设计两个函数时没有统一筛选策略。正确做法是两个函数均采用根任务筛选后递归计数，与 getGroupTasks 保持一致。
+3. reorderGroupRootTasks 第 356 到 361 行存在冗余逻辑：先构建 combinedRoot 拼接重排后任务和其他任务，再从中过滤出 otherGroupsRootTasks，最后又拼回 finalRoot。整个过程等价于将 otherRootTasks 按 order 排序后拼接到 reorderedGroupTasks 后面，中间的构建和二次过滤步骤完全多余，说明模型编写时没有理清数据流。
+
+过程不满意：
+1. 模型首次运行测试发现 3 个失败后，同时修改了生产代码（两个计数函数）和测试数据，没有先隔离排查是代码逻辑还是测试数据问题。第二轮剩 1 个失败时，模型直接将测试 expected 改为匹配代码，声称"生产代码行为与原函数一致"。这是典型试错式调试——没在失败后分析根因决定改哪一侧，而是让测试向代码妥协。正确做法是先确定正确行为，再决定修改代码还是测试。
+2. 模型编写 countFilteredGroupIncomplete 和 countFilteredAllIncomplete 时分别采用 flattenTasks 和根任务递归两种策略，整个过程中从未对比反思两个函数的筛选路径是否一致。测试失败后仅调整测试数据适配代码，始终未意识到筛选逻辑的根本差异。正确做法是在设计阶段就统一同一类角标函数的筛选策略。
+3. 模型修复后运行 pnpm run test 看到 habit-tracker 失败，直接在总结中断定"预先存在的问题"，但未逐文件查看终端输出确认所有失败都在非目标包中。虽然结论本身正确，但作为修复完成验证的关键步骤，该推断不应仅凭粗略印象下结论，应通读完整终端输出逐一确认 todo-list 包无任何失败。

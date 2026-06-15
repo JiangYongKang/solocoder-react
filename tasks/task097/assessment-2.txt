@@ -1,0 +1,8 @@
+产物不满意：
+1. 模型在 menuDesignerCore.test.js 中新增的 `validateMenuItem edge cases` 测试块（missing name、missing type、missing id、invalid children type）与原始测试文件中已有的 `validateMenuItem` 测试块完全重复，包括缺失 id 校验、缺失 name 校验、无效 type 校验、children 类型错误校验等，所有四个测试用例都已在原始文件中覆盖过。`moveMenuItem edge cases` 中的"自己移到自己"和"祖先移到后代"两个用例也与原始 `moveMenuItem` 测试块重复。新增的 45 个测试中包含至少 6 个与已有测试完全重叠的用例，这些重复测试未引入新的边界覆盖，属于无效增量的冗余代码，说明模型在编写测试前没有系统审查已有测试的覆盖范围，直接写出了和已有测试功能相同的断言。
+2. 提示词要求"重新运行 pnpm run test，需要让所有测试通过"，但模型在思考过程中实际执行的是 `npm test -- src/pages/__tests__/menu-designer/menuDesignerCore.test.js undefined`，只运行了菜单设计器的单文件测试，从未执行过完整的 `pnpm run test`。实际运行 `pnpm run test` 后，habit-tracker 包中的 `calculateWeekCompletion` 有两个测试失败：`同一天多次打卡会累加` 期望值 5 实际值 3、`monthly 频率按周目标和累加次数计算` 期望值 3 实际值 2。虽然这两个失败是其他任务的预存问题而非模型引入，但模型在总结中声称"137/137 全部通过"且"修复并验证通过"时，完全没有提及全量测试中存在其他包的失败用例，不符合提示词对全量测试通过的要求。
+
+过程不满意：
+1. 模型在接收到提示词后的第一步操作就是创建 TodoList，然后在 TodoList 的基础上开始逐项查看文件。这违反了"不能在刚收到任务时就直接创建 TodoList，应先分析问题再规划"的规范。正确做法是先阅读已有代码文件理解当前实现状态和问题范围，再基于对问题的理解制定合理的修复计划。
+2. 模型在编写单元测试时出现了典型的试错式调试问题：先根据自己对函数的推测编写了测试断言，首次运行时发现 13 个测试失败，随后才开始反复阅读 menuDesignerCore.js 的核心函数实现来修正测试期望值。在修复过程中，模型对测试文件执行了至少 7 次 `edit_file_search_replace` 编辑操作，对 menuDesignerCore.js 进行至少 4 次重复查看，每次只修正几个测试用例就又运行测试发现新的不匹配。应该在编写任何测试断言之前先完整阅读一次核心函数的实现代码，理解各函数的参数约定、返回值结构和边界处理逻辑，再一次性编写正确的测试期望值，而不是先写上错误断言再批量修正。
+3. 模型在运行测试和 ESLint 时使用了 `npm test -- src/pages/__tests__/menu-designer/menuDesignerCore.test.js undefined` 和 `npx eslint src/pages/menu-designer/ src/pages/__tests__/menu-designer/ undefined` 两个命令，命令末尾均带有一个多余的 `undefined` 参数，这是一个异常的命令构造。虽然这个多余参数对最终执行结果没有影响，但反映了模型在构造 shell 命令时的不严谨。

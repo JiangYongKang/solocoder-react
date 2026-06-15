@@ -47,7 +47,7 @@ export function isValidDirectionChange(currentDir, newDir) {
 export function wrapCoordinate(value) {
   let result = value % GRID_SIZE
   if (result < 0) result += GRID_SIZE
-  return result
+  return result === 0 ? 0 : result
 }
 
 export function moveSnake(state) {
@@ -213,8 +213,8 @@ export function isHighScore(score, storage = typeof window !== 'undefined' ? win
 
 export function formatDate(isoString) {
   const d = new Date(isoString)
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
+  const y = d.getUTCFullYear()
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(d.getUTCDate()).padStart(2, '0')
   return `${y}-${m}-${day}`
 }

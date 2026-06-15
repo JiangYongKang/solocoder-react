@@ -185,7 +185,7 @@ export default function PropertyPanel({ item, onUpdate }) {
               type="text"
               value={item.permission}
               onChange={(e) => handleChange('permission', e.target.value)}
-              placeholder="如: admin, user（留空表示无限制"
+              placeholder="如: admin, user（留空表示无限制）"
               style={inputStyle}
             />
             <div style={{ fontSize: '12px', color: '#999', marginTop: '4px' }}>

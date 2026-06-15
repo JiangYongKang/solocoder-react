@@ -13,7 +13,7 @@ export const TILE_COLORS = {
   256: '#edcc61',
   512: '#edc850',
   1024: '#edc53f',
-  2048: '#edc22e',
+  2048: '#ffd700',
 }
 
 export const TILE_TEXT_COLORS = {
@@ -39,6 +39,6 @@ export const DIRECTIONS = {
 
 export const MAX_UNDO_STEPS = 5
 
-export const ANIMATION_DURATION = 150
+export const ANIMATION_DURATION = 200
 
 export const WIN_VALUE = 2048

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import {
   CANVAS_WIDTH,
   CANVAS_HEIGHT,
@@ -561,22 +561,223 @@ describe('snakeBattleCore - AI behavior', () => {
   })
 
   describe('decideAIDirection', () => {
-    it('should return valid direction and behavior for living snake', () => {
-      const snake = makeSnakeAt(400, 300, 'RIGHT', 3)
-      const foods = generateInitialFoods(10)
-      const result = decideAIDirection(snake, [], foods, 1000)
-      expect(DIRECTION_LIST).toContain(result.direction)
-      expect(Object.values(AI_BEHAVIOR)).toContain(result.behavior)
+    describe('dead snake handling', () => {
+      it('should return original direction and behavior for dead snake', () => {
+        const snake = makeSnakeAt(400, 300, 'RIGHT', 3, { alive: false, aiBehavior: AI_BEHAVIOR.FORAGE })
+        const result = decideAIDirection(snake, [], [], 1000)
+        expect(result.direction).toBe('RIGHT')
+        expect(result.behavior).toBe(AI_BEHAVIOR.FORAGE)
+        expect(result.updated).toBe(false)
+      })
     })
-    it('should not change direction for dead snake', () => {
-      const snake = makeSnakeAt(400, 300, 'RIGHT', 3, { alive: false })
-      const result = decideAIDirection(snake, [], [], 1000)
-      expect(result.direction).toBe('RIGHT')
+
+    describe('decision interval (500ms)', () => {
+      it('should return updated=false and keep direction when within 500ms', () => {
+        const snake = makeSnakeAt(400, 300, 'RIGHT', 3, {
+          lastDecisionAt: 1000,
+          aiBehavior: AI_BEHAVIOR.FORAGE,
+        })
+        const result = decideAIDirection(snake, [], [], 1200)
+        expect(result.updated).toBe(false)
+        expect(result.direction).toBe('RIGHT')
+        expect(result.behavior).toBe(AI_BEHAVIOR.FORAGE)
+      })
+
+      it('should return updated=true when at or beyond 500ms', () => {
+        const snake = makeSnakeAt(400, 300, 'RIGHT', 3, {
+          lastDecisionAt: 1000,
+          aiBehavior: AI_BEHAVIOR.FORAGE,
+        })
+        const result = decideAIDirection(snake, [], [], 1500)
+        expect(result.updated).toBe(true)
+      })
     })
-    it('should switch to AVOID mode when near boundary', () => {
-      const snake = makeSnakeAt(10, 300, 'LEFT', 3, { lastDecisionAt: 0 })
-      const result = decideAIDirection(snake, [], [], 1000)
-      expect(result.behavior).toBe(AI_BEHAVIOR.AVOID)
+
+    describe('AVOID mode - boundary danger', () => {
+      it('should switch to AVOID mode when heading for left boundary', () => {
+        const snake = makeSnakeAt(15, 300, 'LEFT', 3, { lastDecisionAt: 0 })
+        const result = decideAIDirection(snake, [], [], 1000)
+        expect(result.behavior).toBe(AI_BEHAVIOR.AVOID)
+        expect(result.updated).toBe(true)
+      })
+
+      it('should switch to AVOID mode when heading for right boundary', () => {
+        const snake = makeSnakeAt(CANVAS_WIDTH - 15, 300, 'RIGHT', 3, { lastDecisionAt: 0 })
+        const result = decideAIDirection(snake, [], [], 1000)
+        expect(result.behavior).toBe(AI_BEHAVIOR.AVOID)
+      })
+
+      it('should switch to AVOID mode when heading for top boundary', () => {
+        const snake = makeSnakeAt(400, 15, 'UP', 3, { lastDecisionAt: 0 })
+        const result = decideAIDirection(snake, [], [], 1000)
+        expect(result.behavior).toBe(AI_BEHAVIOR.AVOID)
+      })
+
+      it('should switch to AVOID mode when heading for bottom boundary', () => {
+        const snake = makeSnakeAt(400, CANVAS_HEIGHT - 15, 'DOWN', 3, { lastDecisionAt: 0 })
+        const result = decideAIDirection(snake, [], [], 1000)
+        expect(result.behavior).toBe(AI_BEHAVIOR.AVOID)
+      })
+
+      it('should pick a safe direction (not opposite) when in AVOID mode', () => {
+        const snake = makeSnakeAt(15, 300, 'LEFT', 3, { lastDecisionAt: 0 })
+        const result = decideAIDirection(snake, [], [], 1000)
+        expect(DIRECTION_LIST).toContain(result.direction)
+        expect(result.direction).not.toBe('RIGHT')
+      })
+    })
+
+    describe('AVOID mode - snake body danger', () => {
+      it('should switch to AVOID mode when another snake is directly ahead', () => {
+        const snake = makeSnakeAt(300, 300, 'RIGHT', 3, { id: 'ai1', lastDecisionAt: 0 })
+        const obstacle = makeSnakeAt(300 + SEGMENT_SIZE * 2, 300, 'DOWN', 10, { id: 'obs' })
+        const result = decideAIDirection(snake, [snake, obstacle], [], 1000)
+        expect(result.behavior).toBe(AI_BEHAVIOR.AVOID)
+      })
+    })
+
+    describe('FORAGE mode - head toward nearest food', () => {
+      beforeEach(() => {
+        vi.clearAllMocks()
+      })
+
+      it('should select FORAGE mode when random value is in FORAGE range', () => {
+        const snake = makeSnakeAt(400, 300, 'DOWN', 3, { lastDecisionAt: 0 })
+        const foods = [createFood(450, 300)]
+        const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.3)
+        const result = decideAIDirection(snake, [], foods, 1000)
+        expect(result.behavior).toBe(AI_BEHAVIOR.FORAGE)
+        randomSpy.mockRestore()
+      })
+
+      it('should turn RIGHT when nearest food is to the right', () => {
+        const snake = makeSnakeAt(400, 300, 'DOWN', 3, { lastDecisionAt: 0 })
+        const foods = [createFood(500, 300)]
+        const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.3)
+        const result = decideAIDirection(snake, [], foods, 1000)
+        expect(result.direction).toBe('RIGHT')
+        randomSpy.mockRestore()
+      })
+
+      it('should turn LEFT when nearest food is to the left', () => {
+        const snake = makeSnakeAt(400, 300, 'UP', 3, { lastDecisionAt: 0 })
+        const foods = [createFood(300, 300)]
+        const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.3)
+        const result = decideAIDirection(snake, [], foods, 1000)
+        expect(result.direction).toBe('LEFT')
+        randomSpy.mockRestore()
+      })
+
+      it('should turn DOWN when nearest food is below', () => {
+        const snake = makeSnakeAt(400, 300, 'RIGHT', 3, { lastDecisionAt: 0 })
+        const foods = [createFood(400, 400)]
+        const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.3)
+        const result = decideAIDirection(snake, [], foods, 1000)
+        expect(result.direction).toBe('DOWN')
+        randomSpy.mockRestore()
+      })
+
+      it('should turn UP when nearest food is above', () => {
+        const snake = makeSnakeAt(400, 300, 'LEFT', 3, { lastDecisionAt: 0 })
+        const foods = [createFood(400, 200)]
+        const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.3)
+        const result = decideAIDirection(snake, [], foods, 1000)
+        expect(result.direction).toBe('UP')
+        randomSpy.mockRestore()
+      })
+
+      it('should target the nearest food among multiple foods', () => {
+        const snake = makeSnakeAt(400, 300, 'UP', 3, { lastDecisionAt: 0 })
+        const foods = [
+          createFood(600, 300),
+          createFood(350, 300),
+          createFood(200, 200),
+        ]
+        const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.3)
+        const result = decideAIDirection(snake, [], foods, 1000)
+        expect(result.direction).toBe('LEFT')
+        randomSpy.mockRestore()
+      })
+
+      it('should fall back to safe direction if desired direction is opposite', () => {
+        const snake = makeSnakeAt(400, 300, 'LEFT', 3, { lastDecisionAt: 0 })
+        const foods = [createFood(500, 300)]
+        const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.3)
+        const result = decideAIDirection(snake, [], foods, 1000)
+        expect(DIRECTION_LIST).toContain(result.direction)
+        expect(result.direction).not.toBe('RIGHT')
+        randomSpy.mockRestore()
+      })
+
+      it('should use safe direction when foods list is empty', () => {
+        const snake = makeSnakeAt(400, 300, 'RIGHT', 3, { lastDecisionAt: 0 })
+        const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.3)
+        const result = decideAIDirection(snake, [], [], 1000)
+        expect(DIRECTION_LIST).toContain(result.direction)
+        randomSpy.mockRestore()
+      })
+    })
+
+    describe('RANDOM mode - natural wandering', () => {
+      beforeEach(() => {
+        vi.clearAllMocks()
+      })
+
+      it('should select RANDOM mode when random value is in RANDOM range', () => {
+        const snake = makeSnakeAt(400, 300, 'RIGHT', 3, { lastDecisionAt: 0 })
+        const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.7)
+        const result = decideAIDirection(snake, [], [], 1000)
+        expect(result.behavior).toBe(AI_BEHAVIOR.RANDOM)
+        randomSpy.mockRestore()
+      })
+
+      it('should keep direction when random deflection does not trigger', () => {
+        const snake = makeSnakeAt(400, 300, 'RIGHT', 3, { lastDecisionAt: 0 })
+        const randomSpy = vi.spyOn(Math, 'random')
+        randomSpy
+          .mockReturnValueOnce(0.7)
+          .mockReturnValueOnce(0.9)
+        const result = decideAIDirection(snake, [], [], 1000)
+        expect(result.direction).toBe('RIGHT')
+        expect(result.behavior).toBe(AI_BEHAVIOR.RANDOM)
+        randomSpy.mockRestore()
+      })
+
+      it('should change direction when random deflection triggers', () => {
+        const snake = makeSnakeAt(400, 300, 'RIGHT', 3, { lastDecisionAt: 0 })
+        const randomSpy = vi.spyOn(Math, 'random')
+        randomSpy
+          .mockReturnValueOnce(0.7)
+          .mockReturnValueOnce(0.1)
+        const result = decideAIDirection(snake, [], [], 1000)
+        expect(result.behavior).toBe(AI_BEHAVIOR.RANDOM)
+        expect(DIRECTION_LIST).toContain(result.direction)
+        expect(result.direction).not.toBe('LEFT')
+        randomSpy.mockRestore()
+      })
+
+      it('should never turn 180 degrees in RANDOM mode', () => {
+        const snake = makeSnakeAt(400, 300, 'RIGHT', 3, { lastDecisionAt: 0 })
+        const randomSpy = vi.spyOn(Math, 'random')
+        for (let i = 0; i < 100; i++) {
+          randomSpy
+            .mockReturnValueOnce(0.7)
+            .mockReturnValueOnce(0.1)
+          const result = decideAIDirection(snake, [], [], 1000 + i * 600)
+          expect(result.direction).not.toBe('LEFT')
+        }
+        randomSpy.mockRestore()
+      })
+    })
+
+    describe('mode selection probabilities', () => {
+      it('should select AVOID mode when forced by danger (regardless of random)', () => {
+        const snake = makeSnakeAt(10, 300, 'LEFT', 3, { lastDecisionAt: 0 })
+        const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.5)
+        const result = decideAIDirection(snake, [], [], 1000)
+        expect(result.behavior).toBe(AI_BEHAVIOR.AVOID)
+        randomSpy.mockRestore()
+      })
     })
   })
 })

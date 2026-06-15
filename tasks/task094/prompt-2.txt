@@ -1,0 +1,7 @@
+你实现的工时统计页面还存在一些问题，需要进行修复：
+
+1. 计时器在"暂停 → 继续 → 停止"操作序列下，最终保存的工时记录只包含继续后的时长，暂停前的计时被丢失。页面显示的数值虽正确累加，但 localStorage 中保存的工时记录与界面显示不一致。需修复 handleTimerStop 函数确保暂停前已累加的时长也计入最终记录。
+2. 测试文件 timeTrackerUtils.test.js 中名为"should reject duration over 24 hours"的测试用例，实际输入数据为 startTime `00:00` 和 endTime `00:01`（仅 1 分钟），断言为 `errors.endTime` 为 `undefined`。测试名称宣称应拒绝超过 24 小时时长，但实际数据和断言均未触发该边界条件，validateManualEntry 中超过 24 小时的校验分支在全部 68 个测试中零覆盖。需修正该测试用例使用实际超过 24 小时的时间数据。
+3. getBudgetProgress 函数中超过 80% 时返回 warning 的条件使用了 `>` 而非 `>=`，与提示词"超过 80% 变为橙色"的边界语义不一致。需统一使用 `>=`。
+4. 修复后需要为该页面补充纯 JS 函数的单元测试，只测和页面渲染无关的逻辑。测试代码放在 src/pages/__tests__/time-tracker/ 下。
+5. 重新运行 pnpm run test，需要让所有测试通过。

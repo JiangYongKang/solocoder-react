@@ -101,7 +101,12 @@ function Game2048Page() {
     if (animating) return
     if (currentState.gameOver) return
 
-    const undoState = createUndoState(currentState.grid, currentState.score)
+    const undoState = createUndoState(
+      currentState.grid,
+      currentState.score,
+      currentState.won,
+      currentState.continueAfterWin
+    )
 
     const { grid: movedGrid, scoreGained, moved } = move(currentState.grid, direction)
 
@@ -116,14 +121,6 @@ function Game2048Page() {
       const won = hasWon(newGrid)
       const gameOver = !canMove(newGrid)
 
-      const currentHighScore = stateRef.current.highScore
-      if (newScore > currentHighScore) {
-        saveHighScore(newScore)
-        setHighScore(newScore)
-        setIsNewRecord(true)
-        setTimeout(() => setIsNewRecord(false), 2000)
-      }
-
       const continueAfterWin = currentState.continueAfterWin
       const showWin = won && !continueAfterWin
 
@@ -136,6 +133,16 @@ function Game2048Page() {
       }
 
       updateGameAndTiles(newGameState)
+
+      if (gameOver) {
+        const currentHighScore = stateRef.current.highScore
+        if (newScore > currentHighScore) {
+          saveHighScore(newScore)
+          setHighScore(newScore)
+          setIsNewRecord(true)
+          setTimeout(() => setIsNewRecord(false), 2000)
+        }
+      }
 
       if (showWin) {
         setShowWinModal(true)
@@ -225,12 +232,14 @@ function Game2048Page() {
 
     setUndoStack(newStack)
     const newGameState = {
-      ...stateRef.current.gameState,
       grid: prevState.grid,
       score: prevState.score,
       gameOver: false,
+      won: prevState.won,
+      continueAfterWin: prevState.continueAfterWin,
     }
     updateGameAndTiles(newGameState)
+    setShowWinModal(false)
   }, [updateGameAndTiles])
 
   const handleContinue = useCallback(() => {

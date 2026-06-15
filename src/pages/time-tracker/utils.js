@@ -60,6 +60,16 @@ export function msToFormattedHours(ms) {
   return hours.toFixed(2)
 }
 
+export function calculateDurationHours(date, startTime, endTime) {
+  const start = new Date(`${date}T${startTime}`)
+  let end = new Date(`${date}T${endTime}`)
+  if (end <= start) {
+    end = new Date(end.getTime() + 86400000)
+  }
+  const durationMs = end.getTime() - start.getTime()
+  return durationMs / 3600000
+}
+
 export function validateManualEntry(data) {
   const errors = {}
   if (!data.project) {
@@ -81,12 +91,8 @@ export function validateManualEntry(data) {
       errors.startTime = '时间格式无效'
       return errors
     }
-    if (start >= end) {
-      errors.endTime = '结束时间必须晚于开始时间'
-    }
-    const durationMs = end.getTime() - start.getTime()
-    const durationHours = durationMs / 3600000
-    if (durationHours > MAX_DURATION_HOURS) {
+    const durationHours = calculateDurationHours(data.date, data.startTime, data.endTime)
+    if (durationHours >= MAX_DURATION_HOURS) {
       errors.endTime = '时长不能超过24小时'
     }
   }
@@ -95,7 +101,10 @@ export function validateManualEntry(data) {
 
 export function createRecord(data) {
   const start = new Date(`${data.date}T${data.startTime}`)
-  const end = new Date(`${data.date}T${data.endTime}`)
+  let end = new Date(`${data.date}T${data.endTime}`)
+  if (end <= start) {
+    end = new Date(end.getTime() + 86400000)
+  }
   return {
     id: generateId(),
     project: data.project,
@@ -119,12 +128,30 @@ export function createTimerRecord(project, startTime, endTime) {
   }
 }
 
+export function createTimerRecordWithPause(project, endTime, elapsedSeconds) {
+  const end = new Date(endTime)
+  const totalMs = elapsedSeconds * 1000
+  const start = new Date(end.getTime() - totalMs)
+  return {
+    id: generateId(),
+    project,
+    startTime: start.toISOString(),
+    endTime: end.toISOString(),
+    durationMs: totalMs,
+    note: '',
+    createdAt: Date.now(),
+  }
+}
+
 export function updateRecord(records, id, data) {
   const index = records.findIndex((r) => r.id === id)
   if (index === -1) return records
   const updated = [...records]
   const start = new Date(`${data.date}T${data.startTime}`)
-  const end = new Date(`${data.date}T${data.endTime}`)
+  let end = new Date(`${data.date}T${data.endTime}`)
+  if (end <= start) {
+    end = new Date(end.getTime() + 86400000)
+  }
   updated[index] = {
     ...updated[index],
     project: data.project,

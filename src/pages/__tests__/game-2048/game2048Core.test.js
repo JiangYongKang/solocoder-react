@@ -117,34 +117,46 @@ describe('game2048Core', () => {
       expect(newGrid).toEqual(grid)
     })
 
-    it('should generate 2 with 90% probability', () => {
-      const grid = createEmptyGrid()
+    it('should generate 2 with approximately 90% probability over many iterations', () => {
       let count2 = 0
-      const iterations = 1000
+      let count4 = 0
+      const iterations = 10000
       for (let i = 0; i < iterations; i++) {
-        const newGrid = addRandomTile(grid, () => 0.5)
+        const testGrid = createEmptyGrid()
+        const mockRandom = () => Math.random()
+        const newGrid = addRandomTile(testGrid, mockRandom)
         for (let row = 0; row < GRID_SIZE; row++) {
           for (let col = 0; col < GRID_SIZE; col++) {
             if (newGrid[row][col] === 2) count2++
+            else if (newGrid[row][col] === 4) count4++
           }
         }
       }
-      expect(count2).toBeGreaterThan(0)
+      const total = count2 + count4
+      const ratio2 = count2 / total
+      expect(ratio2).toBeGreaterThan(0.85)
+      expect(ratio2).toBeLessThan(0.95)
     })
 
-    it('should generate 4 with 10% probability', () => {
-      const grid = createEmptyGrid()
+    it('should generate 4 with approximately 10% probability over many iterations', () => {
+      let count2 = 0
       let count4 = 0
-      const iterations = 100
+      const iterations = 10000
       for (let i = 0; i < iterations; i++) {
-        const newGrid = addRandomTile(grid, () => 0.95)
+        const testGrid = createEmptyGrid()
+        const mockRandom = () => Math.random()
+        const newGrid = addRandomTile(testGrid, mockRandom)
         for (let row = 0; row < GRID_SIZE; row++) {
           for (let col = 0; col < GRID_SIZE; col++) {
-            if (newGrid[row][col] === 4) count4++
+            if (newGrid[row][col] === 2) count2++
+            else if (newGrid[row][col] === 4) count4++
           }
         }
       }
-      expect(count4).toBeGreaterThan(0)
+      const total = count2 + count4
+      const ratio4 = count4 / total
+      expect(ratio4).toBeGreaterThan(0.05)
+      expect(ratio4).toBeLessThan(0.15)
     })
 
     it('should not mutate the original grid', () => {
@@ -454,21 +466,41 @@ describe('game2048Core', () => {
   })
 
   describe('undo functionality', () => {
-    it('createUndoState should create a deep copy', () => {
+    it('createUndoState should create a deep copy of grid', () => {
       const grid = createGridFromRows([
         [2, 4, 8, 16],
         [0, 0, 0, 0],
         [0, 0, 0, 0],
         [0, 0, 0, 0],
       ])
-      const state = createUndoState(grid, 100)
+      const state = createUndoState(grid, 100, false, false)
       expect(state.score).toBe(100)
       state.grid[0][0] = 999
       expect(grid[0][0]).toBe(2)
     })
 
+    it('createUndoState should save won and continueAfterWin states', () => {
+      const grid = createGridFromRows([
+        [2048, 0, 0, 0],
+        [0, 0, 0, 0],
+        [0, 0, 0, 0],
+        [0, 0, 0, 0],
+      ])
+      const state = createUndoState(grid, 2048, true, true)
+      expect(state.score).toBe(2048)
+      expect(state.won).toBe(true)
+      expect(state.continueAfterWin).toBe(true)
+    })
+
+    it('createUndoState should save false states correctly', () => {
+      const grid = createEmptyGrid()
+      const state = createUndoState(grid, 0, false, false)
+      expect(state.won).toBe(false)
+      expect(state.continueAfterWin).toBe(false)
+    })
+
     it('addToUndoStack should add state to stack', () => {
-      const state = createUndoState(createEmptyGrid(), 0)
+      const state = createUndoState(createEmptyGrid(), 0, false, false)
       const stack = addToUndoStack([], state)
       expect(stack.length).toBe(1)
     })
@@ -476,7 +508,7 @@ describe('game2048Core', () => {
     it('addToUndoStack should limit to MAX_UNDO_STEPS', () => {
       let stack = []
       for (let i = 0; i < 10; i++) {
-        const state = createUndoState(createEmptyGrid(), i)
+        const state = createUndoState(createEmptyGrid(), i, i >= 5, i >= 7)
         stack = addToUndoStack(stack, state)
       }
       expect(stack.length).toBe(MAX_UNDO_STEPS)
@@ -484,23 +516,42 @@ describe('game2048Core', () => {
       expect(stack[MAX_UNDO_STEPS - 1].score).toBe(9)
     })
 
+    it('addToUndoStack should preserve won and continueAfterWin states', () => {
+      const state = createUndoState(createEmptyGrid(), 2048, true, true)
+      const stack = addToUndoStack([], state)
+      expect(stack[0].won).toBe(true)
+      expect(stack[0].continueAfterWin).toBe(true)
+    })
+
     it('canUndo should return false for empty stack', () => {
       expect(canUndo([])).toBe(false)
     })
 
     it('canUndo should return true for non-empty stack', () => {
-      const state = createUndoState(createEmptyGrid(), 0)
+      const state = createUndoState(createEmptyGrid(), 0, false, false)
       expect(canUndo([state])).toBe(true)
     })
 
     it('undo should pop and return the last state', () => {
-      const state1 = createUndoState(createEmptyGrid(), 10)
-      const state2 = createUndoState(createEmptyGrid(), 20)
+      const state1 = createUndoState(createEmptyGrid(), 10, false, false)
+      const state2 = createUndoState(createEmptyGrid(), 20, true, true)
       const stack = [state1, state2]
       const result = undo(stack)
       expect(result.state.score).toBe(20)
+      expect(result.state.won).toBe(true)
+      expect(result.state.continueAfterWin).toBe(true)
       expect(result.newStack.length).toBe(1)
       expect(result.newStack[0].score).toBe(10)
+    })
+
+    it('undo should restore won=false and continueAfterWin=false states', () => {
+      const state1 = createUndoState(createEmptyGrid(), 100, true, true)
+      const state2 = createUndoState(createEmptyGrid(), 50, false, false)
+      const stack = [state1, state2]
+      const result = undo(stack)
+      expect(result.state.score).toBe(50)
+      expect(result.state.won).toBe(false)
+      expect(result.state.continueAfterWin).toBe(false)
     })
 
     it('undo should return null for empty stack', () => {

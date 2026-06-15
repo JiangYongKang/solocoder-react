@@ -4,6 +4,7 @@ import {
   STORAGE_KEY_CHECKINS,
   DEFAULT_GROUPS,
   PRIORITIES,
+  ALL_TASKS_VIEW,
   FILTER_PRIORITY_ALL,
   FILTER_STATUS_PENDING,
   FILTER_STATUS_DONE,
@@ -329,6 +330,38 @@ export function reorderSubtasks(tasks, parentId, fromIndex, toIndex) {
   })
 }
 
+export function reorderGroupRootTasks(tasks, groupId, fromId, toIndex) {
+  const rootTasks = tasks.filter(t => !t.parentId)
+  const groupRootTasks = groupId === ALL_TASKS_VIEW
+    ? [...rootTasks]
+    : rootTasks.filter(t => t.groupId === groupId)
+  const otherRootTasks = groupId === ALL_TASKS_VIEW
+    ? []
+    : rootTasks.filter(t => t.groupId !== groupId)
+
+  const fromIndex = groupRootTasks.findIndex(t => t.id === fromId)
+  if (fromIndex === -1) return tasks
+
+  const [removed] = groupRootTasks.splice(fromIndex, 1)
+  const safeIndex = Math.max(0, Math.min(toIndex, groupRootTasks.length))
+  groupRootTasks.splice(safeIndex, 0, removed)
+
+  const reorderedGroupTasks = groupRootTasks.map((t, i) => ({ ...t, order: i }))
+  const subtaskTasks = tasks.filter(t => t.parentId)
+
+  if (groupId === ALL_TASKS_VIEW) {
+    return [...reorderedGroupTasks, ...subtaskTasks]
+  }
+
+  const combinedRoot = [...reorderedGroupTasks, ...otherRootTasks]
+  const otherGroupsRootTasks = combinedRoot
+    .filter(t => t.groupId !== groupId)
+    .sort((a, b) => a.order - b.order)
+  const finalRoot = [...reorderedGroupTasks, ...otherGroupsRootTasks]
+
+  return [...finalRoot, ...subtaskTasks]
+}
+
 export function isOverdue(dueDate) {
   if (!dueDate) return false
   const today = getTodayKey()
@@ -398,6 +431,25 @@ export function countGroupIncomplete(tasks, groupId) {
 
 export function countAllIncomplete(tasks) {
   return countIncompleteTasks(tasks.filter(t => !t.parentId))
+}
+
+export function countFilteredGroupIncomplete(tasks, groupId, filters) {
+  const allTasks = flattenTasks(tasks)
+  let groupTasks = groupId === ALL_TASKS_VIEW
+    ? allTasks
+    : allTasks.filter(t => t.groupId === groupId)
+  if (filters) {
+    groupTasks = filterTasks(groupTasks, filters)
+  }
+  return groupTasks.filter(t => !t.completed).length
+}
+
+export function countFilteredAllIncomplete(tasks, filters) {
+  let rootTasks = tasks.filter(t => !t.parentId)
+  if (filters) {
+    rootTasks = filterTasks(rootTasks, filters)
+  }
+  return countIncompleteTasks(rootTasks)
 }
 
 export function applyFiltersToTask(task, filters) {

@@ -269,16 +269,48 @@ describe('buildUrl', () => {
 })
 
 describe('urlEncode', () => {
-  it('应该正确 URL 编码字符串', () => {
+  it('应该对可解析 URL 的组件值编码但保留结构符号', () => {
+    const url = 'https://www.example.com/path/to/page?name=hello world&keyword=你好#section name'
+    const result = urlEncode(url)
+    expect(result.success).toBe(true)
+    expect(result.result).toContain('https://')
+    expect(result.result).toContain('www.example.com')
+    expect(result.result).toContain('/path/to/page')
+    expect(result.result).toContain('?')
+    expect(result.result).toContain('#')
+    expect(result.result).toContain('name=hello%20world')
+    expect(result.result).toContain('keyword=')
+  })
+
+  it('编码后的 URL 应该仍可被 parseUrl 解析', () => {
+    const url = 'https://www.example.com/path?name=hello world&keyword=测试#片段'
+    const result = urlEncode(url)
+    expect(result.success).toBe(true)
+    const parsed = parseUrl(result.result)
+    expect(parsed.success).toBe(true)
+    expect(parsed.hostname).toBe('www.example.com')
+    expect(parsed.search).toContain('name=hello%20world')
+  })
+
+  it('对不可解析的字符串应回退到整体 encodeURIComponent', () => {
     const result = urlEncode('hello world!@#$%^&*()')
     expect(result.success).toBe(true)
     expect(result.result).toBe('hello%20world!%40%23%24%25%5E%26*()')
   })
 
-  it('应该编码中文字符', () => {
-    const result = urlEncode('你好世界')
+  it('应该编码路径段中的特殊字符', () => {
+    const url = 'https://example.com/路径/页面?q=值'
+    const result = urlEncode(url)
     expect(result.success).toBe(true)
-    expect(result.result).toBe('%E4%BD%A0%E5%A5%BD%E4%B8%96%E7%95%8C')
+    expect(result.result).toContain('https://example.com/')
+    expect(result.result).toContain('%E8%B7%AF%E5%BE%84')
+  })
+
+  it('应该编码哈希片段中的特殊字符', () => {
+    const url = 'https://example.com/path#片段 名称'
+    const result = urlEncode(url)
+    expect(result.success).toBe(true)
+    expect(result.result).toContain('#%E7%89%87%E6%AE%B5%20%E5%90%8D%E7%A7%B0')
   })
 
   it('非字符串输入应该返回错误', () => {
@@ -287,10 +319,18 @@ describe('urlEncode', () => {
     expect(urlEncode(123).success).toBe(false)
   })
 
-  it('应该编码特殊 URL 字符', () => {
-    const result = urlEncode('/path?query=value#hash')
+  it('没有查询参数和哈希的 URL 应该只编码路径', () => {
+    const url = 'https://example.com/path/to/page'
+    const result = urlEncode(url)
     expect(result.success).toBe(true)
-    expect(result.result).toBe('%2Fpath%3Fquery%3Dvalue%23hash')
+    expect(result.result).toBe('https://example.com/path/to/page')
+  })
+
+  it('空查询参数值的 URL 应该正确编码', () => {
+    const url = 'https://example.com/path?key='
+    const result = urlEncode(url)
+    expect(result.success).toBe(true)
+    expect(result.result).toContain('key=')
   })
 })
 

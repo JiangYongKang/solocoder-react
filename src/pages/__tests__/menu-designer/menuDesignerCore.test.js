@@ -20,6 +20,7 @@ import {
     deepCloneMenu,
     deepCloneMenuItem,
     deleteMenuItem,
+    downloadJson,
     exportToJson,
     findMenuItemById,
     findParentId,
@@ -748,5 +749,340 @@ describe('checkPermission', () => {
     expect(checkPermission('admin, editor', ['admin'])).toBe(true)
     expect(checkPermission('admin, editor', ['editor'])).toBe(true)
     expect(checkPermission('admin, editor', ['user'])).toBe(false)
+  })
+
+  it('should handle whitespace in permission string', () => {
+    expect(checkPermission('  admin  ,  editor  ', ['admin'])).toBe(true)
+    expect(checkPermission('  admin  ,  editor  ', ['editor'])).toBe(true)
+  })
+})
+
+describe('PRESET_ICONS', () => {
+  it('should have at least 16 preset icons', () => {
+    expect(PRESET_ICONS.length).toBeGreaterThanOrEqual(16)
+  })
+
+  it('should have unique icon ids', () => {
+    const ids = PRESET_ICONS.map((icon) => icon.id)
+    const uniqueIds = new Set(ids)
+    expect(uniqueIds.size).toBe(ids.length)
+  })
+
+  it('each icon should have id, emoji, and label', () => {
+    PRESET_ICONS.forEach((icon) => {
+      expect(icon).toHaveProperty('id')
+      expect(icon).toHaveProperty('emoji')
+      expect(icon).toHaveProperty('label')
+      expect(typeof icon.id).toBe('string')
+      expect(typeof icon.emoji).toBe('string')
+      expect(typeof icon.label).toBe('string')
+      expect(icon.id.length).toBeGreaterThan(0)
+      expect(icon.emoji.length).toBeGreaterThan(0)
+      expect(icon.label.length).toBeGreaterThan(0)
+    })
+  })
+
+  it('all preset icon ids should be recognized by isValidIcon', () => {
+    PRESET_ICONS.forEach((icon) => {
+      expect(isValidIcon(icon.id)).toBe(true)
+    })
+  })
+
+  it('all preset icons should resolve to emoji via getIconEmoji', () => {
+    PRESET_ICONS.forEach((icon) => {
+      expect(getIconEmoji(icon.id)).toBe(icon.emoji)
+    })
+  })
+})
+
+describe('downloadJson', () => {
+  it('should return false when window is not available', () => {
+    const originalWindow = globalThis.window
+    delete globalThis.window
+    try {
+      const result = downloadJson(DEFAULT_STATE)
+      expect(result).toBe(false)
+    } finally {
+      globalThis.window = originalWindow
+    }
+  })
+})
+
+describe('isValidIcon', () => {
+  it('should return true for empty icon ids (optional field)', () => {
+    expect(isValidIcon('')).toBe(true)
+    expect(isValidIcon(null)).toBe(true)
+    expect(isValidIcon(undefined)).toBe(true)
+  })
+
+  it('should return false for non-existent icon ids', () => {
+    expect(isValidIcon('non-existent-icon')).toBe(false)
+    expect(isValidIcon(123)).toBe(false)
+  })
+})
+
+describe('validateMenuItem edge cases', () => {
+  it('should reject item with invalid children type', () => {
+    const item = createMenuItem()
+    item.children = 'not an array'
+    const result = validateMenuItem(item)
+    expect(result.valid).toBe(false)
+  })
+
+  it('should reject item with missing name', () => {
+    const item = createMenuItem()
+    delete item.name
+    const result = validateMenuItem(item)
+    expect(result.valid).toBe(false)
+  })
+
+  it('should reject item with missing type', () => {
+    const item = createMenuItem()
+    delete item.type
+    const result = validateMenuItem(item)
+    expect(result.valid).toBe(false)
+  })
+
+  it('should reject item with missing id', () => {
+    const item = createMenuItem()
+    delete item.id
+    const result = validateMenuItem(item)
+    expect(result.valid).toBe(false)
+  })
+})
+
+describe('moveMenuItem edge cases', () => {
+  it('should not move item to be its own child', () => {
+    const result = moveMenuItem(DEFAULT_MENU, 'system', 'system', 'child')
+    expect(result).toBe(DEFAULT_MENU)
+  })
+
+  it('should not move ancestor into descendant', () => {
+    const result = moveMenuItem(DEFAULT_MENU, 'system', 'basic-settings', 'child')
+    expect(result).toBe(DEFAULT_MENU)
+  })
+
+  it('should not move non-existent source', () => {
+    const result = moveMenuItem(DEFAULT_MENU, 'non-existent', 'home', 'after')
+    expect(result).toBe(DEFAULT_MENU)
+  })
+
+  it('should not move to non-existent target', () => {
+    const result = moveMenuItem(DEFAULT_MENU, 'home', 'non-existent', 'after')
+    expect(result).toBe(DEFAULT_MENU)
+  })
+})
+
+describe('deleteMenuItem edge cases', () => {
+  it('should return structurally equal menu when deleting non-existent id', () => {
+    const result = deleteMenuItem(DEFAULT_MENU, 'non-existent-id')
+    expect(result).toEqual(DEFAULT_MENU)
+  })
+
+  it('should return empty array when deleting only root item', () => {
+    const singleMenu = [createMenuItem(MENU_TYPES.LINK, 'Single')]
+    const id = singleMenu[0].id
+    const result = deleteMenuItem(singleMenu, id)
+    expect(result).toHaveLength(0)
+  })
+})
+
+describe('findParentInfo edge cases', () => {
+  it('should return null for non-existent id', () => {
+    const result = findParentInfo(DEFAULT_MENU, 'non-existent-id')
+    expect(result).toBeNull()
+  })
+
+  it('should return null for empty menu', () => {
+    const result = findParentInfo([], 'home')
+    expect(result).toBeNull()
+  })
+
+  it('should return null for invalid menu input', () => {
+    expect(findParentInfo(null, 'home')).toBeNull()
+    expect(findParentInfo(undefined, 'home')).toBeNull()
+    expect(findParentInfo('not an array', 'home')).toBeNull()
+  })
+})
+
+describe('countMenuItems edge cases', () => {
+  it('should return 0 for empty menu', () => {
+    expect(countMenuItems([])).toBe(0)
+  })
+
+  it('should return 0 for invalid input', () => {
+    expect(countMenuItems(null)).toBe(0)
+    expect(countMenuItems(undefined)).toBe(0)
+    expect(countMenuItems('not an array')).toBe(0)
+  })
+
+  it('should count nested items correctly', () => {
+    const simpleMenu = [
+      { id: 'a', children: [] },
+      { id: 'b', children: [
+        { id: 'b1', children: [] },
+        { id: 'b2', children: [
+          { id: 'b2a', children: [] }
+        ]}
+      ]},
+    ]
+    expect(countMenuItems(simpleMenu)).toBe(5)
+  })
+})
+
+describe('getMenuDepth edge cases', () => {
+  it('should return 0 for empty menu (default)', () => {
+    expect(getMenuDepth([])).toBe(0)
+  })
+
+  it('should return 0 for invalid input (default)', () => {
+    expect(getMenuDepth(null)).toBe(0)
+    expect(getMenuDepth(undefined)).toBe(0)
+  })
+
+  it('should return 0 for flat menu (only roots)', () => {
+    const flatMenu = [
+      { id: 'a', children: [] },
+      { id: 'b', children: [] },
+    ]
+    expect(getMenuDepth(flatMenu)).toBe(0)
+  })
+
+  it('should calculate depth correctly for deeply nested menu', () => {
+    const deepMenu = [
+      { id: 'l0', children: [
+        { id: 'l1', children: [
+          { id: 'l2', children: [
+            { id: 'l3', children: [] }
+          ]}
+        ]}
+      ]}
+    ]
+    expect(getMenuDepth(deepMenu)).toBe(3)
+  })
+})
+
+describe('isDescendant edge cases', () => {
+  it('should return true for same id (trivial case)', () => {
+    expect(isDescendant(DEFAULT_MENU, 'system', 'system')).toBe(true)
+  })
+
+  it('should return false for non-existent ancestor', () => {
+    expect(isDescendant(DEFAULT_MENU, 'non-existent', 'basic-settings')).toBe(false)
+  })
+
+  it('should return false for non-existent descendant', () => {
+    expect(isDescendant(DEFAULT_MENU, 'system', 'non-existent')).toBe(false)
+  })
+})
+
+describe('flattenMenu edge cases', () => {
+  it('should return empty array for empty menu', () => {
+    expect(flattenMenu([])).toHaveLength(0)
+  })
+
+  it('should return correct structure for each flat item', () => {
+    const result = flattenMenu([
+      { id: 'a', name: 'A', children: [] }
+    ])
+    expect(result[0]).toHaveProperty('id', 'a')
+    expect(result[0]).toHaveProperty('name', 'A')
+    expect(result[0]).toHaveProperty('level', 0)
+    expect(result[0]).toHaveProperty('parentId', null)
+  })
+
+  it('should assign correct parentId for nested items', () => {
+    const menu = [
+      { id: 'a', name: 'A', children: [
+        { id: 'a1', name: 'A1', children: [] }
+      ]}
+    ]
+    const result = flattenMenu(menu)
+    const a1 = result.find((r) => r.id === 'a1')
+    expect(a1.parentId).toBe('a')
+    expect(a1.level).toBe(1)
+  })
+})
+
+describe('collectDescendantIds edge cases', () => {
+  it('should return empty array for non-existent id', () => {
+    const result = collectDescendantIds(DEFAULT_MENU, 'non-existent')
+    expect(result).toHaveLength(0)
+  })
+
+  it('should return only the item id for leaf node', () => {
+    const result = collectDescendantIds(DEFAULT_MENU, 'basic-settings')
+    expect(result).toEqual(['basic-settings'])
+  })
+
+  it('should collect all descendants for parent node', () => {
+    const result = collectDescendantIds(DEFAULT_MENU, 'settings-mgr')
+    expect(result).toContain('settings-mgr')
+    expect(result).toContain('basic-settings')
+    expect(result).toContain('security-settings')
+    expect(result.length).toBe(3)
+  })
+})
+
+describe('reorderSiblings edge cases', () => {
+  it('should return same menu for non-existent id', () => {
+    const result = reorderSiblings(DEFAULT_MENU, 'non-existent', 0)
+    expect(result).toBe(DEFAULT_MENU)
+  })
+
+  it('should return same menu for out-of-bounds index', () => {
+    const menu = [
+      { id: 'a', children: [] },
+      { id: 'b', children: [] },
+      { id: 'c', children: [] },
+    ]
+    const result = reorderSiblings(menu, 'b', -100)
+    expect(result).toBe(menu)
+    const result2 = reorderSiblings(menu, 'b', 100)
+    expect(result2).toBe(menu)
+  })
+})
+
+describe('addSiblingMenuItem edge cases', () => {
+  it('should return same menu and null id for non-existent sibling', () => {
+    const { menu, newItemId } = addSiblingMenuItem(DEFAULT_MENU, 'non-existent', 'after')
+    expect(menu).toBe(DEFAULT_MENU)
+    expect(newItemId).toBeNull()
+  })
+
+  it('should use provided newItem instead of creating one', () => {
+    const customItem = { id: 'custom-123', name: 'Custom', type: 'link', icon: 'star', link: '#/custom', target: '_self', permission: '', children: [] }
+    const { menu, newItemId } = addSiblingMenuItem(DEFAULT_MENU, 'root', 'after', customItem)
+    expect(newItemId).toBe('custom-123')
+    const found = findMenuItemById(menu, 'custom-123')
+    expect(found).toBeDefined()
+    expect(found.name).toBe('Custom')
+  })
+})
+
+describe('addChildMenuItem edge cases', () => {
+  it('should return structurally equal menu for non-existent parent', () => {
+    const { menu, newItemId } = addChildMenuItem(DEFAULT_MENU, 'non-existent')
+    expect(menu).toEqual(DEFAULT_MENU)
+    expect(typeof newItemId).toBe('string')
+  })
+})
+
+describe('updateMenuItem edge cases', () => {
+  it('should return structurally equal menu for non-existent id', () => {
+    const result = updateMenuItem(DEFAULT_MENU, 'non-existent', { name: 'Updated' })
+    expect(result).toEqual(DEFAULT_MENU)
+  })
+
+  it('should update multiple fields at once', () => {
+    const result = updateMenuItem(DEFAULT_MENU, 'root', {
+      name: '首页Updated',
+      icon: 'star',
+      link: '#/new-home',
+    })
+    const item = findMenuItemById(result, 'root')
+    expect(item.name).toBe('首页Updated')
+    expect(item.icon).toBe('star')
+    expect(item.link).toBe('#/new-home')
   })
 })

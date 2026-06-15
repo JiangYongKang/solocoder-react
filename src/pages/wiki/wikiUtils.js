@@ -501,6 +501,12 @@ export function markdownToHtml(markdown, options = {}) {
   return htmlParts.join('\n')
 }
 
+export function tokenizeLine(line) {
+  const escaped = escapeHtml(line)
+  const tokens = escaped.match(/&(?:[a-zA-Z]+|#\d+|#x[0-9a-fA-F]+);|\s+|[^\s&]+/g)
+  return tokens || []
+}
+
 export function diffContent(oldContent, newContent) {
   if (oldContent === newContent) {
     return { oldHtml: escapeHtml(oldContent), newHtml: escapeHtml(newContent) }
@@ -508,8 +514,6 @@ export function diffContent(oldContent, newContent) {
 
   const oldLines = oldContent.split('\n')
   const newLines = newContent.split('\n')
-
-  const tokenize = (line) => line.split(/(\s+|\b)/).filter(Boolean)
 
   const matchWords = (oldTokens, newTokens) => {
     const dp = Array(oldTokens.length + 1).fill(null).map(() => Array(newTokens.length + 1).fill(0))
@@ -567,16 +571,16 @@ export function diffContent(oldContent, newContent) {
       oldHtml += `<div class="diff-line"><span class="diff-gutter"> </span><span class="diff-content">${escapeHtml(oldLine)}</span></div>`
       newHtml += `<div class="diff-line"><span class="diff-gutter"> </span><span class="diff-content">${escapeHtml(newLine)}</span></div>`
     } else {
-      const oldTokens = tokenize(oldLine)
-      const newTokens = tokenize(newLine)
+      const oldTokens = tokenizeLine(oldLine)
+      const newTokens = tokenizeLine(newLine)
       const { oldMarked, newMarked } = matchWords(oldTokens, newTokens)
 
       let oldLineHtml = '<div class="diff-line diff-removed"><span class="diff-gutter">-</span><span class="diff-content">'
       for (let k = 0; k < oldTokens.length; k++) {
         if (oldMarked[k]) {
-          oldLineHtml += escapeHtml(oldTokens[k])
+          oldLineHtml += oldTokens[k]
         } else {
-          oldLineHtml += `<span class="diff-word-removed">${escapeHtml(oldTokens[k])}</span>`
+          oldLineHtml += `<span class="diff-word-removed">${oldTokens[k]}</span>`
         }
       }
       oldLineHtml += '</span></div>'
@@ -585,9 +589,9 @@ export function diffContent(oldContent, newContent) {
       let newLineHtml = '<div class="diff-line diff-added"><span class="diff-gutter">+</span><span class="diff-content">'
       for (let k = 0; k < newTokens.length; k++) {
         if (newMarked[k]) {
-          newLineHtml += escapeHtml(newTokens[k])
+          newLineHtml += newTokens[k]
         } else {
-          newLineHtml += `<span class="diff-word-added">${escapeHtml(newTokens[k])}</span>`
+          newLineHtml += `<span class="diff-word-added">${newTokens[k]}</span>`
         }
       }
       newLineHtml += '</span></div>'
@@ -665,6 +669,23 @@ export function highlightTextSafe(text, keyword) {
   const escapedRegexQuery = escapedQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const regex = new RegExp(`(${escapedRegexQuery})`, 'gi')
   return escapedText.replace(regex, '<span class="highlight">$1</span>')
+}
+
+export function highlightHtml(html, keyword) {
+  if (!keyword || !html) return html
+  const kw = keyword.trim()
+  if (!kw) return html
+  const escapedKw = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const regex = new RegExp(escapedKw, 'gi')
+
+  const parts = html.split(/(<[^>]+>)/g)
+  for (let i = 0; i < parts.length; i++) {
+    if (parts[i].startsWith('<') && parts[i].endsWith('>')) {
+      continue
+    }
+    parts[i] = parts[i].replace(regex, '<span class="highlight">$&</span>')
+  }
+  return parts.join('')
 }
 
 export function addTagToPage(data, pageId, tag) {

@@ -2,8 +2,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
   MOUSE_EVENT_TYPES,
   MOUSE_EVENT_COLORS,
+  MOUSE_EVENT_LABELS,
   MOUSE_BUTTONS,
   MODIFIER_KEYS,
+  MODIFIER_KEY_LABELS,
   MODIFIER_KEY_COLORS,
   generateId,
   formatTimestamp,
@@ -40,6 +42,14 @@ describe('常量定义', () => {
     })
   })
 
+  it('MOUSE_EVENT_LABELS 为每种事件类型定义标签', () => {
+    MOUSE_EVENT_TYPES.forEach((type) => {
+      expect(MOUSE_EVENT_LABELS[type]).toBeDefined()
+      expect(typeof MOUSE_EVENT_LABELS[type]).toBe('string')
+      expect(MOUSE_EVENT_LABELS[type].length).toBeGreaterThan(0)
+    })
+  })
+
   it('MOUSE_BUTTONS 定义三个鼠标按钮', () => {
     expect(MOUSE_BUTTONS[0]).toBe('左键')
     expect(MOUSE_BUTTONS[1]).toBe('中键')
@@ -54,6 +64,14 @@ describe('常量定义', () => {
     MODIFIER_KEYS.forEach((key) => {
       expect(MODIFIER_KEY_COLORS[key]).toBeDefined()
       expect(MODIFIER_KEY_COLORS[key]).toMatch(/^#[0-9a-f]{6}$/i)
+    })
+  })
+
+  it('MODIFIER_KEY_LABELS 为每个修饰键定义标签', () => {
+    MODIFIER_KEYS.forEach((key) => {
+      expect(MODIFIER_KEY_LABELS[key]).toBeDefined()
+      expect(typeof MODIFIER_KEY_LABELS[key]).toBe('string')
+      expect(MODIFIER_KEY_LABELS[key].length).toBeGreaterThan(0)
     })
   })
 })
@@ -99,6 +117,18 @@ describe('formatTimestamp', () => {
     const result = formatTimestamp(date.getTime())
     expect(result).toContain('.005')
   })
+
+  it('秒、分、时部分补零', () => {
+    const date = new Date('2024-01-15T05:03:02.001')
+    const result = formatTimestamp(date.getTime())
+    expect(result).toContain('05:03:02')
+    expect(result).toContain('.001')
+  })
+
+  it('0 时间戳返回格式化结果', () => {
+    const result = formatTimestamp(0)
+    expect(result).toMatch(/^\d{2}:\d{2}:\d{2}\.\d{3}$/)
+  })
 })
 
 describe('createKeyEventRecord', () => {
@@ -140,6 +170,30 @@ describe('createKeyEventRecord', () => {
     expect(record.shiftKey).toBe(false)
     expect(record.altKey).toBe(false)
     expect(record.metaKey).toBe(false)
+  })
+
+  it('记录 type 始终为 key', () => {
+    const record = createKeyEventRecord({ type: 'keydown' }, 1)
+    expect(record.type).toBe('key')
+  })
+
+  it('修饰键布尔值强制转换', () => {
+    const record = createKeyEventRecord(
+      { ctrlKey: 'true', shiftKey: 0, altKey: null, metaKey: undefined },
+      1
+    )
+    expect(record.ctrlKey).toBe(true)
+    expect(record.shiftKey).toBe(false)
+    expect(record.altKey).toBe(false)
+    expect(record.metaKey).toBe(false)
+  })
+
+  it('没有 timestamp 时使用当前时间', () => {
+    const before = Date.now()
+    const record = createKeyEventRecord({ key: 'a' }, 1)
+    const after = Date.now()
+    expect(record.timestamp).toBeGreaterThanOrEqual(before)
+    expect(record.timestamp).toBeLessThanOrEqual(after)
   })
 })
 
@@ -193,6 +247,22 @@ describe('createMouseEventRecord', () => {
     expect(record.buttons).toBe(0)
     expect(record.x).toBe(0)
     expect(record.y).toBe(0)
+  })
+
+  it('记录 type 始终为 mouse', () => {
+    const record = createMouseEventRecord({ type: 'click' }, 1)
+    expect(record.type).toBe('mouse')
+  })
+
+  it('修饰键布尔值强制转换', () => {
+    const record = createMouseEventRecord(
+      { ctrlKey: 'true', shiftKey: 0, altKey: null, metaKey: undefined },
+      1
+    )
+    expect(record.ctrlKey).toBe(true)
+    expect(record.shiftKey).toBe(false)
+    expect(record.altKey).toBe(false)
+    expect(record.metaKey).toBe(false)
   })
 })
 
@@ -448,6 +518,41 @@ describe('calculateFrequency', () => {
     const result = calculateFrequency([])
     expect(result).toHaveLength(30)
   })
+
+  it('事件正好在窗口边界上的处理', () => {
+    const now = 100000
+    const events = [
+      { timestamp: now - 30000 + 1 },
+      { timestamp: now - 30000 },
+      { timestamp: now - 29999 },
+    ]
+    const result = calculateFrequency(events, 30, now)
+    expect(result[0]).toBe(3)
+  })
+
+  it('事件时间晚于 now 不统计', () => {
+    const now = 100000
+    const events = [
+      { timestamp: now - 500 },
+      { timestamp: now + 500 },
+    ]
+    const result = calculateFrequency(events, 5, now)
+    expect(result.reduce((a, b) => a + b, 0)).toBe(1)
+  })
+
+  it('多事件分布在不同秒', () => {
+    const now = 100000
+    const events = []
+    for (let i = 0; i < 10; i++) {
+      for (let j = 0; j < i + 1; j++) {
+        events.push({ timestamp: now - i * 1000 - 500 })
+      }
+    }
+    const result = calculateFrequency(events, 10, now)
+    expect(result[9]).toBe(1)
+    expect(result[8]).toBe(2)
+    expect(result[0]).toBe(10)
+  })
 })
 
 describe('getMaxFrequency', () => {
@@ -542,6 +647,45 @@ describe('throttle', () => {
     expect(result1).toBe(10)
     expect(result2).toBe(10)
   })
+
+  it('延迟期内多次调用不重置延迟计时器', () => {
+    const fn = vi.fn()
+    const throttled = throttle(fn, 100)
+
+    throttled()
+    expect(fn).toHaveBeenCalledTimes(1)
+
+    vi.advanceTimersByTime(50)
+    throttled()
+    expect(fn).toHaveBeenCalledTimes(1)
+
+    vi.advanceTimersByTime(49)
+    throttled()
+    expect(fn).toHaveBeenCalledTimes(1)
+
+    vi.advanceTimersByTime(2)
+    throttled()
+    expect(fn).toHaveBeenCalledTimes(2)
+  })
+
+  it('this 上下文正确', () => {
+    const context = { value: 42 }
+    function fn() {
+      return this.value
+    }
+    const throttled = throttle(fn, 100)
+
+    const result = throttled.call(context)
+    expect(result).toBe(42)
+  })
+
+  it('参数正确传递', () => {
+    const fn = vi.fn()
+    const throttled = throttle(fn, 100)
+
+    throttled('a', 'b', 'c')
+    expect(fn).toHaveBeenCalledWith('a', 'b', 'c')
+  })
 })
 
 describe('getMouseButtonLabel', () => {
@@ -592,5 +736,16 @@ describe('getActiveModifiers', () => {
     expect(result).toContain('shift')
     expect(result).toContain('alt')
     expect(result).toContain('meta')
+  })
+
+  it('返回数组顺序为 ctrl, shift, alt, meta', () => {
+    const event = {
+      metaKey: true,
+      altKey: true,
+      shiftKey: true,
+      ctrlKey: true,
+    }
+    const result = getActiveModifiers(event)
+    expect(result).toEqual(['ctrl', 'shift', 'alt', 'meta'])
   })
 })

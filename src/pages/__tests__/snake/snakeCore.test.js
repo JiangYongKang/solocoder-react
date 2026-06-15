@@ -8,6 +8,10 @@ import {
   MIN_MOVE_INTERVAL,
   SCORE_PER_FOOD,
   MAX_LEADERBOARD_ENTRIES,
+  MOVE_INTERVAL_DECREMENT,
+  POINTS_PER_LEVEL,
+  DIRECTIONS,
+  OPPOSITE_DIRECTIONS,
 } from '@/pages/snake/constants.js'
 import {
   createInitialState,
@@ -555,6 +559,410 @@ describe('snakeCore', () => {
     it('should pad single digit months and days', () => {
       const isoString = '2024-01-05T00:00:00.000Z'
       expect(formatDate(isoString)).toBe('2024-01-05')
+    })
+
+    it('should handle end of year correctly', () => {
+      const isoString = '2024-12-31T23:59:59.999Z'
+      expect(formatDate(isoString)).toBe('2024-12-31')
+    })
+  })
+
+  describe('Constants validation', () => {
+    it('DIRECTIONS should have dx/dy for all four directions', () => {
+      expect(DIRECTIONS.UP).toEqual({ dx: 0, dy: -1 })
+      expect(DIRECTIONS.DOWN).toEqual({ dx: 0, dy: 1 })
+      expect(DIRECTIONS.LEFT).toEqual({ dx: -1, dy: 0 })
+      expect(DIRECTIONS.RIGHT).toEqual({ dx: 1, dy: 0 })
+    })
+
+    it('OPPOSITE_DIRECTIONS should map correctly for all directions', () => {
+      expect(OPPOSITE_DIRECTIONS.UP).toBe('DOWN')
+      expect(OPPOSITE_DIRECTIONS.DOWN).toBe('UP')
+      expect(OPPOSITE_DIRECTIONS.LEFT).toBe('RIGHT')
+      expect(OPPOSITE_DIRECTIONS.RIGHT).toBe('LEFT')
+    })
+
+    it('MOVE_INTERVAL_DECREMENT should be 10', () => {
+      expect(MOVE_INTERVAL_DECREMENT).toBe(10)
+    })
+
+    it('POINTS_PER_LEVEL should be 50', () => {
+      expect(POINTS_PER_LEVEL).toBe(50)
+    })
+
+    it('INITIAL_MOVE_INTERVAL should be greater than MIN_MOVE_INTERVAL', () => {
+      expect(INITIAL_MOVE_INTERVAL).toBeGreaterThan(MIN_MOVE_INTERVAL)
+    })
+  })
+
+  describe('isValidDirectionChange - edge cases', () => {
+    it('should not allow reversing from DOWN to UP', () => {
+      expect(isValidDirectionChange('DOWN', 'UP')).toBe(false)
+    })
+
+    it('should allow turning DOWN to LEFT or RIGHT', () => {
+      expect(isValidDirectionChange('DOWN', 'LEFT')).toBe(true)
+      expect(isValidDirectionChange('DOWN', 'RIGHT')).toBe(true)
+    })
+
+    it('should allow turning LEFT to UP or DOWN', () => {
+      expect(isValidDirectionChange('LEFT', 'UP')).toBe(true)
+      expect(isValidDirectionChange('LEFT', 'DOWN')).toBe(true)
+    })
+
+    it('should not allow reversing from LEFT to RIGHT', () => {
+      expect(isValidDirectionChange('LEFT', 'RIGHT')).toBe(false)
+    })
+  })
+
+  describe('wrapCoordinate - additional edge cases', () => {
+    it('should handle -GRID_SIZE correctly', () => {
+      expect(wrapCoordinate(-GRID_SIZE)).toBe(0)
+    })
+
+    it('should handle GRID_SIZE * 2 correctly', () => {
+      expect(wrapCoordinate(GRID_SIZE * 2)).toBe(0)
+    })
+
+    it('should handle negative wrap with large offset', () => {
+      expect(wrapCoordinate(-GRID_SIZE - 3)).toBe(GRID_SIZE - 3)
+    })
+
+    it('should handle positive wrap with large offset', () => {
+      expect(wrapCoordinate(GRID_SIZE * 3 + 7)).toBe(7)
+    })
+  })
+
+  describe('moveSnake - additional scenarios', () => {
+    it('should move snake down correctly', () => {
+      const state = {
+        snake: [{ x: 10, y: 10 }, { x: 10, y: 9 }, { x: 10, y: 8 }],
+        direction: 'DOWN',
+        food: { x: 15, y: 15 },
+        gameMode: GAME_MODE.WALL_DEATH,
+      }
+      const result = moveSnake(state)
+      expect(result.newSnake[0]).toEqual({ x: 10, y: 11 })
+      expect(result.newSnake.length).toBe(3)
+      expect(result.ateFood).toBe(false)
+    })
+
+    it('should move snake left correctly', () => {
+      const state = {
+        snake: [{ x: 10, y: 10 }, { x: 11, y: 10 }, { x: 12, y: 10 }],
+        direction: 'LEFT',
+        food: { x: 15, y: 15 },
+        gameMode: GAME_MODE.WALL_DEATH,
+      }
+      const result = moveSnake(state)
+      expect(result.newSnake[0]).toEqual({ x: 9, y: 10 })
+    })
+
+    it('should wrap left boundary in THROUGH_WALL mode', () => {
+      const state = {
+        snake: [{ x: 0, y: 5 }, { x: 1, y: 5 }],
+        direction: 'LEFT',
+        food: { x: 15, y: 15 },
+        gameMode: GAME_MODE.THROUGH_WALL,
+      }
+      const result = moveSnake(state)
+      expect(result.newHeadX).toBe(GRID_SIZE - 1)
+    })
+
+    it('should wrap top boundary in THROUGH_WALL mode', () => {
+      const state = {
+        snake: [{ x: 5, y: 0 }, { x: 5, y: 1 }],
+        direction: 'UP',
+        food: { x: 15, y: 15 },
+        gameMode: GAME_MODE.THROUGH_WALL,
+      }
+      const result = moveSnake(state)
+      expect(result.newHeadY).toBe(GRID_SIZE - 1)
+    })
+
+    it('should wrap bottom boundary in THROUGH_WALL mode', () => {
+      const state = {
+        snake: [{ x: 5, y: GRID_SIZE - 1 }, { x: 5, y: GRID_SIZE - 2 }],
+        direction: 'DOWN',
+        food: { x: 15, y: 15 },
+        gameMode: GAME_MODE.THROUGH_WALL,
+      }
+      const result = moveSnake(state)
+      expect(result.newHeadY).toBe(0)
+    })
+
+    it('should grow snake correctly when eating food on downward move', () => {
+      const state = {
+        snake: [{ x: 10, y: 10 }, { x: 10, y: 9 }],
+        direction: 'DOWN',
+        food: { x: 10, y: 11 },
+        gameMode: GAME_MODE.WALL_DEATH,
+      }
+      const result = moveSnake(state)
+      expect(result.ateFood).toBe(true)
+      expect(result.newSnake.length).toBe(3)
+      expect(result.newSnake[2]).toEqual({ x: 10, y: 9 })
+    })
+  })
+
+  describe('checkSelfCollision - additional edge cases', () => {
+    it('should return false for 2-segment snake', () => {
+      const snake = [{ x: 10, y: 10 }, { x: 9, y: 10 }]
+      expect(checkSelfCollision(snake)).toBe(false)
+    })
+
+    it('should detect collision when head hits 3rd body segment', () => {
+      const snake = [
+        { x: 5, y: 5 },
+        { x: 6, y: 5 },
+        { x: 6, y: 6 },
+        { x: 5, y: 6 },
+        { x: 5, y: 5 },
+      ]
+      expect(checkSelfCollision(snake)).toBe(true)
+    })
+  })
+
+  describe('calculateLevel - boundary values', () => {
+    it('should return level 1 at exact boundary before level 2', () => {
+      expect(calculateLevel(POINTS_PER_LEVEL - 1)).toBe(1)
+    })
+
+    it('should return level 2 at exact level up threshold', () => {
+      expect(calculateLevel(POINTS_PER_LEVEL)).toBe(2)
+    })
+
+    it('should return level 2 just after threshold', () => {
+      expect(calculateLevel(POINTS_PER_LEVEL + 1)).toBe(2)
+    })
+
+    it('should return correct level for double threshold', () => {
+      expect(calculateLevel(POINTS_PER_LEVEL * 2)).toBe(3)
+    })
+  })
+
+  describe('calculateMoveInterval - using MOVE_INTERVAL_DECREMENT constant', () => {
+    it('should decrement by exactly MOVE_INTERVAL_DECREMENT per level', () => {
+      expect(calculateMoveInterval(2)).toBe(INITIAL_MOVE_INTERVAL - MOVE_INTERVAL_DECREMENT)
+      expect(calculateMoveInterval(3)).toBe(INITIAL_MOVE_INTERVAL - 2 * MOVE_INTERVAL_DECREMENT)
+      expect(calculateMoveInterval(4)).toBe(INITIAL_MOVE_INTERVAL - 3 * MOVE_INTERVAL_DECREMENT)
+    })
+
+    it('should reach exactly MIN_MOVE_INTERVAL at boundary level', () => {
+      const stepsToMin = Math.floor((INITIAL_MOVE_INTERVAL - MIN_MOVE_INTERVAL) / MOVE_INTERVAL_DECREMENT)
+      const boundaryLevel = stepsToMin + 1
+      expect(calculateMoveInterval(boundaryLevel)).toBe(MIN_MOVE_INTERVAL)
+    })
+
+    it('should use MIN_MOVE_INTERVAL for all levels beyond max speed', () => {
+      const stepsToMin = Math.floor((INITIAL_MOVE_INTERVAL - MIN_MOVE_INTERVAL) / MOVE_INTERVAL_DECREMENT)
+      expect(calculateMoveInterval(stepsToMin + 2)).toBe(MIN_MOVE_INTERVAL)
+      expect(calculateMoveInterval(stepsToMin + 50)).toBe(MIN_MOVE_INTERVAL)
+    })
+  })
+
+  describe('gameTick - additional scenarios', () => {
+    it('should not game over in THROUGH_WALL mode when hitting boundary', () => {
+      const prevState = {
+        snake: [{ x: 0, y: 10 }, { x: 1, y: 10 }],
+        direction: 'LEFT',
+        nextDirection: 'LEFT',
+        food: { x: 15, y: 15 },
+        score: 0,
+        level: 1,
+        gameMode: GAME_MODE.THROUGH_WALL,
+      }
+      const result = gameTick(prevState)
+      expect(result.gameOver).toBe(false)
+      expect(result.snake[0].x).toBe(GRID_SIZE - 1)
+    })
+
+    it('should still game over on self collision in THROUGH_WALL mode', () => {
+      const prevState = {
+        snake: [
+          { x: 5, y: 5 },
+          { x: 4, y: 5 },
+          { x: 4, y: 6 },
+          { x: 5, y: 6 },
+          { x: 6, y: 6 },
+          { x: 6, y: 5 },
+        ],
+        direction: 'DOWN',
+        nextDirection: 'DOWN',
+        food: { x: 15, y: 15 },
+        score: 0,
+        level: 1,
+        gameMode: GAME_MODE.THROUGH_WALL,
+      }
+      const result = gameTick(prevState)
+      expect(result.gameOver).toBe(true)
+    })
+
+    it('should regenerate food at non-snake position after eating', () => {
+      const prevState = {
+        snake: [{ x: 10, y: 10 }, { x: 9, y: 10 }, { x: 8, y: 10 }],
+        direction: 'RIGHT',
+        nextDirection: 'RIGHT',
+        food: { x: 11, y: 10 },
+        score: 0,
+        level: 1,
+        gameMode: GAME_MODE.WALL_DEATH,
+      }
+      const result = gameTick(prevState)
+      const snakeSet = new Set(result.snake.map(s => `${s.x},${s.y}`))
+      expect(snakeSet.has(`${result.food.x},${result.food.y}`)).toBe(false)
+    })
+
+    it('should trigger level up at score boundary', () => {
+      const prevState = {
+        snake: [{ x: 10, y: 10 }, { x: 9, y: 10 }],
+        direction: 'RIGHT',
+        nextDirection: 'RIGHT',
+        food: { x: 11, y: 10 },
+        score: POINTS_PER_LEVEL - SCORE_PER_FOOD,
+        level: 1,
+        gameMode: GAME_MODE.WALL_DEATH,
+      }
+      const result = gameTick(prevState)
+      expect(result.score).toBe(POINTS_PER_LEVEL)
+      expect(result.level).toBe(2)
+    })
+
+    it('should not change nextDirection when it matches direction', () => {
+      const prevState = {
+        snake: [{ x: 10, y: 10 }, { x: 9, y: 10 }],
+        direction: 'RIGHT',
+        nextDirection: 'RIGHT',
+        food: { x: 15, y: 10 },
+        score: 0,
+        level: 1,
+        gameMode: GAME_MODE.WALL_DEATH,
+      }
+      const result = gameTick(prevState)
+      expect(result.direction).toBe('RIGHT')
+      expect(result.nextDirection).toBe('RIGHT')
+    })
+
+    it('should move through multiple ticks in succession', () => {
+      let state = {
+        snake: [{ x: 10, y: 10 }, { x: 9, y: 10 }, { x: 8, y: 10 }],
+        direction: 'RIGHT',
+        nextDirection: 'RIGHT',
+        food: { x: 18, y: 10 },
+        score: 0,
+        level: 1,
+        gameMode: GAME_MODE.WALL_DEATH,
+      }
+      for (let i = 0; i < 5; i++) {
+        state = gameTick(state)
+        expect(state.gameOver).toBe(false)
+      }
+      expect(state.snake[0]).toEqual({ x: 15, y: 10 })
+      expect(state.score).toBe(0)
+      expect(state.level).toBe(1)
+    })
+  })
+
+  describe('generateFood - additional scenarios', () => {
+    it('should always return valid position when grid has free space', () => {
+      const snake = [{ x: 5, y: 5 }, { x: 5, y: 6 }, { x: 5, y: 7 }]
+      for (let i = 0; i < 100; i++) {
+        const food = generateFood(snake)
+        expect(food).not.toBeNull()
+        expect(food.x).toBeGreaterThanOrEqual(0)
+        expect(food.x).toBeLessThan(GRID_SIZE)
+        expect(food.y).toBeGreaterThanOrEqual(0)
+        expect(food.y).toBeLessThan(GRID_SIZE)
+      }
+    })
+
+    it('should return food not on snake even for large snake', () => {
+      const snake = []
+      for (let x = 0; x < GRID_SIZE - 1; x++) {
+        snake.push({ x, y: 0 })
+      }
+      for (let i = 0; i < 50; i++) {
+        const food = generateFood(snake)
+        const onSnake = snake.some(s => s.x === food.x && s.y === food.y)
+        expect(onSnake).toBe(false)
+      }
+    })
+  })
+
+  describe('addToLeaderboard - additional scenarios', () => {
+    let storage
+
+    beforeEach(() => {
+      storage = createMockStorage()
+    })
+
+    it('should return correct rank for new high score at top', () => {
+      const result = addToLeaderboard(1000, 'TopPlayer', storage)
+      expect(result.rank).toBe(1)
+    })
+
+    it('should return correct rank for entry in middle', () => {
+      addToLeaderboard(300, 'Player1', storage)
+      addToLeaderboard(100, 'Player2', storage)
+      const result = addToLeaderboard(200, 'MiddlePlayer', storage)
+      expect(result.rank).toBe(2)
+    })
+
+    it('should return negative rank when score does not make the leaderboard', () => {
+      for (let i = 0; i < MAX_LEADERBOARD_ENTRIES; i++) {
+        addToLeaderboard((MAX_LEADERBOARD_ENTRIES - i) * 100, `Player${i}`, storage)
+      }
+      const result = addToLeaderboard(10, 'LowScore', storage)
+      expect(result.rank).toBe(-1)
+    })
+
+    it('should maintain sorted order after multiple additions', () => {
+      addToLeaderboard(50, 'P1', storage)
+      addToLeaderboard(200, 'P2', storage)
+      addToLeaderboard(100, 'P3', storage)
+      addToLeaderboard(150, 'P4', storage)
+      const lb = loadLeaderboard(storage)
+      for (let i = 0; i < lb.length - 1; i++) {
+        expect(lb[i].score).toBeGreaterThanOrEqual(lb[i + 1].score)
+      }
+    })
+  })
+
+  describe('isHighScore - additional scenarios', () => {
+    let storage
+
+    beforeEach(() => {
+      storage = createMockStorage()
+    })
+
+    it('should return true for empty leaderboard', () => {
+      expect(isHighScore(1, storage)).toBe(true)
+    })
+
+    it('should return true when score ties with lowest and leaderboard full', () => {
+      for (let i = 0; i < MAX_LEADERBOARD_ENTRIES; i++) {
+        addToLeaderboard((i + 1) * 10, `P${i}`, storage)
+      }
+      const lowest = loadLeaderboard(storage)[MAX_LEADERBOARD_ENTRIES - 1].score
+      expect(isHighScore(lowest, storage)).toBe(false)
+    })
+
+    it('should return true when score exactly one above lowest', () => {
+      for (let i = 0; i < MAX_LEADERBOARD_ENTRIES; i++) {
+        addToLeaderboard((i + 1) * 10, `P${i}`, storage)
+      }
+      const lowest = loadLeaderboard(storage)[MAX_LEADERBOARD_ENTRIES - 1].score
+      expect(isHighScore(lowest + 1, storage)).toBe(true)
+    })
+  })
+
+  describe('calculateScore - additional scenarios', () => {
+    it('should add SCORE_PER_FOOD to large scores correctly', () => {
+      expect(calculateScore(99990, true)).toBe(99990 + SCORE_PER_FOOD)
+    })
+
+    it('should handle 0 score without eating', () => {
+      expect(calculateScore(0, false)).toBe(0)
     })
   })
 })

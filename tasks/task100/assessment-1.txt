@@ -1,0 +1,7 @@
+产物不满意：
+1. `snakeBattleCore.js` 的 `decideAIDirection` 函数中，RANDOM 模式下每游戏逻辑帧以 30% 概率调用 `getRandomDirection` 改变方向，正常速度下每秒约 9 次方向变化，导致 AI 蛇体呈现剧烈抖动而非提示词要求的"模拟自然游动"。根本原因是方向偏转概率判断与游戏帧绑定而非与 500ms 决策周期绑定。正确做法是将方向偏转逻辑移入 500ms 决策块内部，每个决策周期最多执行一次偏转。
+2. `index.jsx` 的 `gameTick` 函数在第 244 行执行 `allSnakes = [state.player, ...state.aiSnakes]` 后，第 247 行 `state.player = moveSnake(state.player)` 将玩家蛇替换为新对象，但 AI 循环第 270 行传入 `decideAIDirection` 的仍是旧 `allSnakes` 数组，其中 `allSnakes[0]` 持移动前玩家旧引用，导致 `detectDangerAhead` 和 `findNearestFood` 基于过时玩家位置决策，构成一帧延迟的数据竞态。正确做法是每个 AI 决策前重建包含最新 `state.player` 的快照。
+
+过程不满意：
+1. 模型在浏览项目结构后立即创建 9 项 TodoList，按 constants、snakeBattleCore、index.jsx、CSS、App.jsx、测试的顺序连续写出全部文件后才首次运行 lint 和测试，导致 index.jsx 中残留 setGameOver、setPaused、isPaused 等未使用变量和导入。模型通过三轮 edit_file_search_replace 和两轮 npx eslint 才将 lint 错误完全修复，且首次使用的 `pnpm lint` 命令在项目中不存在。正确做法是每写完一个模块就立即运行 lint 检查，不应将错误积累到项目收尾阶段集中清理。
+2. 模型在回复中声称"86 个单元测试全部通过"并覆盖"AI行为决策"，但 `decideAIDirection` 测试仅三个用例：通用方向有效性断言、死蛇不改变方向、遇边界切 AVOID 模式。三种行为中仅 AVOID 被独立验证，FORAGE 模式未测试"蛇头转向最近食物"的核心逻辑，RANDOM 模式随机偏转完全无覆盖。提示词要求"为 AI 行为决策编写纯 JS 函数单元测试"，测试数量虽达 86 个但 AI 核心行为模块测试存在结构性空白。

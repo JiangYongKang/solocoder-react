@@ -32,6 +32,7 @@ import HabitTrackerPage from '@/pages/habit-tracker/index.jsx'
 import I18nManagerPage from '@/pages/i18n-manager/index.jsx'
 import InfiniteListPage from '@/pages/infinite-list/index.jsx'
 import JsonToTsPage from '@/pages/json-to-ts/index.jsx'
+import UrlToolPage from '@/pages/url-tool/index.jsx'
 import KanbanPage from '@/pages/kanban/KanbanPage.jsx'
 import KnowledgeBasePage from '@/pages/knowledge-base/index.jsx'
 import MapAreaPage from '@/pages/map-area/index.jsx'
@@ -58,9 +59,11 @@ import SnippetsPage from '@/pages/snippets/index.jsx'
 import SocialFeedPage from '@/pages/social-feed/index.jsx'
 import SpreadsheetPage from '@/pages/spreadsheet/index.jsx'
 import SudokuPage from '@/pages/sudoku/index.jsx'
+import SnakeBattlePage from '@/pages/snake-battle/index.jsx'
 import SurveyPage from '@/pages/survey/index.jsx'
 import TetrisPage from '@/pages/tetris/index.jsx'
 import TextDiffPage from '@/pages/text-diff/index.jsx'
+import TodoListPage from '@/pages/todo-list/index.jsx'
 import ThemeEditorPage from '@/pages/theme-editor/index.jsx'
 import TicketSystemPage from '@/pages/ticket-system/index.jsx'
 import UnionFindPage from '@/pages/union-find/index.jsx'
@@ -72,6 +75,10 @@ import Wizard from '@/pages/wizard/Wizard.jsx'
 import WorkflowPage from '@/pages/workflow/index.jsx'
 import VideoMeetingPage from '@/pages/video-meeting/index.jsx'
 import ScreenshotAnnotatorPage from '@/pages/screenshot-annotator/index.jsx'
+import MenuDesignerPage from '@/pages/menu-designer/index.jsx'
+import EventDebuggerPage from '@/pages/event-debugger/index.jsx'
+import LinkGamePage from '@/pages/link-game/index.jsx'
+import TimeTrackerPage from '@/pages/time-tracker/index.jsx'
 
 const TASKS = [
     { id: 1, title: '用户认证系统', route: 'auth', description: '登录、注册、找回密码、修改密码完整的认证流程，基于 localStorage 存储。' },
@@ -138,6 +145,7 @@ const TASKS = [
     { id: 63, title: '版本发布管理', route: 'release-manager', description: '软件版本发布全生命周期管理，版本分页列表、新增编辑、Diff 对比、审批流程模拟（提交→审核→发布→回滚），基于 localStorage 持久化。' },
     { id: 64, title: 'Markdown 笔记应用', route: 'markdown-notes', description: '完整的 Markdown 笔记应用，多笔记本树形目录、Markdown 编辑与实时预览、标签分类、全文搜索高亮、笔记间内部链接跳转、.md 文件导入导出，基于 localStorage 持久化。' },
     { id: 68, title: 'JSON 转 TypeScript 类型生成器', route: 'json-to-ts', description: '开发者工具，粘贴 JSON 自动生成 TypeScript 接口/类型，支持递归类型推导、可选字段识别、类型名自定义、一键复制和历史记录，基于 localStorage 持久化。' },
+    { id: 76, title: 'URL 解析编解码工具', route: 'url-tool', description: '开发者常用的 URL 解析与编解码工具箱，支持 URL 各部分拆解展示、查询参数表格编辑、URL 编解码、Base64 转换、JSON 互转、批量 URL 解析与 CSV 导出，所有状态仅在当前会话内维护。' },
     { id: 66, title: '外卖点餐', route: 'food-order', description: '完整外卖点餐流程，店铺列表与品类筛选、商品分组与规格选择加购、购物车管理、地址备注填写、订单状态实时跟踪、历史订单查看，基于 localStorage 持久化。' },
     { id: 65, title: 'RPG 角色创建器', route: 'rpg-creator', description: '可视化RPG角色创建工具，CSS/Canvas绘制角色形象、外观定制、30点属性分配、树形技能解锁、角色保存加载与卡片导出，基于 localStorage 持久化。' },
     { id: 67, title: '路线记录器', route: 'route-recorder', description: 'Canvas自绘地图路线规划工具，标记起终点和途经点、拖拽排序、距离时间计算、海拔剖面图、收藏与分享路线，基于 localStorage 持久化。' },
@@ -146,6 +154,9 @@ const TASKS = [
     { id: 73, title: '视频会议模拟', route: 'video-meeting', description: 'Canvas 模拟视频会议界面，画廊/演讲者双视图切换，静音/摄像头/屏幕共享/举手控制，聊天面板和参会人列表，所有状态前端维护。' },
     { id: 70, title: '审计日志系统', route: 'audit-log', description: '企业级操作审计日志管理，支持分页列表、多维度筛选、JSON 详情、CSV 导出、保留策略配置、操作趋势图与异常标记，基于 localStorage 持久化。' },
     { id: 71, title: '弹幕播放器', route: 'danmaku-player', description: 'Canvas 弹幕渲染的视频播放器模拟，支持弹幕发送（位置/颜色/字号）、滚动/固定弹幕渲染、弹幕开关与透明度、弹幕列表与防重叠密度调节。' },
+    { id: 75, title: '连连看游戏', route: 'link-game', description: '经典连连看消除游戏，多难度网格配置、两拐弯BFS路径判定、消除动画连线、计时步数、提示与重排功能、localStorage排行榜持久化。' },
+    { id: 74, title: '工时统计', route: 'time-tracker', description: '团队/个人工时记录与统计工具，支持计时器追踪、手动登记、按项目日期汇总、柱状图统计、预算进度对比、CSV导出，基于 localStorage 持久化。' },
+    { id: 74, title: '待办清单', route: 'todo-list', description: '个人待办任务管理工具，支持任务分组、子任务层级管理、拖拽排序、多维筛选、过期提醒和连续打卡统计，基于 localStorage 持久化。' },
 ]
 
 function HomePage() {
@@ -208,6 +219,7 @@ function App() {
             <Route path="/product-review" element={<ProductReviewPage />} />
             <Route path="/knowledge-base" element={<KnowledgeBasePage />} />
             <Route path="/text-diff" element={<TextDiffPage />} />
+            <Route path="/todo-list" element={<TodoListPage />} />
             <Route path="/spreadsheet" element={<SpreadsheetPage />} />
             <Route path="/gantt-chart" element={<GanttChartPage />} />
             <Route path="/snippets" element={<SnippetsPage />} />
@@ -236,6 +248,7 @@ function App() {
             <Route path="/habit-tracker" element={<HabitTrackerPage />} />
             <Route path="/ticket-system" element={<TicketSystemPage />} />
             <Route path="/sudoku" element={<SudokuPage />} />
+            <Route path="/snake-battle" element={<SnakeBattlePage />} />
             <Route path="/union-find" element={<UnionFindPage />} />
             <Route path="/voting-app" element={<VotingApp />} />
             <Route path="/websocket-debugger" element={<WsDebuggerPage />} />
@@ -244,6 +257,7 @@ function App() {
             <Route path="/data-importer" element={<DataImporterPage />} />
             <Route path="/data-mask" element={<DataMaskPage />} />
             <Route path="/json-to-ts" element={<JsonToTsPage />} />
+            <Route path="/url-tool" element={<UrlToolPage />} />
             <Route path="/release-manager" element={<ReleaseManagerPage />} />
             <Route path="/food-order" element={<FoodOrderPage />} />
             <Route path="/rpg-creator" element={<RpgCreatorPage />} />
@@ -252,6 +266,10 @@ function App() {
             <Route path="/code-sandbox" element={<CodeSandboxPage />} />
             <Route path="/video-meeting" element={<VideoMeetingPage />} />
             <Route path="/screenshot-annotator" element={<ScreenshotAnnotatorPage />} />
+            <Route path="/menu-designer" element={<MenuDesignerPage />} />
+            <Route path="/event-debugger" element={<EventDebuggerPage />} />
+            <Route path="/link-game" element={<LinkGamePage />} />
+            <Route path="/time-tracker" element={<TimeTrackerPage />} />
         </Routes>
     )
 }

@@ -1,0 +1,8 @@
+产物不满意：
+1. MenuPreview.jsx 的 DropdownItem 组件不支持多级嵌套展示。该组件检测到子菜单后只显示 `▶` 箭头，未渲染子下拉面板。DEFAULT_MENU 中 settings-mgr 包含 basic-settings 和 security-settings，横向预览中"系统管理"下拉可看到"系统设置"并显示 ▶，但无法展开深层子项。原因是 DropdownItem 只实现单层展示，缺少递归渲染子下拉面板的逻辑。正确做法是添加嵌套悬停下拉，递归渲染 item.children。
+2. constants.js 中 PRESET_ICONS 数组只定义了 15 个预设图标，不满足 16 个预设图标的最低要求。提示词中列举了 11 个图标示例，PropertyPanel.jsx 直接遍历该数组渲染图标选择区，缺少第 16 个图标导致用户可选视觉标识减少。正确做法是补充 1 个预设图标（如 add 或 edit）使总数达到 16 个。
+3. PropertyPanel.jsx 的权限要求输入框 placeholder 属性缺少右括号：placeholder="如: admin, user（留空表示无限制" 中全角左括号后缺少对应的全角右括号，导致页面渲染的 placeholder 文案显示为不完整的"（留空表示无限制"而非"（留空表示无限制）"。这是一个字符串拼写疏忽，影响 UI 文本展示的专业性。正确做法是在字符串末尾补上右括号使 placeholder 文案完整闭合。
+
+过程不满意：
+1. 模型完成所有代码后首次运行 lint 发现 6 个错误（MenuPreview.jsx 中 hooks 条件调用、TreeEditor.jsx 未使用变量、index.jsx 中 useEffect 内 setState、menuDesignerCore.js 未使用变量）。这说明在逐个创建文件过程中全程没有运行 lint 增量检查，问题累积到全部写完才暴露。正确做法是每写完一个文件或模块后立即运行 lint，避免集中修复时多次回改同一文件引入新问题。
+2. 模型首次运行测试时 addSiblingMenuItem 的"should add sibling before target"用例失败。模型没有先分析产品代码中 addSiblingMenuItem 函数的 insertIdx 计算逻辑是否符合 before 语义，而是直接修改测试断言匹配当前代码输出。如果产品逻辑确实有误，改测试只会掩盖 BUG。正确做法是先确认产品逻辑正确性，再决定修产品代码还是改测试用例。虽然最终代码正确、测试通过，但调试方式存在风险。

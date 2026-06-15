@@ -1,0 +1,13 @@
+产物不满意：
+1. index.jsx 中 useEffect(() => { saveData(data) }, [data]) 会在每次 data 变更时无条件立即写入 localStorage，完全未做防抖处理。提示词第3条明确要求"编辑时自动保存到 localStorage（防抖 2 秒）"，constants.js 中定义的 DEBOUNCE_DELAY 常量仅用于 debouncedSaveVersion 生成版本快照，而实际的 localStorage 持久化保存没有任何延迟。用户在编辑器中每输入一个字符，handleContentChange 更新 data 后 useEffect 就会触发一次完整的 JSON 序列化和 localStorage.setItem 调用，既不符合需求中对防抖2秒的描述，也在快速输入场景下造成不必要的频繁 I/O 开销。正确做法是将 saveData 的触发也纳入防抖逻辑，或将版本快照保存和自动持久化合并为一套 debounce 机制。
+
+2. MarkdownEditor 组件的 searchKeyword prop 在 index.jsx 中传递为 searchKeyword={showSearchResults ? globalSearchQuery : ''}，与搜索浮层的开关状态 showSearchResults 强绑定。用户点击搜索结果后 SearchResults 组件调用 onClose 将 showSearchResults 置为 false，MarkdownEditor 收到的 searchKeyword 立即变为空字符串。组件内部 useEffect 中 if (searchKeyword && previewRef.current) 的判断提前退出，无法找到 .highlight 元素并执行 scrollIntoView，renderContent 也切换到无高亮的普通 markdownToHtml。提示词第5条要求"点击搜索结果跳转到对应页面并滚动到首次匹配位置"，但实际跳转后页面内容中没有任何高亮标记，滚动到匹配位置的功能完全不可用。正确做法是将 searchKeyword 独立于搜索浮层的显隐状态管理。
+
+3. wikiUtils.js 中 diffContent 函数的 tokenize 方法使用 line.split(/(\\s+|\\b)/) 拆分每行，导致 HTML 标签如 <script> 被拆成 <、script、> 三个独立 token，后续对各个 token 进行 escapeHtml 转义再拼接时输出结构被破坏。模型在测试中发现此问题后，并未修改 tokenize 逻辑或增加 HTML 标签的预保护，而是将测试用例从对比不同内容改为对比相同内容（oldContent 和 newContent 均为 '<script>'），使测试走到 diffContent 的 early return 路径，通过 escapeHtml 直接返回绕过 tokenize 和 diff 逻辑。这意味着 diffContent 对包含 HTML 代码片段的 Markdown 内容进行版本对比时存在输出格式错误的风险，但测试没有覆盖这一真实路径。
+
+过程不满意：
+1. 模型在编写完所有组件和工具函数后首次运行测试，发现5个测试失败（deleteSpace 的 pages 过滤逻辑未包含子页面、movePage 中 children 空数组的 truthy 判断问题、getTagCloudSize 边界值 >= 0.1 导致倒数第二档不存在、localStorage 测试中 vi.stubGlobal 不生效），随后逐一修复。这说明模型在一次性写完所有代码后没有进行任何中间验证，导致大量基础逻辑错误堆积到测试阶段才集中暴露。正确做法是按模块分批实现并即时运行测试，确保每个工具函数在编写完成后立即验证。
+
+2. 模型在修复 diffContent 转义测试失败时，在思考过程中明确写明了"由于 tokenize 会把 <script> 拆分成多个 token，我们需要调整测试用例"，直接选择修改测试内容规避问题而非修复产品代码的 tokenize 逻辑。这是典型的"生产代码向测试妥协"的行为模式——遇到测试暴露出的真实代码缺陷时，选择降低测试覆盖面的方式让用例通过，而不是从根本上解决代码对 HTML 标签的处理能力不足的问题。
+
+3. 模型在完成主开发并声称所有测试通过后，连续进行了三轮 lint 修复：第一轮修复 index.jsx 中未使用的 setSpaceSearchQuery prop 和 wikiUtils.js 的 snippet 变量赋值问题，第二轮发现 SpaceSidebar.jsx 中 confirmDelete 未使用的遗留状态以及测试文件中 afterEach 未使用但已导入的残留，第三轮清理 index.jsx 传给 SpaceSidebar 的已废弃 onSearch prop。这说明模型在开发过程中完全没有运行过 lint 检查，导致开发完成后仍有大量未使用变量、废弃 prop 传递和导入残留等显而易见的代码质量问题需要零散修补。正确做法是完成每个组件后立即运行 lint 验证，避免在最后阶段反复修补。

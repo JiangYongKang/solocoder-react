@@ -1,0 +1,4 @@
+产物不满意：
+1. FrequencyChart.jsx 的频率波形图更新机制不满足提示词第 5 条"波形图每秒更新一次"。draw 函数在第 148 行用 requestAnimationFrame 递归调用自身实现约 60fps 的无效高频重绘，严重浪费 GPU 资源。同时 keyFrequency 和 mouseFrequency 用 useMemo 缓存了 calculateFrequency 的计算结果，依赖项仅有 keyEvents 和 mouseEvents，导致无新事件产生时频率数据不会随时间推移重新计算——即使 30 秒时间窗口已滑动，旧事件本应移出窗口、各秒级桶计数归零，图表仍显示过时的频率分布。正确做法是用 setInterval 每秒触发一次重新计算和 Canvas 重绘，替代 useMemo 加 requestAnimationFrame 的双重缺陷。
+2. eventDebuggerUtils.js 定义了 throttle 通用节流函数，测试文件也为 throttle 编写了 3 个测试用例且全部通过，但 MouseCapturePanel.jsx 并未导入使用该函数，而是在 handleMouseEvent 回调内用 lastMouseMoveRef 变量自行实现了一套内联节流逻辑。throttle 成为仅存在于工具模块和测试中的死代码，增加了无意义的测试维护成本。模型应让 MouseCapturePanel 直接使用 throttle 替换内联实现，或干脆不导出该函数也不为其编写测试。
+过程不满意：模型在整个开发过程中仅运行了测试和 lint 来验证代码，完全没有对页面进行任何手动功能验证。在开发完成后的总结中声称"Canvas 绘制的实时滚动波形图"功能已实现，但从未启动 dev server 或编写验证脚本来检查频率波形图是否真的每秒更新、无新事件时数据是否随时间推进而自然刷新。requestAnimationFrame 的滥用和 useMemo 导致的数据不更新这两个问题，在手动操作几次按键和鼠标后就能轻易发现——页面停留几秒不操作后波形图完全没有变化。正确做法是在功能实现后启动项目并在浏览器中实际操作验证关键交互行为。

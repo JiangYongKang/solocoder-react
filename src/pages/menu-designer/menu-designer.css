@@ -1,0 +1,258 @@
+.menu-designer-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: #f0f2f5;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+.md-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 24px;
+  background: white;
+  border-bottom: 1px solid #e8e8e8;
+  gap: 16px;
+}
+
+.md-toolbar-left,
+.md-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.md-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+  color: #1f1f1f;
+}
+
+.md-toolbar-stats {
+  font-size: 12px;
+  color: #8c8c8c;
+  padding: 4px 10px;
+  background: #f5f5f5;
+  border-radius: 4px;
+}
+
+.md-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 14px;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  background: white;
+  color: #333;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.md-btn:hover {
+  border-color: #1677ff;
+  color: #1677ff;
+}
+
+.md-btn-sm {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.md-btn-primary {
+  background: #1677ff;
+  border-color: #1677ff;
+  color: white;
+}
+
+.md-btn-primary:hover {
+  background: #4096ff;
+  border-color: #4096ff;
+  color: white;
+}
+
+.md-btn-ghost {
+  background: transparent;
+}
+
+.md-subtoolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 24px;
+  background: white;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.md-subtoolbar-left,
+.md-subtoolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.md-sub-label {
+  font-size: 13px;
+  color: #666;
+}
+
+.md-layout-tabs {
+  display: flex;
+  border: 1px solid #e8e8e8;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.md-layout-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 14px;
+  border: none;
+  background: white;
+  background: #fafafa;
+  color: #666;
+  font-size: 13px;
+  cursor: pointer;
+  border-right: 1px solid #e8e8e8;
+  transition: all 0.15s;
+}
+
+.md-layout-tab:last-child {
+  border-right: none;
+}
+
+.md-layout-tab.active {
+  background: #e6f4ff;
+  color: #1677ff;
+}
+
+.md-layout-icon {
+  font-size: 14px;
+}
+
+.md-title-input {
+  padding: 6px 12px;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  font-size: 13px;
+  outline: none;
+  width: 200px;
+  transition: border-color 0.15s;
+}
+
+.md-title-input:focus {
+  border-color: #1677ff;
+}
+
+.md-error-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 24px;
+  background: #fff2f0;
+  border-bottom: 1px solid #ffccc7;
+  color: #ff4d4f;
+  font-size: 13px;
+}
+
+.md-error-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #ff4d4f;
+  font-size: 16px;
+  padding: 0 8px;
+}
+
+.md-main {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  padding: 16px;
+  gap: 16px;
+}
+
+.md-panel {
+  display: flex;
+  flex-direction: column;
+  background: white;
+  border: 1px solid #e8e8e8;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.md-tree-panel {
+  width: 340px;
+  min-width: 280px;
+}
+
+.md-property-panel {
+  width: 340px;
+  min-width: 300px;
+}
+
+.md-preview-panel {
+  flex: 1;
+  min-width: 400px;
+  overflow: auto;
+}
+
+.md-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid #f0f0f0;
+  background: #fafafa;
+}
+
+.md-panel-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+.md-panel-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.md-tree-tips {
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #8c8c8c;
+  background: #fafafa;
+  border-top: 1px solid #f0f0f0;
+}
+
+.md-preview-badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  background: #f0f0f0;
+  border-radius: 10px;
+  color: #666;
+}
+
+.md-preview-container {
+  flex: 1;
+  padding: 24px;
+  overflow: auto;
+  background: #fafafa;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.md-property-panel .md-panel-header {
+  flex-shrink: 0;
+}
+
+.md-tree-panel {
+  display: flex;
+  flex-direction: column;
+}

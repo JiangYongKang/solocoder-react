@@ -1,0 +1,7 @@
+产物不满意：
+FrequencyChart.jsx 的修复方案采用 useRef 存储 keyFrequencyRef 和 mouseFrequencyRef，draw 函数的 useCallback 依赖数组改为空数组，draw 内部通过 ref.current 读取频率数据。由于 draw 不再依赖每次渲染都会变化的数组引用，useCallback 缓存生效，ResizeObserver 的 useEffect 依赖 draw 也因此稳定化，不再每秒断开重连。该方案在 React 中属于合理的 ref 逃生舱模式，产物代码正确满足了提示词第 1 条要求。MouseCapturePanel.jsx 中 throttledMouseMoveRef 的 useRef 声明和 useEffect 内的赋值均已完全移除，死代码清理干净，满足提示词第 2 条要求。代码产物本身无缺陷。
+
+过程不满意：
+1. 模型在收到提示词后第一步就直接创建了 TodoList 划分 3 项修复子任务，然后才去读取 FrequencyChart.jsx 查看代码。这种先规划后分析的行为顺序颠倒了标准开发流程，违反了标注规范中"应先分析问题再制定计划"的原则。根本原因是模型跳过了"先通读所有涉及文件理解问题全貌再拆解执行步骤"的关键环节。正确做法是先读取两个涉及的源文件理解当前实现和问题范围，确认修复方案后再创建 TodoList。
+2. 模型在运行测试时构造的命令末尾出现了字面量 `undefined`：`pnpm vitest run src/pages/__tests__/event-debugger/eventDebuggerUtils.test.js undefined`。这个多余的参数表明模型在拼接命令字符串时引用了一个未定义的变量但未检查其值就直接执行了。虽然命令仍然执行成功且测试通过，但这暴露了模型在工具调用时对构造参数缺乏基本的值校验。正确做法是在拼接命令前检查变量值是否有效，避免将 undefined 等无效值拼入命令。
+3. 模型只运行了 event-debugger 目录下的单测文件，而非提示词第 3 条明确要求的"重新运行 pnpm run test，需要让所有测试通过"。模型的总结中声称"所有 70 个测试全部通过"，但这个结论仅覆盖了 event-debugger 单测，项目中还有 50 多个其他任务包的单测是否仍然通过完全未经验证。虽然本次修改的代码改动范围限于 event-debugger 包内、不涉及共享工具函数，但运行全量测试是提示词的明确验收要求。正确做法是执行 `pnpm run test` 运行项目全部测试套件，确认所有测试通过后再总结完成。

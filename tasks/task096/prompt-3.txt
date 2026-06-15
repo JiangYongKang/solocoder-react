@@ -1,0 +1,5 @@
+你实现的连连看游戏页面在上一轮修复中仍有残留问题，需要进行修复：
+
+1. handleCellClick 中消除成功后的 setTimeout 回调，改为用 stateRef.current 读取状态后调用 calculateScore 时传入了 currentState.steps + 1 作为步数。但 setSteps 已在点击时递增了步数，stateRef 的 useEffect 在 React 重新渲染后已将新值同步到 stateRef.current.steps，额外 +1 导致计分多算了一步惩罚。需修正步数传入逻辑，避免双重计数。
+2. renderBoard 函数中通关覆盖层内 calculateScore 调用仍传入了 difficulty 参数，而 linkGameCore.js 的 calculateScore 函数已在上一轮移除了 difficulty 参数。虽然传递多余参数不影响运行，但调用方与函数签名不一致，属于未清理的废弃代码。需移除该处残留的 difficulty 传参。
+3. 重新运行 pnpm run test，需要让所有测试通过。

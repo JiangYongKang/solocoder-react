@@ -23,7 +23,6 @@ function MouseCapturePanel({ onEvent }) {
   const logRef = useRef(null)
   const panelRef = useRef(null)
   const sequenceRef = useRef(0)
-  const throttledMouseMoveRef = useRef(null)
 
   const filteredEvents = useMemo(() => {
     const filtered = filterMouseEvents(events, {
@@ -94,7 +93,6 @@ function MouseCapturePanel({ onEvent }) {
     if (!panel) return
 
     const throttledMouseMove = throttle(handleMouseEvent, 100)
-    throttledMouseMoveRef.current = throttledMouseMove
 
     const handlers = {}
     MOUSE_EVENT_TYPES.forEach((type) => {

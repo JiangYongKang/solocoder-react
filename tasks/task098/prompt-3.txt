@@ -1,0 +1,6 @@
+你实现的 TODO 待办清单页面在上一轮修复中引入的分组角标筛选逻辑仍有缺陷，需要进行修复：
+
+1. countFilteredGroupIncomplete 函数使用 flattenTasks 扁平化所有层级任务后逐项筛选，而 getGroupTasks 只对根任务做筛选后展示。当根任务优先级为 LOW 且子任务优先级为 HIGH 时，激活 HIGH 筛选，角标显示 1（子任务通过筛选），但分组列表为空（根任务不通过筛选），角标数字与实际可见任务不一致。需将角标筛选改为与 getGroupTasks 统一的策略，从根任务开始筛选再递归统计。
+2. countFilteredGroupIncomplete 和 countFilteredAllIncomplete 两个函数采用了不同的筛选计数路径：分组版用 flattenTasks 扁平化逐项筛选，全局版用根任务筛选后递归计数。同一数据在相同筛选条件下走两条不同的计数逻辑，一旦根任务与子任务字段有差异就会产生不一致。需统一两个函数的筛选策略。
+3. reorderGroupRootTasks 中存在冗余的拼合再拆分逻辑，构建 combinedRoot 后又从中过滤出 otherGroupsRootTasks 再拼回 finalRoot，中间的构建和过滤步骤完全多余。需简化这段逻辑，去除不必要的中间操作。
+4. 重新运行 pnpm run test，需要让所有测试通过。

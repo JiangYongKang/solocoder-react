@@ -353,13 +353,7 @@ export function reorderGroupRootTasks(tasks, groupId, fromId, toIndex) {
     return [...reorderedGroupTasks, ...subtaskTasks]
   }
 
-  const combinedRoot = [...reorderedGroupTasks, ...otherRootTasks]
-  const otherGroupsRootTasks = combinedRoot
-    .filter(t => t.groupId !== groupId)
-    .sort((a, b) => a.order - b.order)
-  const finalRoot = [...reorderedGroupTasks, ...otherGroupsRootTasks]
-
-  return [...finalRoot, ...subtaskTasks]
+  return [...reorderedGroupTasks, ...otherRootTasks, ...subtaskTasks]
 }
 
 export function isOverdue(dueDate) {
@@ -434,14 +428,13 @@ export function countAllIncomplete(tasks) {
 }
 
 export function countFilteredGroupIncomplete(tasks, groupId, filters) {
-  const allTasks = flattenTasks(tasks)
-  let groupTasks = groupId === ALL_TASKS_VIEW
-    ? allTasks
-    : allTasks.filter(t => t.groupId === groupId)
+  let rootTasks = groupId === ALL_TASKS_VIEW
+    ? tasks.filter(t => !t.parentId)
+    : tasks.filter(t => t.groupId === groupId && !t.parentId)
   if (filters) {
-    groupTasks = filterTasks(groupTasks, filters)
+    rootTasks = filterTasks(rootTasks, filters)
   }
-  return groupTasks.filter(t => !t.completed).length
+  return countIncompleteTasks(rootTasks)
 }
 
 export function countFilteredAllIncomplete(tasks, filters) {

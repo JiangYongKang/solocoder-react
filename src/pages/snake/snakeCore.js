@@ -47,7 +47,7 @@ export function isValidDirectionChange(currentDir, newDir) {
 export function wrapCoordinate(value) {
   let result = value % GRID_SIZE
   if (result < 0) result += GRID_SIZE
-  return result === 0 ? 0 : result
+  return result
 }
 
 export function moveSnake(state) {

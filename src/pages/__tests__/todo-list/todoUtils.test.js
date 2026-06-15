@@ -650,14 +650,39 @@ describe('todoUtils', () => {
       expect(countFilteredGroupIncomplete(tasks, 'g1', null)).toBe(1)
     })
 
-    it('should count nested subtasks with filter', () => {
+    it('should not count subtask when parent root task does not pass filter', () => {
       const sub = makeTask({ id: 's1', groupId: 'g1', completed: false, priority: PRIORITIES.HIGH })
       const task = makeTask({ id: 't1', groupId: 'g1', completed: false, priority: PRIORITIES.LOW, subtasks: [sub] })
       expect(countFilteredGroupIncomplete([task], 'g1', {
         priority: PRIORITIES.HIGH,
         status: FILTER_STATUS_ALL,
         dueDate: FILTER_DUE_ALL,
-      })).toBe(1)
+      })).toBe(0)
+    })
+
+    it('should count subtasks when parent root task passes filter', () => {
+      const sub = makeTask({ id: 's1', groupId: 'g1', completed: false, priority: PRIORITIES.LOW })
+      const task = makeTask({ id: 't1', groupId: 'g1', completed: false, priority: PRIORITIES.HIGH, subtasks: [sub] })
+      expect(countFilteredGroupIncomplete([task], 'g1', {
+        priority: PRIORITIES.HIGH,
+        status: FILTER_STATUS_ALL,
+        dueDate: FILTER_DUE_ALL,
+      })).toBe(2)
+    })
+
+    it('should use same filter strategy as getGroupTasks (root-first)', () => {
+      const subHigh = makeTask({ id: 's1', groupId: 'g1', completed: false, priority: PRIORITIES.HIGH })
+      const parentLow = makeTask({ id: 't1', groupId: 'g1', completed: false, priority: PRIORITIES.LOW, subtasks: [subHigh] })
+      const parentHigh = makeTask({ id: 't2', groupId: 'g1', completed: false, priority: PRIORITIES.HIGH })
+
+      const tasks = [parentLow, parentHigh]
+      const filters = { priority: PRIORITIES.HIGH, status: FILTER_STATUS_ALL, dueDate: FILTER_DUE_ALL }
+
+      const rootTasks = tasks.filter(t => t.groupId === 'g1' && !t.parentId)
+      const filteredRoot = filterTasks(rootTasks, filters)
+
+      expect(filteredRoot.map(t => t.id)).toEqual(['t2'])
+      expect(countFilteredGroupIncomplete(tasks, 'g1', filters)).toBe(1)
     })
 
     it('should handle ALL_TASKS_VIEW group id', () => {
@@ -715,6 +740,32 @@ describe('todoUtils', () => {
         status: FILTER_STATUS_ALL,
         dueDate: FILTER_DUE_ALL,
       })).toBe(2)
+    })
+
+    it('should not count subtask when parent root task does not pass filter', () => {
+      const sub = makeTask({ id: 's1', completed: false, priority: PRIORITIES.HIGH, parentId: 't1' })
+      const task = makeTask({ id: 't1', completed: false, priority: PRIORITIES.LOW, subtasks: [sub] })
+      expect(countFilteredAllIncomplete([task], {
+        priority: PRIORITIES.HIGH,
+        status: FILTER_STATUS_ALL,
+        dueDate: FILTER_DUE_ALL,
+      })).toBe(0)
+    })
+
+    it('should use same filter strategy as countFilteredGroupIncomplete', () => {
+      const subHigh = makeTask({ id: 's1', groupId: 'g1', completed: false, priority: PRIORITIES.HIGH, parentId: 't1' })
+      const parentLow = makeTask({ id: 't1', groupId: 'g1', completed: false, priority: PRIORITIES.LOW, subtasks: [subHigh] })
+      const parentHigh = makeTask({ id: 't2', groupId: 'g1', completed: false, priority: PRIORITIES.HIGH })
+
+      const tasks = [parentLow, parentHigh]
+      const filters = { priority: PRIORITIES.HIGH, status: FILTER_STATUS_ALL, dueDate: FILTER_DUE_ALL }
+
+      const groupCount = countFilteredGroupIncomplete(tasks, ALL_TASKS_VIEW, filters)
+      const allCount = countFilteredAllIncomplete(tasks, filters)
+
+      expect(groupCount).toBe(1)
+      expect(allCount).toBe(1)
+      expect(groupCount).toBe(allCount)
     })
   })
 

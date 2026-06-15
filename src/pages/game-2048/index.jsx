@@ -148,7 +148,9 @@ function Game2048Page() {
         setShowWinModal(true)
       }
 
-      setIsAnimating(false)
+      setTimeout(() => {
+        setIsAnimating(false)
+      }, ANIMATION_DURATION)
     }, ANIMATION_DURATION)
   }, [updateGameAndTiles])
 

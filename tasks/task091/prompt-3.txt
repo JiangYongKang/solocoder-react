@@ -1,0 +1,4 @@
+你实现的贪吃蛇游戏页面在上一轮修复中引入了一个新的代码质量问题，需要进行修复：
+
+1. snakeCore.js 的 wrapCoordinate 函数末尾新增了一行 `return result === 0 ? 0 : result`，这行代码的唯一目的是让测试用例中 `expect(wrapCoordinate(-GRID_SIZE)).toBe(0)` 通过。在实际游戏中，wrapCoordinate 的入参由蛇头坐标与方向步长 ±1 相加得出，蛇坐标始终在 0 到 GRID_SIZE-1 之间浮动，永远不会产生恰好等于 -GRID_SIZE 整倍数的入参，因此 `-0` 边界在真实游戏逻辑中不会出现。这属于生产代码向测试妥协，需删除该行并从测试中移除对应的无实际场景用例。
+2. 重新运行 pnpm run test，需要让所有测试通过。

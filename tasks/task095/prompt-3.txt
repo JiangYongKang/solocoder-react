@@ -1,0 +1,5 @@
+你实现的事件调试器页面在上一轮修复中引入了两个新的代码质量问题，需要进行修复：
+
+1. FrequencyChart.jsx 中 keyFrequency 和 mouseFrequency 每次渲染都返回新数组引用，而 draw 函数的 useCallback 以这两个值为依赖项，导致 draw 每次渲染都重新创建，useCallback 的缓存完全失效。同时 ResizeObserver 的 useEffect 依赖 draw，导致 Cleanup 函数每秒断开重连一次 Canvas 观测。需修复依赖管理，避免 useCallback 形同虚设和 ResizeObserver 频繁重建。
+2. MouseCapturePanel.jsx 中新增了 throttledMouseMoveRef 变量并在 useEffect 中赋值，但该 ref 在整个组件的 JSX、事件处理和清理函数中均未被读取使用，属于没有任何消费者的死代码变量。需移除该 ref 的声明和赋值。
+3. 重新运行 pnpm run test，需要让所有测试通过。

@@ -266,17 +266,17 @@ describe('timeTrackerUtils', () => {
       expect(errors.endTime).toBe('请输入结束时间')
     })
 
-    it('should handle overnight duration correctly', () => {
+    it('should reject end time before start time (倒序校验)', () => {
       const errors = validateManualEntry({
         project: 'frontend',
         date: '2026-06-15',
-        startTime: '22:00',
-        endTime: '06:00',
+        startTime: '17:00',
+        endTime: '09:00',
       })
-      expect(errors.endTime).toBeUndefined()
+      expect(errors.endTime).toBe('结束时间必须晚于开始时间')
     })
 
-    it('should reject duration over 24 hours', () => {
+    it('should reject duration equal to or over 24 hours (start==end)', () => {
       const errors = validateManualEntry({
         project: 'frontend',
         date: '2026-06-15',
@@ -311,21 +311,6 @@ describe('timeTrackerUtils', () => {
       expect(record.durationMs).toBe(8 * 3600000)
       expect(record.note).toBe('test note')
       expect(record.id).toBeTruthy()
-    })
-
-    it('should handle overnight record when end < start', () => {
-      const data = {
-        project: 'frontend',
-        date: '2026-06-15',
-        startTime: '22:00',
-        endTime: '06:00',
-        note: 'night shift',
-      }
-      const record = createRecord(data)
-      expect(record.durationMs).toBe(8 * 3600000)
-      const startDate = new Date(record.startTime).getDate()
-      const endDate = new Date(record.endTime).getDate()
-      expect(endDate).toBe(startDate + 1)
     })
   })
 
@@ -396,22 +381,6 @@ describe('timeTrackerUtils', () => {
         note: '',
       })
       expect(updated).toBe(records)
-    })
-
-    it('should handle overnight update when end < start', () => {
-      const original = makeRecord({ id: 'test-1' })
-      const records = [original]
-      const updated = updateRecord(records, 'test-1', {
-        project: 'frontend',
-        date: '2026-06-15',
-        startTime: '22:00',
-        endTime: '06:00',
-        note: 'overnight update',
-      })
-      expect(updated[0].durationMs).toBe(8 * 3600000)
-      const startDate = new Date(updated[0].startTime).getDate()
-      const endDate = new Date(updated[0].endTime).getDate()
-      expect(endDate).toBe(startDate + 1)
     })
   })
 

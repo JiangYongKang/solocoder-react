@@ -772,6 +772,21 @@ describe('全文搜索', () => {
         expect(r.snippet).toBeTruthy()
       })
     })
+
+    it('每个结果应该携带匹配时的关键词 matchedKeyword', () => {
+      const results = searchAllPages(testData, '  React Hooks  ')
+      expect(results.length).toBeGreaterThan(0)
+      results.forEach((r) => {
+        expect(r.matchedKeyword).toBe('React Hooks')
+      })
+    })
+
+    it('不同关键词搜索时 matchedKeyword 应该对应各自的输入', () => {
+      const r1 = searchAllPages(testData, 'React')
+      const r2 = searchAllPages(testData, 'Hooks')
+      if (r1.length > 0) expect(r1[0].matchedKeyword).toBe('React')
+      if (r2.length > 0) expect(r2[0].matchedKeyword).toBe('Hooks')
+    })
   })
 
   describe('highlightText', () => {

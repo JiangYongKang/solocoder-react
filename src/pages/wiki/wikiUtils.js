@@ -604,7 +604,8 @@ export function diffContent(oldContent, newContent) {
 
 export function searchAllPages(data, keyword) {
   if (!keyword || typeof keyword !== 'string') return []
-  const kw = keyword.trim().toLowerCase()
+  const originalKw = keyword.trim()
+  const kw = originalKw.toLowerCase()
   if (!kw) return []
 
   const results = []
@@ -646,6 +647,7 @@ export function searchAllPages(data, keyword) {
         score,
         titleMatch,
         contentMatch,
+        matchedKeyword: originalKw,
       })
     }
   }

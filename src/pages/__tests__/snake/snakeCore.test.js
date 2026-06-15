@@ -616,10 +616,6 @@ describe('snakeCore', () => {
   })
 
   describe('wrapCoordinate - additional edge cases', () => {
-    it('should handle -GRID_SIZE correctly', () => {
-      expect(wrapCoordinate(-GRID_SIZE)).toBe(0)
-    })
-
     it('should handle GRID_SIZE * 2 correctly', () => {
       expect(wrapCoordinate(GRID_SIZE * 2)).toBe(0)
     })

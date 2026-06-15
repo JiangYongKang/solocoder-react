@@ -91,6 +91,10 @@ export function validateManualEntry(data) {
       errors.startTime = '时间格式无效'
       return errors
     }
+    if (start > end) {
+      errors.endTime = '结束时间必须晚于开始时间'
+      return errors
+    }
     const durationHours = calculateDurationHours(data.date, data.startTime, data.endTime)
     if (durationHours >= MAX_DURATION_HOURS) {
       errors.endTime = '时长不能超过24小时'
@@ -101,10 +105,7 @@ export function validateManualEntry(data) {
 
 export function createRecord(data) {
   const start = new Date(`${data.date}T${data.startTime}`)
-  let end = new Date(`${data.date}T${data.endTime}`)
-  if (end <= start) {
-    end = new Date(end.getTime() + 86400000)
-  }
+  const end = new Date(`${data.date}T${data.endTime}`)
   return {
     id: generateId(),
     project: data.project,
@@ -148,10 +149,7 @@ export function updateRecord(records, id, data) {
   if (index === -1) return records
   const updated = [...records]
   const start = new Date(`${data.date}T${data.startTime}`)
-  let end = new Date(`${data.date}T${data.endTime}`)
-  if (end <= start) {
-    end = new Date(end.getTime() + 86400000)
-  }
+  const end = new Date(`${data.date}T${data.endTime}`)
   updated[index] = {
     ...updated[index],
     project: data.project,

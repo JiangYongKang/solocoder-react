@@ -189,7 +189,7 @@ function LinkGamePage() {
 
           const score = calculateScore({
             timeSeconds: currentState.elapsedTime,
-            steps: currentState.steps + 1,
+            steps: currentState.steps,
             hintsUsed: currentState.hintsUsed,
             shufflesUsed: currentState.shufflesUsed,
           })
@@ -198,7 +198,7 @@ function LinkGamePage() {
             score,
             difficulty: currentState.difficulty,
             timeSeconds: currentState.elapsedTime,
-            steps: currentState.steps + 1,
+            steps: currentState.steps,
             date: new Date().toISOString(),
           }
 
@@ -488,7 +488,6 @@ function LinkGamePage() {
             )}
             <div className="link-game-overlay-score">
               {calculateScore({
-                difficulty,
                 timeSeconds: elapsedTime,
                 steps,
                 hintsUsed,

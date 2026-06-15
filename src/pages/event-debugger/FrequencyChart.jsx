@@ -12,13 +12,19 @@ function FrequencyChart({ keyEvents, mouseEvents }) {
   const containerRef = useRef(null)
   const [now, setNow] = useState(() => Date.now())
 
-  const keyFrequency = calculateFrequency(keyEvents, WINDOW_SECONDS, now)
-  const mouseFrequency = calculateFrequency(mouseEvents, WINDOW_SECONDS, now)
+  const keyFrequencyRef = useRef([])
+  const mouseFrequencyRef = useRef([])
+
+  keyFrequencyRef.current = calculateFrequency(keyEvents, WINDOW_SECONDS, now)
+  mouseFrequencyRef.current = calculateFrequency(mouseEvents, WINDOW_SECONDS, now)
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current
     const container = containerRef.current
     if (!canvas || !container) return
+
+    const keyFrequency = keyFrequencyRef.current
+    const mouseFrequency = mouseFrequencyRef.current
 
     const ctx = canvas.getContext('2d')
     const dpr = window.devicePixelRatio || 1
@@ -128,11 +134,11 @@ function FrequencyChart({ keyEvents, mouseEvents }) {
     ctx.fillRect(legendX, legendY + 18, 12, 12)
     ctx.fillStyle = TEXT_COLOR
     ctx.fillText('鼠标事件', legendX + 18, legendY + 19)
-  }, [keyFrequency, mouseFrequency])
+  }, [])
 
   useEffect(() => {
     draw()
-  }, [draw])
+  }, [now, keyEvents, mouseEvents, draw])
 
   useEffect(() => {
     const intervalId = setInterval(() => {

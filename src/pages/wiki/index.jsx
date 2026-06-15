@@ -167,7 +167,7 @@ export default function WikiPage() {
   const handleSelectSearchResult = (result) => {
     setSelectedSpaceId(result.spaceId)
     setSelectedPageId(result.pageId)
-    setActiveSearchKeyword(globalSearchQuery)
+    setActiveSearchKeyword(result.matchedKeyword || '')
     setShowSearchResults(false)
   }
 

@@ -40,11 +40,11 @@ import {
   formatDate,
   generateId,
   lockParagraph,
-  renderContentWithRevisions,
   getCharOffsetPosition,
   getSelectionFromDocument,
-  applyFormatToSelection,
-  applyFormatToContent,
+  getFormatRangesForParagraph,
+  renderContentWithFormats,
+  processFormatChange,
   FORMAT_TYPE,
 } from './utils.js'
 import { CURRENT_USER, REVISION_TYPE } from './constants.js'
@@ -286,21 +286,15 @@ export default function CollaborativeDocPage() {
       const para = getParagraphById(prev, selectedText.paragraphId)
       if (!para) return prev
 
-      let result = prev
-      if (prev.revisionMode) {
-        result = applyFormatToSelection(
-          result,
-          selectedText.paragraphId,
-          selectedText.text,
-          selectedText.start,
-          selectedText.end,
-          format,
-          CURRENT_USER.id
-        )
-      }
-
-      const newContent = applyFormatToContent(para.content, selectedText.start, selectedText.end, format)
-      return processContentChangeWithRevision(result, selectedText.paragraphId, para.content, newContent, CURRENT_USER.id)
+      return processFormatChange(
+        prev,
+        selectedText.paragraphId,
+        selectedText.text,
+        selectedText.start,
+        selectedText.end,
+        format,
+        CURRENT_USER.id
+      )
     })
 
     setSelectedText(null)
@@ -448,11 +442,20 @@ export default function CollaborativeDocPage() {
   }
 
   const renderContentSegments = (paragraph, revisions) => {
-    const segments = renderContentWithRevisions(paragraph.content, revisions, data)
+    const formatRanges = getFormatRangesForParagraph(paragraph)
+    const segments = renderContentWithFormats(paragraph.content, formatRanges, revisions, data)
 
     return segments.map((seg, idx) => {
       if (seg.type === 'text') {
         return <span key={idx}>{seg.value}</span>
+      }
+
+      if (seg.type === 'formatted-text') {
+        return (
+          <span key={idx} className={seg.formatClasses.join(' ')}>
+            {seg.value}
+          </span>
+        )
       }
 
       const rev = seg.revision
@@ -468,6 +471,10 @@ export default function CollaborativeDocPage() {
         className = 'cd-revision-format'
       }
 
+      if (seg.extraFormatClasses && seg.extraFormatClasses.length > 0) {
+        className = `${className} ${seg.extraFormatClasses.join(' ')}`
+      }
+
       const tooltip = rev.type === REVISION_TYPE.ADD
         ? `添加: ${author?.name || '未知'} · ${time}`
         : rev.type === REVISION_TYPE.DELETE
@@ -475,7 +482,7 @@ export default function CollaborativeDocPage() {
           : `格式(${rev.format}): ${author?.name || '未知'} · ${time}`
 
       return (
-        <span key={idx} className={className} title={tooltip}>
+        <span key={idx} className={className.trim()} title={tooltip}>
           {seg.value}
           <span className="cd-revision-tooltip">{tooltip}</span>
         </span>

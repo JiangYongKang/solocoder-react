@@ -1,0 +1,9 @@
+产物不满意：
+1. renderParagraph 函数第529行的渲染条件导致非修订模式下格式从未应用到页面。非修订模式下 revisions 始终为空数组，条件 `revisions.length > 0` 恒为 false，渲染分支直接输出 paragraph.content 原始文本，formatRanges 数据层和 CSS 样式虽然已就绪但渲染层被完全跳过。提示词第2条要求"让格式化在非修订模式下也能呈现用户可见的文本样式变化"，用户选中文字点击加粗后页面上仍然看不到任何样式变化，需求未满足。正确做法是将条件改为 `revisions.length > 0 || (paragraph.formatRanges && paragraph.formatRanges.length > 0)`，确保存在格式范围时也调用 renderContentSegments 进行渲染。
+2. renderContentWithFormats 函数的分段渲染逻辑存在范围扩大缺陷。当没有修订记录时，renderContentWithRevisions 仅返回一个包含全文的 `{ type: 'text', value: 全文 }` 段，函数随后判断该段与任何 formatRange 是否存在位置重叠，若重叠则直接将整个段标记为 formatted-text 且 value 保留为全文。例如 content 为"Hello World"、formatRange 为 start=6 end=11（仅"World"），渲染结果会将整个"Hello World"包裹在 cd-format-bold span 中，导致"Hello "也被误加粗。正确做法是在 formatRange 边界处将 text 段拆分为格式化部分和非格式化部分，而非整段应用格式。
+3. renderContentWithFormats 中第896行声明的 allMarkers 数组被填充了 format-start 和 format-end 标记对象，但后续循环处理 revisionSegments 的逻辑完全未引用该变量。allMarkers 的声明、push 操作和 forEach 遍历均为无用代码。虽然不影响功能正确性但增加了函数阅读负担，属于修改过程中计划按标记点拆分文本但最终未实现的残留代码。正确做法是删除未使用的变量和填充逻辑，保持函数干净。
+
+过程不满意：
+1. 模型在收到提示词后第一句话就是"让我先规划修复方案"并立即创建 TodoList，然后才开始读取 utils.js 和 index.jsx。此时模型尚未阅读任何现有代码，不了解函数接口和组件结构，违反了标注规范中"不能在刚收到任务时就直接创建 TodoList，应先分析问题再规划"的要求。正确做法是先完整阅读相关代码、理解当前实现状态和缺陷根因，再制定修复计划。
+2. 模型在完成所有代码修改后仅运行了 `npx vitest run src/pages/__tests__/collaborative-doc/utils.test.js`（128 个测试通过），从未执行 pnpm run dev 启动开发服务器进行页面实际渲染验证。由于所有测试都是纯 JS 单元测试，不涉及 React 渲染路径，因此未能发现 renderParagraph 中 revisions.length > 0 条件导致非修订模式下格式从未应用到页面的 Bug。模型在回复中写道"两个回归问题已全部修复完成"，但视觉效果上非修订模式格式化问题实际上只修复了数据存储层而渲染层仍然不生效。正确做法是启动 dev server 后在浏览器中分别在修订模式和非修订模式下选中文字点击格式化按钮，肉眼确认文本样式变化是否符合预期。
+3. renderContentWithFormats 的单元测试 coverage 深度不足。测试用例"有格式范围时应该返回 formatted-text 段"只验证了返回段中存在 type 为 formatted-text 且 formatClasses 包含 cd-format-bold 的段，未验证 value 是否只包含格式范围内的子串而非全文，也未验证非格式部分是否仍然保留为普通 text 段。这种只验类别不验边界的测试方式导致范围扩大缺陷未被捕获。正确做法是对"Hello World"仅格式化"World"的场景编写测试，断言 segments 中同时存在一个 type 为 text 的段（值为"Hello "）和一个 type 为 formatted-text 的段（值为"World"）。

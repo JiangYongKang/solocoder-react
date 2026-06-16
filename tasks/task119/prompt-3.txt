@@ -1,0 +1,4 @@
+你实现的拼图游戏页面在上一轮修复中引入了跨包污染，需要进行修复：
+
+1. 上一轮修复时修改了以下不属于拼图游戏任务包的文件：src/pages/__tests__/route-planner/routeUtils.test.js、src/pages/route-planner/routeUtils.js 和 src/pages/sticky-notes/stickyNotesUtils.js。这些文件分别属于路线规划编辑器和便签提醒应用的任务包。需要还原这三处不属于本任务包的改动，确保只有 src/pages/puzzle-game/ 和 src/pages/__tests__/puzzle-game/ 目录下的文件被更改。
+2. 运行 pnpm run test，需要让所有测试通过。

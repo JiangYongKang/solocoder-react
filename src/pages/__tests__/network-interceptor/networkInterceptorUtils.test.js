@@ -257,6 +257,90 @@ describe('sortRulesByPriority', () => {
     expect(sortRulesByPriority(null)).toEqual([])
     expect(sortRulesByPriority(undefined)).toEqual([])
   })
+
+  it('启用的规则排在禁用规则前面', () => {
+    const rules = [
+      { id: '1', name: '规则1', enabled: false },
+      { id: '2', name: '规则2', enabled: true },
+      { id: '3', name: '规则3', enabled: false },
+      { id: '4', name: '规则4', enabled: true },
+    ]
+    const result = sortRulesByPriority(rules)
+    expect(result[0].id).toBe('2')
+    expect(result[1].id).toBe('4')
+    expect(result[2].id).toBe('1')
+    expect(result[3].id).toBe('3')
+    expect(result[0].enabled).toBe(true)
+    expect(result[1].enabled).toBe(true)
+    expect(result[2].enabled).toBe(false)
+    expect(result[3].enabled).toBe(false)
+  })
+
+  it('按 priority 数值从小到大排序', () => {
+    const rules = [
+      { id: '1', name: '规则1', enabled: true, priority: 3 },
+      { id: '2', name: '规则2', enabled: true, priority: 1 },
+      { id: '3', name: '规则3', enabled: true, priority: 2 },
+    ]
+    const result = sortRulesByPriority(rules)
+    expect(result[0].id).toBe('2')
+    expect(result[1].id).toBe('3')
+    expect(result[2].id).toBe('1')
+    expect(result[0].priority).toBe(1)
+    expect(result[1].priority).toBe(2)
+    expect(result[2].priority).toBe(3)
+  })
+
+  it('优先按 enabled 排序，同组内按 priority 排序', () => {
+    const rules = [
+      { id: '1', name: '规则1', enabled: false, priority: 1 },
+      { id: '2', name: '规则2', enabled: true, priority: 3 },
+      { id: '3', name: '规则3', enabled: true, priority: 1 },
+      { id: '4', name: '规则4', enabled: false, priority: 2 },
+    ]
+    const result = sortRulesByPriority(rules)
+    expect(result.map((r) => r.id)).toEqual(['3', '2', '1', '4'])
+    expect(result[0].enabled).toBe(true)
+    expect(result[0].priority).toBe(1)
+    expect(result[1].enabled).toBe(true)
+    expect(result[1].priority).toBe(3)
+    expect(result[2].enabled).toBe(false)
+    expect(result[2].priority).toBe(1)
+    expect(result[3].enabled).toBe(false)
+    expect(result[3].priority).toBe(2)
+  })
+
+  it('没有 priority 字段的规则保持原有相对顺序', () => {
+    const rules = [
+      { id: '1', name: '规则1', enabled: true },
+      { id: '2', name: '规则2', enabled: true },
+      { id: '3', name: '规则3', enabled: true },
+    ]
+    const result = sortRulesByPriority(rules)
+    expect(result.map((r) => r.id)).toEqual(['1', '2', '3'])
+  })
+
+  it('部分有 priority 部分没有时，没有的保持稳定', () => {
+    const rules = [
+      { id: '1', name: '规则1', enabled: true },
+      { id: '2', name: '规则2', enabled: true, priority: 1 },
+      { id: '3', name: '规则3', enabled: true },
+    ]
+    const result = sortRulesByPriority(rules)
+    expect(result[0].id).toBe('2')
+    expect(result.map((r) => r.id).slice(1)).toEqual(expect.arrayContaining(['1', '3']))
+  })
+
+  it('不修改原数组', () => {
+    const rules = [
+      { id: '1', name: '规则1', enabled: false },
+      { id: '2', name: '规则2', enabled: true },
+    ]
+    const originalOrder = rules.map((r) => ({ ...r }))
+    sortRulesByPriority(rules)
+    expect(rules.map((r) => r.id)).toEqual(originalOrder.map((r) => r.id))
+    expect(rules.map((r) => r.enabled)).toEqual(originalOrder.map((r) => r.enabled))
+  })
 })
 
 describe('moveRule', () => {

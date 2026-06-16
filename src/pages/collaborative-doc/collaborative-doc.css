@@ -350,6 +350,22 @@
   opacity: 1;
 }
 
+.cd-format-bold {
+  font-weight: 700;
+}
+
+.cd-format-italic {
+  font-style: italic;
+}
+
+.cd-format-underline {
+  text-decoration: underline;
+}
+
+.cd-format-strikethrough {
+  text-decoration: line-through;
+}
+
 .cd-comment-highlight {
   background: rgba(255, 235, 59, 0.3);
   border-bottom: 2px solid #fbc02d;

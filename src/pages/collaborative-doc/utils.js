@@ -331,9 +331,66 @@ export function detectContentChanges(oldText, newText) {
   return mergedChanges
 }
 
+export function adjustFormatRanges(formatRanges, offset, delta) {
+  if (!formatRanges || formatRanges.length === 0) return formatRanges
+
+  return formatRanges.map((range) => {
+    let newStart = range.start
+    let newEnd = range.end
+
+    if (delta > 0) {
+      if (range.start >= offset) {
+        newStart = range.start + delta
+        newEnd = range.end + delta
+      } else if (range.end >= offset) {
+        newEnd = range.end + delta
+      }
+    } else {
+      const absDelta = Math.abs(delta)
+      if (range.start >= offset + absDelta) {
+        newStart = range.start + delta
+        newEnd = range.end + delta
+      } else if (range.end <= offset + absDelta && range.end >= offset) {
+        newEnd = offset
+      } else if (range.start < offset && range.end >= offset + absDelta) {
+        newEnd = range.end + delta
+      } else if (range.start >= offset && range.start < offset + absDelta) {
+        newStart = offset
+        newEnd = Math.max(offset, range.end + delta)
+      } else if (range.start < offset && range.end >= offset && range.end < offset + absDelta) {
+        newEnd = offset
+      }
+    }
+
+    return { ...range, start: Math.max(0, newStart), end: Math.max(0, newEnd) }
+  }).filter((r) => r.start < r.end)
+}
+
 export function processContentChangeWithRevision(data, paragraphId, oldContent, newContent, userId) {
   if (!data.revisionMode) {
-    return updateParagraphContent(data, paragraphId, newContent, userId)
+    const contentDelta = newContent.length - oldContent.length
+    let result = data
+
+    if (contentDelta !== 0) {
+      const changes = detectContentChanges(oldContent, newContent)
+      for (const change of changes) {
+        const delta = change.type === 'add' ? change.text.length : -change.text.length
+        result = {
+          ...result,
+          paragraphs: result.paragraphs.map((p) => {
+            if (p.id === paragraphId) {
+              return {
+                ...p,
+                formatRanges: adjustFormatRanges(p.formatRanges, change.start, delta),
+              }
+            }
+            return p
+          }),
+        }
+      }
+    }
+
+    return updateParagraphContent(result, paragraphId, newContent, userId)
   }
 
   const changes = detectContentChanges(oldContent, newContent)
@@ -351,6 +408,20 @@ export function processContentChangeWithRevision(data, paragraphId, oldContent, 
       change.end,
       userId
     )
+
+    const delta = change.type === 'add' ? change.text.length : -change.text.length
+    result = {
+      ...result,
+      paragraphs: result.paragraphs.map((p) => {
+        if (p.id === paragraphId) {
+          return {
+            ...p,
+            formatRanges: adjustFormatRanges(p.formatRanges, change.start, delta),
+          }
+        }
+        return p
+      }),
+    }
   }
 
   return updateParagraphContent(result, paragraphId, newContent, userId)
@@ -780,4 +851,128 @@ export function applyFormatToContent(content, start, end, format) {
   const selected = content.slice(start, end)
   const after = content.slice(end)
   return before + formatTextWithTags(selected, format) + after
+}
+
+export function addFormatRangeToParagraph(paragraph, start, end, format, userId) {
+  const formatRange = {
+    id: generateId('fmt'),
+    start,
+    end,
+    format,
+    userId,
+    createdAt: Date.now(),
+  }
+  const existingRanges = Array.isArray(paragraph.formatRanges) ? paragraph.formatRanges : []
+  return {
+    ...paragraph,
+    formatRanges: [...existingRanges, formatRange],
+  }
+}
+
+export function applyFormatWithoutMarkers(paragraph, start, end, format, userId) {
+  return addFormatRangeToParagraph(paragraph, start, end, format, userId)
+}
+
+export function updateParagraphWithFormat(data, paragraphId, start, end, format, userId) {
+  if (!canEditParagraph(data, paragraphId, userId)) return data
+
+  const paragraphs = data.paragraphs.map((p) => {
+    if (p.id === paragraphId) {
+      return {
+        ...applyFormatWithoutMarkers(p, start, end, format, userId),
+        modifiedBy: userId,
+      }
+    }
+    return p
+  })
+  return { ...data, paragraphs }
+}
+
+export function getFormatRangesForParagraph(paragraph) {
+  return Array.isArray(paragraph.formatRanges) ? paragraph.formatRanges : []
+}
+
+export function renderContentWithFormats(content, formatRanges, revisions, data) {
+  const allMarkers = []
+
+  formatRanges.forEach((range) => {
+    allMarkers.push({
+      type: 'format-start',
+      position: range.start,
+      format: range.format,
+      range,
+    })
+    allMarkers.push({
+      type: 'format-end',
+      position: range.end,
+      format: range.format,
+      range,
+    })
+  })
+
+  const revisionSegments = renderContentWithRevisions(content, revisions, data)
+
+  if (formatRanges.length === 0) {
+    return revisionSegments
+  }
+
+  const result = []
+  for (const seg of revisionSegments) {
+    if (seg.type === 'text') {
+      const textStart = result.reduce((acc, s) => acc + (s.value?.length || 0), 0)
+      const textEnd = textStart + seg.value.length
+      const activeFormats = formatRanges.filter(
+        (r) => r.start < textEnd && r.end > textStart
+      )
+
+      if (activeFormats.length === 0) {
+        result.push(seg)
+      } else {
+        result.push({
+          type: 'formatted-text',
+          value: seg.value,
+          formats: activeFormats,
+          formatClasses: activeFormats.map((f) => `cd-format-${f.format}`),
+        })
+      }
+    } else if (seg.type === 'revision') {
+      const textStart = result.reduce((acc, s) => acc + (s.value?.length || 0), 0)
+      const textEnd = textStart + seg.value.length
+      const activeFormats = formatRanges.filter(
+        (r) => r.start < textEnd && r.end > textStart
+      )
+
+      if (activeFormats.length > 0) {
+        result.push({
+          ...seg,
+          extraFormats: activeFormats,
+          extraFormatClasses: activeFormats.map((f) => `cd-format-${f.format}`),
+        })
+      } else {
+        result.push(seg)
+      }
+    }
+  }
+
+  return result.length > 0 ? result : revisionSegments
+}
+
+export function processFormatChange(data, paragraphId, text, start, end, format, userId) {
+  let result = data
+
+  if (result.revisionMode) {
+    result = applyFormatToSelection(
+      result,
+      paragraphId,
+      text,
+      start,
+      end,
+      format,
+      userId
+    )
+  }
+
+  result = updateParagraphWithFormat(result, paragraphId, start, end, format, userId)
+
+  return result
 }

@@ -115,13 +115,12 @@ const TimeShareChart = ({ data, prevClose }) => {
       }
     })
 
-    const prevCloseY = priceToY(prevClose)
     const firstX = minuteToX(data[0].minute)
     const lastX = minuteToX(data[data.length - 1].minute)
 
     ctx.save()
     ctx.beginPath()
-    ctx.rect(PADDING_LEFT, PADDING_TOP, chartWidth, chartHeight)
+    ctx.rect(PADDING_LEFT, PADDING_TOP, chartWidth, prevCloseY - PADDING_TOP)
     ctx.clip()
 
     ctx.beginPath()
@@ -138,11 +137,13 @@ const TimeShareChart = ({ data, prevClose }) => {
     upGradient.addColorStop(0, 'rgba(220, 38, 38, 0.35)')
     upGradient.addColorStop(1, 'rgba(220, 38, 38, 0.1)')
     ctx.fillStyle = upGradient
-    ctx.globalCompositeOperation = 'source-over'
     ctx.fill()
 
+    ctx.restore()
+
+    ctx.save()
     ctx.beginPath()
-    ctx.rect(PADDING_LEFT, prevCloseY, chartWidth, chartHeight - (prevCloseY - PADDING_TOP))
+    ctx.rect(PADDING_LEFT, prevCloseY, chartWidth, PADDING_TOP + chartHeight - prevCloseY)
     ctx.clip()
 
     ctx.beginPath()

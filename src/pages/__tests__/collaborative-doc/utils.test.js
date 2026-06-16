@@ -56,6 +56,12 @@ import {
   renderContentWithRevisions,
   formatTextWithTags,
   applyFormatToContent,
+  addFormatRangeToParagraph,
+  updateParagraphWithFormat,
+  getFormatRangesForParagraph,
+  renderContentWithFormats,
+  processFormatChange,
+  adjustFormatRanges,
   FORMAT_TYPE,
 } from '../../collaborative-doc/utils.js'
 import { STORAGE_KEY, getDefaultData, CURRENT_USER, REVISION_TYPE } from '../../collaborative-doc/constants.js'
@@ -1113,6 +1119,183 @@ describe('修订渲染逻辑', () => {
       const rev = result.revisions[result.revisions.length - 1]
       expect(rev).toHaveProperty('format')
       expect(rev.format).toBeNull()
+    })
+  })
+
+  describe('格式范围功能', () => {
+    describe('addFormatRangeToParagraph', () => {
+      it('应该在段落中添加格式范围', () => {
+        const paragraph = { id: 'p-1', content: 'Hello World' }
+        const result = addFormatRangeToParagraph(paragraph, 6, 11, FORMAT_TYPE.BOLD, 'user-1')
+        expect(result.formatRanges).toHaveLength(1)
+        expect(result.formatRanges[0].format).toBe(FORMAT_TYPE.BOLD)
+        expect(result.formatRanges[0].start).toBe(6)
+        expect(result.formatRanges[0].end).toBe(11)
+        expect(result.formatRanges[0].userId).toBe('user-1')
+      })
+
+      it('应该在已有的格式范围后追加', () => {
+        const paragraph = {
+          id: 'p-1',
+          content: 'Hello World',
+          formatRanges: [{ id: 'fmt-1', start: 0, end: 5, format: FORMAT_TYPE.ITALIC }],
+        }
+        const result = addFormatRangeToParagraph(paragraph, 6, 11, FORMAT_TYPE.BOLD, 'user-1')
+        expect(result.formatRanges).toHaveLength(2)
+      })
+    })
+
+    describe('updateParagraphWithFormat', () => {
+      it('应该在段落上添加格式范围', () => {
+        const result = updateParagraphWithFormat(testData, 'p-1', 6, 11, FORMAT_TYPE.BOLD, 'user-1')
+        const paragraph = result.paragraphs.find((p) => p.id === 'p-1')
+        expect(paragraph.formatRanges).toHaveLength(1)
+        expect(paragraph.modifiedBy).toBe('user-1')
+      })
+
+      it('段落被锁定时不应该添加格式范围', () => {
+        const lockedData = {
+          ...testData,
+          paragraphs: testData.paragraphs.map((p) =>
+            p.id === 'p-1' ? { ...p, locked: true, lockedBy: 'other-user' } : p
+          ),
+        }
+        const result = updateParagraphWithFormat(lockedData, 'p-1', 6, 11, FORMAT_TYPE.BOLD, 'user-1')
+        const paragraph = result.paragraphs.find((p) => p.id === 'p-1')
+        expect(paragraph.formatRanges).toBeUndefined()
+      })
+    })
+
+    describe('getFormatRangesForParagraph', () => {
+      it('段落无 formatRanges 时返回空数组', () => {
+        const paragraph = { id: 'p-1', content: 'Hello' }
+        const result = getFormatRangesForParagraph(paragraph)
+        expect(result).toEqual([])
+      })
+
+      it('有 formatRanges 时返回该数组', () => {
+        const paragraph = { id: 'p-1', content: 'Hello', formatRanges: ['a', 'b'] }
+        const result = getFormatRangesForParagraph(paragraph)
+        expect(result).toEqual(['a', 'b'])
+      })
+    })
+
+    describe('processFormatChange', () => {
+      it('修订模式下应该添加 FORMAT 修订记录但不添加 ADD 修订', () => {
+        const revisionData = { ...testData, revisionMode: true }
+        const result = processFormatChange(
+          revisionData,
+          'p-1',
+          '这是一个',
+          0,
+          4,
+          FORMAT_TYPE.BOLD,
+          'user-1'
+        )
+        const formatRevisions = result.revisions.filter((r) => r.type === REVISION_TYPE.FORMAT)
+        const addRevisions = result.revisions.filter((r) => r.type === REVISION_TYPE.ADD)
+        expect(formatRevisions.length).toBeGreaterThanOrEqual(1)
+        expect(addRevisions).toHaveLength(0)
+      })
+
+      it('非修订模式下应该只添加格式范围', () => {
+        const normalData = { ...testData, revisionMode: false }
+        const result = processFormatChange(
+          normalData,
+          'p-1',
+          '这是一个',
+          0,
+          4,
+          FORMAT_TYPE.BOLD,
+          'user-1'
+        )
+        const paragraph = result.paragraphs.find((p) => p.id === 'p-1')
+        expect(paragraph.formatRanges).toHaveLength(1)
+        expect(paragraph.content).toBe(testData.paragraphs[0].content)
+      })
+    })
+
+    describe('adjustFormatRanges', () => {
+      it('在格式范围之前插入内容，范围位置应该整体右移', () => {
+        const ranges = [{ start: 5, end: 10 }]
+        const result = adjustFormatRanges(ranges, 0, 3)
+        expect(result[0].start).toBe(8)
+        expect(result[0].end).toBe(13)
+      })
+
+      it('在格式范围之后插入内容，范围位置不变', () => {
+        const ranges = [{ start: 0, end: 5 }]
+        const result = adjustFormatRanges(ranges, 10, 3)
+        expect(result[0].start).toBe(0)
+        expect(result[0].end).toBe(5)
+      })
+
+      it('在格式范围开始处插入内容，范围结束位置应该右移', () => {
+        const ranges = [{ start: 0, end: 10 }]
+        const result = adjustFormatRanges(ranges, 0, 2)
+        expect(result[0].start).toBe(2)
+        expect(result[0].end).toBe(12)
+      })
+
+      it('在格式范围之前删除内容，范围位置应该整体左移', () => {
+        const ranges = [{ start: 5, end: 10 }]
+        const result = adjustFormatRanges(ranges, 0, -3)
+        expect(result[0].start).toBe(2)
+        expect(result[0].end).toBe(7)
+      })
+
+      it('删除范围完全重叠的内容，应该过滤掉该范围', () => {
+        const ranges = [{ start: 2, end: 5 }]
+        const result = adjustFormatRanges(ranges, 0, -10)
+        expect(result).toHaveLength(0)
+      })
+    })
+
+    describe('processContentChangeWithRevision 与 formatRanges 交互', () => {
+      it('非修订模式下插入内容后，格式范围应该相应调整', () => {
+        const data = {
+          ...testData,
+          revisionMode: false,
+          paragraphs: [
+            {
+              ...testData.paragraphs[0],
+              formatRanges: [
+                {
+                  id: 'fmt-1',
+                  start: 5,
+                  end: 10,
+                  format: FORMAT_TYPE.BOLD,
+                },
+              ],
+            },
+          ],
+        }
+        const oldContent = data.paragraphs[0].content
+        const newContent = 'XXX' + oldContent
+        const result = processContentChangeWithRevision(data, 'p-1', oldContent, newContent, 'user-1')
+        const paragraph = result.paragraphs.find((p) => p.id === 'p-1')
+        expect(paragraph.formatRanges[0].start).toBe(8)
+        expect(paragraph.formatRanges[0].end).toBe(13)
+      })
+    })
+
+    describe('renderContentWithFormats', () => {
+      it('没有格式范围和修订时返回纯文本段', () => {
+        const segments = renderContentWithFormats('Hello World', [], [], testData)
+        expect(segments.length).toBe(1)
+        expect(segments[0].type).toBe('text')
+        expect(segments[0].value).toBe('Hello World')
+      })
+
+      it('有格式范围时应该返回 formatted-text 段', () => {
+        const formatRanges = [
+          { id: 'fmt-1', start: 6, end: 11, format: FORMAT_TYPE.BOLD },
+        ]
+        const segments = renderContentWithFormats('Hello World', formatRanges, [], testData)
+        const formattedSeg = segments.find((s) => s.type === 'formatted-text')
+        expect(formattedSeg).toBeDefined()
+        expect(formattedSeg.formatClasses).toContain('cd-format-bold')
+      })
     })
   })
 })

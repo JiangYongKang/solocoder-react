@@ -286,7 +286,11 @@ export default function MessageQueuePage() {
     setSelectedTopicId(topicId);
     setDetailTab('messages');
     const topic = topics.find((t) => t.id === topicId);
-    if (topic) setEditMaxRetries(topic.maxRetries);
+    if (topic) {
+      setEditMaxRetries(topic.maxRetries);
+    }
+    setMaxRetriesError('');
+    setMaxRetriesSaveMsg('');
   }, [topics]);
 
   const handleBackToList = useCallback(() => {

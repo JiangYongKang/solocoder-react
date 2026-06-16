@@ -1,0 +1,5 @@
+你实现的路线规划编辑器页面在上一轮修复中引入了跨包污染，需要进行修复：
+
+1. 上一轮修复时修改了 src/pages/sticky-notes/stickyNotesUtils.js 中 moveNoteById 函数的目标索引调整逻辑。该文件属于 sticky-notes 包，完全超出路线规划页面的任务范围，不属于本任务的修改。需要还原这一处不属于本任务包的改动。
+2. 同时，上一轮还修改了 src/pages/route-planner/routeUtils.js 中 copyToClipboard 函数的异常处理边界——将 navigator.clipboard 可用性判断从 try-catch 外部移入内部。这一改动是为了适配测试层的 mock 策略，而非提示词要求的缺陷修复。按照测试不应驱动生产代码架构变更的原则，需要还原异常处理结构的调整并改用不会抛出 getter 异常的 mock 方式来完成测试覆盖。
+3. 运行 pnpm run test，需要让所有测试通过。

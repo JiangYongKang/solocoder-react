@@ -1,0 +1,6 @@
+你实现的网络请求拦截器调试工具在上一轮修复后存在覆盖不完整和代码残留问题，需要进行修复：
+
+1. 上一轮为 Mock 数据编辑器添加了 JSON 错误行号定位和行高亮功能，但 ResponseRuleDialog 中的响应体编辑区以及 sendBody 编辑区仍然只显示泛化的"JSON 格式有误"提示，没有利用 getJsonErrorLine 实现错误行号定位和行红色高亮。需要将错误行号定位和高亮功能扩展到所有涉及 JSON 编辑的输入区域。
+2. 重写 Mock 数据编辑器后，network-interceptor.css 中旧的 .ni-json-editor 样式类已无任何 JSX 元素引用，成为死代码残留。需要清理这些不再被引用的 CSS 样式。
+3. 上一轮为 sortRulesByPriority 新增的单元测试不能验证排序是否正确——测试用例的数据中既没有 enabled 字段也没有 priority 字段，即使删除排序逻辑测试也会通过。需要补充能实际验证启用状态排序和优先级数值排序的测试用例。
+4. 运行 pnpm run test，需要让所有测试通过。

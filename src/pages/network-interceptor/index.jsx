@@ -44,6 +44,7 @@ function JsonEditorWithLineNumbers({
   onChange,
   placeholder,
   readOnly = false,
+  minHeight,
 }) {
   const textareaRef = useRef(null)
   const valid = isValidJson(value)
@@ -58,8 +59,13 @@ function JsonEditorWithLineNumbers({
     return Array.from({ length: total }, (_, i) => i + 1)
   }, [value])
 
+  const wrapperStyle = minHeight ? { minHeight } : undefined
+
   return (
-    <div className={`ni-json-editor-wrapper ${!valid && value ? 'has-error' : ''}`}>
+    <div
+      className={`ni-json-editor-wrapper ${!valid && value ? 'has-error' : ''}`}
+      style={wrapperStyle}
+    >
       <div className="ni-json-line-numbers">
         {lines.map((n) => (
           <span
@@ -315,7 +321,9 @@ function ResponseRuleDialog({ visible, initialRule, onCancel, onSave }) {
             <label className="ni-form-label">
               Mock 响应体（JSON）
               {!validJson && mockBody && (
-                <span style={{ color: '#e74c3c', marginLeft: 8, fontSize: 12 }}>JSON 格式有误</span>
+                <span className="ni-json-error-message" style={{ marginLeft: 8 }}>
+                  JSON 错误（第 {getJsonErrorLine(mockBody)} 行）
+                </span>
               )}
             </label>
             <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
@@ -335,12 +343,10 @@ function ResponseRuleDialog({ visible, initialRule, onCancel, onSave }) {
                 ))}
               </select>
             </div>
-            <textarea
-              className={`ni-form-textarea ${!validJson && mockBody ? 'has-error' : ''}`}
+            <JsonEditorWithLineNumbers
               value={mockBody}
-              onChange={(e) => setMockBody(e.target.value)}
+              onChange={setMockBody}
               placeholder='{ "code": 0, "data": { ... } }'
-              spellCheck={false}
             />
           </div>
         </div>
@@ -1042,15 +1048,16 @@ function NetworkInterceptorPage() {
                   压缩
                 </button>
                 {!sendBodyValid && sendBody && (
-                  <span style={{ fontSize: 12, color: '#e74c3c' }}>JSON 格式有误</span>
+                  <span className="ni-json-error-message">
+                    JSON 错误（第 {getJsonErrorLine(sendBody)} 行）
+                  </span>
                 )}
               </div>
-              <textarea
-                className={`ni-send-body-textarea ${!sendBodyValid && sendBody ? 'has-error' : ''}`}
+              <JsonEditorWithLineNumbers
                 value={sendBody}
-                onChange={(e) => setSendBody(e.target.value)}
+                onChange={setSendBody}
                 placeholder='{ "key": "value" }'
-                spellCheck={false}
+                minHeight="140px"
               />
             </div>
           )}

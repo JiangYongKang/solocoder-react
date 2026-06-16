@@ -140,8 +140,16 @@ export function sortRulesByPriority(rules) {
     if (a.enabled !== b.enabled) {
       return a.enabled ? -1 : 1
     }
-    if (typeof a.priority === 'number' && typeof b.priority === 'number') {
+    const aHasPriority = typeof a.priority === 'number'
+    const bHasPriority = typeof b.priority === 'number'
+    if (aHasPriority && bHasPriority) {
       return a.priority - b.priority
+    }
+    if (aHasPriority && !bHasPriority) {
+      return -1
+    }
+    if (!aHasPriority && bHasPriority) {
+      return 1
     }
     return 0
   })

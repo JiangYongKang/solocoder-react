@@ -609,14 +609,18 @@ describe('日期函数', () => {
 
   it('getDateNDaysAgo 返回正确的日期 - 完整n天包含两端', () => {
     const today = new Date()
+    today.setHours(0, 0, 0, 0)
     const result = new Date(getDateNDaysAgo(7))
+    result.setHours(0, 0, 0, 0)
     const diff = Math.round((today - result) / 86400000)
     expect(diff).toBe(6)
   })
 
   it('getDateNDaysAgo(1) 返回今天（因为包含今天）', () => {
     const today = new Date()
+    today.setHours(0, 0, 0, 0)
     const result = new Date(getDateNDaysAgo(1))
+    result.setHours(0, 0, 0, 0)
     const diff = Math.round((today - result) / 86400000)
     expect(diff).toBe(0)
   })

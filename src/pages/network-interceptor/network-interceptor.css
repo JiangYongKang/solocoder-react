@@ -335,16 +335,6 @@
   gap: 6px;
 }
 
-.ni-json-editor {
-  flex: 1;
-  position: relative;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  overflow: hidden;
-  display: flex;
-}
-
 .ni-json-textarea {
   flex: 1;
   width: 100%;
@@ -366,18 +356,6 @@
 
 .ni-json-textarea.has-error {
   background: rgba(231, 76, 60, 0.05);
-}
-
-.ni-json-highlight {
-  flex: 1;
-  padding: 12px;
-  margin: 0;
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-  font-size: 13px;
-  line-height: 1.5;
-  overflow: auto;
-  white-space: pre-wrap;
-  word-break: break-all;
 }
 
 .ni-json-key {
@@ -838,30 +816,6 @@
   display: flex;
   gap: 8px;
   align-items: center;
-}
-
-.ni-send-body-textarea {
-  width: 100%;
-  min-height: 100px;
-  padding: 12px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  color: var(--text-h);
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-  font-size: 13px;
-  line-height: 1.5;
-  resize: vertical;
-  box-sizing: border-box;
-}
-
-.ni-send-body-textarea:focus {
-  outline: none;
-  border-color: var(--accent);
-}
-
-.ni-send-body-textarea.has-error {
-  border-color: #e74c3c;
 }
 
 .ni-dialog-mask {

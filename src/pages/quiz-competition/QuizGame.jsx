@@ -20,7 +20,7 @@ import {
 
 const ANIMATION_DURATION = 1000
 
-export default function QuizGame({ onFinish, onBack, roundNumber = 1 }) {
+export default function QuizGame({ onFinish, onBack, onCoinsEarned, roundNumber = 1 }) {
   const [questions] = useState(() => {
     const qs = loadQuestions()
     return drawRandomQuestions(qs, DEFAULT_QUESTIONS_PER_ROUND)
@@ -120,6 +120,12 @@ export default function QuizGame({ onFinish, onBack, roundNumber = 1 }) {
     }
     return undefined
   }, [isAnswered, showRoundSummary, goToNextQuestion])
+
+  useEffect(() => {
+    if (showRoundSummary && earnedCoins > 0) {
+      onCoinsEarned?.(earnedCoins)
+    }
+  }, [showRoundSummary, earnedCoins, onCoinsEarned])
 
   const handleAnswer = (optionValue) => {
     if (isAnswered || !currentQuestion) return

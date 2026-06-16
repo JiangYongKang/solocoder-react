@@ -38,6 +38,12 @@ export default function QuizCompetition() {
     setCoins(newCoins)
   }
 
+  const handleCoinsEarned = (earned) => {
+    if (earned > 0) {
+      setCoins((prev) => prev + earned)
+    }
+  }
+
   const handleStartGame = (multiRound = false) => {
     const ranking = loadRanking()
     if (ranking.length > 0 && !nickname) {
@@ -217,6 +223,7 @@ export default function QuizCompetition() {
           key={gameKey}
           onFinish={handleGameFinish}
           onBack={handleBackToHome}
+          onCoinsEarned={handleCoinsEarned}
           roundNumber={roundNumber}
         />
       )}

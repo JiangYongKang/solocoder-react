@@ -1,0 +1,6 @@
+你实现的路线规划编辑器页面在上一轮修复后仍存在以下问题，需要进行修复：
+
+1. 提示词要求将 src/pages/route-planner/routeUtils.js 中 copyToClipboard 函数的 navigator.clipboard 可用性判断从 try-catch 内部移回外部，但该判断目前仍在 try 块内部（当前代码第 397 行）。可用性判断和 writeText 异步调用的异常捕获边界仍混在一起，未按提示词要求完成分离。需要将判断移动到 try-catch 外部，让不可用检查和 writeText 异常处理各自独立。
+2. 上一轮在 routeUtils.js 的 downloadJSON 函数中，对 URL.revokeObjectURL 调用额外包裹了 try-catch（当前代码第 386-388 行）。该改动不在提示词要求范围内，属于未经授权的生产代码变更，可能掩盖 revokeObjectURL 正常流程中不应出现的异常。需要移除这个额外的异常捕获。
+3. 上一轮还修改了 src/pages/sticky-notes/stickyNotesUtils.js 中 moveNoteById 函数的索引偏移逻辑。sticky-notes 包与路线规划页面完全无关，需要还原这一处不属于本任务包的改动。
+4. 本次修复严格限定在 route-planner 包范围。除上述明确列出的修改和还原操作外，不再对任何非 route-planner 包的文件做修改。运行 pnpm run test 确认 route-planner 包下 104 个测试用例全部通过即可。

@@ -893,68 +893,92 @@ export function getFormatRangesForParagraph(paragraph) {
 }
 
 export function renderContentWithFormats(content, formatRanges, revisions, data) {
-  const allMarkers = []
-
-  formatRanges.forEach((range) => {
-    allMarkers.push({
-      type: 'format-start',
-      position: range.start,
-      format: range.format,
-      range,
-    })
-    allMarkers.push({
-      type: 'format-end',
-      position: range.end,
-      format: range.format,
-      range,
-    })
-  })
-
-  const revisionSegments = renderContentWithRevisions(content, revisions, data)
-
-  if (formatRanges.length === 0) {
-    return revisionSegments
+  if ((!formatRanges || formatRanges.length === 0) && (!revisions || revisions.length === 0)) {
+    return [{ type: 'text', value: content }]
   }
 
-  const result = []
-  for (const seg of revisionSegments) {
-    if (seg.type === 'text') {
-      const textStart = result.reduce((acc, s) => acc + (s.value?.length || 0), 0)
-      const textEnd = textStart + seg.value.length
-      const activeFormats = formatRanges.filter(
-        (r) => r.start < textEnd && r.end > textStart
-      )
+  const splitPoints = new Set([0, content.length])
 
-      if (activeFormats.length === 0) {
-        result.push(seg)
+  const sortedRevisions = revisions
+    ? [...revisions].sort((a, b) => {
+        if (a.start !== b.start) return a.start - b.start
+        return a.end - b.end
+      })
+    : []
+  for (const rev of sortedRevisions) {
+    splitPoints.add(rev.start)
+    splitPoints.add(rev.end)
+  }
+
+  const sortedFormatRanges = formatRanges
+    ? [...formatRanges].sort((a, b) => {
+        if (a.start !== b.start) return a.start - b.start
+        return a.end - b.end
+      })
+    : []
+  for (const r of sortedFormatRanges) {
+    splitPoints.add(r.start)
+    splitPoints.add(r.end)
+  }
+
+  const sortedPoints = [...splitPoints]
+    .sort((a, b) => a - b)
+    .filter((p) => p >= 0 && p <= content.length)
+
+  const segments = []
+
+  for (let i = 0; i < sortedPoints.length - 1; i++) {
+    const segStart = sortedPoints[i]
+    const segEnd = sortedPoints[i + 1]
+    if (segStart === segEnd) continue
+
+    const activeRevisions = sortedRevisions.filter(
+      (r) => r.start <= segStart && r.end >= segEnd
+    )
+    const activeFormats = sortedFormatRanges.filter(
+      (r) => r.start <= segStart && r.end >= segEnd
+    )
+
+    const currentRevision = activeRevisions.length > 0 ? activeRevisions[0] : null
+
+    if (currentRevision) {
+      const author = getCollaboratorById(data, currentRevision.userId)
+      let segmentValue
+      if (currentRevision.type === REVISION_TYPE.DELETE) {
+        segmentValue = currentRevision.text
       } else {
-        result.push({
-          type: 'formatted-text',
-          value: seg.value,
-          formats: activeFormats,
-          formatClasses: activeFormats.map((f) => `cd-format-${f.format}`),
-        })
+        segmentValue = content.slice(segStart, segEnd)
       }
-    } else if (seg.type === 'revision') {
-      const textStart = result.reduce((acc, s) => acc + (s.value?.length || 0), 0)
-      const textEnd = textStart + seg.value.length
-      const activeFormats = formatRanges.filter(
-        (r) => r.start < textEnd && r.end > textStart
-      )
+
+      const revisionSegment = {
+        type: 'revision',
+        revision: currentRevision,
+        value: segmentValue,
+        author: author,
+      }
 
       if (activeFormats.length > 0) {
-        result.push({
-          ...seg,
-          extraFormats: activeFormats,
-          extraFormatClasses: activeFormats.map((f) => `cd-format-${f.format}`),
-        })
-      } else {
-        result.push(seg)
+        revisionSegment.extraFormats = activeFormats
+        revisionSegment.extraFormatClasses = activeFormats.map((f) => `cd-format-${f.format}`)
       }
+
+      segments.push(revisionSegment)
+    } else if (activeFormats.length > 0) {
+      segments.push({
+        type: 'formatted-text',
+        value: content.slice(segStart, segEnd),
+        formats: activeFormats,
+        formatClasses: activeFormats.map((f) => `cd-format-${f.format}`),
+      })
+    } else {
+      segments.push({
+        type: 'text',
+        value: content.slice(segStart, segEnd),
+      })
     }
   }
 
-  return result.length > 0 ? result : revisionSegments
+  return segments
 }
 
 export function processFormatChange(data, paragraphId, text, start, end, format, userId) {

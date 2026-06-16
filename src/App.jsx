@@ -8,6 +8,7 @@ import BudgetTrackerPage from '@/pages/budget-tracker/index.jsx'
 import CalendarPage from '@/pages/calendar/index.jsx'
 import ChatPage from '@/pages/chat/index.jsx'
 import CodeSandboxPage from '@/pages/code-sandbox/index.jsx'
+import CollaborativeDocPage from '@/pages/collaborative-doc/index.jsx'
 import CouponPage from '@/pages/coupon/index.jsx'
 import CSSAnimationPage from '@/pages/css-animation/index.jsx'
 import CurrencyConverterPage from '@/pages/currency-converter/index.jsx'
@@ -286,6 +287,7 @@ function App() {
             <Route path="/route-recorder" element={<RouteRecorderPage />} />
             <Route path="/grade-manager" element={<GradeManagerPage />} />
             <Route path="/code-sandbox" element={<CodeSandboxPage />} />
+            <Route path="/collaborative-doc" element={<CollaborativeDocPage />} />
             <Route path="/video-meeting" element={<VideoMeetingPage />} />
             <Route path="/screenshot-annotator" element={<ScreenshotAnnotatorPage />} />
             <Route path="/menu-designer" element={<MenuDesignerPage />} />

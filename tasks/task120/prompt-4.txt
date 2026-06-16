@@ -1,0 +1,4 @@
+你实现的网络请求拦截器调试工具在上一轮修复后仍有一个遗漏区域，需要进行修复：
+
+1. ImportDialog 组件的 JSON 粘贴编辑区仍然使用原生 `<textarea>` 配合 `className="ni-form-textarea"`，未替换为 JsonEditorWithLineNumbers 组件，也未调用 getJsonErrorLine 实现错误行号定位。当用户在导入对话框中粘贴格式有误的 JSON 时，仅显示泛化的错误提示文本，无法像其他编辑区一样获得"JSON 错误（第 N 行）"的行号定位和红色高亮。提示词要求将错误行号定位和高亮功能扩展到所有涉及 JSON 编辑的输入区域，导入对话框中的 JSON 粘贴区属于这个范围。需要将 ImportDialog 的 textarea 同样替换为 JsonEditorWithLineNumbers 组件，并在 JSON 校验失败时利用 getJsonErrorLine 展示具体错误行号。
+2. 修复完成后运行 pnpm run test，需要让 network-interceptor 包下 103 个测试用例全部通过。

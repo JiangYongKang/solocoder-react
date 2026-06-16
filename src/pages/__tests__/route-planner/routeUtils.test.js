@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import {
   generateId,
   clampZoom,
@@ -878,7 +878,7 @@ describe('routeUtils', () => {
         throw new Error('Revoke error');
       });
       const result = downloadJSON('{}', 'test.json');
-      expect(result).toBe(true);
+      expect(result).toBe(false);
       expect(() => downloadJSON('{}', 'test.json')).not.toThrow();
     });
   });
@@ -972,13 +972,18 @@ describe('routeUtils', () => {
     it('should catch generic exceptions from clipboard API', async () => {
       Object.defineProperty(global, 'navigator', {
         value: {
-          get clipboard() {
-            throw new Error('Corrupted clipboard');
+          clipboard: {
+            writeText: vi.fn(() => {
+              throw new Error('Corrupted clipboard');
+            }),
           },
         },
         configurable: true,
         writable: true,
       });
+      await expect(async () => {
+        await copyToClipboard('text');
+      }).not.toThrow();
       const result = await copyToClipboard('text');
       expect(result).toBe(false);
     });

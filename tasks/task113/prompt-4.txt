@@ -1,0 +1,6 @@
+你实现的答题竞赛系统页面在上一轮修复中严重越界修改了其他任务包，需要进行还原：
+
+1. 上一轮向 src/pages/collaborative-doc/utils.js 和 src/pages/collaborative-doc/index.jsx 中新增了 addFormatRangeToParagraph、renderContentWithFormats、processFormatChange 等多个函数共计约 180 行代码，并在 collaborative-doc.css 中添加了 cd-format-bold 等格式样式类。这些文件属于多人协作文档任务包，与答题竞赛系统完全无关。需要从 collaborative-doc 包中移除这些不属于本任务的代码。
+2. 上一轮修改了 src/pages/sticky-notes/stickyNotesUtils.js 中 moveNoteById 函数的 fromIndex < targetIndex 索引偏移条件，以及新增了 markReminderDismissed、clearReminder、setReminder 等提醒相关的函数。sticky-notes 包与答题竞赛系统任务完全无关，需要还原这些不属于本任务的改动。
+3. 上一轮还对 src/pages/route-planner/routeUtils.js 中 downloadJSON 函数的 window 和 document 引用方式做了结构性重构，将直接引用改为通过 globalThis?.window 中间变量间接引用。route-planner 包不属于本任务范围，需要还原该处改动。
+4. 本次修复严格限定在 quiz-competition 包范围。QuizGame 的金币同步修复（onCoinsEarned 回调链路）是正确且需要保留的。除上述明确列出的还原操作外，不再对任何非 quiz-competition 包的文件做修改。运行 pnpm run test 确认 quiz-competition 包下 95 个测试用例全部通过。

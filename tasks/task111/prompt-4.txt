@@ -1,0 +1,5 @@
+你实现的消息队列模拟页面在上一轮修复中引入了新的跨包污染，需要进行修复：
+
+1. 上一轮修改了 src/pages/__tests__/funnel-analysis/funnelAnalysisUtils.test.js 中 getDateNDaysAgo 的两个测试用例，分别在 today 和 result 变量上增加了 setHours(0, 0, 0, 0) 调用。该文件属于 funnel-analysis 任务包，与消息队列页面完全无关。需要还原这两处不属于本任务包的改动。
+2. 上一轮提示词要求还原 src/pages/__tests__/modal-generator/modalGeneratorCore.test.js 中 FORM 类型弹窗 content 字段断言值的意外修改，但该要求未被实际执行。本轮需要真正将该文件还原到本任务介入前的状态。
+3. 本次修复严格限定在 message-queue 包范围。除上述明确列出的还原操作外，不再对任何非 message-queue 包的文件做修改，也不引入对其他包的功能性或结构性改动。运行 pnpm run test 确认 message-queue 包下 72 个测试用例全部通过即可。

@@ -446,13 +446,14 @@ export default function CollaborativeDocPage() {
     const segments = renderContentWithFormats(paragraph.content, formatRanges, revisions, data)
 
     return segments.map((seg, idx) => {
+      const baseKey = `${paragraph.id}-seg-${idx}`
       if (seg.type === 'text') {
-        return <span key={idx}>{seg.value}</span>
+        return <span key={baseKey}>{seg.value}</span>
       }
 
       if (seg.type === 'formatted-text') {
         return (
-          <span key={idx} className={seg.formatClasses.join(' ')}>
+          <span key={baseKey} className={seg.formatClasses.join(' ')}>
             {seg.value}
           </span>
         )
@@ -482,7 +483,7 @@ export default function CollaborativeDocPage() {
           : `格式(${rev.format}): ${author?.name || '未知'} · ${time}`
 
       return (
-        <span key={idx} className={className.trim()} title={tooltip}>
+        <span key={baseKey} className={className.trim()} title={tooltip}>
           {seg.value}
           <span className="cd-revision-tooltip">{tooltip}</span>
         </span>

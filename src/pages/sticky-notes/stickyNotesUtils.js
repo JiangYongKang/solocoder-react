@@ -5,7 +5,6 @@ import {
   TRASH_RETENTION_DAYS,
   REMINDER_STATUS_PENDING,
   REMINDER_STATUS_TRIGGERED,
-  REMINDER_STATUS_DISMISSED,
   STORAGE_KEY_NOTES,
   STORAGE_KEY_VIEW,
   STORAGE_KEY_TRASH,
@@ -78,7 +77,6 @@ export function isExpired(note, now = Date.now()) {
 export function shouldTriggerReminder(note, now = Date.now()) {
   if (!note || !note.reminderAt) return false
   if (note.reminderStatus === REMINDER_STATUS_TRIGGERED) return false
-  if (note.reminderStatus === REMINDER_STATUS_DISMISSED) return false
   return note.reminderAt <= now
 }
 
@@ -86,30 +84,6 @@ export function markReminderTriggered(notes, noteId) {
   return notes.map(note =>
     note.id === noteId
       ? { ...note, reminderStatus: REMINDER_STATUS_TRIGGERED }
-      : note
-  )
-}
-
-export function markReminderDismissed(notes, noteId) {
-  return notes.map(note =>
-    note.id === noteId
-      ? { ...note, reminderStatus: REMINDER_STATUS_DISMISSED }
-      : note
-  )
-}
-
-export function clearReminder(notes, noteId) {
-  return notes.map(note =>
-    note.id === noteId
-      ? { ...note, reminderAt: null, reminderStatus: REMINDER_STATUS_PENDING }
-      : note
-  )
-}
-
-export function setReminder(notes, noteId, reminderAt) {
-  return notes.map(note =>
-    note.id === noteId
-      ? { ...note, reminderAt, reminderStatus: reminderAt ? REMINDER_STATUS_PENDING : REMINDER_STATUS_PENDING }
       : note
   )
 }

@@ -1,0 +1,6 @@
+你实现的多人协作文档编辑模拟页面在上一轮修复后仍存在以下问题，需要进行修复：
+
+1. 非修订模式下点击格式化按钮后，页面上仍然看不到文本样式变化。renderParagraph 函数中的渲染条件 `revisions.length > 0` 在非修订模式下恒为 false，导致渲染分支直接输出 paragraph.content 原始文本，完全跳过了 formatRanges 中的格式数据和 renderContentSegments 的渲染逻辑。虽然 processFormatChange 已正确将格式写入数据层、CSS 样式也已定义，但渲染层因条件判断过窄从未被触发。需要修改该条件，确保存在格式范围时也能调用 renderContentSegments 进行渲染。
+2. renderContentWithFormats 函数的分段渲染逻辑存在范围扩大缺陷。当没有修订记录时，renderContentWithRevisions 返回一个包含全文的 text 段，随后函数判断该段与某个 formatRange 有位置重叠时，便直接将整个 text 段标记为 formatted-text 且 value 保留为全文。例如选中部分文字加粗后，渲染结果会将整个段落的文字全部包裹在加粗样式中，而非仅对选中部分应用格式。需要在 formatRange 的边界处将文本段拆分为格式化部分和非格式化部分。
+3. renderContentWithFormats 函数中声明并填充了 allMarkers 数组（声明了 format-start 和 format-end 标记对象并通过 forEach 遍历），但该变量在后续循环逻辑中完全没有被使用，属于未使用的残留代码。需要清理这部分无效代码。
+4. 修复完成后运行 pnpm run test，需要让 collaborative-doc 包下 128 个测试用例全部通过。还需要启动 pnpm run dev，在浏览器中分别在修订模式和非修订模式下选中文字点击格式化按钮，肉眼确认文本样式变化是否符合预期。

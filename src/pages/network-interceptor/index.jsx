@@ -396,8 +396,7 @@ function ImportDialog({ visible, onCancel, onConfirm }) {
     setPreview(result.data)
   }
 
-  const handleJsonChange = (e) => {
-    const text = e.target.value
+  const handleJsonChange = (text) => {
     setJsonText(text)
     if (text.trim()) {
       validateAndPreview(text)
@@ -413,6 +412,8 @@ function ImportDialog({ visible, onCancel, onConfirm }) {
   }
 
   if (!visible) return null
+
+  const jsonErrorLine = !isValidJson(jsonText) && jsonText ? getJsonErrorLine(jsonText) : null
 
   return (
     <div className="ni-dialog-mask" onClick={onCancel}>
@@ -433,14 +434,19 @@ function ImportDialog({ visible, onCancel, onConfirm }) {
             />
           </div>
           <div className="ni-form-row">
-            <label className="ni-form-label">或粘贴 JSON</label>
-            <textarea
-              className="ni-form-textarea"
+            <label className="ni-form-label">
+              或粘贴 JSON
+              {jsonErrorLine && (
+                <span className="ni-json-error-message" style={{ marginLeft: 8 }}>
+                  JSON 错误（第 {jsonErrorLine} 行）
+                </span>
+              )}
+            </label>
+            <JsonEditorWithLineNumbers
               value={jsonText}
               onChange={handleJsonChange}
               placeholder='{ "requestRules": [...], "responseRules": [...] }'
-              spellCheck={false}
-              style={{ minHeight: 100 }}
+              minHeight="120px"
             />
             {error && <div className="ni-form-error">{error}</div>}
           </div>

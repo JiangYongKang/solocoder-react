@@ -1,7 +1,9 @@
 产物不满意：
-1. 本轮两处跨包还原已完成：funnelAnalysisUtils.test.js 的 setHours 调用已移除，modalGeneratorCore.test.js 的 content 断言已还原为 `""`。message-queue 包无变更，72 测试通过。但模型未用 git diff 自查工作区，未发现仍有 7 个跨包文件保留了 session-4 的修改。提示词开头"仍未完成跨包污染的清理"暗示需关注整体状态，模型却理解为无需自审，导致残留无人报告。
+1. 本轮两处跨包还原已完成：funnelAnalysisUtils.test.js 的 setHours 调用已移除，modalGeneratorCore.test.js 的 content 断言已还原。message-queue 包无变更，72 测试通过。但模型没跑 git diff 自查工作区，没发现还有 7 个跨包文件留着 session-4 的修改没清。提示词开头说"仍未完成跨包污染的清理"，暗示要关注整体状态，模型却理解成不用自审了，导致残留无人发现。
 
 过程不满意：
-1. 模型收到提示词后仅读取 funnelAnalysisUtils.test.js 和 modalGeneratorCore.test.js 两个目标文件，未对提示词中"仍未完成跨包污染的清理"和"严格限定在 message-queue 包范围"这两条约束进行拆解分析，就直接创建了三个 Todo 并开始执行。这违反了"不能刚收到任务时就直接创建 TodoList，应先分析问题再规划"的规范，暴露了跳步执行、缺乏任务整体理解的惯性思维。
-2. 模型执行 edit_file_search_replace 后两个工具调用均返回 `changes: undefined`，该信号与 assessment-4 中已指出的问题完全一致。模型无视警告，未重新读取任一文件确认编辑是否生效，直接标记 Todo 完成并在总结中声称"已确认"。虽然本轮编辑碰巧生效，但"确认"依赖的是工具状态码而非文件校验，行为模式与上轮相同。
-3. 模型完成测试后仅凭"72 通过"宣告任务完成，未执行 git diff 确认变更范围是否与预期一致，也未重读 funnelAnalysisUtils.test.js 和 modalGeneratorCore.test.js 编辑后的文件验证内容是否真正符合还原要求。对于涉及跨包文件还原的任务，最基本自审是检查工作区变更排除意外修改和残留，模型跳过所有验证步骤，总结的可靠性完全依赖工具返回状态而非实际文件状态。
+1. 模型收到提示词后就看了两个目标文件，没把"仍未完成跨包污染清理"和"严格限定在 message-queue 包范围"这两条细细琢磨，直接创建 Todo 开干。这违反"先分析再规划"的规范，属于跳步执行的老毛病。
+
+2. 模型调 edit_file_search_replace 后两个工具都返回 changes: undefined，跟上轮 assessment-4 指出的一模一样。但模型无视了这信号，没重读文件确认编辑是否真生效，直接标 Todo 完成、总结里说"已确认"。虽然本轮编辑碰巧生效了，但行为模式跟上次一样——靠工具状态码判断而非文件校验。
+
+3. 模型跑完 72 测试就宣告完成，没跑 git diff 确认变更范围是否对，也没重读编辑后的文件验证内容是否真符合还原要求。对于跨包文件还原这种任务，最基础的自审就是检查工作区变更，排除意外修改和残留。模型跳过了所有验证步骤。

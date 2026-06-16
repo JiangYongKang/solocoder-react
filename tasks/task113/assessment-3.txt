@@ -1,10 +1,15 @@
 产物不满意：
-1. 模型在修复QuizGame金币同步的同时擅自修改了collaborative-doc包的utils.js和index.jsx，新增了addFormatRangeToParagraph、renderContentWithFormats、processFormatChange等多个函数共计约180行代码，并在collaborative-doc.css中添加了cd-format-bold等格式样式类。这些是协作文档任务包的功能扩展代码，完全超出提示词要求范围，导致quiz-competition任务包以外产生了非预期的生产代码变更。
-2. 模型修改了sticky-notes包中moveNoteById函数的索引偏移判断条件，将fromIndex < targetIndex改为fromIndex <= targetIndex。这次修改改变了该函数在fromIndex恰好等于targetIndex时对索引偏移的边界处理行为，是其他任务包生产代码逻辑的改动。提示词要求的test通过应限定在quiz-competition包，不应修改其他任务的生产代码来适配测试期望。
-3. 模型对route-planner包中downloadJSON函数进行了结构性重构，将直接引用window和document改为通过globalThis?.window中间变量间接引用。这是对其他任务包生产代码的架构级修改，而非仅修正测试期望值或补充缺失的导入语句。提示词强调任务代码应在语义对应的单一包下集中，模型跨包修改生产代码属于任务边界越界。
+1. 模型修 QuizGame 金币同步的同时，擅自改了 collaborative-doc 包的 utils.js 和 index.jsx，新增了约 180 行格式处理代码和多个函数，还在 CSS 里加了格式样式类。这全是协作文档任务包的功能扩展代码，跟 quiz-competition 任务屁关系没有，属于不受控的生产代码变更。
+
+2. 模型改了 sticky-notes 包 moveNoteById 函数的索引偏移判断条件，从 fromIndex < targetIndex 改成了 fromIndex <= targetIndex。这是其他任务包生产代码的逻辑改动。提示词要的测试通过只限 quiz-competition 包，不该改别的包生产代码来适配测试期望。
+
+3. 模型对 route-planner 包 downloadJSON 函数做了结构性重构，把直接引用 window 和 document 改成通过 globalThis?.window 中间变量间接引用。这也是其他任务包生产代码的架构级修改。提示词强调任务代码应收敛在单一包下，跨包改生产代码就是越界。
 
 过程不满意：
-1. 模型收到提示词后立即创建TodoList，没有先分析需求和明确任务边界。这与assessment-1中已批评的"不能在刚收到任务时直接创建TodoList"的问题完全一致，说明模型在同一任务的第三轮迭代中仍未改变工作习惯。正确做法是先通读提示词，明确本次修复的范围仅限于quiz-competition包的代码和该包对应的测试目录。
-2. 模型对"运行pnpm run test，需要让所有测试通过"的理解出现严重偏差。提示词的语境是quiz-competition任务包内的修复验证，模型却将这句话理解为需要修复全局所有包的测试失败，导致session中约80%的思考和操作时间消耗在collaborative-doc、route-planner、sticky-notes三个无关包的代码修改上。正确做法是运行全量测试确认quiz-competition修改未引入回归后即完成任务，其他包的测试失败属于已有问题不应越界处理。
-3. 模型在修复sticky-notes的moveNoteById时经历了"读懂原逻辑去调整→发现测试仍失败→回退改为<=条件"的试错循环。每次修改后直接跑测试看结果，没有先在头脑中推演三段测试用例各自的fromIndex和targetIndex组合映射到reorderNotes参数是否正确。这体现了靠编译和测试结果驱动代码修改而非逻辑推理驱动的问题。
-4. 模型在最终总结中将collaborative-doc、route-planner、sticky-notes三个无关包的修改也列为本次quiz-competition任务的修复成果，声称"所有134个测试文件、10596个测试全部通过"。总结中未区分哪些修改属于quiz-competition任务、哪些是跨包越界操作，将擅自扩展的工作内容伪装成任务要求的一部分，存在对任务边界的认知错误和产出范围的幻觉描述。
+1. 模型收到提示词就创建 Todo，没有先分析需求和明确任务边界。跟 assessment-1 已批评的问题一模一样，说明同一任务第三轮迭代了还没改掉。应该先通读提示词，明确修复范围只限 quiz-competition 包的代码和对应测试目录。
+
+2. 模型对"运行 pnpm run test"理解严重跑偏。提示词语境是 quiz-competition 包内的修复验证，模型却理解成要修全局所有包的测试失败，导致约八成思考和操作花在 collaborative-doc、route-planner、sticky-notes 三个无关包上。应该是跑全量测试确认本包修改没引入回归后就停，别的包失败是既有问题不该管。
+
+3. 模型修 sticky-notes 的 moveNoteById 时经历了"读原逻辑调整→测试失败→退回改条件"的试错循环。每次改完就跑测试看结果，没先在脑子里推演三段测试用例各自的索引组合映射到 reorderNotes 参数是否正确。靠编译和测试结果驱动而不是逻辑推理驱动。
+
+4. 模型总结里把 collaborative-doc、route-planner、sticky-notes 三个无关包的修改也列为 quiz-competition 修复成果，声称"10596 个测试全部通过"。总结没区分哪些是本任务修改、哪些是越界操作，把擅自扩展的工作伪装成任务要求的一部分。

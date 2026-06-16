@@ -1,9 +1,13 @@
 产物不满意：
-1. buildGraphNodes 函数中依赖关系图边的方向与需求第四条语义相反。walk 函数在遍历子依赖时通过 `edges.push({ source: parentName, target: key })` 构建边，边的方向是父节点指向子节点。但需求明确要求"节点之间的有向箭头连线表示依赖关系（被依赖方指向依赖方）"，即子依赖应指向父依赖。当前实现让箭头从父指向子，用户看到的依赖流向与实际语义完全颠倒，会导致对"谁依赖谁"的理解产生混淆。正确做法是将边的 source 设为子依赖节点 key，target 设为父依赖节点 parentName。
-2. Lock Diff 视图仅覆盖生产依赖的版本对比，遗漏了 devDependencies。LockDiff 组件在 index.jsx 中接收的 upgradedDependencies 参数是 upgradedDepsPreview，它通过 `applyUpgrades(dependencies, allUpgradedDeps)` 仅对生产依赖计算升级结果，开发依赖完全没有参与对比构建。当用户在 devDependencies 标签页选中了 eslint、vite 等包并标记升级后，切换到 Lock Diff 视图时这些开发依赖的版本变更完全不会出现在左右对比面板中，变更统计也为零。正确做法是在构建升级预览数据时应将 dependencies 和 devDependencies 合并后一起传入，使 Lock Diff 能覆盖全部依赖类型的变更。
-3. DependencyTree.jsx 中的统计数字存在计算口径不一致的问题。`directDepsCount` 直接取 `dependencies.length` 始终为未过滤前的直接依赖数量，而 `totalDepsCount` 取的是 `flatRows.length` 即经过搜索过滤后的扁平化结果数量。当用户在搜索框中输入关键词进行过滤后，页面顶部显示的"共 N 个包（直接依赖 M 个）"中总包数是过滤后数量但直接依赖数仍是过滤前数量，两个数字来自不同计算基准，导致统计信息自相矛盾。正确做法是统一统计来源，要么都基于过滤前数据，要么都基于过滤后数据。
+1. buildGraphNodes 里依赖图边的方向搞反了。walk 函数遍历子依赖时用 `edges.push({ source: parentName, target: key })` 让父指向子。但需求说的是"被依赖方指向依赖方"，即子依赖指向父依赖才对。现在方向反了，用户看到的是谁依赖谁的流向完全颠倒。应该把 source 设成子依赖节点 key，target 设成父依赖 parentName。
+
+2. Lock Diff 视图只覆盖了生产依赖的版本对比，devDependencies 完全漏了。index.jsx 传的 upgradedDependencies 是通过 applyUpgrades(dependencies, ...) 只对生产依赖算的，开发依赖压根没参与。用户切到 devDependencies 标签页选中包标记升级后，再切到 Lock Diff，这些开发依赖的变更在左右对比面板里完全不显示，变更统计也是零。应该把 dependencies 和 devDependencies 合并后一起传入构建。
+
+3. DependencyTree 里的统计数字口径不一致。directDepsCount 取的是过滤前的直接依赖数，totalDepsCount 取的却是搜索过滤后的扁平结果数。用户搜关键词过滤后，顶部显示"共 N 个包（直接依赖 M 个）"，总数是过滤后的但直接依赖数还是过滤前的，两个数来自不同基准互相矛盾。应该统一统计来源，要么都过滤前要么都过滤后。
 
 过程不满意：
-1. 模型在编写 DependencyTree.jsx 后运行 ESLint 发现解析错误，先用 edit_file_search_replace 修补了一处语法问题，运行 ESLint 后仍然报错，然后读取文件看了一眼就说"可能有隐藏字符"，随后用 Write 工具重写了整个 DependencyTree.jsx 文件才最终通过。同一个文件因为一处 JSX 模板字符串未闭合的语法错误，经历了"初写→修补→重写"三次修改才修复，说明首次写入时对 JSX 语法的闭合检查不够仔细。正确做法是在写完文件后立即回读确认语法完整性，避免用重写整文件的方式修复局部语法错误。
-2. 模型在 App.jsx 中注册路由时进行了两次编辑：先添加 import 语句，再添加 Route 配置，然后读取文件发现"文件结构有问题"，又执行了第三次编辑来修复。这表明前两次编辑不够精确，可能在首次插入时破坏了已有的 JSX 结构或引用链。对于高度模板化的路由配置文件，应该先通读获取完整上下文，将 import 和 Route 的增补在一次精确操作中完成，而不是分步编辑后再回头修补结构损伤。
-3. 模型在完成所有开发和测试后，总结中写道"你可以通过 npm run dev 启动开发服务器，访问 /package-manager 路径查看效果"，这句话暗示模型实际并未启动 dev server 进行运行时验证。对于一个涉及树形表格递归展开、SVG 依赖关系图渲染与交互、左右分栏同步滚动、状态联动更新等大量 UI 交互逻辑的复杂页面，仅靠 65 个纯 JS 单元测试通过和 ESLint 零报错就声称功能全部完成是不够的。应在提交前至少启动一次 dev server 确认页面正常渲染、视图切换无报错、核心交互链路可走通。
+1. 模型写完 DependencyTree.jsx 跑 ESLint 报解析错误，修了一处还报错，然后读文件看了一眼说"可能有隐藏字符"，用 Write 重写了整个文件才通过。就因为一处 JSX 模板字符串没闭合的语法错，经历了"初写→修补→重写"三轮。应该在写完文件后立即回读确认语法完整性。
+
+2. 模型在 App.jsx 注册路由时两次编辑没改对：加 import、加 Route 后读文件发现"结构有问题"，又执行了第三次编辑修复。说明前两次编辑不够精确，可能插坏了已有 JSX 结构。对模板化程度高的路由配置，应该先通读完整上下文，import 和 Route 在一步精确操作中搞定。
+
+3. 模型总结里写"可以通过 npm run dev 启动访问 /package-manager 查看效果"，这句话暗示实际根本没启动 dev server 验证。这个页面涉及树形表格递归展开、SVG 依赖图渲染交互、分栏同步滚动等大量 UI 逻辑，仅靠 65 个纯 JS 单测通过就说功能完成是不够的。应该至少启动一次 dev server 确认页面正常渲染、核心交互能走通。

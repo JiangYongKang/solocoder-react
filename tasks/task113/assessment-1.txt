@@ -1,8 +1,11 @@
 产物不满意：
-1. quiz.css 中的得分动画只定义了 scoreFloat 一种关键帧动画，所有四种状态（correct、wrong、timeout、skip）共享同一套 translate(-50%, -50%) 到 translate(-50%, -120%) 的向上飘动效果。提示词第3条明确要求答对飘字"+10"上升、答错飘字"-5"下降，当前代码中答错和超时的扣分飘字同样是向上移动，未实现下降动画。原因是在 CSS 中只写了一个 @keyframes 动画复用到全部状态，没有为 wrong 和 timeout 类名单独定义向下飘落的 @keyframes 下落动画。正确做法是为 wrong 和 timeout 类型新增一个从 translate(-50%, -50%) 向 translate(-50%, 30%) 移动的下落动画，并在对应的 CSS 选择器上覆盖 animation 属性。
-2. QuizGame.jsx 的 handleAnswer 函数中，answerRecord 对象的 doubleNext 字段被硬编码为 false，而非使用当前组件状态中的 doubleNext 变量值。当用户使用双倍道具后（doubleNext 变为 true），handleAnswer 展示的实时得分确实通过 calculateScore(isCorrect, false, doubleNext) 正确计算了双倍分数，但存入 answers 数组的 answerRecord 中 doubleNext 始终为 false，导致竞赛结束时 calculateRoundResult 函数无法从答案记录中检测到双倍道具的生效标记，最终计算出的轮次总分与答题过程中的实时得分不一致。根本原因是 answerRecord 构造时使用了字面量 false 而非引用 state 变量 doubleNext。正确做法是将 `doubleNext: false` 改为 `doubleNext`，使答案记录能正确携带双倍效果标记。
-3. index.jsx 的 QuizCompetition 组件中，coins 状态通过 `useState(() => loadCoins())` 仅在组件挂载时初始化一次。当用户在道具商店（ItemShop 组件）消费金币后，saveCoins 更新了 localStorage，但 index.jsx 中的 coins 状态未同步更新。导致顶部导航栏的金币徽章数量停留在页面初始值，直到页面刷新或组件重新挂载才会更新。用户在商店购买道具后返回首页，看到的仍然是消费前的金币余额，存在状态不一致。原因是父组件 coins 状态完全依赖初始化时的 localStorage 读取，未建立与子组件金币变动的同步机制。正确做法是将金币状态提升为共享状态，或在道具商店消费后通过回调通知父组件更新 coins。
+1. quiz.css 里得分动画只有一个 scoreFloat 关键帧，四种状态（答对、答错、超时、跳过）全用同一套向上飘的效果。提示词明确说答对飘字"+10"上升、答错"-5"下降，现在答错和超时也是往上飘的。原因就是只写了一个 @keyframes 复用给全部状态，没给 wrong 和 timeout 单独定义下落动画。应该为它们新增一个向下的动画，并覆盖对应选择器的 animation。
+
+2. QuizGame.jsx 的 handleAnswer 里 answerRecord 的 doubleNext 字段硬编码成了 false，而不是用当前组件状态里实际的 doubleNext 变量值。用户用了双倍道具后虽然实时得分算对了，但存的答案记录里双倍标记永远是 false。竞赛结束时 calculateRoundResult 从记录里读不到双倍生效标记，算出的总分跟答题时看到的不一致。应该把 `doubleNext: false` 改成 `doubleNext` 直接引用变量。
+
+3. index.jsx 里 coins 状态只在组件挂载时从 localStorage 加载一次。用户在道具商店花了金币后 saveCoins 更新了存储，但顶部导航栏的数字没变，要刷新页面才会更新。原因是父组件的 coins 状态跟子组件的金币变动没同步。应该把金币状态提升为共享状态，或者商店消费后用回调通知父组件更新。
 
 过程不满意：
-1. 模型在收到提示词后的第一个操作就是创建包含 9 个待办项的 TodoList，没有先通读提示词梳理 7 条需求的边界条件和验收标准。根据标注规范，不能在刚收到任务时直接创建 TodoList，应先全面分析需求文档再制定合理规划。这个行为导致整个开发过程缺少对需求复杂度的预判，比如将"编写核心逻辑模块"和"创建题库管理组件"等同优先级并列执行，未体现答题倒计时动画系统、道具效果计算等高复杂度需求与简单组件之间的轻重缓急区分，更容易在后期遇到架构问题时被迫返工。
-2. 模型在首次 ESLint 检查报错后，对 QuizGame.jsx 采取了直接重写整个文件的处理方式，而非针对具体的 lint 错误做逐个最小修正。QuizGame.jsx 是一个包含倒计时管理、得分动画、道具交互等核心逻辑的 375 行组件，整文件重写会引入不可控的新增变更风险。之后又经历了两轮"运行 lint → 发现错误 → 修改 → 再运行 lint"的循环才最终通过，体现了试错式修复的特征。以 Date.now() 在渲染期间调用为例，第一次修改只是换了个位置仍非法调用，第二次才改用 useEffect 方案。正确做法是先仔细阅读 lint 输出的具体行号和规则名称，精确定位每个违规点做最小修补，一次性分析和修复所有问题后再验证，避免同一文件反复推倒重来。
+1. 模型收到提示词后第一个操作就创建了 9 个 Todo，没先通读需求梳理边界条件和验收标准。规范要求不能上来就创建 Todo，应该先全面分析再规划。这导致把所有需求等同优先级排列，没区分倒计时动画、道具计算这种高复杂度跟简单组件之间的轻重，后面更容易被迫返工。
+
+2. 模型首次 ESLint 报错后直接重写了整个 QuizGame.jsx，而不是逐个修 lint 错误。这是 375 行的核心组件，整文件重写会引入不可控风险。之后又经历两轮"跑 lint→报错→改→再跑"才通过。以 Date.now() 在渲染期调用为例，第一次只是换了个位置还触发一样的问题，第二次才改用 useEffect。应该先仔细读 lint 输出，精确定位每个违规点做最小修补，一次性分析全量后统一修改。

@@ -1,7 +1,11 @@
 产物不满意：
-1. networkInterceptorUtils.test.js 中 sortRulesByPriority 的测试仅有两个用例——"返回规则数组的副本"和"空输入返回空数组"，两个用例均未验证真实的优先级排序行为。测试数据 `[{ id: '1' }, { id: '2' }]` 既没有 `enabled` 字段也没有 `priority` 字段，导致断言 `expect(result).toEqual(rules)` 即使排序逻辑被完整移除也依然通过，旧版纯浅拷贝的实现同样能通过此测试。这意味着测试套件无法检测排序功能是否被意外破坏或回退。正确做法是增加针对性测试：验证 `enabled` 为 true 的规则排在 false 之前、验证具有 `priority` 字段的规则按数值从小到大排列。
-2. network-interceptor.css 中仍保留了 `.ni-json-editor` 样式类（声明了 flex 布局、边框圆角、溢出隐藏等属性），但该 CSS 类在更新后的 JSX 中已无任何元素引用。模型将 Mock 数据编辑器改为使用 JsonEditorWithLineNumbers 组件（对应 CSS 类 `.ni-json-editor-wrapper`）后，旧的 `.ni-json-editor` 样式成为死代码残留，增加了样式文件的维护负担。正确做法是在组件重构完成后，对 CSS 文件做一次全局搜索，确认每个类都有对应的 JSX 引用，清理不再使用的样式规则。
+1. networkInterceptorUtils.test.js 里 sortRulesByPriority 的测试只有"返回副本"和"空输入返回空数组"两个用例，都没验证真实的优先级排序行为。测试数据没有任何 enabled 或 priority 字段，导致断言 `expect(result).toEqual(rules)` 即使排序逻辑被全删了也照样通过。这意味着测试套件检测不到排序功能被意外破坏或回退。应该加针对性测试：验证 enabled 为 true 排在 false 前、有 priority 字段的按数值从小到大排列。
+
+2. network-interceptor.css 里还留着 `.ni-json-editor` 样式类（声明了 flex 布局、边框圆角、溢出隐藏等属性），但更新后的 JSX 已不用这个类了。模型把 Mock 编辑器改成用 JsonEditorWithLineNumbers 组件后，旧样式成了死代码残留。应该在组件重构完成后对 CSS 做全局搜索，确认每个类都有对应的 JSX 引用，清掉不再使用的规则。
+
 过程不满意：
-1. 模型在收到提示词任务后，第一步行为就是调用 todo_write 创建 TodoList，没有先通读现有代码文件、理解当前实现状态再进行任务规划。根据标注规范要求，应该在分析问题和代码现状之后再创建 Todo 清单，而不是一上来就写任务列表。这种行为模式导致模型在还未充分了解代码结构时就已预设了修改方案，可能遗漏关键的上下文依赖关系。
-2. 模型在会话过程中多次重复完整读取相同的文件：index.jsx 至少被完整读取了 4 次（首次探索时读取、正则搜索 Mock 编辑器和 logContainerRef 后再次读取、准备添加 JsonEditorWithLineNumbers 组件前再次读取、准备添加自动滚动 useEffect 前再读取），networkInterceptorUtils.js 被完整读取了至少 3 次。虽然分批查看同一文件的不同区域是合理的，但多次完整读取同一文件而没有使用差量查看或语义搜索定点定位，说明模型对已获取的文件内容缺乏有效复用，浪费了推理轮次。正确做法是首次完整读取后建立对文件结构的整体认知，后续修改时用语义搜索或搜索定位到具体函数区域进行定点查看。
-3. 模型在运行测试和 lint 命令时，命令字符串末尾出现了 `undefined` 字面值——`pnpm test -- src/pages/__tests__/network-interceptor/ undefined` 和 `pnpm eslint src/pages/network-interceptor/ src/pages/__tests__/network-interceptor/ undefined`。这是工具调用参数未正确构造导致的 artifact，说明模型在拼装命令时对可选参数的处理不够严谨。虽然 vitest 和 eslint 可能忽略了多余的尾部参数未导致运行失败，但这种不精确的命令构造在生产环境中可能导致意外行为。正确做法是在构造命令字符串前确认所有参数都有合法值，避免将未定义的变量拼接进命令中。
+1. 模型收到提示词第一步就是创建 TodoList，没先读现有代码理解当前状态。违反"先分析再规划"规范。这导致还没充分了解代码结构就已预设了修改方案，可能遗漏关键上下文。
+
+2. 模型会话中多次重复完整读取相同文件：index.jsx 至少读了 4 次，networkInterceptorUtils.js 读了至少 3 次。虽然分批查不同区域是合理的，但多次完整读取说明对已获取的文件内容缺乏有效复用。应该首次完整读取后建立对文件结构的整体认知，后续用语义搜索或行号定位到具体区域做差量查看。
+
+3. 模型跑测试和 lint 命令时末尾出现 undefined 字面值。这是工具调用参数未正确构造导致的，说明拼装命令时对可选参数处理不严谨。虽然 vitest 和 eslint 可能忽略多余尾部参数没导致失败，但这种不精确的命令构造在生产环境可能导致意外行为。构造命令前应确认所有参数都有合法值，避免把未定义变量拼进去。

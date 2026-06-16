@@ -1,6 +1,9 @@
 产物不满意：
-1. handleFormat 函数在修订模式下为同一个格式化操作同时生成了 FORMAT 类型修订和多条 ADD 类型修订。当用户在修订模式下选中文字点击加粗按钮时，handleFormat 先调用 applyFormatToSelection 生成一条 FORMAT 修订记录，然后调用 applyFormatToContent 将选中文字包裹为 markdown 标记（如"测试"变成"**测试**"），再通过 processContentChangeWithRevision 检测内容变化。由于 oldContent 和 newContent 不一致，detectContentChanges 将前后新增的 markdown 标记符`**`识别为新增内容，额外生成了两条 ADD 类型修订记录。结果是同一个格式化操作在修订面板中同时显示一条 FORMAT 修订和两条 ADD 修订（分别对应首尾的标记符），修订记录冗余且语义混乱，用户无法分清哪些是真正的内容变更、哪些是格式化实现细节。根本原因是 handleFormat 在修订模式下不应再用 processContentChangeWithRevision 追踪格式化实现细节的内容变化，标记符属于内部实现不应对外暴露为修订记录。正确做法是在修订模式下仅通过 applyFormatToSelection 创建 FORMAT 修订记录，内容更新直接使用 updateParagraphContent 跳过 processContentChangeWithRevision。
-2. 非修订模式下格式化操作将 markdown 标记符直接注入段落内容导致视觉污染。handleFormat 无条件调用 applyFormatToContent 将选中文字包裹为 markdown 标记（如`**文字**`、`*文字*`、`<u>文字</u>`），但 renderParagraph 函数在无修订记录时直接渲染 paragraph.content 原始文本，不经过 renderContentSegments 即不应用 cd-revision-add 等 CSS 类。用户在非修订模式下选中文字点击加粗按钮后，段落内容从"文字"变为"**文字**"，页面上显示的是带星号的原生文本而非粗体效果。根本原因是格式化功能依赖修订模式下的 CSS 样式类来呈现视觉效果，但 handleFormat 中的 applyFormatToContent 调用未受 revisionMode 条件保护，内容注入和视觉呈现之间存在断档。正确做法是对格式化工具栏按钮增加 revisionMode 判断，非修订模式下禁用格式化操作并给出提示，或将格式信息与内容分离存储而非混入段落文本。
+1. handleFormat 在修订模式下为同一个格式化操作同时生成了 FORMAT 类型修订和多条 ADD 类型修订。用户选中文字点加粗时，handleFormat 先把选中文字包成 markdown 标记（如"**测试**"），再通过 processContentChangeWithRevision 检测内容变化。因为新旧内容确实不一样了，detectContentChanges 把新增的 `**` 标记符识别为新增内容，额外生成了 ADD 修订。结果一个格式化在修订面板里同时显示一条 FORMAT 加两条 ADD 修订，记录冗余语义混乱。应该在修订模式下不再追踪格式化实现细节的内容变化，标记符属于内部实现不应暴露为修订记录。
+
+2. 非修订模式下格式化把 markdown 标记符直接注入段落内容造成视觉污染。handleFormat 无条件把选中文字包裹为 markdown 标记，但 renderParagraph 在无修订时直接渲染原始文本，不经过 renderContentSegments 即不应用格式化样式。用户点加粗后段落从"文字"变成"**文字**"，页面上显示的是带星号的原始文本。应该对格式化按钮增加 revisionMode 判断，非修订模式下禁用并提示，或把格式信息与内容分离存储。
+
 过程不满意：
-1. 模型在收到提示词后立即创建了包含 7 个条目的 TodoList，然后才开始读取现有代码文件 view_files。违反了标注规范中"不能在刚收到任务时就直接创建 TodoList，应先分析问题再规划"的要求。此时模型尚未阅读 utils.js 和 index.jsx 的现有实现，不清楚代码中已有的函数接口、组件结构和数据流，所规划的 TodoList 条目基于对提示词的表面理解而非对实际代码缺陷的分析。正确做法是先通过 view_files 和 grep 完整阅读现有代码，理解当前实现的状态和各缺陷的根因，再基于代码现状制定修复计划和 TodoList。
-2. 模型在阅读完两个核心文件后直接决定"现在完全重写 index.jsx"，使用 Write 工具一次性替换了整个 950 行的组件文件。本轮是 Session 2 缺陷修复会话，提示词列出了 6 个明确的 BUG 修复点，每个都有独立的问题描述和修复方向。采用完全重写的方式既无法让标注人员通过 git diff 清晰看到每个 BUG 的具体修复内容，也存在引入与修复无关的新缺陷的风险——一旦重写时遗漏了原代码中的某个功能逻辑，就会产生回归。正确做法是针对每个 BUG 做一次独立的、最小化的 StrReplace 修改，每次修改后有明确的 diff 范围，既便于审查也降低引入新问题的风险。
+1. 模型收到提示词就创建了 7 个条目的 TodoList，然后才开始读代码。这时还没看 utils.js 和 index.jsx 的现有实现，不了解函数接口和组件结构，TodoList 基于对提示词的表面理解而非实际缺陷分析。应该先完整读现有代码理解现状和各缺陷根因，再基于代码现状定修复计划。
+
+2. 模型读完两个核心文件后直接决定"完全重写 index.jsx"，用 Write 一次性替换了整个 950 行的组件文件。本轮是 Session 2 缺陷修复会话，提示词列出 6 个明确 BUG 修复点，每个有独立的问题描述和修复方向。完全重写让标注人员无法通过 git diff 清晰看每个 BUG 的具体修复内容，也存在引入新缺陷的风险。应该针对每个 BUG 做最小化 StrReplace 修改，每次修改有明确 diff 范围。

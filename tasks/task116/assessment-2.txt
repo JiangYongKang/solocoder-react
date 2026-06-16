@@ -1,7 +1,9 @@
 产物不满意：
-模型在修复 copyToClipboard 测试时，修改了 routeUtils.js 中 copyToClipboard 函数的异常处理结构，将 `navigator.clipboard` 可用性判断从 try/catch 外部移入内部。该改动的直接动因是测试中用抛出异常的 getter 模拟 clipboard 不可用状态时，异常发生在 try 块外部导致测试报错无法通过，而非提示词中提到的任何产品缺陷。虽然改动本身在功能上使 getter 异常可被捕获属于合理增强，但触发它的根本原因是模型的 mock 策略与产品代码原有结构不兼容，模型选择了修改产品代码而非调整 mock 方案。根据标注规范中碰到 mock 困难应调整测试方案而非改变生产代码架构的原则，正确做法是改用不会抛错的 mock 对象来模拟 clipboard 不可用状态。
+模型修 copyToClipboard 测试时改了 routeUtils.js 的异常处理结构，把 navigator.clipboard 可用性判断从 try/catch 外面移进了里面。原因是测试里用了抛出异常的 getter 模拟 clipboard 不可用状态，异常发生在 try 块外部导致报错。虽然改动本身使 getter 异常可被捕获算合理增强，但触发它的根因是 mock 策略和产品代码原有结构不兼容，模型选了改产品代码而不是调整 mock 方案。根据规范遇到 mock 困难应调测试方案而非改生产代码架构，应该换用不抛异常的 mock 对象来模拟 clipboard 不可用。
 
 过程不满意：
-1. 模型在完成 route-planner 测试后，花费大量时间调查 sticky-notes 包的测试状态，包括读取 stickyNotesUtils.js 源码、搜索 moveNoteById 和 reorderNotes 函数定义、尝试单独运行 sticky-notes 测试用例。sticky-notes 是另一个完全独立的任务包，与当前任务 route-planner 毫无关联，根据项目标注规范只关注当前任务所在包的代码，这种跨任务包探索行为属于明确的范围越界，浪费了约两轮对话的开发时间。
-2. 模型在编写 downloadJSON 和 copyToClipboard 的单元测试时，经历了至少三轮测试文件全量重写：先用两次 edit_file_search_replace 追加测试内容，运行后发现缺少 vi 导入导致失败，修正后再次运行仍失败，接着尝试局部编辑失败后改用 Write 工具全量重写整个测试文件，之后因 vi.stubGlobal 兼容性问题仍然失败，最终第二次用 Write 全量重写才通过。整个过程呈现典型的试错式调试模式，模型没有在动手前先系统分析 jsdom 环境下 Blob、URL.createObjectURL、document、navigator.clipboard 等浏览器 API 的正确 mock 方式，而是反复推翻方案重写整个文件。
-3. 模型在编写测试任务的初期，连续三次调用 view_files 读取 routeUtils.test.js 文件，三次读取之间没有插入任何修改操作，全部显示相同内容。后续分析 downloadJSON 实现时，又连续两次读取 routeUtils.js。这种无意义的重复读取表明模型在读取文件后未立即行动，而是反复回到同一文件重新确认内容，读取效率低下。正确做法是一次性读取文件后立即进入分析或修改阶段，避免对同一文件做无变更的重复读取。
+1. 模型完成 route-planner 测试后花大量时间调查 sticky-notes 包的测试状态，包括读源码、搜索函数定义、单独跑测试。sticky-notes 是另一个完全独立的任务包，跟 route-planner 毫无关系。规范规定只关注当前任务包代码，这种跨包探索就是范围越界，浪费了约两轮对话时间。
+
+2. 模型写 downloadJSON 和 copyToClipboard 单测时经历了至少三轮测试文件全量重写：先追加内容发现缺 vi 导入，修了还失败又换局部编辑，报错后再 Write 全量重写，vi.stubGlobal 兼容性问题仍然失败，最后第二次 Write 全量重写才通过。整个过程是典型的试错式调试——没在动手前系统分析 jsdom 环境下这些浏览器 API 的正确 mock 方式，而是反复推翻方案重写整个文件。
+
+3. 模型初期连续三次 view_files 读 routeUtils.test.js，中间没做任何修改操作，显示相同内容。之后分析 downloadJSON 又连续两次读 routeUtils.js。无意义的重复读取说明读了文件后没立刻行动，反复回去确认。正确做法是一次性读取后马上进入分析或修改阶段。

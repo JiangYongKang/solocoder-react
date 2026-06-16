@@ -1,8 +1,11 @@
 产物不满意：
-1. renderParagraph 函数第530行的渲染条件仍为 `revisions.length > 0 ? renderContentSegments(paragraph, revisions) : paragraph.content`，提示词第3条要求"修改该条件确保存在格式范围时也能调用 renderContentSegments 进行渲染"的需求未被满足。在非修订模式下 revisions 始终为空数组，条件恒为 false，渲染分支直接输出 paragraph.content 原始文本，formatRanges 中的格式数据和 CSS 样式虽然已就绪但渲染层从未被触发。虽然 utils.js 中的 renderContentWithFormats 已通过拆分点算法正确修复了提示词第4条要求的分段渲染逻辑，但 renderParagraph 的入口条件未修改导致所有格式化渲染路径在非修订模式下仍然被短路，用户选中文字加粗后页面上仍然看不到任何样式变化，需求完全未达成。正确做法是在 renderParagraph 中增加 `const formatRanges = getFormatRangesForParagraph(paragraph)` 并将会渲染条件改为 `revisions.length > 0 || formatRanges.length > 0`，确保存在格式范围时也能调用 renderContentSegments 进行渲染。
-2. 提示词第5条要求的 allMarkers 残留代码清理已在 rewrite renderContentWithFormats 时完成，拆分点算法已正确替代旧的分段逻辑，formatRange 边界处的文本拆分也已实现。提示词第6条要求的128个测试全部通过。
+1. renderParagraph 的渲染条件还是 `revisions.length > 0 ? renderContentSegments(...) : paragraph.content`，提示词让修改条件确保有格式范围时也能调用 renderContentSegments 的要求没实现。非修订模式下 revisions 始终为空，渲染还是直接输出原始文本，formatRanges 数据和 CSS 虽已就绪但渲染路径从未触发。虽然 utils.js 的 renderContentWithFormats 已通过拆分点算法修好了逻辑，但 renderParagraph 的入口条件没改导致所有格式化渲染在非修订模式下仍然被短路。应该在 renderParagraph 中增加 formatRanges 并改成 `revisions.length > 0 || formatRanges.length > 0`。
+
+2. allMarkers 残留代码清理已在重写 renderContentWithFormats 时完成，拆分点算法已正确替代旧的分段逻辑，formatRange 边界处的文本拆分也已实现。128 个测试全部通过。
 
 过程不满意：
-1. 模型在收到提示词后第一句话就是"让我逐个分析并修复这4个问题"并立即创建 TodoList，然后才开始读取 utils.js 和 index.jsx。此时模型尚未阅读任何现有代码、不了解函数接口和组件结构，违反了标注规范中"不能在刚收到任务时就直接创建 TodoList，应先分析问题再规划"的要求。这导致后续修复计划与实际代码状态脱节——模型在未确认 renderParagraph 当前条件逻辑和 formatRanges 数据流的情况下就直接拟定修复方案。正确做法是先完整阅读相关代码文件、逐条对照提示词理解各缺陷的根因和影响范围，再制定修复计划。
-2. 模型在 session-cot-4.md 总结中声称 renderParagraph 条件已修改并添加了 shouldRenderSegments 变量，但实际 git diff 确认 index.jsx 的 renderParagraph 函数完全未被改动，模型的总结描述与代码实际状态不符。结合 session-cot-4.md 日志中模型发现 utils.js 的修改未保存并重新编辑的事实，推断 index.jsx 的编辑操作同样未生效，但模型在后续步骤中只重新检查了 utils.js 的保存状态而未以同样方式验证 index.jsx 的编辑结果。模型在未通过 git diff 或读取文件确认修改已落盘的情况下就声称问题已修复，存在幻觉与虚假完成问题。正确做法是在每次编辑操作后读取文件关键区域或运行 git diff 确认修改已实际写入，并在总结开发成果时基于文件系统的真实内容进行描述。
-3. 模型在总结中声称"133个测试全部通过（原112 + 上轮16 + 本轮5个边界拆分测试）"，但实际运行 collaborative-doc 包测试终端输出显示共128个测试通过，与模型声称的133个存在5个偏差。虽然所有测试确实全部通过，功能验证结果本身没有问题，但测试数量统计不准确反映出模型在总结时未基于实际测试终端输出进行描述，而是凭手动推算或记忆给出数字。正确做法是在最终总结前重新运行一次完整测试，直接从终端输出的 Tests: 行提取实际通过数量作为描述的准确依据。
+1. 模型收到提示词第一句就是"让我逐个分析并修复"然后创建 TodoList，才开始读代码。此时还没看任何代码，不了解函数接口和组件结构，违反"先分析再规划"规范。导致修复计划跟实际代码状态脱节——没确认 renderParagraph 当前条件和 formatRanges 数据流就拟定方案。
+
+2. 模型在 session-cot 总结里声称 renderParagraph 条件已修改并添加了 shouldRenderSegments 变量，但实际 git diff 确认 renderParagraph 完全没被改动。结合日志中模型发现 utils.js 修改没保存并重编的事实，推断 index.jsx 的编辑同样没生效，但模型只重查了 utils.js 的保存状态没同样验证 index.jsx。总结描述与代码实际状态不符，属于幻觉与虚假完成。每次编辑后都应读文件关键区域或 git diff 确认改动物理写入。
+
+3. 模型总结说"133 个测试全部通过"，但实际 terminal 输出显示共 128 个测试通过。虽然测试确实全过了功能验证结果没问题，但数量统计不准说明模型写总结时不是基于实际 terminal 输出，而是凭手动推算或记忆写数字。应该总结前重新跑一次完整测试，从 terminal 的 Tests 行提取实际通过数量。

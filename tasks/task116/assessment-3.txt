@@ -1,9 +1,13 @@
 产物不满意：
-1. 提示词第 2 条要求将 copyToClipboard 的 navigator.clipboard 可用性判断从 try-catch 内部移回外部，但 routeUtils.js 第 396-397 行的判断仍位于 try 块内部。可用性判断与 writeText 异步调用的异常捕获边界未分离，违反"测试不应驱动生产代码架构变更"原则。原因是模型只做了表面编辑但判断位置实际未移动。正确做法是将判断移至 try 外部，让不可用检查和 writeText 异常处理各自独立。
-2. 模型在 routeUtils.js 第 386-388 行对 downloadJSON 函数中 URL.revokeObjectURL 调用额外包裹了 try-catch。该改动不在提示词三条要求的范围内，属于未经授权的生产代码变更，可能掩盖 revokeObjectURL 正常流程中不应出现的异常。原因是模型在还原 copyToClipboard 结构时将注意力扩散到了相邻函数。正确做法是只做提示词范围内的还原。
+1. 提示词让把 copyToClipboard 的可用性判断从 try-catch 内部移回外部，但 routeUtils.js 第 396-397 行的判断还在 try 块里面。可用性判断和 writeText 异常捕获的边界没分开，违反"测试不应驱动生产代码架构变更"的原则。原因是模型只做了表面编辑但判断位置实际没移动。应该把判断移到 try 外部。
+
+2. 模型在 routeUtils.js 里对 downloadJSON 的 URL.revokeObjectURL 调用额外包了 try-catch。这个改动不在提示词三条要求范围内，属于未经授权的生产代码变更，可能掩盖正常情况下不该出现的异常。原因是在还原 copyToClipboard 结构时注意力扩散到了相邻函数。应该只做提示词范围内的还原。
 
 过程不满意：
-1. 模型在总结中展示的 copyToClipboard 代码将判断标注为"移回 try 外部"，但 routeUtils.js 第 396-397 行实际判断仍在 try 内部。总结描述与文件内容严重不符，属于幻觉与虚假完成问题。模型凭借"执行了还原操作"的主观印象得出错误结论，未在总结前通过 view_files 重新读取文件逐行核实改动是否实际生效。
-2. 模型对 sticky-notes 包进行了大量跨包操作：编辑 stickyNotesUtils.js 尝试还原 adjustedIndex、两次查看并两次编辑 stickyNotesUtils.test.js 来修改期望值、两次单独运行 sticky-notes 测试验证。提示词第 1 条只要求还原一处源码改动，不需要也不应修改该包的测试文件。sticky-notes 是独立任务包，这些读改操作属于明确的范围越界。
-3. 模型对 funnel-analysis 和 modal-generator 两个包的测试失败进行了调查：搜索 getDateNDaysAgo 和 createDefaultConfig 函数、查看 modalGeneratorCore.test.js、单独运行测试用例。这两个包与 route-planner 任务完全无关，调查无关包的测试失败浪费了多轮工具调用时间，属于明确的范围越界。
-4. 模型对 downloadJSON 函数添加 revokeObjectURL 的 try-catch 包裹未在提示词中被要求。这反映出模型将还原 copyToClipboard 异常处理结构的意图泛化到了相邻函数，对"还原操作"的边界理解出现了无意识扩散。正确做法是严格按提示词限定的三条要求执行，不额外修改其他函数的实现。
+1. 模型总结里展示的 copyToClipboard 代码把判断标注为"移回 try 外部"，但实际文件中判断还在 try 里面。总结跟文件内容严重不符，属于幻觉与虚假完成。模型凭借"执行了还原操作"的主观印象得出错结论，没在总结前通过 view_files 重新读文件逐行核实。
+
+2. 模型对 sticky-notes 包做了大量跨包操作：编辑源码尝试还原调整逻辑、两次看两次改测试文件改期望值、两次单独跑测试验证。提示词只要求还原一处源码改动，不需要也不该改那个包的测试。sticky-notes 是独立任务包，这些读改都算范围越界。
+
+3. 模型调查了 funnel-analysis 和 modal-generator 两个包的测试失败：搜索函数、看测试文件、单独跑用例。这两个包跟 route-planner 一点关系没有，调查无关包的测试失败浪费了多轮工具调用时间。
+
+4. 模型对 downloadJSON 加 revokeObjectURL 的 try-catch 包裹不在提示词要求中。这反映出把还原 copyToClipboard 异常处理结构的意图泛化到了相邻函数，对"还原操作"的边界理解无意识扩散了。应该严格按提示词限定的三条要求做事。

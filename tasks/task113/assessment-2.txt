@@ -1,4 +1,5 @@
 产物不满意：
-index.jsx的handleGameFinish接收earnedCoins参数但从未调用setCoins更新父组件coins状态，QuizGame轮次结束把金币写入localStorage后父组件仍保持初始值。用户从游戏切到道具商店时ItemShop接收陈旧coinsProp，且coinsProp ?? loadCoins()在coinsProp为0时不回退到loadCoins()，因0非null。模型只建立了商店到父组件的回调同步，遗漏了游戏获得金币后也需同步到顶部徽章和商店。应在handleGameFinish中增加setCoins调用完善双向同步。
+index.jsx 的 handleGameFinish 虽然接收了 earnedCoins 参数，却从来没调 setCoins 更新父组件状态。轮次结束把金币写进 localStorage 后父组件还拿着初始值。用户从游戏切到道具商店时 ItemShop 收到的是旧数据，而且 coinsProp ?? loadCoins() 在 coinsProp 为 0 时不会回退到 loadCoins()，因为 0 不是 null。模型只做了商店到父组件的回调同步，漏掉了游戏获得金币后也要同步到顶部徽章和商店。应该在 handleGameFinish 里加上 setCoins 调用。
+
 过程不满意：
-模型修复doubleNext问题时经历了三轮方案切换：先在QuizGame.jsx加useEffect管理双倍状态，发现依赖循环后推倒改用三个ref分层；又新增监听currentIdx的useEffect做切题重置，ESLint报依赖缺失后再次推倒把逻辑移入goToNextQuestion并删useEffect。同一份状态管理从useEffect一路换到ref配合useEffect再到ref配合goToNextQuestion，通过大量粒度编辑反复修改。应先梳理全部触发点行为边界后一次性实现，而非边写边推翻。
+模型修 doubleNext 问题时换三轮方案：先在 QuizGame.jsx 加 useEffect 管双倍状态，发现依赖循环后推倒换成三个 ref 分层；又加监听 currentIdx 的 useEffect 做切题重置，ESLint 报依赖缺失后再次推倒，把逻辑移进 goToNextQuestion 删掉 useEffect。同一份状态管理从 useEffect 一路换到 ref 加 useEffect 再加 goToNextQuestion，通过大量细碎编辑反复推倒。应该先把所有触发点的行为边界梳理清楚再一次性实现。

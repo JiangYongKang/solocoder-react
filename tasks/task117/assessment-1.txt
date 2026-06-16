@@ -1,13 +1,21 @@
 产物不满意：
-1. 修订痕迹标记仅存在于侧边栏数据列表中，未渲染到文档编辑区文本上。index.jsx 的 renderParagraphWithCursors 方法虽然调用了 getRevisionsByParagraph 获取了 revisions 变量但后续完全没有使用该变量来标记段落文本。CSS 中定义了 .cd-revision-add/.cd-revision-delete/.cd-revision-format 以及 .cd-revision-tooltip 的样式，但 JSX 中从未将这些 CSS 类应用到文本 span 上，也未渲染悬停提示的 DOM 元素。需求第3条要求的绿色背景加下划线、红色背景加删除线、蓝色虚线边框等视觉标记均未实现。根本原因是修订标记的渲染逻辑被遗漏，只做了数据层面的增删改查。正确做法是在 renderParagraphWithCursors 中根据 revisions 数组拆分文本为多个 span 并分别应用对应样式类，同时为每个标记段附加 title 属性或悬浮 tooltip 显示操作人和时间。
-2. 格式修改修订类型从未触发，REVISION_TYPE.FORMAT 已在 constants.js 中定义且 CSS 有对应样式但整个页面没有生成 FORMAT 修订的代码路径。handleParagraphChange 方法仅通过比较新旧内容长度增减来判断 ADD 或 DELETE 类型，工具栏中没有加粗、斜体、字体颜色等格式化按钮，无法触发 FORMAT 类型修订。需求第3条明确要求"格式修改（如加粗、字体颜色变化）以蓝色虚线边框标记"，该功能完全缺失。正确做法是在工具栏增加格式化按钮，监听格式变更事件并在修订模式下生成 FORMAT 类型的修订记录。
-3. 批注的文本选中功能未按需求实现。需求第5条要求"选中一段文字后添加批注"，但实际实现使用一个 select 下拉框让用户选择段落编号，newComment.text 默认取段落内容的前30个字符，用户无法通过鼠标在编辑区中划选具体文字片段来创建批注，选中原文引用与批注之间的语义关联丢失。评论卡片中显示的原文引用始终是段落前30字而非用户实际选中的文字。正确做法是监听编辑区的 selectionchange 事件获取用户划选的文本范围，用选中的文字填充批注的 text 字段。
-4. 光标位置渲染不准确。utils.js 的 moveRandomCursor 将光标 offset 设置为随机字符索引，但 index.jsx 渲染时用 `left: ${Math.min(cursor.offset * 0.6, 95)}%` 将字符索引与容器宽度百分比强行线性映射，offset=10 和 offset=100 对应的像素位置与各自文字在段落中的实际位置无关联。此外光标 span 元素直接插入 contentEditable 的 div 内部与文本节点混排，会干扰用户的编辑操作和浏览器的文字布局。正确做法是用独立的叠加层渲染光标，通过 Range API 获取字符的实际 DOM 坐标来计算光标位置。
-5. utils.js 的 getCollaboratorById 函数存在冗余遍历：先用 `data.collaborators.findIndex` 获取索引 idx，紧接着又用 `data.collaborators.find` 查找同一用户对象 collab，同一个数组被遍历两次仅为了分别取索引和值。且在 userId 等于 CURRENT_USER.id 时直接返回当前用户对象，idx 变量被声明但未使用，存在无效变量。应合并为单次循环同时获取索引和值。
-6. 删除类型的修订比较逻辑过于简化。handleParagraphChange 中判断删除类型仅使用 `newContent.length < oldPara.content.length` 并将 `oldPara.content.slice(newContent.length)` 全部标记为删除文字，此方法假设修改只发生在内容末尾。当用户在段落中间删除文字时，slice 截取的是末尾部分而非实际被删除的中间文字，导致删除修订记录的内容与实际删除位置不匹配。正确做法是使用 diff 算法比较旧内容和新内容，精确识别被删除的文字片段及其起止位置。
+1. 修订痕迹标记只存在于侧边栏数据列表里，没渲染到文档编辑区的文本上。renderParagraphWithCursors 虽然调了 getRevisionsByParagraph 拿到了 revisions 变量，但后面根本没用它来标记段落文字。CSS 里定义了 .cd-revision-add/.cd-revision-delete/.cd-revision-format 样式，JSX 却从没把这些类应用到文本 span 上，也没渲染 tooltip。需求要求的绿色背景加下划线、红色背景加删除线、蓝色虚线边框全没做。应该在渲染时按 revisions 拆分文本为多个 span 并应用对应样式。
+
+2. 格式修改修订类型从来没触发过。FORMAT 类型虽已在常量里定义且 CSS 有对应样式，但整个页面没任何代码路径能生成 FORMAT 修订。handleParagraphChange 只通过新旧内容长度对比判断 ADD/DELETE，工具栏没有格式化按钮，无法触发 FORMAT 修订。需求明确要求格式修改以蓝色虚线边框标记，这功能完全缺失。应该在工具栏加格式化按钮，修订模式下生成 FORMAT 记录。
+
+3. 批注的文本选中功能没按需求实现。需求要求"选中一段文字后添加批注"，实际却用下拉框让用户选段落编号，批注原文取段落前 30 个字符。用户没法在编辑区划选具体文字来创建批注，产生的批注跟实际选中内容没关系。应该监听 selectionchange 事件获取用户划选范围，用选中文字填批注 text。
+
+4. 光标位置不准确。moveRandomCursor 设了字符索引作为 offset，渲染时用 `left: ${Math.min(cursor.offset * 0.6, 95)}%` 把字符索引和容器宽度百分比强行线性映射，offset 为 10 和 100 对应的像素位置跟文字实际位置没关系。而且光标 span 插在 contentEditable 的 div 里跟文本混排，会干扰用户编辑。应该用独立叠加层通过 Range API 获取字符真实坐标来定位。
+
+5. getCollaboratorById 里先用 findIndex 拿索引，再用 find 查同一用户，同一个数组遍历两次只为分别取索引和值。userId 等于 CURRENT_USER.id 时直接返回，idx 变量声明了但没用。应该合并为单次循环同时取索引和值。
+
+6. 删除修订的比较逻辑太简陋了。handleParagraphChange 判断删除时只用 `newContent.length < oldPara.content.length` 并把多出长度全部标记为删除文字，这假定了修改只发生在末尾。用户在段落中间删字时，slice 截取的是末尾部分而不是实际被删的中间文字。应该用 diff 算法精确对比新旧内容找出真正被删的文字和位置。
 
 过程不满意：
-1. 模型在任务开始后立即创建了7项 TodoList，未先通读7条需求做复杂度评估和模块划分就开始规划。随后将全部功能写入单个 index.jsx 文件——该文件长达 740 行，包含文档编辑区、协作者列表、修订面板、版本对比视图、批注系统、通知系统等所有 UI 逻辑，没有任何子组件拆分。项目中其他任务页面（如 auth 有 LoginForm/RegisterForm 等子组件、kanban 有多列组件）均采用组件拆分模式，模型未参考现有项目规范。单体组件导致各功能模块高度耦合，修复一个缺陷时可能需要通读整个文件。
-2. 模型仅运行了 npx vitest run 确认 82 个测试用例通过，从未执行 pnpm run dev 启动开发服务器进行页面实际渲染验证。因此未能发现修订痕迹标记未渲染到编辑区、光标位置偏差、评论批注无法通过选中文字添加等页面交互层面的缺陷。模型在最终回复中写道"多人协作文档编辑模拟页面已全部实现完成"时，从未在浏览器中实际验证过任何一个功能的交互效果，属于虚假完成问题。正确做法是开发完成后启动 dev server 手动走通全部功能路径，逐条对照需求检查交互效果。
-3. 光标移动定时器使用了 `setInterval(callback, 3000 + Math.random() * 5000)`，Math.random() 在 useEffect 首次执行时就已计算完毕并固定为某个具体数值，之后的每次定时触发间隔均为该固定值，不符合需求第1条中"每隔 3-8 秒随机移动"的要求。正确做法是使用 setTimeout 递归调用，每次执行完回调后重新计算下一次的随机延迟时间。
-4. 模型在 session-cot-1.md 中的执行路径为"查看项目结构 -> 查看示例页面 -> 创建文件 -> 运行测试 -> 检查 lint"，全程未建立需求到实现的映射对照表，也未在完成后逐条回溯需求做自检。这导致修订痕迹渲染、选中文字标注、FORMAT 修订触发等多个功能点的遗漏没有被及时发现。正确做法是在实现前将7条需求逐一拆解为功能点清单，完成后逐项打勾确认覆盖，而非仅依赖测试通过数量判断完成度。
+1. 模型开始后立即创建 7 项 Todo，没先通读 7 条需求做评估就规划。然后把所有功能塞进一个 740 行的 index.jsx，没有任何子组件拆分。项目里其他任务页面都做了组件拆分，模型没参考现有规范。单体组件导致功能高度耦合，修一个缺陷可能要通读整个文件。
+
+2. 模型只跑了 npx vitest run 确认 82 个测试通过，从没启动 dev server 做页面实际渲染验证。因此没能发现修订痕迹没渲染到编辑区、光标偏差、批注无法选文字这些交互层缺陷。最终回复里说"全部实现完成"时压根没在浏览器验证过任何功能。应该启动 dev server 手工走通全部路径，逐条对照需求检查交互效果。
+
+3. 光标定时器用了 setInterval(callback, 3000 + Math.random() * 5000)，Math.random() 在 useEffect 首次执行时就固化成一个值了，之后每次触发间隔都是这个固定值，不符合需求"每隔 3-8 秒随机移动"的要求。应该用 setTimeout 递归调用，每次执行完后重新算随机延迟。
+
+4. 模型执行路径是"看项目结构→看示例页面→创建文件→跑测试→检查 lint"，全程没建立需求到实现的映射对照表，也没在完成后逐条回溯自检。导致修订渲染、划选批注、FORMAT 触发等多个功能点遗漏没及时发现。应该在实现前把需求拆成功能点清单，完成后逐项打勾确认。

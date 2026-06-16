@@ -1,8 +1,11 @@
 产物不满意：
-ImportDialog 组件的 JSON 粘贴编辑区（index.jsx 第 437-444 行）仍然使用原生 `<textarea>` 配合 `className="ni-form-textarea"`，没有替换为 `JsonEditorWithLineNumbers` 组件，也没有调用 `getJsonErrorLine` 做错误行号定位。当用户粘贴格式有误的 JSON 到导入规则对话框时，仅显示 `importRulesFromJson` 返回的泛化错误文本，无法像其他编辑区一样获得"JSON 错误（第 N 行）"的行号提示和红色高亮。提示词第 1 条要求将错误行号定位和高亮功能扩展到"所有涉及 JSON 编辑的输入区域"，导入对话框中的 JSON 粘贴区是一个允许用户编辑 JSON 文本的输入区域，属于该要求的覆盖范围。正确做法是将 ImportDialog 的 textarea 同样替换为 JsonEditorWithLineNumbers 组件，并在 JSON 校验失败时利用 getJsonErrorLine 展示具体错误行号。
+ImportDialog 的 JSON 粘贴编辑区还是原生 `<textarea>` 没换成 JsonEditorWithLineNumbers 组件，也没调用 getJsonErrorLine 做错误行号定位。用户粘贴格式有误的 JSON 到导入对话框时，只能看到 importRulesFromJson 返回的泛化错误文本，没法像其他编辑区一样获得"第 N 行"的行号提示和红色高亮。提示词要求把错误行号定位扩展到"所有涉及 JSON 编辑的输入区域"，导入对话框的 JSON 粘贴区显然属于这个范围。应该同样替换为 JsonEditorWithLineNumbers 组件并展示具体错误行号。
 
 过程不满意：
-1. 模型在收到提示词后的第一个工具调用就是 `todo_write` 创建了 4 个子任务，然后才开始读取 index.jsx 代码文件。这是连续第三轮出现相同的问题模式——assessment-1 和 assessment-2 均已指出不应在未分析代码现状的情况下直接创建 TodoList。正确的流程是先读取当前代码文件了解实现状态，对照提示词梳理需求清单，确认理解无偏差后再制定分步实施计划。过早创建 Todo 导致模型在尚未充分理解代码结构时就预设了修改方案。
-2. 模型在开始编辑前对 index.jsx 进行了三次连续的完整读取（第一次在创建 TodoList 之前，第二次在创建 TodoList 之后，第三次在进入编辑前），每次读取的都是同一个文件的完整内容且中间没有任何编辑动作。这是 assessment-2 中已指出过的冗余读取问题——模型在同一文件上做了无意义的重复全量读取，浪费了推理轮次。正确做法是首次完整读取后利用语义搜索或定点搜索定位到具体函数区域做差量查看。
-3. 模型在运行测试和 ESLint 命令时，命令字符串末尾多次出现 `undefined` 字面值——`pnpm test -- src/pages/__tests__/network-interceptor/ undefined` 和 `pnpm eslint src/pages/network-interceptor/ src/pages/__tests__/network-interceptor/ undefined` 共出现了 4 次。这是 assessment-2 中已明确指出的工具调用参数构造问题，说明模型在拼装命令时对可选参数的处理仍然不严谨，未从上一轮的反馈中修正此行为。正确做法是在构造命令字符串前确认所有参数都有合法值，避免将未定义的变量拼接进命令中。
-4. 模型首次运行测试时使用了 `pnpm test -- src/pages/__tests__/network-interceptor/`，该命令会运行整个项目中匹配该路径的所有测试文件。测试结果输出中包含了 `funnel-analysis` 包的失败用例，模型直到看到其他包的失败后才意识到需要更精确的过滤，然后又运行了带 `--run` 标志的命令再次失败，最终才换成直接指定测试文件路径的方式成功运行。整个过程浪费了两轮命令执行来试错。正确做法是先确认 vitest 命令的正确语法和过滤参数，一步到位地运行目标包的测试。
+1. 模型收到提示词第一个操作就是创建 4 个 Todo，然后才读代码。这是连续三轮出现相同问题模式——assessment-1 和 assessment-2 都已指出不应在未分析代码现状下直接创建 Todo。正确流程是先读当前代码了解实现状态，对照提示词梳理需求，确认理解无偏差后再规划。过早创建 Todo 导致还没充分理解代码结构就预设了修改方案。
+
+2. 模型编辑前对 index.jsx 连续三次完整读取（第一次在创建 Todo 前、第二次在之后、第三次在编辑前），每次读同一个文件完整内容且中间没任何编辑。这是 assessment-2 已指出过的冗余读取。应该首次完整读取后用语义搜索或定点搜索定位到具体函数做差量查看。
+
+3. 模型跑测试和 ESLint 命令时末尾多次出现 undefined 字面值，共出现了 4 次。这是 assessment-2 已明确指出的工具调用参数构造问题，说明模型拼命令时对可选参数的处理仍然不严谨，未从上轮反馈修正。构造命令字符串前应确认所有参数都有合法值。
+
+4. 模型首次跑测试用 `pnpm test -- src/pages/__tests__/network-interceptor/`，该命令会跑整个项目匹配该路径的全部测试，结果输出包含 funnel-analysis 包失败用例。模型看到其他包失败后才意识到需要更精确过滤，又跑带 --run 标志的命令再次失败，最终才换成直接指定文件路径的方式成功。浪费两轮命令来试错。应该先确认 vitest 命令正确语法和过滤参数一步到位。

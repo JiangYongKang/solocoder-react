@@ -1,7 +1,9 @@
 产物不满意：
-1. 模型修改了 src/pages/__tests__/modal-generator/modalGeneratorCore.test.js 中 createConfigByType(FORM) 测试的 content 断言，从期望空字符串改为 expect(config.content).toBe('请填写以下信息：')。该文件属于 modal-generator 包，与当前任务 message-queue 包完全无关。提示词第 2 条要求 pnpm run test 全量通过，但修改其他任务包测试用例来达成全量通过属于跨任务污染，违反了任务隔离原则。message-queue 包下 72 个测试在改动前即可全部通过，无需修改任何非本包文件。正确做法是只确认本包测试通过，对其他包的测试失败不应干预。
-2. 在 handleSelectTopic 函数中切换主题时，函数内部只调用了 setEditMaxRetries(topic.maxRetries) 重置重试次数输入值，但没有清除 maxRetriesError 和 maxRetriesSaveMsg 这两个新增状态。当用户在主题 A 设置页保存最大重试次数触发"✅ 保存成功"后，若 2 秒内切换到主题 B，主题 A 的成功提示会残留在主题 B 的设置界面中。原因是引入两个新 UI 状态字段后，未在主题切换生命周期中同步清理。正确做法是在 handleSelectTopic 中增加 setMaxRetriesError('') 和 setMaxRetriesSaveMsg('') 调用。
+1. 模型改了 modal-generator 包的测试文件，把 content 断言从空字符串改成了特定文案。这文件跟 message-queue 任务毫无关系。提示词让跑通全量测试，但 message-queue 包 72 个测试本来就能过，没必要碰别人包的代码。这种跨包修改违反了任务隔离原则，正确做法是只确认本包测试通过就行。
+
+2. handleSelectTopic 切换主题时只重置了重试次数输入值，没清掉 maxRetriesError 和 maxRetriesSaveMsg 这两个状态。如果在主题 A 保存成功弹出提示，2 秒内切到主题 B，A 的成功提示就残留到 B 界面上了。问题是加了新状态后忘记在切换时一起清理。应该在 handleSelectTopic 里加上对这两个状态的清除。
 
 过程不满意：
-1. 模型在动手修改 index.jsx 之前连续三次调用文件查看工具打开同一个 index.jsx 文件，三次读取之间没有任何有效操作或思考输出，属于无意义的机械重复。这反映出模型在正式修改前未先梳理改动范围和具体位置，而是惯性多次打开同一文件却不做实质性分析。正确做法是第一次读取后就在思考中明确需要在 handleUpdateMaxRetries 和 renderSettings 两个函数中进行改动，然后直接开始编辑而非反复查看。
-2. 模型首次运行 pnpm run test 后发现 modal-generator 包存在测试失败，没有判断这些失败是否与当前 message-queue 任务相关，而是直接将其视作任务的一部分进行修复。模型用搜索工具查找关键词"请填写以下信息"后，在思考过程中写道"核心代码更合理，所以我修改测试来匹配实现"，并在最终总结中将 modal-generator 测试的改动列为任务的两个修复成果之一。这暴露出模型对任务边界理解偏差，提示词明确限定修复范围是消息队列页面的两个问题，其他包测试失败不属于本任务范畴。正确做法是确认 message-queue 包 72 个测试通过后即停止，对其他包失败只做观察汇报，不做修改。
+1. 模型动手改 index.jsx 前连续三次打开同一个文件，中间啥也没干，属于机械重复。这说明没先想清楚要改哪，就惯性反复读。正确做法是第一次读完就明确要在 handleUpdateMaxRetries 和 renderSettings 里下手，然后直接改。
+
+2. 模型跑测试发现 modal-generator 包有失败，没判断跟当前任务有没有关系就直接去修。搜索关键词后认为"核心代码更合理所以改测试来匹配"，还把这改动列为本轮成果。但提示词明明只让修消息队列页面的两个问题，其他包测试失败不归本轮管。正确做法是确认 message-queue 72 测试通过就停，别的包只观察不干预。

@@ -1,11 +1,11 @@
 产物不满意：
-1. modalGeneratorCore.js 的 highlightSyntax 函数在字符串 token 解析中，while 循环仅在找到闭合引号后退出。当输入包含未闭合字符串时，j 越过 code.length 导致循环退出但 i 仍停留在引号位置，外层循环会反复进入同一分支形成死循环。正常生成代码不会触发此问题，但该导出函数缺乏异常输入的防御。根本原因是分支末尾遗漏了 j 越界的兜底处理。正确做法是在 while 循环后判断 j 是否越界，若越界则将剩余内容作为异常 token 输出并推进 i。
+1. highlightSyntax 函数的字符串解析里，while 循环只在找到闭合引号才退出。如果输入有未闭合字符串，j 越过 code.length 但 i 还卡在引号位置，外层循环反复进入同一分支形成死循环。正常调用不会触发，但导出函数缺少异常输入的防御。应该在循环后加 j 越界的兜底处理，把剩余内容当异常 token 输出然后推进 i。
 
-2. modalGeneratorCore.js 的 hasButtonColor 函数与 hasConfirmButton 函数体完全一致，都只对 CONFIRM、ALERT、FORM 返回 true。两个函数语义拆分合理但实现重复，如果未来需要差异化按钮显示和按钮颜色逻辑时，修改者可能只改一处而遗漏另一处。根本原因是模型在编写 hasButtonColor 时直接复制了 hasConfirmButton 的实现而非复用它。正确做法是 hasButtonColor 内部直接调用 hasConfirmButton 并返回其结果。
+2. hasButtonColor 和 hasConfirmButton 两个函数体完全一样，都只对三种类型返回 true。现在这样复制粘贴实现的，万一以后要改按钮颜色逻辑跟按钮显示逻辑分开，改一处理论上就会漏另一处。应该在 hasButtonColor 里直接调 hasConfirmButton 返回结果就行。
 
 过程不满意：
-1. 模型在收到提示词后立即创建了 5 项 TodoList，跳过了通读需求和预分析文件依赖的环节。后续开发中 modalGeneratorCore.js 在相邻两轮工具调用中被读取了两次，测试文件 modalGeneratorCore.test.js 在修改前被读取了三次才定位到编辑位置。这种未分析就动手的行为导致视线在多个文件间来回切换，浪费了约两轮推理周期。正确做法是收到任务后先浏览所有相关文件的完整内容，理清各修复需求的文件归属和修改顺序，再创建按依赖排序的 TodoList。
+1. 模型收到提示词后立刻创建了 5 个 Todo，跳过了通读需求和分析文件依赖。后续 modalGeneratorCore.js 被相邻两轮读了两次，测试文件在读第三次才定位到编辑位置。没分析就动手，视线在多个文件间来回跳。应该先浏览所有相关文件完整内容，理清各修复的文件归属和顺序再排 Todo。
 
-2. 模型在修复完成后两次运行测试时均使用了 `pnpm vitest run src/pages/__tests__/modal-generator/modalGeneratorCore.test.js`，直接指定了单包测试文件路径，而非提示词第五条明确要求的 `pnpm run test` 全量测试命令。模型自行缩小测试范围的行为违背了提示词的显性指令，缺少对防守性约束的敏感度。根本原因是模型习惯性选择了更快的局部验证路径。正确做法是严格运行提示词指定的 `pnpm run test`，确认全部测试文件无回归后再用局部测试进行快速迭代。
+2. 模型跑测试时用了指定文件路径的命令 `pnpm vitest run src/pages/__tests__/modal-generator/...`，而不是提示词明确要求的 `pnpm run test` 全量测试。自己缩小测试范围违背了显式指令，是习惯性选择更快路径。应该严格用提示词指定的命令确认无回归后再用局部测试加速迭代。
 
-3. 模型对 ConfigPanel.jsx 修复时分四次独立调用 edit_file_search_replace，分别改动正文输入区展示、表单字段配置块、语法高亮渲染和按钮交互。这些改动中有三处位于同一个 JSX return 结构的相邻区域，本可以在阅读完整文件后合并为一次或两次编辑。分散编辑导致该文件的变更历史碎片化，审查人员在 session-cot 中难以一眼看清该文件的完整改动意图。正确做法是先通读整个文件，列出所有修改点，确认相邻区域可合并后再提交编辑。
+3. 模型修 ConfigPanel.jsx 时分四次独立编辑，改正文输入、表单配置、语法高亮渲染、按钮交互。这些改动有三个在同一个 JSX 结构的相邻区域，本可以合并一两次。分散编辑让变更历史碎片化，审查时看不清完整意图。应该先通读文件列出所有修改点，相邻的合并提交。

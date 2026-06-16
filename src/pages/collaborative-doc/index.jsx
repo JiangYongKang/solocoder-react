@@ -42,10 +42,7 @@ import {
   lockParagraph,
   getCharOffsetPosition,
   getSelectionFromDocument,
-  getFormatRangesForParagraph,
-  renderContentWithFormats,
-  processFormatChange,
-  FORMAT_TYPE,
+  renderContentWithRevisions,
 } from './utils.js'
 import { CURRENT_USER, REVISION_TYPE } from './constants.js'
 
@@ -268,41 +265,6 @@ export default function CollaborativeDocPage() {
     paragraphContents.current[paragraphId] = newContent
   }, [])
 
-  const handleFormat = useCallback((format) => {
-    if (!selectedText) {
-      alert('请先选中要格式化的文字')
-      return
-    }
-
-    if (!canEditParagraph(data, selectedText.paragraphId, CURRENT_USER.id)) {
-      const locker = getParagraphLocker(data, selectedText.paragraphId)
-      if (locker) {
-        alert(`此段落已被 ${locker.name} 锁定`)
-      }
-      return
-    }
-
-    setData((prev) => {
-      const para = getParagraphById(prev, selectedText.paragraphId)
-      if (!para) return prev
-
-      return processFormatChange(
-        prev,
-        selectedText.paragraphId,
-        selectedText.text,
-        selectedText.start,
-        selectedText.end,
-        format,
-        CURRENT_USER.id
-      )
-    })
-
-    setSelectedText(null)
-    if (window.getSelection()) {
-      window.getSelection().removeAllRanges()
-    }
-  }, [selectedText, data])
-
   const handleTitleChange = useCallback((e) => {
     setData((prev) => updateTitle(prev, e.target.value))
   }, [])
@@ -442,21 +404,12 @@ export default function CollaborativeDocPage() {
   }
 
   const renderContentSegments = (paragraph, revisions) => {
-    const formatRanges = getFormatRangesForParagraph(paragraph)
-    const segments = renderContentWithFormats(paragraph.content, formatRanges, revisions, data)
+    const segments = renderContentWithRevisions(paragraph.content, revisions, data)
 
     return segments.map((seg, idx) => {
       const baseKey = `${paragraph.id}-seg-${idx}`
       if (seg.type === 'text') {
         return <span key={baseKey}>{seg.value}</span>
-      }
-
-      if (seg.type === 'formatted-text') {
-        return (
-          <span key={baseKey} className={seg.formatClasses.join(' ')}>
-            {seg.value}
-          </span>
-        )
       }
 
       const rev = seg.revision
@@ -470,10 +423,6 @@ export default function CollaborativeDocPage() {
         className = 'cd-revision-delete'
       } else if (rev.type === REVISION_TYPE.FORMAT) {
         className = 'cd-revision-format'
-      }
-
-      if (seg.extraFormatClasses && seg.extraFormatClasses.length > 0) {
-        className = `${className} ${seg.extraFormatClasses.join(' ')}`
       }
 
       const tooltip = rev.type === REVISION_TYPE.ADD
@@ -504,6 +453,8 @@ export default function CollaborativeDocPage() {
         ? { fontWeight: 600, fontSize: 16, marginTop: 20 }
         : {}
 
+    const shouldRenderSegments = revisions.length > 0 || formatRanges.length > 0
+
     return (
       <div
         key={paragraph.id}
@@ -527,7 +478,7 @@ export default function CollaborativeDocPage() {
           onBlur={(e) => handleParagraphBlur(paragraph.id, e.target.innerText)}
           style={paraStyle}
         >
-          {revisions.length > 0 ? renderContentSegments(paragraph, revisions) : paragraph.content}
+          {shouldRenderSegments ? renderContentSegments(paragraph, revisions) : paragraph.content}
         </div>
 
         {locked && locker && (
@@ -629,39 +580,6 @@ export default function CollaborativeDocPage() {
         </button>
         <button className="cd-toolbar-btn" onClick={handleLockAllMine}>
           🔒 锁定所有我的段落
-        </button>
-        <div className="cd-toolbar-separator" />
-        <button
-          className="cd-toolbar-btn"
-          onClick={() => handleFormat(FORMAT_TYPE.BOLD)}
-          title="加粗 (选中文字后点击)"
-          style={{ fontWeight: 'bold' }}
-        >
-          B
-        </button>
-        <button
-          className="cd-toolbar-btn"
-          onClick={() => handleFormat(FORMAT_TYPE.ITALIC)}
-          title="斜体 (选中文字后点击)"
-          style={{ fontStyle: 'italic' }}
-        >
-          I
-        </button>
-        <button
-          className="cd-toolbar-btn"
-          onClick={() => handleFormat(FORMAT_TYPE.UNDERLINE)}
-          title="下划线 (选中文字后点击)"
-          style={{ textDecoration: 'underline' }}
-        >
-          U
-        </button>
-        <button
-          className="cd-toolbar-btn"
-          onClick={() => handleFormat(FORMAT_TYPE.STRIKETHROUGH)}
-          title="删除线 (选中文字后点击)"
-          style={{ textDecoration: 'line-through' }}
-        >
-          S
         </button>
         <div className="cd-toolbar-separator" />
         <button className="cd-toolbar-btn" onClick={handleSaveVersion}>

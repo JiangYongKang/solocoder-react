@@ -1,0 +1,5 @@
+你实现的答题竞赛系统页面仍未完成 collaborative-doc 包的越界代码清理，且还原操作越界破坏了 route-planner 测试，需要进行修复：
+
+1. 之前要求从 collaborative-doc 包中移除 addFormatRangeToParagraph、renderContentWithFormats、processFormatChange、applyFormatToSelection、updateParagraphWithFormat、getFormatRangesForParagraph 等约 180 行代码，以及 cd-format-bold、cd-format-italic、cd-format-underline、cd-format-strikethrough 四个 CSS 样式类。上一轮只修改了 renderContentWithFormats 的内部算法，其余函数和全部 CSS 样式类仍保留在 collaborative-doc 包中未被移除。本轮需要真正从 collaborative-doc/utils.js、collaborative-doc/index.jsx、collaborative-doc.css 中逐一删除这些越界代码。
+2. 之前将 routeUtils.test.js 的 vitest 导入语句中的 afterEach 和 vi 一并移除了，但这两个标识符在测试文件中仍在被使用，导致测试文件抛出 ReferenceError 无法执行。提示词未要求修改 route-planner 的测试文件，本轮需要将 routeUtils.test.js 的导入语句恢复到本轮介入前的状态。
+3. 本次修复严格限定在 quiz-competition 包范围。QuizGame 的金币同步修复（onCoinsEarned 回调链路）是正确的需要保留。除上述明确列出的还原和修复操作外，不再对任何非 quiz-competition 包的文件做修改。运行 pnpm run test 确认 quiz-competition 包下 95 个测试用例全部通过。

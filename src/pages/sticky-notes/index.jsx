@@ -20,6 +20,9 @@ import {
   isExpired,
   shouldTriggerReminder,
   markReminderTriggered,
+  markReminderDismissed,
+  setReminder,
+  clearReminder,
   filterByTags,
   searchNotes,
   createNote,
@@ -163,6 +166,17 @@ function NoteCard({
     onUpdate(note.id, { content: e.target.value })
   }
 
+  const handleEditComplete = () => {
+    setIsEditing(false)
+  }
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleEditComplete()
+    }
+  }
+
   const handleColorChange = (color) => {
     onUpdate(note.id, { color })
   }
@@ -199,12 +213,38 @@ function NoteCard({
         onDoubleClick={handleDoubleClick}
       >
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 600, marginBottom: 4 }}>
-            {note.title || '无标题'}
-          </div>
-          <div className="sn-note-content-list" style={{ color: textColor }}>
-            {note.content || '无内容'}
-          </div>
+          {isEditing && !isTrashed && !isArchived ? (
+            <>
+              <textarea
+              className="sn-note-title-list"
+              style={{ color: textColor }}
+              value={note.title}
+              onChange={handleTitleChange}
+              onBlur={handleEditComplete}
+              onKeyDown={handleKeyDown}
+              placeholder="标题..."
+              autoFocus
+            />
+            <textarea
+              className="sn-note-content-list"
+              style={{ color: textColor }}
+              value={note.content}
+              onChange={handleContentChange}
+              onBlur={handleEditComplete}
+              onKeyDown={handleKeyDown}
+              placeholder="写点什么..."
+            />
+            </>
+          ) : (
+            <>
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                {note.title || '无标题'}
+              </div>
+              <div className="sn-note-content-list" style={{ color: textColor }}>
+                {note.content || '无内容'}
+              </div>
+            </>
+          )}
         </div>
 
         <div className="sn-note-tags">
@@ -312,15 +352,23 @@ function NoteCard({
       onDoubleClick={handleDoubleClick}
     >
       <div className="sn-note-header">
-        <textarea
-          className="sn-note-title"
-          style={{ color: textColor }}
-          value={note.title}
-          onChange={handleTitleChange}
-          placeholder="标题..."
-          rows={1}
-          readOnly={isTrashed || isArchived}
-        />
+        {isEditing && !isTrashed && !isArchived ? (
+          <textarea
+            className="sn-note-title"
+            style={{ color: textColor }}
+            value={note.title}
+            onChange={handleTitleChange}
+            onBlur={handleEditComplete}
+            onKeyDown={handleKeyDown}
+            placeholder="标题..."
+            rows={1}
+            autoFocus
+          />
+        ) : (
+          <div className="sn-note-title-text">
+            {note.title || '无标题'}
+          </div>
+        )}
         {!isTrashed && !isArchived && (
           <ColorPicker
             selectedColor={note.color}
@@ -330,14 +378,21 @@ function NoteCard({
         )}
       </div>
 
-      <textarea
-        className="sn-note-content"
-        style={{ color: textColor }}
-        value={note.content}
-        onChange={handleContentChange}
-        placeholder="写点什么..."
-        readOnly={isTrashed || isArchived}
-      />
+      {isEditing && !isTrashed && !isArchived ? (
+        <textarea
+          className="sn-note-content"
+          style={{ color: textColor }}
+          value={note.content}
+          onChange={handleContentChange}
+          onBlur={handleEditComplete}
+          onKeyDown={handleKeyDown}
+          placeholder="写点什么..."
+        />
+      ) : (
+        <div className="sn-note-content-text">
+          {note.content || '无内容'}
+        </div>
+      )}
 
       <div className="sn-note-tags">
         {note.tags?.map(tag => (

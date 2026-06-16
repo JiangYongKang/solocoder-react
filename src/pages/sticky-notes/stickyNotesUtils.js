@@ -88,6 +88,30 @@ export function markReminderTriggered(notes, noteId) {
   )
 }
 
+export function markReminderDismissed(notes, noteId) {
+  return notes.map(note =>
+    note.id === noteId
+      ? { ...note, reminderStatus: REMINDER_STATUS_DISMISSED }
+      : note
+  )
+}
+
+export function setReminder(notes, noteId, reminderAt) {
+  return notes.map(note =>
+    note.id === noteId
+      ? { ...note, reminderAt, reminderStatus: REMINDER_STATUS_PENDING }
+      : note
+  )
+}
+
+export function clearReminder(notes, noteId) {
+  return notes.map(note =>
+    note.id === noteId
+      ? { ...note, reminderAt: null, reminderStatus: REMINDER_STATUS_PENDING }
+      : note
+  )
+}
+
 export function filterByTags(notes, selectedTags) {
   if (!selectedTags || selectedTags.length === 0) return notes
   return notes.filter(note =>
@@ -173,8 +197,7 @@ export function reorderNotes(notes, fromIndex, toIndex) {
 export function moveNoteById(notes, noteId, targetIndex) {
   const fromIndex = notes.findIndex(n => n.id === noteId)
   if (fromIndex === -1) return notes
-  const adjustedIndex = fromIndex < targetIndex ? targetIndex - 1 : targetIndex
-  return reorderNotes(notes, fromIndex, adjustedIndex)
+  return reorderNotes(notes, fromIndex, targetIndex)
 }
 
 export function archiveNote(notes, archivedNotes, noteId) {

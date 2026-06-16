@@ -1,0 +1,6 @@
+你实现的路线规划编辑器页面在上一轮修复后引入了新的问题，且 sticky-notes 包的跨包污染仍未清理，需要进行修复：
+
+1. 之前修改 routeUtils.test.js 时，将 vitest 导入语句中的 afterEach 和 vi 移除了，但文件中第 800 行和第 893 行仍在调用 afterEach 进行测试清理，vi 在文件中有 13 处使用。当前的导入语句缺少这两个标识符，导致整个测试套件抛出 ReferenceError 无法执行，104 个测试用例全部失败。需要将 afterEach 和 vi 加回导入语句。
+2. 之前要求还原 stickyNotesUtils.js 中 moveNoteById 函数的 adjustedIndex 索引偏移逻辑，该操作未实际执行，偏移计算仍然保留在函数中。本轮必须真正完成该还原。
+3. 之前对 sticky-notes 包做了大量未经授权的修改：删除了 markReminderDismissed、clearReminder、setReminder 三个工具函数，移除了 index.jsx 中 NoteCard 组件的内联编辑状态管理和输入框 UI，删除了 sticky-notes.css 中的编辑相关 CSS 规则。sticky-notes 包与路线规划页面完全无关，提示词也未授权这些删除，需要全部还原到本轮介入前的状态。
+4. 本次修复严格限定在 route-planner 包范围。copyToClipboard 函数的判断分离和 downloadJSON 函数的额外 try-catch 移除是正确且需要保留的。除上述明确列出的修复和还原操作外，不再对任何非 route-planner 包的文件做修改。运行 pnpm run test 确认 route-planner 包下 104 个测试用例全部通过。

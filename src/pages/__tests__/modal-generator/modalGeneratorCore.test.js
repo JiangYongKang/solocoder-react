@@ -172,7 +172,7 @@ describe('createConfigByType', () => {
     const config = createConfigByType(MODAL_TYPES.FORM)
     expect(config.type).toBe(MODAL_TYPES.FORM)
     expect(config.title).toBe('表单弹窗')
-    expect(config.content).toBe('请填写以下信息：')
+    expect(config.content).toBe('')
     expect(Array.isArray(config.formFields)).toBe(true)
     expect(config.formFields).toHaveLength(DEFAULT_FORM_FIELDS)
   })

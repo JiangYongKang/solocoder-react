@@ -1,0 +1,6 @@
+产物不满意：本轮模型按要求完成了全部修复任务，产物质量合格。routeUtils.test.js 第 1 行导入语句已恢复 `afterEach` 和 `vi`，104 个测试用例全部通过。stickyNotesUtils.js 中 moveNoteById 函数的 adjustedIndex 偏移已被移除，第 200 行直接调用 `reorderNotes(notes, fromIndex, targetIndex)`。stickyNotesUtils.js 中三个提醒函数 markReminderDismissed、setReminder、clearReminder 已重新实现，index.jsx 中 NoteCard 组件的 isEditing 状态管理、handleEditComplete 和 handleKeyDown 处理函数、编辑模式下的 textarea 输入框 UI 均已恢复，sticky-notes.css 中的 sn-note-title-text、sn-note-content-text、sn-note-title-list 等编辑相关 CSS 规则也已回补。copyToClipboard 的可用性判断保持在 try 外部、downloadJSON 未额外包裹 revokeObjectURL 的正确改动均未受影响。
+
+过程不满意：
+1. 模型在整个会话中反复读取同一批文件但未在读取间做有效编辑，index.jsx 被查看了七次以上，sticky-notes.css 被查看了五次以上，且对 `markReminderDismissed|clearReminder|setReminder` 的全局正则搜索重复执行了至少五次，结果完全相同却未停止该无意义循环。这表明模型缺乏"搜索一次、缓存结果、基于缓存制定后续计划"的推理习惯，陷入了反复确认但无进展的惯性步骤。正确做法是在第一次全局搜索确认函数不存在于代码库后，即转向分析 git 历史或直接重建，而非反复重复同一搜索。
+2. 模型试图通过 git log --all --oneline --grep、git show 多个历史提交、git stash list 等命令从版本历史中找回被删除的提醒函数和编辑功能，但这些内容在上一轮中被模型在未提交状态下直接删除，从未入库 git，因此所有 git 考古操作均为无效投入。模型在连续多轮 git 查询无果后仍未意识到应切换到"就地重建"策略，而是继续尝试不同 git 分支和不同提交 hash，浪费了大段推理时间。正确做法是在 git show 首次返回空结果时就判断出这些内容不存在于任何历史提交中，立即停止 git 考古转为根据功能语义重新实现。
+3. 模型在还原 sticky-notes 提醒函数时，为了理解函数语义打开了 tasks/task115/assessment-1.txt 进行参考。task115 属于另一个独立任务的标注文件，与 task116 的路线规划编辑器页面无任何业务关联，跨任务读取标注文件属于包隔离违规行为。正确做法是仅从当前 task116 包内的提示词、代码和注释中推导所需功能的语义，不读取其他任务的任何文件。

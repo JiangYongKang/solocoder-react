@@ -1,0 +1,5 @@
+你实现的性能监控面板页面还存在一些问题，需要进行修复：
+1. generateId 函数修改后 utils.test.js 中的测试断言未同步更新。generateId 为解决 StrictMode 双重调用问题加入了 _idCounter 计数器段，ID 格式从两段变为三段，但测试中的正则 `/^test_[a-z0-9]+_[a-z0-9]+$/` 仍匹配旧的二段格式，实际值 `test_mqfyyv6b_1_wzxw8` 匹配失败。需要修正测试正则以匹配新增的计数器段。
+2. ResourceStats.jsx 中资源类型徽章的 className 使用了普通双引号字符串 "resource-type-badge resource-type-{res.type}" 而非模板字符串，JSX 将 {res.type} 当作字面文本输出，导致所有资源类型的徽章 CSS 类名都是 resource-type-{res.type} 这个字面值，按类型着色的样式规则全部失效。需要改用模板字符串语法。
+3. 告警历史记录缺少"持续时间"列。AlertHistoryPanel.jsx 的表头列中没有持续时间，createAlertRecord 函数中 duration 字段创建后始终为 null，processAlerts 在告警条件解除时也未计算持续时间写回。需要在表格中增加持续时间列，并在告警解除时计算 `当前时间 - triggeredAt` 更新到记录的 duration 字段。
+4. 修复后重新运行 pnpm run test，确保所有测试通过。

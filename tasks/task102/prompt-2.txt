@@ -1,0 +1,5 @@
+你实现的简历模板市场页面还存在一些问题，需要进行修复：
+1. TemplateSelector.jsx 中 StarRating 组件的评分取消逻辑存在冲突：组件设计为点击已选星星可取消评分为 0，但 setRating 函数内部将评分钳位在 1 到 5，导致用户取消了评分但 localStorage 中保存的值为 1，视觉上星星已不高亮但实际评分未归零。需要对齐 StarRating 和 setRating 对评分 0 的处理逻辑。
+2. ModuleEditor.jsx 的 handleDragEnd 拖拽排序使用了 @dnd-kit/sortable 的 arrayMove，绕过了 resumeTemplatesCore.js 中专门编写的 reorderModules 纯函数。导致该核心函数虽有完整测试覆盖但与生产路径脱节。需要让 handleDragEnd 统一使用 reorderModules 完成排序。
+3. index.jsx 的 handleSelectTemplate 函数中使用了两层嵌套 setTimeout 管理模板切换过渡动画，但组件卸载时未清理定时器，快速切换页面时会触发 React 状态更新警告。需要在 useEffect cleanup 中清除定时器。
+4. 修复后重新运行 pnpm run test，确保所有测试通过。

@@ -403,7 +403,6 @@ export default function ExamGradingPage() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [filter, setFilter] = useState(FILTER_OPTIONS.ALL)
   const [showCSVPreview, setShowCSVPreview] = useState(false)
-  const gradingStartTimeRef = useRef({})
 
   const progress = useMemo(
     () => getGradingProgress(gradingState, MOCK_STUDENTS),
@@ -416,9 +415,12 @@ export default function ExamGradingPage() {
   )
 
   useEffect(() => {
-    if (currentStudentId && !gradingStartTimeRef.current[currentStudentId]) {
-      gradingStartTimeRef.current[currentStudentId] = Date.now()
-    }
+    if (!currentStudentId) return
+    setGradingState((prev) => {
+      const g = prev[currentStudentId]
+      if (!g || g.startedAt !== null) return prev
+      return updateStudentStatus(prev, currentStudentId, STUDENT_STATUS.UNGRADED)
+    })
   }, [currentStudentId])
 
   const handleSelectStudent = useCallback((studentId) => {
@@ -429,26 +431,36 @@ export default function ExamGradingPage() {
   const handleGradeQuestion = useCallback(
     (questionId, result, score) => {
       if (!currentStudentId) return
+      let nextStudent = null
+      let allGraded = false
+
       setGradingState((prev) => {
-        let next = updateQuestionGrade(prev, currentStudentId, questionId, {
+        let next = prev
+        const currentGrading = next[currentStudentId]
+        if (currentGrading && currentGrading.startedAt === null) {
+          next = updateStudentStatus(next, currentStudentId, STUDENT_STATUS.UNGRADED)
+        }
+        next = updateQuestionGrade(next, currentStudentId, questionId, {
           result,
           score,
         })
         if (isStudentAllGraded(next, currentStudentId, MOCK_QUESTIONS)) {
           next = updateStudentStatus(next, currentStudentId, STUDENT_STATUS.GRADED)
-          const nextStudent = findNextUngradedStudent(MOCK_STUDENTS, next, currentStudentId)
-          if (nextStudent) {
-            setTimeout(() => {
-              setCurrentStudentId(nextStudent.id)
-              setCurrentQuestionIndex(0)
-            }, 300)
-          }
+          allGraded = true
+          nextStudent = findNextUngradedStudent(MOCK_STUDENTS, next, currentStudentId)
         }
         return next
       })
 
       const qIndex = MOCK_QUESTIONS.findIndex((q) => q.id === questionId)
-      if (qIndex < MOCK_QUESTIONS.length - 1) {
+      if (allGraded) {
+        if (nextStudent) {
+          setTimeout(() => {
+            setCurrentStudentId(nextStudent.id)
+            setCurrentQuestionIndex(0)
+          }, 300)
+        }
+      } else if (qIndex < MOCK_QUESTIONS.length - 1) {
         setCurrentQuestionIndex(qIndex + 1)
       }
     },

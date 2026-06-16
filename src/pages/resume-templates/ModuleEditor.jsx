@@ -7,14 +7,13 @@ import {
   useSensors,
 } from '@dnd-kit/core'
 import {
-  arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
   useSortable,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { getModuleLabel, getModuleIcon } from './resumeTemplatesCore'
+import { getModuleLabel, getModuleIcon, reorderModules } from './resumeTemplatesCore'
 
 function SortableModuleCard({
   module,
@@ -100,7 +99,7 @@ export default function ModuleEditor({
     const oldIndex = modules.findIndex((m) => m.id === active.id)
     const newIndex = modules.findIndex((m) => m.id === over.id)
     if (oldIndex < 0 || newIndex < 0) return
-    onReorderModules && onReorderModules(arrayMove(modules, oldIndex, newIndex))
+    onReorderModules && onReorderModules(reorderModules(modules, oldIndex, newIndex))
   }
 
   return (

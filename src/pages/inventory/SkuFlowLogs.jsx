@@ -42,8 +42,9 @@ export default function SkuFlowLogs({
   const getWarehouseName = (id) => warehouses.find((w) => w.id === id)?.name || id;
 
   const getFlowIconClass = (type) => {
-    if (type === 'inbound' || type === 'transfer_in') return 'inbound';
-    if (type === 'outbound' || type === 'transfer_out') return 'outbound';
+    if (type === 'inbound') return 'inbound';
+    if (type === 'outbound') return 'outbound';
+    if (type === 'transfer_in' || type === 'transfer_out') return 'transfer';
     if (type === 'stocktake') return 'stocktake';
     return '';
   };

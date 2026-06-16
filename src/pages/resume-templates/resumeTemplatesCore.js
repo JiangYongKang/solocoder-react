@@ -249,10 +249,16 @@ export function isFavorite(favorites, templateId) {
 
 export function setRating(ratings, templateId, rating) {
   if (!ratings || typeof ratings !== 'object') {
-    return { [templateId]: rating }
+    if (rating <= 0) return {}
+    return { [templateId]: Math.max(1, Math.min(5, rating)) }
   }
-  const safeRating = Math.max(1, Math.min(5, rating))
-  return { ...ratings, [templateId]: safeRating }
+  const next = { ...ratings }
+  if (rating <= 0) {
+    delete next[templateId]
+    return next
+  }
+  next[templateId] = Math.max(1, Math.min(5, rating))
+  return next
 }
 
 export function getRating(ratings, templateId) {

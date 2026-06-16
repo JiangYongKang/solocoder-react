@@ -1,38 +1,39 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  parsePathCommands,
-  serializePathCommands,
-  toAbsoluteCommands,
-  getControlPoints,
-  updateCommandParam,
-  insertNodeOnSegment,
-  convertSegmentToLine,
-  buildSvgString,
-  screenToWorld,
-  clampZoom,
-  distance,
-  findNearestPointOnCubic,
-  findNearestPointOnQuadratic,
-  findNearestPointOnLine,
-  loadFromStorage,
-  saveToStorage,
-  getPathBounds,
-  isValidHexColor,
-} from './svgPathEditorCore.js'
-import {
-  ANCHOR_RADIUS,
-  HANDLE_RADIUS,
-  GRID_SIZE,
-  PRESET_COLORS,
-  LINECAP_OPTIONS,
-  LINEJOIN_OPTIONS,
-  FILL_TYPES,
-  DASH_PRESETS,
-  createDefaultPath,
-  createDefaultPathStyle,
+    ANCHOR_RADIUS,
+    DASH_PRESETS,
+    FILL_TYPES,
+    GRID_SIZE,
+    HANDLE_RADIUS,
+    LINECAP_OPTIONS,
+    LINEJOIN_OPTIONS,
+    PRESET_COLORS,
+    createDefaultPath,
+    createDefaultPathStyle,
 } from './constants.js'
 import './svg-path-editor.css'
+import {
+    buildSvgString,
+    clampZoom,
+    convertSegmentToLine,
+    deleteNode,
+    distance,
+    findNearestPointOnCubic,
+    findNearestPointOnLine,
+    findNearestPointOnQuadratic,
+    getControlPoints,
+    getPathBounds,
+    insertNodeOnSegment,
+    isValidHexColor,
+    loadFromStorage,
+    parsePathCommands,
+    saveToStorage,
+    screenToWorld,
+    serializePathCommands,
+    toAbsoluteCommands,
+    updateCommandParam,
+} from './svgPathEditorCore.js'
 
 function SvgPathEditorPage() {
   const navigate = useNavigate()
@@ -110,66 +111,32 @@ function SvgPathEditorPage() {
     const pt = controlPoints[selectedNodeIndex]
     if (pt.type !== 'anchor') return
 
-    let nodeCount = 0
+    let anchorIdx = 0
     let targetNodeIdx = -1
     for (let i = 0; i < controlPoints.length; i++) {
       if (controlPoints[i].type === 'anchor') {
         if (i === selectedNodeIndex) {
-          targetNodeIdx = nodeCount
+          targetNodeIdx = anchorIdx
           break
         }
-        nodeCount++
+        anchorIdx++
       }
     }
 
-    if (targetNodeIdx <= 0) return
-    const absCmdsCopy = [...absCmds]
-    const newCmds = []
-
-    let anchorIdx = 0
-    for (let i = 0; i < absCmdsCopy.length; i++) {
-      const cmd = absCmdsCopy[i]
-      if (cmd.type === 'M') {
-        anchorIdx++
-        if (anchorIdx - 1 === targetNodeIdx) continue
-        if (anchorIdx - 1 === targetNodeIdx - 1 && i + 1 < absCmdsCopy.length) {
-          const nextCmd = absCmdsCopy[i + 1]
-          const endPoint = nextCmd.type === 'C'
-            ? { x: nextCmd.params[4], y: nextCmd.params[5] }
-            : nextCmd.type === 'Q'
-            ? { x: nextCmd.params[2], y: nextCmd.params[3] }
-            : nextCmd.type === 'A'
-            ? { x: nextCmd.params[5], y: nextCmd.params[6] }
-            : nextCmd.type === 'L'
-            ? { x: nextCmd.params[0], y: nextCmd.params[1] }
-            : null
-          if (endPoint) {
-            newCmds.push({ type: 'L', relative: false, params: [endPoint.x, endPoint.y] })
-          }
-          i++
-          anchorIdx++
-          continue
-        }
-        newCmds.push(cmd)
-      } else if (cmd.type === 'Z') {
-        newCmds.push(cmd)
-      } else {
-        anchorIdx++
-        if (anchorIdx - 1 === targetNodeIdx) continue
-        newCmds.push(cmd)
-      }
-    }
-
+    if (targetNodeIdx < 0) return
+    const parsed = parsePathCommands(currentPath.d)
+    const newCmds = deleteNode(parsed, targetNodeIdx)
+    if (newCmds === parsed || newCmds.length === 0) return
     const newD = serializePathCommands(newCmds)
     updateCurrentPath({ d: newD })
     setSelectedNodeIndex(-1)
-  }, [selectedNodeIndex, controlPoints, absCmds, updateCurrentPath])
+  }, [selectedNodeIndex, controlPoints, currentPath, updateCurrentPath])
 
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
       if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (selectedNodeIndex >= 1 && mode === 'select') {
+        if (selectedNodeIndex >= 0 && mode === 'select') {
           handleDeleteNode()
         }
       }

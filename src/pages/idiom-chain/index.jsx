@@ -14,6 +14,7 @@ import {
   buildIdiomMapByFirstChar,
   selectAiIdiom,
   calculateScore,
+  calculateStreakBonus,
   getHint,
   getLastChar,
   loadStreakRecord,
@@ -50,6 +51,13 @@ function IdiomChainPage() {
   const timerRef = useRef(null)
   const aiTimeoutRef = useRef(null)
   const lastIsHintedRef = useRef(false)
+  const humanScoreRef = useRef(humanScore)
+  const aiScoreRef = useRef(aiScore)
+  const streakRecordRef = useRef(streakRecord)
+
+  humanScoreRef.current = humanScore
+  aiScoreRef.current = aiScore
+  streakRecordRef.current = streakRecord
 
   const scrollToBottom = useCallback(() => {
     if (chainContainerRef.current) {
@@ -108,12 +116,21 @@ function IdiomChainPage() {
     setGameOverReason(reason)
     setShowGameOverModal(true)
 
-    const winnerResult = determineWinner(humanScore, aiScore)
+    const currentHumanScore = humanScoreRef.current
+    const currentAiScore = aiScoreRef.current
+    const currentStreakRecord = streakRecordRef.current
+
+    const winnerResult = determineWinner(currentHumanScore, currentAiScore)
     const playerWon = winnerResult.winner === PLAYER.HUMAN
-    const newRecord = updateStreakRecord(streakRecord, playerWon)
+    const newRecord = updateStreakRecord(currentStreakRecord, playerWon)
     setStreakRecord(newRecord)
     saveStreakRecord(newRecord)
-  }, [humanScore, aiScore, streakRecord])
+
+    if (playerWon) {
+      const bonus = calculateStreakBonus(currentStreakRecord, true)
+      setHumanScore((prev) => prev + bonus)
+    }
+  }, [])
 
   const startGame = useCallback((diff) => {
     const idiomList = getDifficultyIdiomList(IDIOM_DATABASE, diff)
@@ -482,7 +499,7 @@ function IdiomChainPage() {
 
             {gameStatus === GAME_STATUS.AI_THINKING && (
               <div className="ai-thinking">
-                <span className="dots">AI正在思考</span>
+                AI 思考中<span className="thinking-dots"><span className="dot">.</span><span className="dot">.</span><span className="dot">.</span></span>
               </div>
             )}
 

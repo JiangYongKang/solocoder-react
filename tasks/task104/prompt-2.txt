@@ -1,0 +1,6 @@
+你实现的成语接龙游戏页面还存在一些问题，需要进行修复：
+1. index.jsx 中倒计时 useEffect 内部调用了 handleGameOver 函数但未将其列入依赖数组，导致 timer 超时判负时使用的是过期的闭包分数值，胜负判定可能与实际最终分数不一致。需要使用 useRef 存储最新分数或确保闭包中的分数值是最新的。
+2. AI 思考状态的展示文案为"AI正在思考"，缺少空格和中文省略号，与需求明确要求的"AI 思考中..."不符，需要将文案修正为需求中的字面规格。
+3. constants.js 中定义了 WIN_STREAK_BONUS 常量值为 5，但整个 idiom-chain 包中从未使用该常量。连胜纪录的持久化逻辑中未将连胜奖励加到玩家得分。需要在连胜相关逻辑中加入 WIN_STREAK_BONUS 的奖励计算。
+4. idiomChain.css 中省略号动画使用了 `@keyframes dots` 通过修改伪元素 content 属性实现，但 content 在 CSS 规范中不属于可动画属性，非 Chromium 浏览器中省略号动画可能完全不显示。需要改用 JavaScript 定时器或多个 span 元素配合 opacity 动画实现。
+5. 修复后重新运行 pnpm run test，确保所有测试通过。

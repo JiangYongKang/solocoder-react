@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import './resume-templates.css'
 import { TEMPLATES } from './constants'
 import {
@@ -27,6 +27,8 @@ export default function ResumeTemplatesPage() {
   const [ratings, setRatings] = useState(() => loadRatings())
   const [isPrintMode, setIsPrintMode] = useState(false)
   const [isTransitioning, setIsTransitioning] = useState(false)
+  const transitionTimerRef = useRef(null)
+  const innerTimerRef = useRef(null)
 
   useEffect(() => {
     saveResumeState(resumeState)
@@ -40,12 +42,31 @@ export default function ResumeTemplatesPage() {
     saveRatings(ratings)
   }, [ratings])
 
+  useEffect(() => {
+    return () => {
+      if (transitionTimerRef.current) {
+        clearTimeout(transitionTimerRef.current)
+      }
+      if (innerTimerRef.current) {
+        clearTimeout(innerTimerRef.current)
+      }
+    }
+  }, [])
+
   const handleSelectTemplate = useCallback((templateId) => {
     if (templateId === resumeState.selectedTemplateId) return
+
+    if (transitionTimerRef.current) {
+      clearTimeout(transitionTimerRef.current)
+    }
+    if (innerTimerRef.current) {
+      clearTimeout(innerTimerRef.current)
+    }
+
     setIsTransitioning(true)
-    setTimeout(() => {
+    transitionTimerRef.current = setTimeout(() => {
       setResumeState((prev) => ({ ...prev, selectedTemplateId: templateId }))
-      setTimeout(() => setIsTransitioning(false), 100)
+      innerTimerRef.current = setTimeout(() => setIsTransitioning(false), 100)
     }, 150)
   }, [resumeState.selectedTemplateId])
 

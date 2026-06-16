@@ -6,6 +6,7 @@ import {
   exportAlertRecordsToCsv,
   downloadCsv,
   formatDateTime,
+  formatDuration,
   sortAlertRecords,
 } from './utils'
 
@@ -87,10 +88,11 @@ function AlertHistoryPanel({ alertRecords, onRecordsChange }) {
           <table className="alert-history-table">
             <thead>
               <tr>
-                <th style={{ width: '18%' }}>触发时间</th>
-                <th style={{ width: '25%' }}>规则描述</th>
-                <th style={{ width: '25%' }}>触发信息</th>
-                <th style={{ width: '12%' }}>状态</th>
+                <th style={{ width: '16%' }}>触发时间</th>
+                <th style={{ width: '22%' }}>规则描述</th>
+                <th style={{ width: '22%' }}>触发信息</th>
+                <th style={{ width: '10%' }}>持续时间</th>
+                <th style={{ width: '10%' }}>状态</th>
                 <th style={{ width: '10%' }}>确认时间</th>
                 <th style={{ width: '10%' }}>操作</th>
               </tr>
@@ -115,6 +117,11 @@ function AlertHistoryPanel({ alertRecords, onRecordsChange }) {
                       <code className="alert-trigger-info">
                         {record.triggerInfo}
                       </code>
+                    </td>
+                    <td className="alert-duration-cell">
+                      {record.duration != null
+                        ? formatDuration(record.duration)
+                        : '-'}
                     </td>
                     <td className="alert-status-cell">
                       {isPending ? (

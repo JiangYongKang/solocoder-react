@@ -93,53 +93,11 @@ const generateMockErrors = (count = 100, daysBack = 30) => {
   return errors.sort((a, b) => b.occurredAt - a.occurredAt)
 }
 
-const generateDailySummaries = (errors, daysBack = 30) => {
-  const summaries = {}
-  const now = new Date()
-  const msPerDay = 24 * 60 * 60 * 1000
-
-  for (let i = 0; i < daysBack; i++) {
-    const date = new Date(now.getTime() - i * msPerDay)
-    const dateKey = formatDateKey(date)
-    summaries[dateKey] = {
-      date: dateKey,
-      total: 0,
-      resolved: 0,
-      unresolved: 0,
-      newTypes: new Set(),
-      errors: [],
-    }
-  }
-
-  errors.forEach((err) => {
-    if (summaries[err.dateKey]) {
-      summaries[err.dateKey].total += err.count
-      summaries[err.dateKey].errors.push(err.id)
-      if (err.resolved) {
-        summaries[err.dateKey].resolved += err.count
-      } else {
-        summaries[err.dateKey].unresolved += err.count
-      }
-      summaries[err.dateKey].newTypes.add(err.type)
-    }
-  })
-
-  const result = Object.values(summaries)
-    .map((s) => ({
-      ...s,
-      newTypes: s.newTypes.size,
-    }))
-    .sort((a, b) => (a.date < b.date ? 1 : -1))
-
-  return result
-}
-
 export {
   randomInt,
   randomChoice,
   generateCallStack,
   generateMockErrors,
-  generateDailySummaries,
   formatDateKey,
   formatDateTime,
 }

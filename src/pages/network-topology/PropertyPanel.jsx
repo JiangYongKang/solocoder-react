@@ -3,6 +3,7 @@ import {
   DEVICE_TYPE_LABELS,
   DEVICE_TYPE_ICONS,
   LINE_STYLE_LABELS,
+  LINE_CURVE_STYLE_LABELS,
   MIN_LINE_WIDTH,
   MAX_LINE_WIDTH,
   DEFAULT_LINE_WIDTH,
@@ -138,6 +139,21 @@ export default function PropertyPanel({
                   key={value}
                   className={`nt-style-btn ${selectedLink.style === value ? 'active' : ''}`}
                   onClick={() => onUpdateLink(selectedLink.id, { style: value })}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="nt-prop-section">
+            <label className="nt-prop-label">连线样式</label>
+            <div className="nt-style-options">
+              {Object.entries(LINE_CURVE_STYLE_LABELS).map(([value, label]) => (
+                <button
+                  key={value}
+                  className={`nt-style-btn ${(selectedLink.curveStyle || 'bezier') === value ? 'active' : ''}`}
+                  onClick={() => onUpdateLink(selectedLink.id, { curveStyle: value })}
                 >
                   {label}
                 </button>

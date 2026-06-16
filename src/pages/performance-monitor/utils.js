@@ -246,6 +246,26 @@ export function confirmAllAlertRecords(records) {
   return { success: changed, records: newRecords }
 }
 
+export function resolveAlertRecords(records, ruleIds, timestamp) {
+  if (!Array.isArray(records) || !Array.isArray(ruleIds) || ruleIds.length === 0) {
+    return records || []
+  }
+
+  const now = timestamp || Date.now()
+  const ruleIdSet = new Set(ruleIds)
+
+  return records.map((r) => {
+    if (ruleIdSet.has(r.ruleId) && r.resolvedAt === null) {
+      return {
+        ...r,
+        resolvedAt: now,
+        duration: now - r.triggeredAt,
+      }
+    }
+    return r
+  })
+}
+
 export function sortAlertRecords(records, sortBy = 'triggeredAt', order = 'desc') {
   if (!Array.isArray(records) || records.length === 0) return records || []
 
@@ -274,6 +294,7 @@ export function exportAlertRecordsToCsv(records) {
     '触发值',
     '阈值',
     '条件',
+    '持续时间',
     '状态',
     '确认时间',
   ]
@@ -295,6 +316,7 @@ export function exportAlertRecordsToCsv(records) {
     `${Number(r.value).toFixed(1)}${METRIC_UNITS[r.metricType] || ''}`,
     `${r.threshold}${METRIC_UNITS[r.metricType] || ''}`,
     conditionMap[r.condition] || r.condition,
+    r.duration != null ? formatDuration(r.duration) : '',
     statusMap[r.status] || r.status,
     r.confirmedAt ? formatDateTime(r.confirmedAt) : '',
   ])

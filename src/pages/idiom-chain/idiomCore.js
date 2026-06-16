@@ -6,6 +6,7 @@ import {
   HINT_PENALTY,
   RARE_PINYIN_INITIALS,
   STORAGE_KEYS,
+  WIN_STREAK_BONUS,
 } from './constants.js'
 
 export function getFirstChar(word) {
@@ -226,4 +227,10 @@ export function getDifficultyIdiomList(fullList, difficulty) {
     }
   }
   return deduped
+}
+
+export function calculateStreakBonus(streakRecord, playerWon) {
+  if (!playerWon || !streakRecord) return 0
+  const newStreak = streakRecord.currentStreak + 1
+  return newStreak * WIN_STREAK_BONUS
 }

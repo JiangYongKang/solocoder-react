@@ -1,0 +1,6 @@
+你实现的网络拓扑图编辑器页面还存在一些问题，需要进行修复：
+1. networkTopologyCore.js 中 buildBezierPath 函数的贝塞尔曲线控制点始终沿 X 轴方向偏移，当设备端口为上下连接或斜向连接时曲线形态扭曲不自然。同时 buildDirectPath 直线路径函数已实现但从未在 TopologyCanvas 中被调用，连线只有曲线一种形态，不符合"连线为直线或贝塞尔曲线"的要求。需要让控制点根据连线方向自适应偏移，并在属性面板中增加线型切换选项。
+2. index.jsx 的 handleExportPng 函数中使用 `querySelector('g > g')` 层级选择器定位变换组，选择器完全依赖于 SVG 内部的 DOM 层级结构，未来增加嵌套的 g 元素后导出会匹配错误目标。需要给包含拓扑内容的 g 元素添加明确的类名属性，改用类名选择器精确定位。
+3. TopologyCanvas.jsx 的 NodeShape 组件和 DevicePanel.jsx 的 DeviceShape 组件对六种设备形状各自实现了约 60 行独立的 SVG 渲染代码，两处针对同一形状类型的 switch-case 分支布局参数不同但逻辑重复。需要提取通用的形状渲染函数供两处共用。
+4. TopologyCanvas.jsx 的 handlePortMouseUp 回调中直接内联构造 link 对象（用 Date.now 和 Math.random 拼接 ID），而没有调用 networkTopologyCore.js 中已导出的 createLink 函数，导致连线 ID 格式与 createLink 生成的格式不一致。需要统一使用 createLink 创建连线对象。
+5. 修复后重新运行 pnpm run test，确保所有测试通过。

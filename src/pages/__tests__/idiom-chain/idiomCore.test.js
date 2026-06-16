@@ -3,6 +3,7 @@ import {
   BASE_SCORE,
   RARE_CHAR_BONUS,
   HINT_PENALTY,
+  WIN_STREAK_BONUS,
   VALIDATION_ERROR,
   PLAYER,
 } from '@/pages/idiom-chain/constants.js'
@@ -19,6 +20,7 @@ import {
   getAvailableIdiomsByChar,
   selectAiIdiom,
   calculateScore,
+  calculateStreakBonus,
   getHint,
   createInitialStreakRecord,
   updateStreakRecord,
@@ -600,6 +602,33 @@ describe('idiomCore', () => {
         expect(loaded.maxStreak).toBe(0)
         expect(loaded.totalGames).toBe(0)
       })
+    })
+  })
+
+  describe('calculateStreakBonus', () => {
+    it('should return 0 when player did not win', () => {
+      const record = { currentStreak: 2, maxStreak: 5, totalGames: 10 }
+      expect(calculateStreakBonus(record, false)).toBe(0)
+    })
+
+    it('should return 0 when streakRecord is null', () => {
+      expect(calculateStreakBonus(null, true)).toBe(0)
+    })
+
+    it('should calculate bonus as (currentStreak + 1) * WIN_STREAK_BONUS on first win', () => {
+      const record = { currentStreak: 0, maxStreak: 0, totalGames: 0 }
+      expect(calculateStreakBonus(record, true)).toBe(1 * WIN_STREAK_BONUS)
+    })
+
+    it('should calculate bonus for ongoing streak', () => {
+      const record = { currentStreak: 3, maxStreak: 5, totalGames: 10 }
+      expect(calculateStreakBonus(record, true)).toBe(4 * WIN_STREAK_BONUS)
+    })
+
+    it('should use WIN_STREAK_BONUS constant value', () => {
+      const record = { currentStreak: 0, maxStreak: 0, totalGames: 0 }
+      const bonus = calculateStreakBonus(record, true)
+      expect(bonus).toBe(WIN_STREAK_BONUS)
     })
   })
 

@@ -1,0 +1,4 @@
+你实现的错误监控面板页面还存在一些问题，需要进行修复：
+1. generateDailySummaries 函数在 utils.js 和 mockData.js 中存在两份不同的实现。index.jsx 组件从 mockData.js 导入该函数来生成每日错误摘要，但测试文件 utils.test.js 中导入和测试的是 utils.js 的版本。需要统一为一份实现，或确保测试同时覆盖组件实际调用的 mockData.js 版本路径。
+2. index.jsx 中摘要卡片的"今日新增"数值来源与其他卡片不一致。"总错误数"和"未解决"使用 getSummaryStats(filteredErrors) 从筛选后的数据计算，而"今日新增"使用 getTodayCount(allErrors) 从全量未筛选数据计算。切换时间筛选后各卡片行为不同步，且 getSummaryStats 内部已计算的 todayNew 字段被闲置。需要统一所有摘要卡片使用 filteredErrors 数据源通过 getSummaryStats 计算。
+3. 修复后重新运行 pnpm run test，确保所有测试通过。

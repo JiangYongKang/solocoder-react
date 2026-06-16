@@ -440,12 +440,25 @@ describe('setRating', () => {
     expect(result.tpl1).toBe(4)
   })
 
-  it('should clamp rating between 1 and 5', () => {
-    const result1 = setRating({}, 'tpl1', 0)
-    expect(result1.tpl1).toBe(1)
+  it('should clamp rating between 1 and 5 for positive values', () => {
+    const result = setRating({}, 'tpl1', 10)
+    expect(result.tpl1).toBe(5)
+  })
 
-    const result2 = setRating({}, 'tpl1', 10)
-    expect(result2.tpl1).toBe(5)
+  it('should delete rating when setting to 0', () => {
+    const result1 = setRating({ tpl1: 4 }, 'tpl1', 0)
+    expect(result1.tpl1).toBeUndefined()
+    expect(result1).toEqual({})
+  })
+
+  it('should delete rating when setting to negative values', () => {
+    const result1 = setRating({ tpl1: 4 }, 'tpl1', -1)
+    expect(result1.tpl1).toBeUndefined()
+  })
+
+  it('should return empty object when setting 0 on empty ratings', () => {
+    const result = setRating({}, 'tpl1', 0)
+    expect(result).toEqual({})
   })
 
   it('should not mutate original object', () => {
@@ -454,9 +467,22 @@ describe('setRating', () => {
     expect(original.tpl2).toBeUndefined()
   })
 
+  it('should not mutate original object when deleting rating', () => {
+    const original = { tpl1: 3, tpl2: 4 }
+    const result = setRating(original, 'tpl1', 0)
+    expect(original.tpl1).toBe(3)
+    expect(result.tpl1).toBeUndefined()
+    expect(result.tpl2).toBe(4)
+  })
+
   it('should handle null/undefined input', () => {
     const result = setRating(null, 'tpl1', 3)
     expect(result.tpl1).toBe(3)
+  })
+
+  it('should handle null/undefined input when setting 0', () => {
+    const result = setRating(null, 'tpl1', 0)
+    expect(result).toEqual({})
   })
 })
 

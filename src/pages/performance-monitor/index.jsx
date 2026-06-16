@@ -15,6 +15,7 @@ import {
   generateSimulatedTargetValue,
   generateWaterfallData,
   getRuleDescription,
+  resolveAlertRecords,
   smoothValue,
   updateRuleLastTriggered,
 } from './utils'
@@ -110,6 +111,13 @@ const PerformanceMonitorPage = () => {
       }
     } else {
       if (prevIds.length > 0) {
+        const now = Date.now()
+        const resolvedRuleIds = prevIds.filter((id) => !newTriggeredIds.includes(id))
+        if (resolvedRuleIds.length > 0) {
+          setAlertRecords((prevRecords) =>
+            resolveAlertRecords(prevRecords, resolvedRuleIds, now)
+          )
+        }
         setActiveAlerts([])
       }
       alertingRulesRef.current = {}

@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BOARD_SIZES, GAME_MODE, PLAYERS, AI_DELAY_MIN, AI_DELAY_MAX } from './constants.js'
 import {
@@ -11,6 +11,10 @@ import {
   formatDate,
 } from './gameCore.js'
 import './tic-tac-toe.css'
+
+const CELL_SIZES = { 3: 72, 4: 60, 5: 52 }
+const PADDING = 36
+const PIECE_R = { 3: 22, 4: 18, 5: 15 }
 
 function TicTacToePage() {
   const navigate = useNavigate()
@@ -166,26 +170,145 @@ function TicTacToePage() {
 
   const isDrawGame = gameResult === 'draw'
 
-  const renderCell = (row, col) => {
-    const value = board[row][col]
-    const isWin = isWinCell(row, col)
-    const isDrawCell = isDrawGame && value !== null
+  const svgParams = useMemo(() => {
+    const cellSize = CELL_SIZES[boardSize] || 60
+    const pieceR = PIECE_R[boardSize] || 18
+    const boardPx = PADDING * 2 + cellSize * (boardSize - 1)
+    return { cellSize, pieceR, boardPx }
+  }, [boardSize])
 
-    let className = 'ttt-cell'
-    if (value) className += ' ttt-cell-occupied'
-    if (gameOver || aiThinking) className += ' ttt-cell-disabled'
-    if (isWin) className += ' ttt-winning'
-    if (isDrawCell) className += ' ttt-draw'
+  const getIntersectionCoords = useCallback((row, col) => {
+    const { cellSize } = svgParams
+    return {
+      x: PADDING + col * cellSize,
+      y: PADDING + row * cellSize,
+    }
+  }, [svgParams])
+
+  const renderPiece = (row, col) => {
+    const value = board[row][col]
+    if (!value) return null
+    const { x, y } = getIntersectionCoords(row, col)
+    const { pieceR } = svgParams
+    const isWin = isWinCell(row, col)
+    const isDrawCell = isDrawGame
+
+    let cls = 'ttt-piece'
+    if (value === PLAYERS.X) cls += ' x-piece'
+    if (value === PLAYERS.O) cls += ' o-piece'
+    if (isWin) cls += ' ttt-winning'
+    if (isDrawCell) cls += ' ttt-draw'
+
+    if (value === PLAYERS.X) {
+      return (
+        <g key={`p-${row}-${col}`} className={cls}>
+          <line
+            x1={x - pieceR * 0.7} y1={y - pieceR * 0.7}
+            x2={x + pieceR * 0.7} y2={y + pieceR * 0.7}
+            stroke="currentColor"
+            strokeWidth="5"
+            strokeLinecap="round"
+          />
+          <line
+            x1={x + pieceR * 0.7} y1={y - pieceR * 0.7}
+            x2={x - pieceR * 0.7} y2={y + pieceR * 0.7}
+            stroke="currentColor"
+            strokeWidth="5"
+            strokeLinecap="round"
+          />
+        </g>
+      )
+    } else {
+      return (
+        <g key={`p-${row}-${col}`} className={cls}>
+          <circle
+            cx={x} cy={y} r={pieceR * 0.7}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="5"
+          />
+        </g>
+      )
+    }
+  }
+
+  const renderClickTargets = () => {
+    const targets = []
+    const { pieceR } = svgParams
+    const hitR = pieceR * 1.1
+    for (let row = 0; row < boardSize; row++) {
+      for (let col = 0; col < boardSize; col++) {
+        const { x, y } = getIntersectionCoords(row, col)
+        const isOccupied = board[row][col] !== null
+        const isDisabled = gameOver || aiThinking
+        targets.push(
+          <circle
+            key={`t-${row}-${col}`}
+            cx={x}
+            cy={y}
+            r={hitR}
+            fill="transparent"
+            className={`ttt-hit-target ${isOccupied ? 'occupied' : ''} ${isDisabled ? 'disabled' : ''}`}
+            onClick={() => handleCellClick(row, col)}
+            style={{ cursor: (isDisabled || isOccupied) ? 'default' : 'pointer' }}
+          />
+        )
+      }
+    }
+    return targets
+  }
+
+  const renderBoardSVG = () => {
+    const { cellSize, boardPx } = svgParams
+    const lines = []
+
+    for (let i = 0; i < boardSize; i++) {
+      const y = PADDING + i * cellSize
+      lines.push(
+        <line
+          key={`h-${i}`}
+          x1={PADDING} y1={y}
+          x2={boardPx - PADDING} y2={y}
+          stroke="#475569"
+          strokeWidth="2"
+          strokeLinecap="round"
+        />
+      )
+    }
+
+    for (let i = 0; i < boardSize; i++) {
+      const x = PADDING + i * cellSize
+      lines.push(
+        <line
+          key={`v-${i}`}
+          x1={x} y1={PADDING}
+          x2={x} y2={boardPx - PADDING}
+          stroke="#475569"
+          strokeWidth="2"
+          strokeLinecap="round"
+        />
+      )
+    }
+
+    const pieces = []
+    for (let r = 0; r < boardSize; r++) {
+      for (let c = 0; c < boardSize; c++) {
+        if (board[r][c]) pieces.push(renderPiece(r, c))
+      }
+    }
 
     return (
-      <div
-        key={`${row}-${col}`}
-        className={className}
-        onClick={() => handleCellClick(row, col)}
+      <svg
+        width={boardPx}
+        height={boardPx}
+        className="ttt-board-svg"
+        viewBox={`0 0 ${boardPx} ${boardPx}`}
       >
-        {value === PLAYERS.X && <span className="x-mark">✕</span>}
-        {value === PLAYERS.O && <span className="o-mark">○</span>}
-      </div>
+        <rect x="0" y="0" width={boardPx} height={boardPx} fill="#1e293b" rx="8" />
+        <g>{lines}</g>
+        <g>{renderClickTargets()}</g>
+        <g>{pieces}</g>
+      </svg>
     )
   }
 
@@ -221,8 +344,6 @@ function TicTacToePage() {
     if (gameResult === PLAYERS.X) return 'x-wins'
     return 'o-wins'
   }
-
-  const sizeClass = `ttt-size-${boardSize}`
 
   return (
     <div className="ttt-page">
@@ -269,14 +390,7 @@ function TicTacToePage() {
           </div>
 
           <div className="ttt-board-container">
-            <div
-              className={`ttt-board ${sizeClass}`}
-              style={{ gridTemplateColumns: `repeat(${boardSize}, 1fr)` }}
-            >
-              {Array.from({ length: boardSize }, (_, r) =>
-                Array.from({ length: boardSize }, (_, c) => renderCell(r, c))
-              )}
-            </div>
+            {renderBoardSVG()}
 
             {gameOver && (
               <div className="ttt-overlay">

@@ -10,7 +10,7 @@ import {
   Area,
   AreaChart,
 } from 'recharts';
-import { buildStockHistory, getSkuTotalStock } from './utils.js';
+import { buildStockHistory, buildStockHistoryByWarehouse, buildStockHistoryBySku } from './utils.js';
 import { CHART_DAYS } from './constants.js';
 
 export default function StockChart({ flowLogs, skus, warehouses, batches }) {
@@ -20,7 +20,7 @@ export default function StockChart({ flowLogs, skus, warehouses, batches }) {
 
   const chartData = useMemo(() => {
     if (viewType === 'total') {
-      const history = buildStockHistory(flowLogs, skus, CHART_DAYS);
+      const history = buildStockHistory(flowLogs, batches, CHART_DAYS);
       return history.map((item) => ({
         date: item.date.slice(5),
         库存总量: item.totalStock,
@@ -30,45 +30,37 @@ export default function StockChart({ flowLogs, skus, warehouses, batches }) {
     }
 
     if (viewType === 'warehouse') {
-      const history = buildStockHistory(flowLogs, skus, CHART_DAYS);
       if (selectedWarehouse === 'all') {
+        const history = buildStockHistory(flowLogs, batches, CHART_DAYS);
         return history.map((item) => ({
           date: item.date.slice(5),
           库存总量: item.totalStock,
         }));
       }
-      const whSkus = skus.filter(() => true);
-      const whHistory = buildStockHistory(flowLogs, whSkus, CHART_DAYS);
-      return whHistory.map((item) => {
-        const whStock = batches
-          .filter((b) => b.warehouseId === selectedWarehouse)
-          .reduce((sum, b) => sum + (Number(b.quantity) || 0), 0);
-        return {
-          date: item.date.slice(5),
-          仓库库存: whStock,
-        };
-      });
+      const whHistory = buildStockHistoryByWarehouse(flowLogs, selectedWarehouse, batches, CHART_DAYS);
+      return whHistory.map((item) => ({
+        date: item.date.slice(5),
+        仓库库存: item.totalStock,
+      }));
     }
 
     if (viewType === 'sku') {
-      const history = buildStockHistory(flowLogs, skus, CHART_DAYS);
       if (selectedSku === 'all') {
+        const history = buildStockHistory(flowLogs, batches, CHART_DAYS);
         return history.map((item) => ({
           date: item.date.slice(5),
           库存总量: item.totalStock,
         }));
       }
-      const skuFlowLogs = flowLogs.filter((l) => l.skuId === selectedSku);
-      const skuHistory = buildStockHistory(skuFlowLogs, skus.filter((s) => s.id === selectedSku), CHART_DAYS);
-      const skuStock = getSkuTotalStock(batches, selectedSku);
+      const skuHistory = buildStockHistoryBySku(flowLogs, selectedSku, batches, CHART_DAYS);
       return skuHistory.map((item) => ({
         date: item.date.slice(5),
-        SKU库存: item.totalStock || skuStock,
+        SKU库存: item.totalStock,
       }));
     }
 
     return [];
-  }, [viewType, selectedWarehouse, selectedSku, flowLogs, skus, batches]);
+  }, [viewType, selectedWarehouse, selectedSku, flowLogs, batches]);
 
   return (
     <div className="chart-container">

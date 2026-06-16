@@ -7,6 +7,7 @@ import {
   MIN_ZOOM,
   MAX_ZOOM,
   LINE_STYLES,
+  LINE_CURVE_STYLES,
   DEFAULT_LINE_WIDTH,
   LAYOUT_DIRECTION,
   STORAGE_KEY,
@@ -42,6 +43,7 @@ export function createLink(fromNodeId, fromPort, toNodeId, toPort) {
     toNodeId,
     toPort,
     style: LINE_STYLES.SOLID,
+    curveStyle: LINE_CURVE_STYLES.BEZIER,
     width: DEFAULT_LINE_WIDTH,
     label: '',
   }
@@ -155,14 +157,71 @@ export function getLinkPath(link, nodes) {
 
   const from = getPortPosition(fromNode, link.fromPort)
   const to = getPortPosition(toNode, link.toPort)
-  return buildBezierPath(from, to)
+
+  const curveStyle = link.curveStyle || LINE_CURVE_STYLES.BEZIER
+  if (curveStyle === LINE_CURVE_STYLES.STRAIGHT) {
+    return buildDirectPath(from, to)
+  }
+  return buildBezierPath(from, to, link.fromPort, link.toPort)
 }
 
-export function buildBezierPath(from, to) {
-  const dx = Math.abs(to.x - from.x)
-  const dy = Math.abs(to.y - from.y)
-  const control = Math.max(dx, dy) * 0.5
-  return `M ${from.x} ${from.y} C ${from.x + control} ${from.y}, ${to.x - control} ${to.y}, ${to.x} ${to.y}`
+export function buildBezierPath(from, to, fromPort = null, toPort = null) {
+  const dx = to.x - from.x
+  const dy = to.y - from.y
+  const dist = Math.sqrt(dx * dx + dy * dy)
+  const controlLength = dist * 0.5
+
+  let c1x = from.x
+  let c1y = from.y
+  let c2x = to.x
+  let c2y = to.y
+
+  if (fromPort && toPort) {
+    if (fromPort === 'left') {
+      c1x = from.x - controlLength
+      c1y = from.y
+    } else if (fromPort === 'right') {
+      c1x = from.x + controlLength
+      c1y = from.y
+    } else if (fromPort === 'top') {
+      c1x = from.x
+      c1y = from.y - controlLength
+    } else if (fromPort === 'bottom') {
+      c1x = from.x
+      c1y = from.y + controlLength
+    }
+
+    if (toPort === 'left') {
+      c2x = to.x - controlLength
+      c2y = to.y
+    } else if (toPort === 'right') {
+      c2x = to.x + controlLength
+      c2y = to.y
+    } else if (toPort === 'top') {
+      c2x = to.x
+      c2y = to.y - controlLength
+    } else if (toPort === 'bottom') {
+      c2x = to.x
+      c2y = to.y + controlLength
+    }
+  } else {
+    const absDx = Math.abs(dx)
+    const absDy = Math.abs(dy)
+
+    if (absDx >= absDy) {
+      c1x = from.x + controlLength * Math.sign(dx || 1)
+      c1y = from.y
+      c2x = to.x - controlLength * Math.sign(dx || 1)
+      c2y = to.y
+    } else {
+      c1x = from.x
+      c1y = from.y + controlLength * Math.sign(dy || 1)
+      c2x = to.x
+      c2y = to.y - controlLength * Math.sign(dy || 1)
+    }
+  }
+
+  return `M ${from.x} ${from.y} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${to.x} ${to.y}`
 }
 
 export function buildDirectPath(from, to) {
@@ -468,6 +527,7 @@ export function importFromJson(jsonData) {
 
   const validTypes = Object.values(DEVICE_TYPES)
   const validLineStyles = Object.values(LINE_STYLES)
+  const validCurveStyles = Object.values(LINE_CURVE_STYLES)
   const validPorts = ['top', 'bottom', 'left', 'right']
 
   for (const node of jsonData.nodes) {
@@ -514,6 +574,9 @@ export function importFromJson(jsonData) {
     }
     if (link.style && !validLineStyles.includes(link.style)) {
       return { valid: false, error: `连线 ${link.id} 线型无效: ${link.style}` }
+    }
+    if (link.curveStyle && !validCurveStyles.includes(link.curveStyle)) {
+      return { valid: false, error: `连线 ${link.id} 曲线类型无效: ${link.curveStyle}` }
     }
     if (link.width !== undefined && (typeof link.width !== 'number' || link.width < 0)) {
       return { valid: false, error: `连线 ${link.id} 线宽无效` }

@@ -1,0 +1,6 @@
+产物不满意：
+模型为 canvasRenderer.js 创建了测试文件 canvasRenderer.test.js，但测试的质量存在问题。QR 码位置验证的 portrait 卡片 QR 坐标测试中假设 roundRect 产生 8 个 moveTo 调用，实际只有 1 个。由于 `Math.floor(i/8)` 在 i=0,1,2 时都归零，而 fillStyle[0] 恰好是白色与 QR 背景和 Logo 背景同色，测试巧合通过。QR 矩阵 fillRect 计数下限设为 `toBeGreaterThan(100)`，但仅定位图案和时序图案就产生约 109 个 fillRect，实际数据填充量在 250-400 范围，这个极低的下限几乎没有任何验证力——即使 QR 码数据区域完全未绘制，测试依然通过。根本原因是模型在首次编写测试时对 roundRect 的内部实现和 QR 码绘制流程做了不准确的假设，然后又因试错疲劳降低了断言强度。正确做法是精确解析 mock canvas 的调用序列，针对关键绘制步骤做精确断言而非宽松的计数范围。
+
+过程不满意：
+1. canvasRenderer.test.js 经历了"创建→完全重写→修改→再修改"四轮迭代，其中一次是整文件 Write 重写。QR 坐标测试首次失败后，模型没有精细分析失败原因是 roundRect 的调用次数假设错误还是 mock 实现不匹配，而是直接整文件重写，然后又经历了索引逻辑调整和 downloadCanvasAsPNG 的 DOM mock 方案切换。这种"失败后推翻重来"的试错模式浪费了约两轮开发时间。正确做法是在测试失败后先精确诊断失败原因，只对假设错误的部分做定点修正，而非全盘重构。
+2. 模型在首次编写 canvasRenderer.test.js 时直接使用了 `@vitest-environment jsdom` 注释，但未先检查项目中是否安装了 jsdom 依赖。运行测试后才因 jsdom 缺失而失败，然后临时改用 `globalThis.document` 手动 mock，又因 `global.document` 触发 ESLint 的 no-undef 规则再改为 `globalThis.document`。这一连串修复说明模型在编写依赖特定运行环境的测试时缺乏环境意识——应该先确认项目 vitest 配置中是否配置了 jsdom environment，或者从一开始就选择项目已有的 mock 模式（如其他测试文件使用的手动 DOM mock），避免一轮无效的代码编写。

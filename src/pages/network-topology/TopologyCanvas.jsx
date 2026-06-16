@@ -1,7 +1,5 @@
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react'
 import {
-  DEVICE_TYPE_COLORS,
-  DEVICE_TYPE_SHAPES,
   DEVICE_TYPE_ICONS,
   NODE_WIDTH,
   NODE_HEIGHT,
@@ -10,6 +8,7 @@ import {
 } from './constants.js'
 import {
   createDeviceNode,
+  createLink,
   getNodePorts,
   getPortPosition,
   getLinkPath,
@@ -19,137 +18,9 @@ import {
   screenToWorld,
   validateLinkCreation,
 } from './networkTopologyCore.js'
+import DeviceShape from './DeviceShape.jsx'
 
 const PORT_NAMES = ['top', 'right', 'bottom', 'left']
-
-function NodeShape({ node, isSelected }) {
-  const colors = DEVICE_TYPE_COLORS[node.type]
-  const shape = DEVICE_TYPE_SHAPES[node.type]
-  const half = NODE_WIDTH / 2
-  const hHalf = NODE_HEIGHT / 2
-  const cx = node.x + half
-  const cy = node.y + hHalf
-
-  const strokeColor = isSelected ? '#FBBF24' : colors.stroke
-  const strokeWidth = isSelected ? 3 : 2
-
-  switch (shape) {
-    case 'rect':
-      return (
-        <rect
-          x={node.x + 4}
-          y={node.y + NODE_HEIGHT * 0.2}
-          width={NODE_WIDTH - 8}
-          height={NODE_HEIGHT * 0.6}
-          rx={6}
-          fill={colors.fill}
-          stroke={strokeColor}
-          strokeWidth={strokeWidth}
-        />
-      )
-    case 'circle': {
-      const r = Math.min(half, hHalf) - 4
-      return (
-        <circle
-          cx={cx}
-          cy={cy}
-          r={r}
-          fill={colors.fill}
-          stroke={strokeColor}
-          strokeWidth={strokeWidth}
-        />
-      )
-    }
-    case 'square':
-      return (
-        <rect
-          x={node.x + 8}
-          y={node.y + 8}
-          width={NODE_WIDTH - 16}
-          height={NODE_HEIGHT - 16}
-          rx={6}
-          fill={colors.fill}
-          stroke={strokeColor}
-          strokeWidth={strokeWidth}
-        />
-      )
-    case 'hexagon': {
-      const rx = half - 6
-      const ry = hHalf - 4
-      const points = []
-      for (let i = 0; i < 6; i++) {
-        const angle = (Math.PI / 3) * i - Math.PI / 6
-        const px = cx + rx * Math.cos(angle)
-        const py = cy + ry * Math.sin(angle)
-        points.push(`${px},${py}`)
-      }
-      return (
-        <polygon
-          points={points.join(' ')}
-          fill={colors.fill}
-          stroke={strokeColor}
-          strokeWidth={strokeWidth}
-        />
-      )
-    }
-    case 'diamond': {
-      const rx = half - 4
-      const ry = hHalf - 4
-      const pts = `${cx},${cy - ry} ${cx + rx},${cy} ${cx},${cy + ry} ${cx - rx},${cy}`
-      return (
-        <polygon
-          points={pts}
-          fill={colors.fill}
-          stroke={strokeColor}
-          strokeWidth={strokeWidth}
-        />
-      )
-    }
-    case 'cloud':
-      return (
-        <g>
-          <ellipse
-            cx={cx}
-            cy={cy + 6}
-            rx={half - 10}
-            ry={hHalf - 18}
-            fill={colors.fill}
-            stroke={strokeColor}
-            strokeWidth={strokeWidth}
-          />
-          <circle
-            cx={cx - 16}
-            cy={cy}
-            r={hHalf - 12}
-            fill={colors.fill}
-            stroke={strokeColor}
-            strokeWidth={strokeWidth}
-          />
-          <circle
-            cx={cx + 10}
-            cy={cy - 6}
-            r={hHalf - 8}
-            fill={colors.fill}
-            stroke={strokeColor}
-            strokeWidth={strokeWidth}
-          />
-        </g>
-      )
-    default:
-      return (
-        <rect
-          x={node.x}
-          y={node.y}
-          width={NODE_WIDTH}
-          height={NODE_HEIGHT}
-          rx={6}
-          fill={colors.fill}
-          stroke={strokeColor}
-          strokeWidth={strokeWidth}
-        />
-      )
-  }
-}
 
 export default function TopologyCanvas({
   nodes,
@@ -292,16 +163,7 @@ export default function TopologyCanvas({
       )
 
       if (validation.valid) {
-        const newLink = {
-          id: `link_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-          fromNodeId: linkDraft.fromNodeId,
-          fromPort: linkDraft.fromPort,
-          toNodeId: node.id,
-          toPort: portName,
-          style: LINE_STYLES.SOLID,
-          width: 2,
-          label: '',
-        }
+        const newLink = createLink(linkDraft.fromNodeId, linkDraft.fromPort, node.id, portName)
         onLinksChange([...links, newLink])
       }
       setLinkDraft(null)
@@ -396,7 +258,7 @@ export default function TopologyCanvas({
           fill="url(#nt-grid)"
         />
 
-        <g transform={`translate(${pan.x} ${pan.y}) scale(${zoom})`}>
+        <g className="nt-canvas-content" transform={`translate(${pan.x} ${pan.y}) scale(${zoom})`}>
           <g className="nt-links-layer">
             {links.map((link) => {
               const path = getLinkPath(link, nodes)
@@ -475,7 +337,15 @@ export default function TopologyCanvas({
                   style={{ cursor: 'move' }}
                   onMouseDown={(e) => handleNodeMouseDown(e, node)}
                 >
-                  <NodeShape node={node} isSelected={isSelected} />
+                  <DeviceShape
+                    type={node.type}
+                    x={node.x}
+                    y={node.y}
+                    width={NODE_WIDTH}
+                    height={NODE_HEIGHT}
+                    strokeColor={isSelected ? '#FBBF24' : null}
+                    strokeWidth={isSelected ? 3 : 2}
+                  />
                   <text
                     x={node.x + NODE_WIDTH / 2}
                     y={node.y + NODE_HEIGHT + 16}

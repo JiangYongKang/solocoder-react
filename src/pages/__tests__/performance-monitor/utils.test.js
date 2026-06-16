@@ -28,6 +28,7 @@ import {
   addAlertRecord,
   confirmAlertRecord,
   confirmAllAlertRecords,
+  resolveAlertRecords,
   sortAlertRecords,
   exportAlertRecordsToCsv,
   generateWaterfallData,
@@ -46,7 +47,7 @@ import {
 describe('ID生成函数', () => {
   it('generateId 应生成指定前缀的ID', () => {
     const id = generateId('test')
-    expect(id).toMatch(/^test_[a-z0-9]+_[a-z0-9]+$/)
+    expect(id).toMatch(/^test_[a-z0-9]+_[a-z0-9]+_[a-z0-9]+$/)
   })
 
   it('两次调用应生成不同的ID', () => {
@@ -470,6 +471,29 @@ describe('告警记录管理', () => {
     const result = confirmAllAlertRecords(records)
     expect(result.success).toBe(true)
     expect(result.records.filter((r) => r.status === ALERT_STATUS.CONFIRMED)).toHaveLength(3)
+  })
+
+  it('resolveAlertRecords 告警解除时计算持续时间', () => {
+    const triggeredAt = 1000000
+    const resolvedAt = 1003500
+    const records = [
+      { id: 'a1', ruleId: 'rule_001', resolvedAt: null, duration: null, triggeredAt },
+      { id: 'a2', ruleId: 'rule_002', resolvedAt: null, duration: null, triggeredAt },
+      { id: 'a3', ruleId: 'rule_001', resolvedAt: 999, duration: 500, triggeredAt: 499 },
+    ]
+    const result = resolveAlertRecords(records, ['rule_001'], resolvedAt)
+    expect(result[0].resolvedAt).toBe(resolvedAt)
+    expect(result[0].duration).toBe(3500)
+    expect(result[1].resolvedAt).toBeNull()
+    expect(result[1].duration).toBeNull()
+    expect(result[2].resolvedAt).toBe(999)
+    expect(result[2].duration).toBe(500)
+  })
+
+  it('resolveAlertRecords 空规则ID列表不修改记录', () => {
+    const records = [{ id: 'a1', ruleId: 'r1', resolvedAt: null, duration: null }]
+    expect(resolveAlertRecords(records, [])).toEqual(records)
+    expect(resolveAlertRecords(records, null)).toEqual(records)
   })
 
   it('sortAlertRecords 默认按触发时间降序', () => {

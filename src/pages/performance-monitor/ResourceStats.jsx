@@ -223,7 +223,7 @@ function ResourceStats({ resources }) {
                       <code>{res.path}</code>
                     </td>
                     <td>
-                      <span className="resource-type-badge resource-type-{res.type}">
+                      <span className={`resource-type-badge resource-type-${res.type}`}>
                         {RESOURCE_TYPE_LABELS[res.type] || res.type}
                       </span>
                     </td>

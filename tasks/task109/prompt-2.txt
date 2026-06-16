@@ -1,0 +1,4 @@
+你实现的分享卡生成器页面还存在一些问题，需要进行修复：
+1. utils.js 中导出的 isRgbaColor 函数在测试文件 utils.test.js 中缺少独立的单元测试用例。当前仅通过 isValidColor 间接覆盖了部分 rgba 场景，当调用方直接使用 isRgbaColor("rgba(255,0,0)") 验证不带 alpha 通道的格式，或传入含多余空格的 "rgba( 255 , 0 , 0 , 0.5 )" 格式时，缺少针对性的边界测试。需要为 isRgbaColor 补充专有的 describe 块和独立测试用例。
+2. canvasRenderer.js 中的 renderShareCard、drawQRCode、downloadCanvasAsPNG 等 Canvas 绘制和导出函数完全未被测试覆盖。其中 renderShareCard 涉及背景模式分支切换和 Canvas 尺寸计算，drawQRCode 涉及像素绘制坐标计算，downloadCanvasAsPNG 涉及文件名 fallback 逻辑，这些都属于可测试的纯逻辑。需要为 canvasRenderer.js 中的关键计算逻辑补充单元测试。
+3. 修复后重新运行 pnpm run test，确保所有测试通过。

@@ -476,37 +476,112 @@ export function insertNodeOnSegment(commands, segIndex, t) {
 
 export function deleteNode(commands, nodeIndex) {
   const absCmds = toAbsoluteCommands(commands)
-  if (absCmds.length <= 2) return commands
+  const anchors = getAnchorNodes(absCmds)
 
-  let segIndex = -1
-  let count = 0
+  if (anchors.length <= 2) return commands
+  if (nodeIndex < 0 || nodeIndex >= anchors.length) return commands
+  if (anchors[nodeIndex].isClosePoint) return commands
 
-  for (let i = 0; i < absCmds.length; i++) {
-    if (absCmds[i].type !== 'Z') {
-      if (count === nodeIndex) {
-        segIndex = i
-        break
+  const deleted = anchors[nodeIndex]
+  let newCmds = []
+
+  if (nodeIndex === 0) {
+    const secondAnchor = anchors[1]
+    let foundFirst = false
+    for (let i = 0; i < absCmds.length; i++) {
+      const cmd = absCmds[i]
+      if (!foundFirst) {
+        if (cmd.type === 'M' || cmd.type === 'L' || cmd.type === 'C' || cmd.type === 'Q' || cmd.type === 'A') {
+          const endPt = getCmdEndPoint(cmd)
+          if (endPt.x === secondAnchor.x && endPt.y === secondAnchor.y) {
+            foundFirst = true
+          }
+        }
+      } else {
+        if (cmd.type === 'Z') {
+          newCmds.push({ type: 'M', relative: false, params: [secondAnchor.x, secondAnchor.y] })
+        }
+        newCmds.push(cmd)
       }
-      count++
+    }
+    if (newCmds.length > 0 && newCmds[0].type !== 'M') {
+      newCmds.unshift({ type: 'M', relative: false, params: [secondAnchor.x, secondAnchor.y] })
+    }
+  } else {
+    const nextAnchor = nodeIndex + 1 < anchors.length ? anchors[nodeIndex + 1] : null
+    let skipUntil = -1
+
+    for (let i = 0; i < absCmds.length; i++) {
+      if (i <= skipUntil) continue
+
+      const cmd = absCmds[i]
+      const endPt = getCmdEndPoint(cmd)
+
+      if (endPt.x === deleted.x && endPt.y === deleted.y && cmd.type !== 'M') {
+        if (nextAnchor && !nextAnchor.isClosePoint) {
+          newCmds.push({ type: 'L', relative: false, params: [nextAnchor.x, nextAnchor.y] })
+          for (let j = i + 1; j < absCmds.length; j++) {
+            const nextCmdEnd = getCmdEndPoint(absCmds[j])
+            if (nextCmdEnd.x === nextAnchor.x && nextCmdEnd.y === nextAnchor.y) {
+              skipUntil = j
+              break
+            }
+          }
+        } else if (nextAnchor && nextAnchor.isClosePoint) {
+          newCmds.push({ type: 'Z', relative: false, params: [] })
+          break
+        }
+      } else {
+        newCmds.push(cmd)
+      }
     }
   }
 
-  if (segIndex <= 0) return commands
+  if (newCmds.length === 0 || newCmds[0].type !== 'M') return commands
+  return newCmds
+}
 
-  const prevPoint = getSegmentStart(absCmds, segIndex)
-  const nextPoint = getSegmentEnd(absCmds, segIndex)
+function getCmdEndPoint(cmd) {
+  if (cmd.type === 'M' || cmd.type === 'L') {
+    return { x: cmd.params[0], y: cmd.params[1] }
+  }
+  if (cmd.type === 'C') {
+    return { x: cmd.params[4], y: cmd.params[5] }
+  }
+  if (cmd.type === 'Q') {
+    return { x: cmd.params[2], y: cmd.params[3] }
+  }
+  if (cmd.type === 'A') {
+    return { x: cmd.params[5], y: cmd.params[6] }
+  }
+  return { x: 0, y: 0 }
+}
 
-  if (!prevPoint || !nextPoint) return commands
+function getAnchorNodes(absCmds) {
+  const anchors = []
+  let startX = 0
+  let startY = 0
 
-  const newCmd = { type: 'L', relative: false, params: [nextPoint.x, nextPoint.y] }
-  const newCmds = [...absCmds.slice(0, segIndex - 1), ...absCmds.slice(segIndex)]
-  if (segIndex - 1 >= 0 && segIndex < absCmds.length) {
-    newCmds[segIndex - 1] = newCmd
-  } else {
-    newCmds.splice(segIndex, 0, newCmd)
+  for (let i = 0; i < absCmds.length; i++) {
+    const cmd = absCmds[i]
+    if (cmd.type === 'M') {
+      startX = cmd.params[0]
+      startY = cmd.params[1]
+      anchors.push({ x: cmd.params[0], y: cmd.params[1], cmdIndex: i, isClosePoint: false })
+    } else if (cmd.type === 'L') {
+      anchors.push({ x: cmd.params[0], y: cmd.params[1], cmdIndex: i, isClosePoint: false })
+    } else if (cmd.type === 'C') {
+      anchors.push({ x: cmd.params[4], y: cmd.params[5], cmdIndex: i, isClosePoint: false })
+    } else if (cmd.type === 'Q') {
+      anchors.push({ x: cmd.params[2], y: cmd.params[3], cmdIndex: i, isClosePoint: false })
+    } else if (cmd.type === 'A') {
+      anchors.push({ x: cmd.params[5], y: cmd.params[6], cmdIndex: i, isClosePoint: false })
+    } else if (cmd.type === 'Z') {
+      anchors.push({ x: startX, y: startY, cmdIndex: i, isClosePoint: true })
+    }
   }
 
-  return newCmds
+  return anchors
 }
 
 export function convertSegmentToLine(commands, segIndex) {
@@ -553,22 +628,6 @@ function getSegmentStart(absCmds, segIndex) {
     }
   }
   return { x, y }
-}
-
-function getSegmentEnd(absCmds, segIndex) {
-  if (segIndex >= absCmds.length) return null
-  const cmd = absCmds[segIndex]
-  if (cmd.type === 'M') return { x: cmd.params[0], y: cmd.params[1] }
-  if (cmd.type === 'L') return { x: cmd.params[0], y: cmd.params[1] }
-  if (cmd.type === 'C') return { x: cmd.params[4], y: cmd.params[5] }
-  if (cmd.type === 'Q') return { x: cmd.params[2], y: cmd.params[3] }
-  if (cmd.type === 'A') return { x: cmd.params[5], y: cmd.params[6] }
-  if (cmd.type === 'Z') {
-    for (let j = segIndex - 1; j >= 0; j--) {
-      if (absCmds[j].type === 'M') return { x: absCmds[j].params[0], y: absCmds[j].params[1] }
-    }
-  }
-  return null
 }
 
 export function mergeStyles(baseStyle, overrides) {
@@ -619,15 +678,15 @@ export function buildSvgString(paths, exportAll = true) {
 
   for (const p of pathsToExport) {
     const style = p.style || {}
-    let styleStr = ''
-    if (style.fill && style.fill !== 'none') styleStr += `fill="${style.fill}"; `
-    else styleStr += `fill="none"; `
-    if (style.stroke) styleStr += `stroke="${style.stroke}"; `
-    if (style.strokeWidth) styleStr += `stroke-width="${style.strokeWidth}"; `
-    if (style.linecap && style.linecap !== 'butt') styleStr += `stroke-linecap="${style.linecap}"; `
-    if (style.linejoin && style.linejoin !== 'miter') styleStr += `stroke-linejoin="${style.linejoin}"; `
-    if (style.dasharray) styleStr += `stroke-dasharray="${style.dasharray}"; `
-    styleStr = styleStr.replace(/; $/, '')
+    const styleParts = []
+    if (style.fill && style.fill !== 'none') styleParts.push(`fill:${style.fill}`)
+    else styleParts.push('fill:none')
+    if (style.stroke) styleParts.push(`stroke:${style.stroke}`)
+    if (style.strokeWidth) styleParts.push(`stroke-width:${style.strokeWidth}`)
+    if (style.linecap && style.linecap !== 'butt') styleParts.push(`stroke-linecap:${style.linecap}`)
+    if (style.linejoin && style.linejoin !== 'miter') styleParts.push(`stroke-linejoin:${style.linejoin}`)
+    if (style.dasharray) styleParts.push(`stroke-dasharray:${style.dasharray}`)
+    const styleStr = styleParts.join('; ')
 
     svg += `  <path d="${p.d}"${styleStr ? ' style="' + styleStr + '"' : ''} />\n`
   }

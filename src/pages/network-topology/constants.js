@@ -71,6 +71,16 @@ export const LINE_STYLE_LABELS = {
   [LINE_STYLES.DASHED]: '虚线',
 }
 
+export const LINE_CURVE_STYLES = {
+  BEZIER: 'bezier',
+  STRAIGHT: 'straight',
+}
+
+export const LINE_CURVE_STYLE_LABELS = {
+  [LINE_CURVE_STYLES.BEZIER]: '曲线',
+  [LINE_CURVE_STYLES.STRAIGHT]: '直线',
+}
+
 export const DEFAULT_LINE_WIDTH = 2
 export const MIN_LINE_WIDTH = 1
 export const MAX_LINE_WIDTH = 8

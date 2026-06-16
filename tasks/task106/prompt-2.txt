@@ -1,0 +1,5 @@
+你实现的 SVG 路径编辑器页面还存在一些问题，需要进行修复：
+1. svgPathEditorCore.js 中导出的 deleteNode 函数从未被 index.jsx 导入或调用，成为死代码且测试文件 svgPathEditorCore.test.js 完全未覆盖节点删除逻辑。handleDeleteNode 需要改为调用核心层的 deleteNode，并为删除后的坐标重算补充单元测试。
+2. index.jsx 的 handleDeleteNode 函数在删除仅含 M 和一个曲线段的双节点路径、被删节点为第二个锚点时，用 L 命令替换了 M 命令但未在结果数组中补入新的 M 起始命令。导致删除后的路径以 L 开头而非 M，属于不完整的 SVG 语法。需要确保路径命令数组的第一项始终为 M 命令。
+3. svgPathEditorCore.js 中 buildSvgString 函数导出 SVG 代码时，style 属性拼接生成了双引号嵌套的非语法（`style="fill="#ff0000"; stroke="#333333""`），且 style 内使用了 SVG 属性格式而非 CSS 格式。需要修正为 CSS 内联样式格式（`fill:none; stroke:#333333`）或直接使用 SVG 表现属性挂载到 path 元素上。
+4. 修复后重新运行 pnpm run test，确保所有测试通过。

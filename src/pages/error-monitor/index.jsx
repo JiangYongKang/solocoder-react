@@ -7,7 +7,7 @@ import {
   SORT_OPTIONS,
   PAGE_SIZE,
 } from './constants.js'
-import { generateMockErrors, generateDailySummaries } from './mockData.js'
+import { generateMockErrors } from './mockData.js'
 import {
   getTimeRange,
   filterErrorsByTimeRange,
@@ -21,7 +21,7 @@ import {
   markErrorResolved,
   markAllResolved,
   formatNumber,
-  getTodayCount,
+  generateDailySummaries,
 } from './utils.js'
 import { drawLineChart, drawPieChart } from './chartUtils.js'
 import './error-monitor.css'
@@ -290,8 +290,6 @@ const ErrorMonitor = () => {
     }))
   }
 
-  const todayCount = useMemo(() => getTodayCount(allErrors), [allErrors])
-
   return (
     <div className="em-page">
       <div className="em-header">
@@ -309,13 +307,13 @@ const ErrorMonitor = () => {
         </div>
         <div className="em-summary-card em-summary-card--warning">
           <div className="em-summary-label">今日新增</div>
-          <div className="em-summary-value">{formatNumber(todayCount)}</div>
-          <div className="em-summary-sub">24 小时内</div>
+          <div className="em-summary-value">{formatNumber(summaryStats.todayNew)}</div>
+          <div className="em-summary-sub">当前筛选范围内</div>
         </div>
         <div className="em-summary-card em-summary-card--danger">
           <div className="em-summary-label">未解决</div>
           <div className="em-summary-value">{formatNumber(summaryStats.unresolved)}</div>
-          <div className="em-summary-sub">待处理错误</div>
+          <div className="em-summary-sub">当前筛选范围内</div>
         </div>
       </div>
 

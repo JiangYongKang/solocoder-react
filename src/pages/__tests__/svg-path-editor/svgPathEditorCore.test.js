@@ -1,29 +1,29 @@
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import {
-  parsePathCommands,
-  serializePathCommands,
-  toAbsoluteCommands,
-  cubicBezierPoint,
-  quadraticBezierPoint,
-  splitCubicBezier,
-  splitQuadraticBezier,
-  findNearestPointOnCubic,
-  findNearestPointOnQuadratic,
-  findNearestPointOnLine,
-  insertNodeOnSegment,
-  convertSegmentToLine,
-  mergeStyles,
-  buildSvgString,
-  isValidHexColor,
-  getControlPoints,
-  updateCommandParam,
-  getPathBounds,
-  extractNodes,
-  nodesToCommands,
-  distance,
-  screenToWorld,
-  worldToScreen,
-  clampZoom,
+    buildSvgString,
+    clampZoom,
+    convertSegmentToLine,
+    cubicBezierPoint,
+    deleteNode,
+    distance,
+    extractNodes,
+    findNearestPointOnCubic,
+    findNearestPointOnLine,
+    findNearestPointOnQuadratic,
+    getControlPoints,
+    getPathBounds,
+    insertNodeOnSegment,
+    isValidHexColor,
+    mergeStyles,
+    parsePathCommands,
+    quadraticBezierPoint,
+    screenToWorld,
+    serializePathCommands,
+    splitCubicBezier,
+    splitQuadraticBezier,
+    toAbsoluteCommands,
+    updateCommandParam,
+    worldToScreen
 } from '../../svg-path-editor/svgPathEditorCore.js'
 
 describe('parsePathCommands', () => {
@@ -382,6 +382,104 @@ describe('convertSegmentToLine', () => {
   })
 })
 
+describe('deleteNode', () => {
+  it('deletes middle node from L path', () => {
+    const cmds = parsePathCommands('M 0 0 L 50 50 L 100 0')
+    const result = deleteNode(cmds, 1)
+    expect(result[0].type).toBe('M')
+    expect(result[0].params).toEqual([0, 0])
+    expect(result[1].type).toBe('L')
+    expect(result[1].params).toEqual([100, 0])
+    expect(result.length).toBe(2)
+  })
+
+  it('first command always remains M after deletion', () => {
+    const cmds = parsePathCommands('M 0 0 L 50 50 L 100 0')
+    const result = deleteNode(cmds, 1)
+    expect(result[0].type).toBe('M')
+  })
+
+  it('deletes first node and makes second node the new M', () => {
+    const cmds = parsePathCommands('M 0 0 L 50 50 L 100 0')
+    const result = deleteNode(cmds, 0)
+    expect(result[0].type).toBe('M')
+    expect(result[0].params).toEqual([50, 50])
+    expect(result[1].type).toBe('L')
+    expect(result[1].params).toEqual([100, 0])
+    expect(result.length).toBe(2)
+  })
+
+  it('does not delete when only 2 anchor nodes remain', () => {
+    const cmds = parsePathCommands('M 0 0 L 100 0')
+    const result = deleteNode(cmds, 1)
+    expect(result).toEqual(toAbsoluteCommands(cmds))
+  })
+
+  it('returns unchanged for invalid index', () => {
+    const cmds = parsePathCommands('M 0 0 L 50 50 L 100 0')
+    expect(deleteNode(cmds, -1)).toEqual(toAbsoluteCommands(cmds))
+    expect(deleteNode(cmds, 99)).toEqual(toAbsoluteCommands(cmds))
+  })
+
+  it('deletes middle C curve node, replaces with L', () => {
+    const cmds = parsePathCommands('M 0 0 C 30 40 50 60 100 100 L 150 50')
+    const result = deleteNode(cmds, 1)
+    expect(result[0].type).toBe('M')
+    expect(result[0].params).toEqual([0, 0])
+    expect(result[1].type).toBe('L')
+    expect(result[1].params).toEqual([150, 50])
+    expect(result.length).toBe(2)
+  })
+
+  it('deletes node from path with multiple curves', () => {
+    const cmds = parsePathCommands('M 0 0 C 30 40 50 60 100 100 Q 120 80 150 50 L 200 100')
+    const result = deleteNode(cmds, 2)
+    expect(result[0].type).toBe('M')
+    expect(result.length).toBe(3)
+    expect(result[1].type).toBe('C')
+    expect(result[2].type).toBe('L')
+    expect(result[2].params).toEqual([200, 100])
+  })
+
+  it('deletes Q curve node from M+Q+L path', () => {
+    const cmds = parsePathCommands('M 0 0 Q 50 100 100 0 L 150 50')
+    const result = deleteNode(cmds, 1)
+    expect(result[0].type).toBe('M')
+    expect(result[1].type).toBe('L')
+    expect(result[1].params).toEqual([150, 50])
+    expect(result.length).toBe(2)
+  })
+
+  it('deletes node from closed path with Z', () => {
+    const cmds = parsePathCommands('M 0 0 L 100 0 L 100 100 Z')
+    const result = deleteNode(cmds, 1)
+    expect(result[0].type).toBe('M')
+    expect(result[0].params).toEqual([0, 0])
+    expect(result[1].type).toBe('L')
+    expect(result[1].params).toEqual([100, 100])
+    expect(result[2].type).toBe('Z')
+  })
+
+  it('preserves relative commands as absolute in result', () => {
+    const cmds = parsePathCommands('M 0 0 l 50 50 l 50 -50')
+    const result = deleteNode(cmds, 1)
+    expect(result[0].type).toBe('M')
+    expect(result[0].relative).toBe(false)
+    expect(result[1].type).toBe('L')
+    expect(result[1].params).toEqual([100, 0])
+  })
+
+  it('bridge between two curves becomes L', () => {
+    const cmds = parsePathCommands('M 0 0 C 25 100 50 100 100 0 C 150 -100 200 100 250 0')
+    const result = deleteNode(cmds, 1)
+    expect(result.length).toBe(2)
+    expect(result[0].type).toBe('M')
+    expect(result[0].params).toEqual([0, 0])
+    expect(result[1].type).toBe('L')
+    expect(result[1].params).toEqual([250, 0])
+  })
+})
+
 describe('mergeStyles', () => {
   it('merges override into base', () => {
     const base = { stroke: '#000', fill: 'none', strokeWidth: 2 }
@@ -421,6 +519,34 @@ describe('buildSvgString', () => {
     expect(svg).toContain('M 0 0')
   })
 
+  it('uses CSS inline style format without nested quotes', () => {
+    const paths = [{
+      d: 'M 0 0 L 100 0',
+      style: { stroke: '#ff0000', fill: 'none', strokeWidth: 2, linecap: 'round' },
+      visible: true,
+    }]
+    const svg = buildSvgString(paths)
+    expect(svg).toContain('style="')
+    expect(svg).toContain('fill:none')
+    expect(svg).toContain('stroke:#ff0000')
+    expect(svg).toContain('stroke-width:2')
+    expect(svg).toContain('stroke-linecap:round')
+    expect(svg).not.toContain('fill="')
+    expect(svg).not.toContain('stroke="#')
+    expect(svg).not.toContain('fill="none"')
+    expect(svg.match(/style="([^"]*)"/)).toBeTruthy()
+  })
+
+  it('style properties separated by semicolon and space', () => {
+    const paths = [{
+      d: 'M 0 0 L 100 0',
+      style: { stroke: '#333', fill: '#fff', strokeWidth: 1 },
+      visible: true,
+    }]
+    const svg = buildSvgString(paths)
+    expect(svg).toContain('fill:#fff; stroke:#333; stroke-width:1')
+  })
+
   it('skips hidden paths when not exporting all', () => {
     const paths = [
       { d: 'M 0 0 L 100 0', style: { stroke: '#000', fill: 'none' }, visible: true },
@@ -434,6 +560,12 @@ describe('buildSvgString', () => {
   it('handles empty paths array', () => {
     const svg = buildSvgString([])
     expect(svg).toContain('<svg')
+  })
+
+  it('includes xmlns attribute', () => {
+    const paths = [{ d: 'M 0 0 L 100 0', style: { stroke: '#000', fill: 'none' }, visible: true }]
+    const svg = buildSvgString(paths)
+    expect(svg).toContain('xmlns="http://www.w3.org/2000/svg"')
   })
 })
 

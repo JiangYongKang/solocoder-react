@@ -1,0 +1,5 @@
+你实现的仓库库存管理页面还存在一些问题，需要进行修复：
+1. StockChart.jsx 中按仓库查看趋势图时，whStock 是直接用当前 batches 快照一次性计算的，然后 30 天中每一天都填入相同的数值，导致折线图为水平直线，未反映任何历史趋势变化。需要基于 flowLogs 按仓库和日期分组逐天重建该仓库的历史库存量。
+2. StockChart.jsx 中按 SKU 查看趋势图时，buildStockHistory 的聚合逻辑依赖 balanceAfter 字段，但该字段在流水生成时记录的是 SKU 在单仓的库存而非全仓总库存，且双重过滤逻辑与调用方预先过滤了 skuId 的操作冲突，导致聚合值恒为 0。需要修正 balanceAfter 的语义使其反映全仓总库存，并修正过滤逻辑的冲突。
+3. SkuFlowLogs.jsx 的 getFlowIconClass 函数中将调拨入库映射为 inbound、调拨出库映射为 outbound，但 CSS 中已定义了独立的 transfer 样式，导致调拨操作无法以独立的蓝色图标区分，视觉效果与普通出入库相同。需要修正 CSS 类名映射，使用 transfer 样式。
+4. 修复后重新运行 pnpm run test，确保所有测试通过。

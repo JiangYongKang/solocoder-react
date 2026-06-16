@@ -1,0 +1,8 @@
+产物不满意：
+1. svgPathEditorCore.test.js 中为 buildBezierPath 新增的曲线样式测试用例只验证了 c1 控制点的坐标，完全没有检查 c2 控制点。以水平端口测试和垂直端口测试为例，前者从 fromPort='left' toPort='right' 调用 buildBezierPath 时 c2 应为 (300, 50) 即右侧端口处偏移，后者 fromPort='bottom' toPort='top' 时 c1 和 c2 都退化为同一个中点。但两个测试都只对 c1 做了 toBeCloseTo 断言，完全没有解析路径中的第二个 C 命令参数来验证 c2。如果 buildBezierPath 中 toPort 方向的处理分支被意外破坏导致 c2 坐标错误，现有测试依然全部通过，测试的防护能力形同虚设。根本原因是为新增测试写断言时只关注了 c1 而未比对完整路径命令，漏掉了路径渲染中同等关键的 c2 验证点。正确做法是在曲线路径测试中至少解析出 c1 和 c2 两个控制点并分别断言。
+2. importFromJson 函数中对 link 的 curveStyle 字段校验使用了 `link.curveStyle &&` 的 truthiness 短路判断。当用户导入的 JSON 数据中 curveStyle 字段为空字符串 "" 时，短路判断认为它是 falsy 不进入后续的 includes 校验，导致空字符串被静默接受而非被拒绝为非法值。虽然空字符串在后续 getLinkPath 消费时会被默认回退为贝塞尔曲线，但用户导入时不会收到任何输入不合法的警告提示，且下次重新导入同一份数据时 curveStyle 仍然为空字符串，数据完整性问题未被发现。根本原因是模型在添加校验逻辑时用 truthy 判断替代了更精确的类型检查，没有考虑到空字符串是一个合法的字符串类型但非合法的枚举值。正确做法是先校验 typeof link.curveStyle === 'string'，再调用 includes 检查是否为允许值。
+
+过程不满意：
+1. 模型在收到提示词后的第一步就创建了 5 到 6 个 TodoList 条目，此时尚未读取 networkTopologyCore.js、constants.js、TopologyCanvas.jsx 等任何源文件，不了解当前代码中 buildBezierPath 的偏移逻辑、NodeShape 和 DeviceShape 的重复代码规模以及 handlePortMouseUp 的内联 link 构造细节。这违反了标注规范中"不能在刚收到任务时就直接创建 TodoList，应先分析问题再规划"的要求。正确做法是先逐个读取需要修改的文件，理解现有实现和问题根因后再制定修改计划。
+2. 模型在对 networkTopologyCore.js 进行修改时采用了多轮"编辑-读取-编辑"的交替模式，对该文件进行了至少三次分散的 edit_file_search_replace（常量新增、贝塞尔方向、getLinkPath），中间插入多次 view_files 重读同文件。这反映出模型没有在第一次读取文件时一次性梳理出所有需要修改的位置和顺序，导致修改过程中反复回头确认文件当前状态。正确做法是完整阅读文件后将所有修改点记录下来，按顺序一次性完成编辑链。
+3. 模型完成修复后只运行了 network-topology 包的测试和 ESLint 检查就认为修复完成。但本次修复涉及贝塞尔曲线方向自适应和 PNG 导出选择器两个视觉渲染相关的问题，纯单元测试只能验证路径字符串的语法正确性，无法验证 SVG 画布上实际渲染的曲线形态是否真正根据端口方向自适应弯折、PNG 导出的裁剪区域是否精确包含拓扑内容而非多余空白。这种情况下模型应该提示在浏览器中手动验证渲染效果，而不是仅凭测试通过就声称修复完成。

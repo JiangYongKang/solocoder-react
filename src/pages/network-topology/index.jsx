@@ -186,7 +186,7 @@ export default function NetworkTopologyPage() {
       const height = bbox.height + padding * 2
 
       const clonedSvg = svg.cloneNode(true)
-      const transformGroup = clonedSvg.querySelector('g > g')
+      const transformGroup = clonedSvg.querySelector('.nt-canvas-content')
       if (transformGroup) {
         transformGroup.setAttribute(
           'transform',

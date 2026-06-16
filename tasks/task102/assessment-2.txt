@@ -1,0 +1,7 @@
+产物不满意：
+getAverageRating 函数中保留了 `v > 0` 的过滤逻辑和对应的 should filter out zero ratings 测试用例，这是旧版 setRating 评分钳位 bug 的防御性 workaround。在 setRating 已修复为评分 ≤ 0 时直接 delete 后，rating 对象中不会存在值为 0 的条目，`v > 0` 过滤在运行时永远不触发，成为死逻辑。但测试文件中仍保留了 should filter out zero ratings 用例并预期通过，当后续有人移除 getAverageRating 中的冗余过滤时测试会失败，形成了"修复后代码正常、但测试强制保留冗余防御"的语义断层。根本原因是模型修复 setRating 后没有向上追溯所有读取评分数据的消费方是否需要同步简化，导致过时的 workaround 逻辑和对应测试残留。正确做法是在修复数据写入逻辑后全局搜索所有读取 rating 的函数，移除不再需要的防御性过滤，同时更新或删除对应的测试用例。
+
+过程不满意：
+1. 模型在收到提示词后第一步就创建了包含 4 个任务的 TodoList，此时尚未读取 resumeTemplatesCore.js、TemplateSelector.jsx、ModuleEditor.jsx 或 index.jsx 任何一个源文件。这违反了标注规范中"不能在刚收到任务时就直接创建 TodoList，应先分析问题再规划"的要求。正确做法是先读取提示词中涉及的关键文件理解当前的 setRating 钳位逻辑、ModuleEditor 的 arrayMove 调用以及 index.jsx 的嵌套 setTimeout，再基于分析制定修改计划。
+2. 模型在修复过程中重复读取了 resumeTemplatesCore.js 和 ModuleEditor.jsx 各两次，且两次读取间没有对文件做任何修改。这种无意义的重复读取说明模型在审阅代码时注意力分散，没有在第一次读取后就充分吸收文件内容，降低了推理效率。正确做法是一次性读取并记录文件关键信息后再开始修改，避免回头重新读取已看过的区域。
+3. 模型在运行测试时仅执行了 `pnpm test -- --reporter=verbose src/pages/__tests__/resume-templates/` 即包内测试，而提示词第 4 条明确要求"修复后重新运行 pnpm run test，确保所有测试通过"。虽然包内 101 个测试全部通过，但模型没有按提示词要求执行全量测试验证修改未破坏其他包的代码。此外模型在总结中声称"新增 6 个测试用例，测试总数从 96 增加到 101 个"，实际净增为 5 个用例，总结中的数量与实际不一致，属于粗心导致的数字错误。

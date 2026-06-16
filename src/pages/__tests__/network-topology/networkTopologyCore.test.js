@@ -12,6 +12,8 @@ import {
     LAYOUT_DIRECTION_LABELS,
     LINE_STYLES,
     LINE_STYLE_LABELS,
+    LINE_CURVE_STYLES,
+    LINE_CURVE_STYLE_LABELS,
     MAX_ZOOM,
     MIN_ZOOM,
     NODE_HEIGHT,
@@ -119,6 +121,15 @@ describe('line style constants', () => {
   })
 })
 
+describe('line curve style constants', () => {
+  it('should define bezier and straight curve styles', () => {
+    expect(LINE_CURVE_STYLES.BEZIER).toBe('bezier')
+    expect(LINE_CURVE_STYLES.STRAIGHT).toBe('straight')
+    expect(LINE_CURVE_STYLE_LABELS[LINE_CURVE_STYLES.BEZIER]).toBe('曲线')
+    expect(LINE_CURVE_STYLE_LABELS[LINE_CURVE_STYLES.STRAIGHT]).toBe('直线')
+  })
+})
+
 describe('layout direction constants', () => {
   it('should define vertical and horizontal directions', () => {
     expect(LAYOUT_DIRECTION.VERTICAL).toBe('vertical')
@@ -197,6 +208,7 @@ describe('createLink', () => {
     expect(link.toNodeId).toBe('node2')
     expect(link.toPort).toBe('left')
     expect(link.style).toBe(LINE_STYLES.SOLID)
+    expect(link.curveStyle).toBe(LINE_CURVE_STYLES.BEZIER)
     expect(link.width).toBe(DEFAULT_LINE_WIDTH)
     expect(link.label).toBe('')
     expect(typeof link.id).toBe('string')
@@ -491,6 +503,27 @@ describe('path building functions', () => {
     expect(path).toContain('C ')
   })
 
+  it('buildBezierPath with horizontal ports should have horizontal control points', () => {
+    const path = buildBezierPath(from, to, 'right', 'left')
+    expect(path.startsWith('M 0 50')).toBe(true)
+    expect(path).toContain('C ')
+    const parts = path.split('C ')[1].split(', ')
+    const c1 = parts[0].split(' ')
+    expect(Number(c1[0])).toBeGreaterThan(0)
+    expect(Number(c1[1])).toBe(50)
+  })
+
+  it('buildBezierPath with vertical ports should have vertical control points', () => {
+    const top = { x: 150, y: 0 }
+    const bottom = { x: 150, y: 300 }
+    const path = buildBezierPath(top, bottom, 'bottom', 'top')
+    expect(path.startsWith('M 150 0')).toBe(true)
+    const parts = path.split('C ')[1].split(', ')
+    const c1 = parts[0].split(' ')
+    expect(Number(c1[0])).toBe(150)
+    expect(Number(c1[1])).toBeGreaterThan(0)
+  })
+
   it('buildDirectPath should return SVG line string', () => {
     const path = buildDirectPath(from, to)
     expect(path).toBe('M 0 50 L 300 50')
@@ -527,6 +560,24 @@ describe('getLinkPath and getLinkMidpoint', () => {
     const to = getPortPosition(nodes[1], 'left')
     expect(mid.x).toBeCloseTo((from.x + to.x) / 2)
     expect(mid.y).toBeCloseTo((from.y + to.y) / 2)
+  })
+
+  it('getLinkPath with bezier curveStyle should contain bezier command', () => {
+    const bezierLink = { ...link, curveStyle: LINE_CURVE_STYLES.BEZIER }
+    const path = getLinkPath(bezierLink, nodes)
+    expect(path).toContain('C ')
+  })
+
+  it('getLinkPath with straight curveStyle should contain line command', () => {
+    const straightLink = { ...link, curveStyle: LINE_CURVE_STYLES.STRAIGHT }
+    const path = getLinkPath(straightLink, nodes)
+    expect(path).toContain('L ')
+    expect(path).not.toContain('C ')
+  })
+
+  it('getLinkPath default curveStyle should be bezier', () => {
+    const path = getLinkPath(link, nodes)
+    expect(path).toContain('C ')
   })
 })
 
@@ -802,6 +853,18 @@ describe('importFromJson', () => {
     const data = makeValidData()
     data.links[0].style = 'invalid_style'
     expect(importFromJson(data).valid).toBe(false)
+  })
+
+  it('should reject link with invalid curveStyle', () => {
+    const data = makeValidData()
+    data.links[0].curveStyle = 'invalid_curve'
+    expect(importFromJson(data).valid).toBe(false)
+  })
+
+  it('should accept link with valid curveStyle', () => {
+    const data = makeValidData()
+    data.links[0].curveStyle = LINE_CURVE_STYLES.STRAIGHT
+    expect(importFromJson(data).valid).toBe(true)
   })
 
   it('should accept link without optional style/width', () => {

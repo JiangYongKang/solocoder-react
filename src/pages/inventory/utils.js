@@ -1,11 +1,11 @@
 import {
-  DOCUMENT_TYPES,
-  STOCK_STATUS,
-  WARNING_MULTIPLIER,
-  BATCH_STATUS,
-  EXPIRING_DAYS,
-  FLOW_LOG_TYPES,
-  CHART_DAYS,
+    BATCH_STATUS,
+    CHART_DAYS,
+    DOCUMENT_TYPES,
+    EXPIRING_DAYS,
+    FLOW_LOG_TYPES,
+    STOCK_STATUS,
+    WARNING_MULTIPLIER,
 } from './constants.js';
 
 export function generateId(prefix = '') {
@@ -313,6 +313,7 @@ export function applyStocktake(batches, warehouseId, differences) {
         updatedBatches = allocResult.updatedBatches;
       }
     }
+    const totalAfter = getSkuTotalStock(updatedBatches, diff.skuId);
     flowLogs.push({
       id: generateId('fl_'),
       skuId: diff.skuId,
@@ -320,6 +321,7 @@ export function applyStocktake(batches, warehouseId, differences) {
       type: FLOW_LOG_TYPES.STOCKTAKE,
       quantityChange: changeQty,
       balanceAfter: targetQty,
+      balanceAfterTotal: totalAfter,
       refId: '',
       refType: 'stocktake',
       remark: diff.remark || '盘点调整',
@@ -344,6 +346,7 @@ export function createFlowLog(data) {
     type: data.type,
     quantityChange: data.quantityChange || 0,
     balanceAfter: data.balanceAfter || 0,
+    balanceAfterTotal: data.balanceAfterTotal != null ? data.balanceAfterTotal : (data.balanceAfter || 0),
     refId: data.refId || '',
     refType: data.refType || '',
     batchNo: data.batchNo || '',
@@ -374,43 +377,168 @@ export function getWarningSkus(skus, batches) {
   });
 }
 
-export function buildStockHistory(flowLogs, skus, days = CHART_DAYS) {
+export function buildStockHistory(flowLogs, batches, days = CHART_DAYS) {
   const history = [];
   const now = new Date();
   now.setHours(0, 0, 0, 0);
-  for (let i = days - 1; i >= 0; i--) {
+
+  if (!Array.isArray(flowLogs)) flowLogs = [];
+
+  const currentTotalStock = Array.isArray(batches)
+    ? batches.reduce((sum, b) => sum + (Number(b.quantity) || 0), 0)
+    : 0;
+
+  const netChanges = [];
+  for (let i = 0; i < days; i++) {
     const date = new Date(now);
     date.setDate(date.getDate() - i);
     const dateStr = formatDate(date);
     const dayStart = date.getTime();
     const dayEnd = dayStart + 24 * 60 * 60 * 1000 - 1;
-    const dayLogs = flowLogs.filter((log) => log.createdAt >= dayStart && log.createdAt <= dayEnd);
-    const inboundTotal = dayLogs
+    const dayLogs = flowLogs.filter((l) => l.createdAt >= dayStart && l.createdAt <= dayEnd);
+    const inbound = dayLogs
       .filter((l) => l.type === FLOW_LOG_TYPES.INBOUND || l.type === FLOW_LOG_TYPES.TRANSFER_IN)
       .reduce((sum, l) => sum + (l.quantityChange || 0), 0);
-    const outboundTotal = Math.abs(
+    const outbound = Math.abs(
       dayLogs
-        .filter((l) => l.type === FLOW_LOG_TYPES.OUTBOUND || l.type === FLOW_LOG_TYPES.TRANSFER_OUT)
+        .filter((l) => l.type === FLOW_LOG_TYPES.OUTBOUND || l.type === FLOW_LOG_TYPES.TRANSFER_OUT || (l.type === FLOW_LOG_TYPES.STOCKTAKE && l.quantityChange < 0))
         .reduce((sum, l) => sum + (l.quantityChange || 0), 0)
     );
-    let totalStock = 0;
-    if (skus && skus.length > 0) {
-      const dayFlowLogs = flowLogs.filter((l) => l.createdAt <= dayEnd);
-      for (const sku of skus) {
-        const skuLogs = dayFlowLogs.filter((l) => l.skuId === sku.id);
-        if (skuLogs.length > 0) {
-          const lastLog = skuLogs[skuLogs.length - 1];
-          totalStock += lastLog.balanceAfter || 0;
-        }
-      }
-    }
-    history.push({
-      date: dateStr,
-      timestamp: dayStart,
-      inbound: inboundTotal,
-      outbound: outboundTotal,
-      totalStock,
+    const stocktakeIn = dayLogs
+      .filter((l) => l.type === FLOW_LOG_TYPES.STOCKTAKE && l.quantityChange > 0)
+      .reduce((sum, l) => sum + (l.quantityChange || 0), 0);
+    netChanges.unshift({
+      dateStr,
+      dayStart,
+      inbound,
+      outbound,
+      stocktakeIn,
+      net: inbound + stocktakeIn - outbound,
     });
+  }
+
+  let runningStock = currentTotalStock;
+  for (let i = days - 1; i >= 0; i--) {
+    const info = netChanges[i];
+    history.unshift({
+      date: info.dateStr,
+      timestamp: info.dayStart,
+      inbound: info.inbound,
+      outbound: info.outbound,
+      totalStock: runningStock,
+    });
+    runningStock -= info.net;
+    if (runningStock < 0) runningStock = 0;
+  }
+  return history;
+}
+
+export function buildStockHistoryByWarehouse(flowLogs, warehouseId, batches, days = CHART_DAYS) {
+  const history = [];
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+
+  const whBatches = batches.filter((b) => b.warehouseId === warehouseId);
+  let currentWhStock = whBatches.reduce((sum, b) => sum + (Number(b.quantity) || 0), 0);
+
+  const netChanges = [];
+  for (let i = 0; i < days; i++) {
+    const date = new Date(now);
+    date.setDate(date.getDate() - i);
+    const dateStr = formatDate(date);
+    const dayStart = date.getTime();
+    const dayEnd = dayStart + 24 * 60 * 60 * 1000 - 1;
+    const dayLogs = flowLogs.filter(
+      (l) => l.warehouseId === warehouseId && l.createdAt >= dayStart && l.createdAt <= dayEnd
+    );
+    const inbound = dayLogs
+      .filter((l) => l.type === FLOW_LOG_TYPES.INBOUND || l.type === FLOW_LOG_TYPES.TRANSFER_IN)
+      .reduce((sum, l) => sum + (l.quantityChange || 0), 0);
+    const outbound = Math.abs(
+      dayLogs
+        .filter((l) => l.type === FLOW_LOG_TYPES.OUTBOUND || l.type === FLOW_LOG_TYPES.TRANSFER_OUT || (l.type === FLOW_LOG_TYPES.STOCKTAKE && l.quantityChange < 0))
+        .reduce((sum, l) => sum + (l.quantityChange || 0), 0)
+    );
+    const stocktakeIn = dayLogs
+      .filter((l) => l.type === FLOW_LOG_TYPES.STOCKTAKE && l.quantityChange > 0)
+      .reduce((sum, l) => sum + (l.quantityChange || 0), 0);
+    netChanges.unshift({
+      dateStr,
+      dayStart,
+      inbound,
+      outbound,
+      stocktakeIn,
+      net: inbound + stocktakeIn - outbound,
+    });
+  }
+
+  let runningStock = currentWhStock;
+  for (let i = days - 1; i >= 0; i--) {
+    const info = netChanges[i];
+    history.unshift({
+      date: info.dateStr,
+      timestamp: info.dayStart,
+      inbound: info.inbound,
+      outbound: info.outbound,
+      totalStock: runningStock,
+    });
+    runningStock -= info.net;
+    if (runningStock < 0) runningStock = 0;
+  }
+  return history;
+}
+
+export function buildStockHistoryBySku(flowLogs, skuId, batches, days = CHART_DAYS) {
+  const history = [];
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+
+  const skuBatches = batches.filter((b) => b.skuId === skuId);
+  let currentSkuStock = skuBatches.reduce((sum, b) => sum + (Number(b.quantity) || 0), 0);
+
+  const netChanges = [];
+  for (let i = 0; i < days; i++) {
+    const date = new Date(now);
+    date.setDate(date.getDate() - i);
+    const dateStr = formatDate(date);
+    const dayStart = date.getTime();
+    const dayEnd = dayStart + 24 * 60 * 60 * 1000 - 1;
+    const dayLogs = flowLogs.filter(
+      (l) => l.skuId === skuId && l.createdAt >= dayStart && l.createdAt <= dayEnd
+    );
+    const inbound = dayLogs
+      .filter((l) => l.type === FLOW_LOG_TYPES.INBOUND || l.type === FLOW_LOG_TYPES.TRANSFER_IN)
+      .reduce((sum, l) => sum + (l.quantityChange || 0), 0);
+    const outbound = Math.abs(
+      dayLogs
+        .filter((l) => l.type === FLOW_LOG_TYPES.OUTBOUND || l.type === FLOW_LOG_TYPES.TRANSFER_OUT || (l.type === FLOW_LOG_TYPES.STOCKTAKE && l.quantityChange < 0))
+        .reduce((sum, l) => sum + (l.quantityChange || 0), 0)
+    );
+    const stocktakeIn = dayLogs
+      .filter((l) => l.type === FLOW_LOG_TYPES.STOCKTAKE && l.quantityChange > 0)
+      .reduce((sum, l) => sum + (l.quantityChange || 0), 0);
+    netChanges.unshift({
+      dateStr,
+      dayStart,
+      inbound,
+      outbound,
+      stocktakeIn,
+      net: inbound + stocktakeIn - outbound,
+    });
+  }
+
+  let runningStock = currentSkuStock;
+  for (let i = days - 1; i >= 0; i--) {
+    const info = netChanges[i];
+    history.unshift({
+      date: info.dateStr,
+      timestamp: info.dayStart,
+      inbound: info.inbound,
+      outbound: info.outbound,
+      totalStock: runningStock,
+    });
+    runningStock -= info.net;
+    if (runningStock < 0) runningStock = 0;
   }
   return history;
 }

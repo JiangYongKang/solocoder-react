@@ -1,0 +1,4 @@
+你实现的考试阅卷系统页面还存在一些问题，需要进行修复：
+1. 阅卷计时功能完全失效。examGradingCore.js 的 createInitialGradingState 中每个学生的 startedAt 始终为 null，而 index.jsx 中的 gradingStartTimeRef 虽然记录了开始时间但从未同步写入 gradingState。导致平均耗时、最快阅卷耗时、最慢阅卷耗时和预估剩余时间始终显示 0 秒。需要确保在首次选中学生开始阅卷时正确设置 startedAt 字段。
+2. index.jsx 的 handleGradeQuestion 函数中题目自动跳转与学生切换逻辑缺少互斥判断。当学生最后一道未评题被评分时，如果该题不是题目列表中的最后一道，会自动跳转到下一题，但此时学生已全部评完、新学生数据尚未加载，会出现上一学生残留数据短暂显示。需要在跳题前判断当前学生是否已全部评阅完成，再决定跳题还是切换学生。
+3. 修复后重新运行 pnpm run test，确保所有测试通过。

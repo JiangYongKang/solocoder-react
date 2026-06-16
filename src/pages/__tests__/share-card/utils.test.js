@@ -27,6 +27,7 @@ import {
   clamp,
   isValidHexColor,
   isValidColor,
+  isRgbaColor,
   generateId,
 } from '@/pages/share-card/utils.js'
 import {
@@ -115,6 +116,67 @@ describe('Share Card - Utility Functions', () => {
       expect(isValidHexColor('#12345g')).toBe(false)
       expect(isValidHexColor('')).toBe(false)
       expect(isValidHexColor(null)).toBe(false)
+    })
+  })
+
+  describe('isRgbaColor', () => {
+    it('should accept rgb format without alpha', () => {
+      expect(isRgbaColor('rgb(255,0,0)')).toBe(true)
+      expect(isRgbaColor('rgb(0,0,0)')).toBe(true)
+      expect(isRgbaColor('rgb(128,128,128)')).toBe(true)
+    })
+
+    it('should accept rgba format with alpha channel', () => {
+      expect(isRgbaColor('rgba(255,0,0,0.5)')).toBe(true)
+      expect(isRgbaColor('rgba(0,0,0,0)')).toBe(true)
+      expect(isRgbaColor('rgba(255,255,255,1)')).toBe(true)
+      expect(isRgbaColor('rgba(100,150,200,0.75)')).toBe(true)
+    })
+
+    it('should accept rgba format without alpha (three arguments)', () => {
+      expect(isRgbaColor('rgba(255,0,0)')).toBe(true)
+      expect(isRgbaColor('rgba(0,0,0)')).toBe(true)
+      expect(isRgbaColor('rgba(128,128,128)')).toBe(true)
+    })
+
+    it('should handle spaces around numbers', () => {
+      expect(isRgbaColor('rgba( 255 , 0 , 0 , 0.5 )')).toBe(true)
+      expect(isRgbaColor('rgb( 255 , 0 , 0 )')).toBe(true)
+      expect(isRgbaColor('rgba(   255   ,   0   ,   0   ,   0.5   )')).toBe(true)
+      expect(isRgbaColor('rgba( 255 , 0 , 0 )')).toBe(true)
+    })
+
+    it('should handle alpha with decimal values', () => {
+      expect(isRgbaColor('rgba(255,0,0,0)')).toBe(true)
+      expect(isRgbaColor('rgba(255,0,0,1)')).toBe(true)
+      expect(isRgbaColor('rgba(255,0,0,0.0)')).toBe(true)
+      expect(isRgbaColor('rgba(255,0,0,0.123)')).toBe(true)
+      expect(isRgbaColor('rgba(255,0,0,.5)')).toBe(true)
+    })
+
+    it('should reject invalid formats', () => {
+      expect(isRgbaColor('#fff')).toBe(false)
+      expect(isRgbaColor('red')).toBe(false)
+      expect(isRgbaColor('rgba(255,0)')).toBe(false)
+      expect(isRgbaColor('rgba(255,0,0,0.5,0.5)')).toBe(false)
+      expect(isRgbaColor('rgba(-1,0,0,1)')).toBe(false)
+      expect(isRgbaColor('')).toBe(false)
+      expect(isRgbaColor(null)).toBe(false)
+      expect(isRgbaColor(undefined)).toBe(false)
+      expect(isRgbaColor(123)).toBe(false)
+    })
+
+    it('should reject invalid characters', () => {
+      expect(isRgbaColor('rgba(abc,0,0,1)')).toBe(false)
+      expect(isRgbaColor('rgba(255,gg,0,1)')).toBe(false)
+      expect(isRgbaColor('rgba[255,0,0,1]')).toBe(false)
+      expect(isRgbaColor('rgba{255,0,0,1}')).toBe(false)
+    })
+
+    it('should be case sensitive for function name', () => {
+      expect(isRgbaColor('RGBA(255,0,0,1)')).toBe(false)
+      expect(isRgbaColor('Rgb(255,0,0)')).toBe(false)
+      expect(isRgbaColor('Rgba(255,0,0,1)')).toBe(false)
     })
   })
 

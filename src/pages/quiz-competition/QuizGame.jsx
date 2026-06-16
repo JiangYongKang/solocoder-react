@@ -41,6 +41,9 @@ export default function QuizGame({ onFinish, onBack, roundNumber = 1 }) {
 
   const timerRef = useRef(null)
   const startTimeRef = useRef(0)
+  const isDoubleActiveRef = useRef(false)
+  const pendingDoubleRef = useRef(false)
+  const doubleUsedInCurrentRef = useRef(false)
 
   const currentQuestion = questions[currentIdx]
 
@@ -54,6 +57,13 @@ export default function QuizGame({ onFinish, onBack, roundNumber = 1 }) {
     setIsAnswered(false)
     setSelectedAnswer(null)
     setScoreAnimation(null)
+
+    isDoubleActiveRef.current = pendingDoubleRef.current
+    pendingDoubleRef.current = false
+    doubleUsedInCurrentRef.current = false
+    if (doubleNext) {
+      setDoubleNext(false)
+    }
 
     setCurrentIdx((prevIdx) => {
       if (prevIdx + 1 >= questions.length) {
@@ -76,7 +86,7 @@ export default function QuizGame({ onFinish, onBack, roundNumber = 1 }) {
       setTotalTime(DEFAULT_TIME_LIMIT)
       return prevIdx + 1
     })
-  }, [questions, answers])
+  }, [questions, answers, doubleNext])
 
   useEffect(() => {
     startTimeRef.current = Date.now()
@@ -119,7 +129,7 @@ export default function QuizGame({ onFinish, onBack, roundNumber = 1 }) {
     setSelectedAnswer(optionValue)
 
     const isCorrect = optionValue === currentQuestion.answer
-    const scoreChange = calculateScore(isCorrect, false, doubleNext)
+    const scoreChange = calculateScore(isCorrect, false, isDoubleActiveRef.current)
 
     setScoreAnimation({
       type: isCorrect ? 'correct' : 'wrong',
@@ -129,11 +139,7 @@ export default function QuizGame({ onFinish, onBack, roundNumber = 1 }) {
     const answerRecord = {
       selected: optionValue,
       correct: isCorrect,
-      doubleNext: false,
-    }
-
-    if (doubleNext) {
-      setDoubleNext(false)
+      doubleNext: doubleUsedInCurrentRef.current,
     }
 
     setAnswers((prev) => [...prev, answerRecord])
@@ -157,6 +163,7 @@ export default function QuizGame({ onFinish, onBack, roundNumber = 1 }) {
       selected: currentQuestion.answer,
       skipped: true,
       correct: true,
+      doubleNext: doubleUsedInCurrentRef.current,
     }
     setAnswers((prev) => [...prev, answerRecord])
   }
@@ -177,7 +184,7 @@ export default function QuizGame({ onFinish, onBack, roundNumber = 1 }) {
 
   const handleUseDouble = () => {
     if (isAnswered || !currentQuestion) return
-    if (doubleNext) {
+    if (pendingDoubleRef.current || doubleNext) {
       alert('双倍效果已激活')
       return
     }
@@ -188,6 +195,8 @@ export default function QuizGame({ onFinish, onBack, roundNumber = 1 }) {
     }
     setInventory(result.inventory)
     saveInventory(result.inventory)
+    pendingDoubleRef.current = true
+    doubleUsedInCurrentRef.current = true
     setDoubleNext(true)
   }
 

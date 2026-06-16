@@ -73,6 +73,9 @@ function ModalPreview({ config, animationKey, onClose }) {
         <div className="mg-modal-body">
           {showForm ? (
             <div className="mg-modal-form">
+              {config.content && (
+                <p className="mg-modal-content">{config.content}</p>
+              )}
               {config.formFields && config.formFields.map((field) => (
                 <div key={field.id} className="mg-form-item">
                   <label className="mg-form-label">{field.label}</label>

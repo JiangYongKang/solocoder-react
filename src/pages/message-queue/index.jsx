@@ -194,6 +194,8 @@ export default function MessageQueuePage() {
   const [delaySeconds, setDelaySeconds] = useState(30);
   const [newGroupName, setNewGroupName] = useState('');
   const [editMaxRetries, setEditMaxRetries] = useState(DEFAULT_MAX_RETRIES);
+  const [maxRetriesError, setMaxRetriesError] = useState('');
+  const [maxRetriesSaveMsg, setMaxRetriesSaveMsg] = useState('');
 
   const [now, setNow] = useState(() => Date.now());
 
@@ -342,11 +344,18 @@ export default function MessageQueuePage() {
   }, [selectedTopicId, newGroupName]);
 
   const handleUpdateMaxRetries = useCallback((value) => {
-    const num = parseInt(value, 10);
-    if (isNaN(num) || num < 1 || num > 10) return;
+    const num = Number(value);
+    if (!Number.isFinite(num) || !Number.isInteger(num) || num < 1 || num > 10) {
+      setMaxRetriesError('最大重试次数必须是 1-10 之间的整数');
+      setMaxRetriesSaveMsg('');
+      return;
+    }
+    setMaxRetriesError('');
     setTopics((prev) =>
       prev.map((t) => (t.id === selectedTopicId ? { ...t, maxRetries: num } : t))
     );
+    setMaxRetriesSaveMsg('保存成功');
+    setTimeout(() => setMaxRetriesSaveMsg(''), 2000);
   }, [selectedTopicId]);
 
   function renderTopicList() {
@@ -688,7 +697,7 @@ export default function MessageQueuePage() {
           <input className="mq-form-input" type="text" value={selectedTopic.name} readOnly />
         </div>
         <div className="mq-form-group">
-          <label className="mq-form-label">最大重试次数</label>
+          <label className="mq-form-label">最大重试次数（1-10）</label>
           <div className="mq-form-row">
             <input
               className="mq-form-input"
@@ -696,7 +705,11 @@ export default function MessageQueuePage() {
               min={1}
               max={10}
               value={editMaxRetries}
-              onChange={(e) => setEditMaxRetries(Number(e.target.value))}
+              onChange={(e) => {
+                setEditMaxRetries(Number(e.target.value));
+                if (maxRetriesError) setMaxRetriesError('');
+                if (maxRetriesSaveMsg) setMaxRetriesSaveMsg('');
+              }}
               style={{ width: 120 }}
             />
             <button
@@ -706,6 +719,16 @@ export default function MessageQueuePage() {
               保存
             </button>
           </div>
+          {maxRetriesError && (
+            <div style={{ color: '#ff4d4f', fontSize: 13, marginTop: 6 }}>
+              ⚠️ {maxRetriesError}
+            </div>
+          )}
+          {maxRetriesSaveMsg && (
+            <div style={{ color: '#52c41a', fontSize: 13, marginTop: 6 }}>
+              ✅ {maxRetriesSaveMsg}
+            </div>
+          )}
         </div>
         <div className="mq-form-group">
           <label className="mq-form-label">创建时间</label>

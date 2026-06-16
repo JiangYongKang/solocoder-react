@@ -38,15 +38,18 @@ function LockDiffRow({ change, side }) {
   )
 }
 
-export default function LockDiff({ dependencies, upgradedDependencies }) {
+export default function LockDiff({ dependencies, devDependencies, upgradedDependencies, upgradedDevDependencies }) {
   const leftRef = useRef(null)
   const rightRef = useRef(null)
   const syncingRef = useRef(false)
 
-  const oldEntries = useMemo(() => buildLockEntries(dependencies), [dependencies])
+  const allOldDeps = useMemo(() => [...dependencies, ...devDependencies], [dependencies, devDependencies])
+  const allNewDeps = useMemo(() => [...upgradedDependencies, ...upgradedDevDependencies], [upgradedDependencies, upgradedDevDependencies])
+
+  const oldEntries = useMemo(() => buildLockEntries(allOldDeps), [allOldDeps])
   const newEntries = useMemo(
-    () => buildLockEntries(upgradedDependencies),
-    [upgradedDependencies]
+    () => buildLockEntries(allNewDeps),
+    [allNewDeps]
   )
 
   const { changes, stats } = useMemo(

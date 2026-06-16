@@ -275,6 +275,26 @@
   cursor: grabbing;
 }
 
+.puzzle-pause-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  z-index: 10;
+}
+
+.puzzle-pause-text {
+  color: #fff;
+  font-size: 28px;
+  font-weight: 700;
+}
+
 .puzzle-preview-overlay {
   position: fixed;
   top: 0;
@@ -296,10 +316,11 @@
   cursor: move;
   user-select: none;
   position: absolute;
+  opacity: 0.85;
 }
 
 .puzzle-preview-modal.dragging {
-  opacity: 0.85;
+  opacity: 0.7;
 }
 
 .puzzle-preview-header {

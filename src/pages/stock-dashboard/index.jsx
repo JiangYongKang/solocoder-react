@@ -66,6 +66,11 @@ const StockDashboardPage = () => {
   const [notifications, setNotifications] = useState([])
 
   const triggeredAlertsRef = useRef(new Set())
+  const stocksRef = useRef([])
+
+  useEffect(() => {
+    stocksRef.current = stocks
+  }, [stocks])
 
   useEffect(() => {
     saveWatchlist(watchlist)
@@ -118,7 +123,7 @@ const StockDashboardPage = () => {
       setTimeShareData((prev) => {
         const updated = { ...prev }
         Object.keys(updated).forEach((code) => {
-          const stock = stocks.find((s) => s.code === code)
+          const stock = stocksRef.current.find((s) => s.code === code)
           if (!stock || !updated[code] || updated[code].length === 0) return
 
           const lastData = updated[code][updated[code].length - 1]
@@ -151,7 +156,7 @@ const StockDashboardPage = () => {
     }, TIMESHARE_UPDATE_INTERVAL)
 
     return () => clearInterval(timer)
-  }, [stocks])
+  }, [])
 
   useEffect(() => {
     alerts.forEach((alert) => {
@@ -189,24 +194,21 @@ const StockDashboardPage = () => {
   const handleAddStock = (stock) => {
     setWatchlist((prev) => [...prev, stock])
 
+    const newStock = initializeStockData(stock)
+
     setStocks((prev) => {
       if (prev.some((s) => s.code === stock.code)) return prev
-      const newStock = initializeStockData(stock)
       return [...prev, newStock]
     })
 
     setKlineData((prev) => {
       if (prev[stock.code]) return prev
-      const stockData = stocks.find((s) => s.code === stock.code)
-      const basePrice = stockData?.prevClose || 100
-      return { ...prev, [stock.code]: generateKLineData(basePrice) }
+      return { ...prev, [stock.code]: generateKLineData(newStock.prevClose) }
     })
 
     setTimeShareData((prev) => {
       if (prev[stock.code]) return prev
-      const stockData = stocks.find((s) => s.code === stock.code)
-      const basePrice = stockData?.prevClose || 100
-      return { ...prev, [stock.code]: generateTimeShareData(basePrice) }
+      return { ...prev, [stock.code]: generateTimeShareData(newStock.prevClose) }
     })
   }
 

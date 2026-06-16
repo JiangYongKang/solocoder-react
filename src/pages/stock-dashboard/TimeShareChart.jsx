@@ -115,30 +115,53 @@ const TimeShareChart = ({ data, prevClose }) => {
       }
     })
 
-    const isAbove = data[0]?.price >= prevClose
+    const prevCloseY = priceToY(prevClose)
+    const firstX = minuteToX(data[0].minute)
+    const lastX = minuteToX(data[data.length - 1].minute)
+
+    ctx.save()
+    ctx.beginPath()
+    ctx.rect(PADDING_LEFT, PADDING_TOP, chartWidth, chartHeight)
+    ctx.clip()
 
     ctx.beginPath()
-    ctx.moveTo(minuteToX(data[0].minute), priceToY(prevClose))
-
+    ctx.moveTo(firstX, prevCloseY)
     for (let i = 0; i < data.length; i++) {
       const x = minuteToX(data[i].minute)
       const y = priceToY(data[i].price)
       ctx.lineTo(x, y)
     }
-
-    ctx.lineTo(minuteToX(data[data.length - 1].minute), priceToY(prevClose))
+    ctx.lineTo(lastX, prevCloseY)
     ctx.closePath()
 
-    const gradient = ctx.createLinearGradient(0, PADDING_TOP, 0, PADDING_TOP + chartHeight)
-    if (data[data.length - 1]?.price >= prevClose) {
-      gradient.addColorStop(0, 'rgba(220, 38, 38, 0.3)')
-      gradient.addColorStop(1, 'rgba(220, 38, 38, 0.05)')
-    } else {
-      gradient.addColorStop(0, 'rgba(22, 163, 74, 0.3)')
-      gradient.addColorStop(1, 'rgba(22, 163, 74, 0.05)')
-    }
-    ctx.fillStyle = gradient
+    const upGradient = ctx.createLinearGradient(0, PADDING_TOP, 0, prevCloseY)
+    upGradient.addColorStop(0, 'rgba(220, 38, 38, 0.35)')
+    upGradient.addColorStop(1, 'rgba(220, 38, 38, 0.1)')
+    ctx.fillStyle = upGradient
+    ctx.globalCompositeOperation = 'source-over'
     ctx.fill()
+
+    ctx.beginPath()
+    ctx.rect(PADDING_LEFT, prevCloseY, chartWidth, chartHeight - (prevCloseY - PADDING_TOP))
+    ctx.clip()
+
+    ctx.beginPath()
+    ctx.moveTo(firstX, prevCloseY)
+    for (let i = 0; i < data.length; i++) {
+      const x = minuteToX(data[i].minute)
+      const y = priceToY(data[i].price)
+      ctx.lineTo(x, y)
+    }
+    ctx.lineTo(lastX, prevCloseY)
+    ctx.closePath()
+
+    const downGradient = ctx.createLinearGradient(0, prevCloseY, 0, PADDING_TOP + chartHeight)
+    downGradient.addColorStop(0, 'rgba(22, 163, 74, 0.1)')
+    downGradient.addColorStop(1, 'rgba(22, 163, 74, 0.35)')
+    ctx.fillStyle = downGradient
+    ctx.fill()
+
+    ctx.restore()
 
     ctx.beginPath()
     ctx.moveTo(minuteToX(data[0].minute), priceToY(data[0].price))

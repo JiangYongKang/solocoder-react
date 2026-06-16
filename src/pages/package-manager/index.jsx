@@ -58,6 +58,10 @@ export default function PackageManagerPage() {
     return applyUpgrades(dependencies, allUpgradedDeps)
   }, [dependencies, allUpgradedDeps])
 
+  const upgradedDevDepsPreview = useMemo(() => {
+    return applyUpgrades(devDependencies, allUpgradedDeps)
+  }, [devDependencies, allUpgradedDeps])
+
   const upgradeList = useMemo(() => {
     const result = []
     for (const name of selectedUpgrades) {
@@ -262,7 +266,9 @@ export default function PackageManagerPage() {
           {viewMode === VIEW_MODE.LOCK_DIFF && (
             <LockDiff
               dependencies={dependencies}
+              devDependencies={devDependencies}
               upgradedDependencies={upgradedDepsPreview}
+              upgradedDevDependencies={upgradedDevDepsPreview}
             />
           )}
 

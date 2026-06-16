@@ -66,7 +66,7 @@ export function createConfigByType(type) {
     case MODAL_TYPES.FORM:
       config.formFields = createDefaultFormFields(DEFAULT_FORM_FIELDS)
       config.title = '表单弹窗'
-      config.content = ''
+      config.content = '请填写以下信息：'
       break
     case MODAL_TYPES.INFO:
       config.showCloseButton = true
@@ -192,12 +192,14 @@ export function generateCallCode(config) {
     }
   }
 
-  if (config.confirmColor !== undefined && config.confirmColor !== null) {
-    lines.push(`  confirmColor: '${escapeString(String(config.confirmColor))}',`)
-  }
+  if (hasButtonColor(config.type)) {
+    if (config.confirmColor !== undefined && config.confirmColor !== null) {
+      lines.push(`  confirmColor: '${escapeString(String(config.confirmColor))}',`)
+    }
 
-  if (config.cancelColor !== undefined && config.cancelColor !== null) {
-    lines.push(`  cancelColor: '${escapeString(String(config.cancelColor))}',`)
+    if (hasCancelButton(config.type) && config.cancelColor !== undefined && config.cancelColor !== null) {
+      lines.push(`  cancelColor: '${escapeString(String(config.cancelColor))}',`)
+    }
   }
 
   if (config.maskOpacity !== undefined && config.maskOpacity !== null) {
@@ -253,4 +255,94 @@ export function hasCancelButton(type) {
 
 export function hasFormFields(type) {
   return type === MODAL_TYPES.FORM
+}
+
+const JS_KEYWORDS = new Set(['true', 'false', 'null', 'undefined'])
+
+export function highlightSyntax(code) {
+  if (!code) return []
+
+  const tokens = []
+  let i = 0
+
+  while (i < code.length) {
+    const char = code[i]
+
+    if (char === "'" || char === '"') {
+      const quote = char
+      let j = i + 1
+      while (j < code.length && code[j] !== quote) {
+        if (code[j] === '\\') {
+          j += 2
+        } else {
+          j += 1
+        }
+      }
+      if (j < code.length) {
+        tokens.push({
+          type: 'string',
+          value: code.slice(i, j + 1),
+        })
+        i = j + 1
+        continue
+      }
+    }
+
+    if (/[0-9]/.test(char)) {
+      let j = i
+      while (j < code.length && /[0-9.]/.test(code[j])) {
+        j += 1
+      }
+      tokens.push({
+        type: 'number',
+        value: code.slice(i, j),
+      })
+      i = j
+      continue
+    }
+
+    if (/[a-zA-Z_$]/.test(char)) {
+      let j = i
+      while (j < code.length && /[a-zA-Z0-9_$]/.test(code[j])) {
+        j += 1
+      }
+      const word = code.slice(i, j)
+      let type = 'identifier'
+      if (JS_KEYWORDS.has(word)) {
+        type = 'keyword'
+      } else if (/^[a-z][a-zA-Z0-9]*$/.test(word) && code[j] === ':') {
+        type = 'property'
+      } else if (/^[A-Z][a-zA-Z0-9]*$/.test(word)) {
+        type = 'function'
+      }
+      tokens.push({ type, value: word })
+      i = j
+      continue
+    }
+
+    if (char === '/' && code[i + 1] === '/') {
+      let j = i
+      while (j < code.length && code[j] !== '\n') {
+        j += 1
+      }
+      tokens.push({
+        type: 'comment',
+        value: code.slice(i, j),
+      })
+      i = j
+      continue
+    }
+
+    tokens.push({
+      type: 'punctuation',
+      value: char,
+    })
+    i += 1
+  }
+
+  return tokens
+}
+
+export function hasButtonColor(type) {
+  return type === MODAL_TYPES.CONFIRM || type === MODAL_TYPES.ALERT || type === MODAL_TYPES.FORM
 }

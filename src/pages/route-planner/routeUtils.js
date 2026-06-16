@@ -383,7 +383,9 @@ export function downloadJSON(content, filename) {
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    try {
+      URL.revokeObjectURL(url);
+    } catch {}
     return true;
   } catch {
     return false;
@@ -391,8 +393,8 @@ export function downloadJSON(content, filename) {
 }
 
 export async function copyToClipboard(text) {
-  if (typeof navigator === 'undefined' || !navigator.clipboard) return false;
   try {
+    if (typeof navigator === 'undefined' || !navigator.clipboard) return false;
     await navigator.clipboard.writeText(text);
     return true;
   } catch {

@@ -514,6 +514,9 @@ export function calculateRoundResult(questions, answers) {
     if (ans.skipped) {
       correctCount += 1
       doubleNext = false
+      if (ans.doubleNext) {
+        doubleNext = true
+      }
       return
     }
     const isCorrect = ans.selected === q.answer

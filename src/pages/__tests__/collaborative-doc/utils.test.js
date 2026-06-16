@@ -49,6 +49,14 @@ import {
   removeNotification,
   getNotificationMessage,
   simulateCollaboratorEdit,
+  detectContentChanges,
+  processContentChangeWithRevision,
+  addFormatRevision,
+  applyFormatToSelection,
+  renderContentWithRevisions,
+  formatTextWithTags,
+  applyFormatToContent,
+  FORMAT_TYPE,
 } from '../../collaborative-doc/utils.js'
 import { STORAGE_KEY, getDefaultData, CURRENT_USER, REVISION_TYPE } from '../../collaborative-doc/constants.js'
 
@@ -773,3 +781,339 @@ describe('其他功能', () => {
     })
   })
 })
+
+describe('精确 Diff 算法', () => {
+  describe('detectContentChanges', () => {
+    it('相同内容应该返回空数组', () => {
+      const changes = detectContentChanges('Hello', 'Hello')
+      expect(changes.length).toBe(0)
+    })
+
+    it('应该精确识别中间删除的内容', () => {
+      const changes = detectContentChanges('Hello World', 'Hello')
+      expect(changes.length).toBeGreaterThan(0)
+      const hasDelete = changes.some((c) => c.type === 'delete')
+      expect(hasDelete).toBe(true)
+      const delChange = changes.find((c) => c.type === 'delete')
+      expect(delChange.start).toBe(5)
+      expect(delChange.text).toContain(' World')
+    })
+
+    it('应该精确识别中间新增的内容', () => {
+      const changes = detectContentChanges('Hello', 'Hello World')
+      expect(changes.length).toBeGreaterThan(0)
+      const hasAdd = changes.some((c) => c.type === 'add')
+      expect(hasAdd).toBe(true)
+      const addChange = changes.find((c) => c.type === 'add')
+      expect(addChange.start).toBe(5)
+      expect(addChange.text).toBe(' World')
+    })
+
+    it('应该精确识别段落中间的删除', () => {
+      const oldText = '这是一个测试段落，用于验证删除功能'
+      const newText = '这是一个测试段落，用于验证功能'
+      const changes = detectContentChanges(oldText, newText)
+      expect(changes.length).toBeGreaterThan(0)
+      const delChange = changes.find((c) => c.type === 'delete')
+      expect(delChange).toBeTruthy()
+      expect(delChange.text).toBe('删除')
+      expect(delChange.start).toBe(13)
+    })
+
+    it('应该精确识别段落中间的新增', () => {
+      const oldText = '这是一个段落，用于测试功能'
+      const newText = '这是一个重要的段落，用于测试功能'
+      const changes = detectContentChanges(oldText, newText)
+      expect(changes.length).toBeGreaterThan(0)
+      const addChange = changes.find((c) => c.type === 'add')
+      expect(addChange).toBeTruthy()
+      expect(addChange.text).toBe('重要的')
+      expect(addChange.start).toBe(4)
+    })
+
+    it('应该识别连续的多个变化', () => {
+      const oldText = 'ABCDEF'
+      const newText = 'ABXYDEF'
+      const changes = detectContentChanges(oldText, newText)
+      expect(changes.length).toBe(2)
+      expect(changes[0].type).toBe('delete')
+      expect(changes[0].text).toBe('C')
+      expect(changes[1].type).toBe('add')
+      expect(changes[1].text).toBe('XY')
+    })
+  })
+
+  describe('processContentChangeWithRevision', () => {
+    let testData
+
+    beforeEach(() => {
+      testData = {
+        ...getDefaultData(),
+        revisionMode: true,
+      }
+    })
+
+    it('非修订模式下应该只更新内容', () => {
+      const data = { ...testData, revisionMode: false }
+      const result = processContentChangeWithRevision(data, 'p-1', '旧内容', '新内容', CURRENT_USER.id)
+      expect(result.revisions.length).toBe(0)
+      expect(getParagraphById(result, 'p-1').content).toBe('新内容')
+    })
+
+    it('修订模式下删除内容应该生成精确位置的删除修订', () => {
+      const paraId = 'p-1'
+      const oldContent = '这是一个测试段落'
+      const newContent = '这是一个段落'
+      const result = processContentChangeWithRevision(testData, paraId, oldContent, newContent, CURRENT_USER.id)
+      expect(result.revisions.length).toBeGreaterThan(0)
+      const delRev = result.revisions.find((r) => r.type === REVISION_TYPE.DELETE)
+      expect(delRev).toBeTruthy()
+      expect(delRev.text).toBe('测试')
+      expect(delRev.start).toBe(4)
+      expect(delRev.end).toBe(6)
+    })
+
+    it('修订模式下新增内容应该生成精确位置的新增修订', () => {
+      const paraId = 'p-1'
+      const oldContent = '这是一个段落'
+      const newContent = '这是一个重要的段落'
+      const result = processContentChangeWithRevision(testData, paraId, oldContent, newContent, CURRENT_USER.id)
+      expect(result.revisions.length).toBeGreaterThan(0)
+      const addRev = result.revisions.find((r) => r.type === REVISION_TYPE.ADD)
+      expect(addRev).toBeTruthy()
+      expect(addRev.text).toBe('重要的')
+      expect(addRev.start).toBe(4)
+      expect(addRev.end).toBe(7)
+    })
+
+    it('段落末尾删除内容应该生成正确的修订', () => {
+      const paraId = 'p-1'
+      const oldContent = 'Hello World'
+      const newContent = 'Hello'
+      const result = processContentChangeWithRevision(testData, paraId, oldContent, newContent, CURRENT_USER.id)
+      const delRev = result.revisions.find((r) => r.type === REVISION_TYPE.DELETE)
+      expect(delRev).toBeTruthy()
+      expect(delRev.text).toBe(' World')
+      expect(delRev.start).toBe(5)
+    })
+
+    it('段落开头新增内容应该生成正确的修订', () => {
+      const paraId = 'p-1'
+      const oldContent = 'Hello'
+      const newContent = 'New Hello'
+      const result = processContentChangeWithRevision(testData, paraId, oldContent, newContent, CURRENT_USER.id)
+      const addRev = result.revisions.find((r) => r.type === REVISION_TYPE.ADD)
+      expect(addRev).toBeTruthy()
+      expect(addRev.text).toBe('New ')
+      expect(addRev.start).toBe(0)
+    })
+  })
+})
+
+describe('格式修改功能', () => {
+  let testData
+
+  beforeEach(() => {
+    testData = getDefaultData()
+  })
+
+  describe('addFormatRevision', () => {
+    it('应该添加格式修订记录', () => {
+      const result = addFormatRevision(testData, 'p-1', '测试文字', 2, 6, FORMAT_TYPE.BOLD, CURRENT_USER.id)
+      expect(result.revisions.length).toBe(testData.revisions.length + 1)
+      const rev = result.revisions[result.revisions.length - 1]
+      expect(rev.type).toBe(REVISION_TYPE.FORMAT)
+      expect(rev.format).toBe(FORMAT_TYPE.BOLD)
+      expect(rev.text).toBe('测试文字')
+      expect(rev.start).toBe(2)
+      expect(rev.end).toBe(6)
+    })
+
+    it('格式修订应该包含 format 字段', () => {
+      const result = addFormatRevision(testData, 'p-1', '文字', 0, 2, FORMAT_TYPE.ITALIC, 'user-1')
+      const rev = result.revisions[result.revisions.length - 1]
+      expect(rev).toHaveProperty('format')
+      expect(rev.format).toBe(FORMAT_TYPE.ITALIC)
+    })
+  })
+
+  describe('applyFormatToSelection', () => {
+    it('应该应用格式到选中文字', () => {
+      const result = applyFormatToSelection(testData, 'p-1', '测试', 0, 2, FORMAT_TYPE.BOLD, CURRENT_USER.id)
+      expect(result.revisions.length).toBeGreaterThan(0)
+      const rev = result.revisions.find((r) => r.type === REVISION_TYPE.FORMAT)
+      expect(rev).toBeTruthy()
+      expect(rev.format).toBe(FORMAT_TYPE.BOLD)
+    })
+  })
+
+  describe('formatTextWithTags', () => {
+    it('应该正确添加加粗标记', () => {
+      expect(formatTextWithTags('文字', FORMAT_TYPE.BOLD)).toBe('**文字**')
+    })
+
+    it('应该正确添加斜体标记', () => {
+      expect(formatTextWithTags('文字', FORMAT_TYPE.ITALIC)).toBe('*文字*')
+    })
+
+    it('应该正确添加下划线标记', () => {
+      expect(formatTextWithTags('文字', FORMAT_TYPE.UNDERLINE)).toBe('<u>文字</u>')
+    })
+
+    it('应该正确添加删除线标记', () => {
+      expect(formatTextWithTags('文字', FORMAT_TYPE.STRIKETHROUGH)).toBe('~~文字~~')
+    })
+
+    it('未知格式应该返回原文字', () => {
+      expect(formatTextWithTags('文字', 'unknown')).toBe('文字')
+    })
+  })
+
+  describe('applyFormatToContent', () => {
+    it('应该在正确位置应用格式', () => {
+      const content = '这是一个测试'
+      const result = applyFormatToContent(content, 4, 6, FORMAT_TYPE.BOLD)
+      expect(result).toBe('这是一个**测试**')
+    })
+
+    it('边界情况：start < 0 应该返回原内容', () => {
+      const content = '测试'
+      const result = applyFormatToContent(content, -1, 1, FORMAT_TYPE.BOLD)
+      expect(result).toBe('测试')
+    })
+
+    it('边界情况：start >= end 应该返回原内容', () => {
+      const content = '测试'
+      const result = applyFormatToContent(content, 2, 1, FORMAT_TYPE.BOLD)
+      expect(result).toBe('测试')
+    })
+
+    it('边界情况：end 超出长度应该返回原内容', () => {
+      const content = '测试'
+      const result = applyFormatToContent(content, 0, 10, FORMAT_TYPE.BOLD)
+      expect(result).toBe('测试')
+    })
+
+    it('应该正确在段落中间应用格式', () => {
+      const content = 'ABCDEF'
+      const result = applyFormatToContent(content, 2, 4, FORMAT_TYPE.ITALIC)
+      expect(result).toBe('AB*CD*EF')
+    })
+  })
+})
+
+describe('修订渲染逻辑', () => {
+  let testData
+
+  beforeEach(() => {
+    testData = getDefaultData()
+  })
+
+  describe('renderContentWithRevisions', () => {
+    it('没有修订时应该返回单一 text 段', () => {
+      const content = 'Hello World'
+      const segments = renderContentWithRevisions(content, [], testData)
+      expect(segments.length).toBe(1)
+      expect(segments[0].type).toBe('text')
+      expect(segments[0].value).toBe('Hello World')
+    })
+
+    it('有修订时应该正确分段', () => {
+      const content = 'Hello World'
+      const revisions = [
+        {
+          id: 'rev-1',
+          type: REVISION_TYPE.ADD,
+          text: ' World',
+          start: 5,
+          end: 11,
+          userId: 'user-1',
+          createdAt: Date.now(),
+          accepted: false,
+          rejected: false,
+        },
+      ]
+      const segments = renderContentWithRevisions(content, revisions, testData)
+      expect(segments.length).toBe(2)
+      expect(segments[0].type).toBe('text')
+      expect(segments[0].value).toBe('Hello')
+      expect(segments[1].type).toBe('revision')
+      expect(segments[1].value).toBe(' World')
+    })
+
+    it('删除类型修订应该显示被删除的文字', () => {
+      const content = 'Hello'
+      const revisions = [
+        {
+          id: 'rev-1',
+          type: REVISION_TYPE.DELETE,
+          text: ' World',
+          start: 5,
+          end: 11,
+          userId: 'user-1',
+          createdAt: Date.now(),
+          accepted: false,
+          rejected: false,
+        },
+      ]
+      const segments = renderContentWithRevisions(content, revisions, testData)
+      expect(segments.length).toBe(2)
+      expect(segments[1].value).toBe(' World')
+    })
+
+    it('修订段应该包含作者信息', () => {
+      const content = 'Hello'
+      const revisions = [
+        {
+          id: 'rev-1',
+          type: REVISION_TYPE.ADD,
+          text: '!',
+          start: 5,
+          end: 6,
+          userId: 'user-1',
+          createdAt: Date.now(),
+          accepted: false,
+          rejected: false,
+        },
+      ]
+      const segments = renderContentWithRevisions(content, revisions, testData)
+      expect(segments[1].author).toBeTruthy()
+      expect(segments[1].author.id).toBe('user-1')
+    })
+
+    it('格式修订应该正确分段', () => {
+      const content = 'Hello World'
+      const revisions = [
+        {
+          id: 'rev-1',
+          type: REVISION_TYPE.FORMAT,
+          text: 'World',
+          start: 6,
+          end: 11,
+          userId: 'user-1',
+          createdAt: Date.now(),
+          accepted: false,
+          rejected: false,
+          format: FORMAT_TYPE.BOLD,
+        },
+      ]
+      const segments = renderContentWithRevisions(content, revisions, testData)
+      expect(segments.length).toBe(2)
+      expect(segments[0].type).toBe('text')
+      expect(segments[0].value).toBe('Hello ')
+      expect(segments[1].type).toBe('revision')
+      expect(segments[1].revision.format).toBe(FORMAT_TYPE.BOLD)
+      expect(segments[1].value).toBe('World')
+    })
+  })
+
+  describe('addRevision', () => {
+    it('创建的修订应该包含 format 字段默认为 null', () => {
+      const result = addRevision(testData, 'p-1', REVISION_TYPE.ADD, 'text', 0, 4, 'user-1')
+      const rev = result.revisions[result.revisions.length - 1]
+      expect(rev).toHaveProperty('format')
+      expect(rev.format).toBeNull()
+    })
+  })
+})
+

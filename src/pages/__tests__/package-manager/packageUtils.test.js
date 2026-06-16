@@ -434,8 +434,8 @@ describe('图结构与可视化', () => {
       const { nodes, edges } = buildGraphNodes(mockDeps)
       expect(nodes.length).toBe(3)
       expect(edges.length).toBe(1)
-      expect(edges[0].source).toBe('react')
-      expect(edges[0].target).toBe('loose-envify')
+      expect(edges[0].source).toBe('loose-envify')
+      expect(edges[0].target).toBe('react')
     })
 
     it('应该标记直接依赖', () => {

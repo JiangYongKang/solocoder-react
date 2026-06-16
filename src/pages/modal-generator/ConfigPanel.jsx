@@ -16,6 +16,7 @@ import {
 } from './constants'
 import {
   generateCallCode,
+  highlightSyntax,
   clampWidth,
   clampMaskOpacity,
   clampAnimationDuration,
@@ -64,9 +65,8 @@ function ColorPicker({ label, value, onChange }) {
   )
 }
 
-function ConfigPanel({ config, onConfigChange, onPreviewAnimation, generatedCode }) {
+function ConfigPanel({ config, onConfigChange, onPreviewAnimation, generatedCode, onGeneratedCodeChange }) {
   const [copied, setCopied] = useState(false)
-  const [codeFlash, setCodeFlash] = useState(false)
 
   const handleTypeChange = useCallback((type) => {
     onConfigChange({ type })
@@ -107,20 +107,20 @@ function ConfigPanel({ config, onConfigChange, onPreviewAnimation, generatedCode
   }, [config, onConfigChange])
 
   const handleGenerateCode = useCallback(() => {
-    setCodeFlash(true)
-    setTimeout(() => setCodeFlash(false), 500)
-  }, [])
+    const code = generateCallCode(config)
+    onGeneratedCodeChange(code)
+  }, [config, onGeneratedCodeChange])
 
   const handleCopyCode = useCallback(async () => {
-    const code = generatedCode || generateCallCode(config)
+    if (!generatedCode) return
     try {
-      await navigator.clipboard.writeText(code)
+      await navigator.clipboard.writeText(generatedCode)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch (err) {
       console.error('复制失败:', err)
     }
-  }, [config, generatedCode])
+  }, [generatedCode])
 
   const showConfirmBtn = hasConfirmButton(config.type)
   const showCancelBtn = hasCancelButton(config.type)
@@ -158,18 +158,16 @@ function ConfigPanel({ config, onConfigChange, onPreviewAnimation, generatedCode
           />
         </div>
 
-        {!showForm && (
-          <div className="mg-field">
-            <label className="mg-field-label">正文内容</label>
-            <textarea
-              className="mg-textarea"
-              value={config.content}
-              onChange={(e) => handleInputChange('content', e.target.value)}
-              placeholder="请输入弹窗内容"
-              rows={4}
-            />
-          </div>
-        )}
+        <div className="mg-field">
+          <label className="mg-field-label">正文内容</label>
+          <textarea
+            className="mg-textarea"
+            value={config.content}
+            onChange={(e) => handleInputChange('content', e.target.value)}
+            placeholder="请输入弹窗内容"
+            rows={4}
+          />
+        </div>
 
         {showForm && (
           <>
@@ -359,8 +357,18 @@ function ConfigPanel({ config, onConfigChange, onPreviewAnimation, generatedCode
         </button>
 
         <div className="mg-code-panel">
-          <pre className={`mg-code-block ${codeFlash ? 'mg-code-flash' : ''}`}>
-            <code>{generatedCode}</code>
+          <pre className="mg-code-block">
+            <code>
+              {generatedCode ? (
+                highlightSyntax(generatedCode).map((token, idx) => (
+                  <span key={idx} className={`mg-token-${token.type}`}>
+                    {token.value}
+                  </span>
+                ))
+              ) : (
+                <span className="mg-code-placeholder">点击"生成代码"按钮生成</span>
+              )}
+            </code>
           </pre>
         </div>
 

@@ -376,11 +376,44 @@
   color: var(--text-h);
   white-space: pre-wrap;
   word-break: break-all;
-  transition: background-color 0.3s;
 }
 
-.mg-code-flash {
-  background-color: var(--accent-bg);
+.mg-code-placeholder {
+  color: var(--text-l);
+  font-style: italic;
+}
+
+.mg-token-string {
+  color: #0550ae;
+}
+
+.mg-token-number {
+  color: #098658;
+}
+
+.mg-token-keyword {
+  color: #cf222e;
+}
+
+.mg-token-property {
+  color: #953800;
+}
+
+.mg-token-function {
+  color: #6639ba;
+}
+
+.mg-token-identifier {
+  color: var(--text-h);
+}
+
+.mg-token-punctuation {
+  color: var(--text-m);
+}
+
+.mg-token-comment {
+  color: #6e7781;
+  font-style: italic;
 }
 
 .mg-preview-wrapper {

@@ -9,7 +9,9 @@ import {
   VIEW_MAIN,
   VIEW_ARCHIVE,
   VIEW_TRASH,
+  REMINDER_STATUS_PENDING,
   REMINDER_STATUS_TRIGGERED,
+  REMINDER_STATUS_DISMISSED,
   EXPIRE_OPTIONS,
 } from './constants.js'
 import {
@@ -20,6 +22,9 @@ import {
   isExpired,
   shouldTriggerReminder,
   markReminderTriggered,
+  markReminderDismissed,
+  clearReminder,
+  setReminder,
   filterByTags,
   searchNotes,
   createNote,
@@ -150,17 +155,49 @@ function NoteCard({
   onUnarchive,
 }) {
   const [isEditing, setIsEditing] = useState(false)
+  const [editTitle, setEditTitle] = useState(note.title)
+  const [editContent, setEditContent] = useState(note.content)
   const textColor = getContrastColor(note.color)
   const timeUntil = note.reminderAt ? getTimeUntilReminder(note.reminderAt) : null
   const expired = isExpired(note)
   const retentionDays = isTrashed ? getTrashRetentionDays(note) : null
+  const cardRef = useRef(null)
+
+  const readOnly = isTrashed || isArchived || !isEditing
+
+  useEffect(() => {
+    setEditTitle(note.title)
+    setEditContent(note.content)
+  }, [note.title, note.content])
+
+  useEffect(() => {
+    if (!isEditing) return
+    function handleClickOutside(e) {
+      if (cardRef.current && !cardRef.current.contains(e.target)) {
+        handleFinishEdit()
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [isEditing, editTitle, editContent])
+
+  const handleFinishEdit = () => {
+    if (editTitle !== note.title || editContent !== note.content) {
+      onUpdate(note.id, { title: editTitle, content: editContent })
+    }
+    setIsEditing(false)
+  }
 
   const handleTitleChange = (e) => {
-    onUpdate(note.id, { title: e.target.value })
+    if (isEditing) {
+      setEditTitle(e.target.value)
+    }
   }
 
   const handleContentChange = (e) => {
-    onUpdate(note.id, { content: e.target.value })
+    if (isEditing) {
+      setEditContent(e.target.value)
+    }
   }
 
   const handleColorChange = (color) => {
@@ -178,9 +215,17 @@ function NoteCard({
   }
 
   const handleDoubleClick = (e) => {
-    if (!isTrashed && !isArchived) {
+    if (!isTrashed && !isArchived && !isEditing) {
       e.stopPropagation()
       setIsEditing(true)
+    }
+  }
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Escape') {
+      setEditTitle(note.title)
+      setEditContent(note.content)
+      setIsEditing(false)
     }
   }
 
@@ -191,20 +236,45 @@ function NoteCard({
   if (view === VIEW_LIST) {
     return (
       <div
+        ref={cardRef}
         className={cardClass}
         style={{ background: note.color, color: textColor }}
-        draggable={!isTrashed && !isArchived}
+        draggable={!isTrashed && !isArchived && !isEditing}
         onDragStart={(e) => onDragStart?.(e, note)}
         onDragEnd={onDragEnd}
         onDoubleClick={handleDoubleClick}
+        onKeyDown={handleKeyDown}
+        tabIndex={0}
       >
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 600, marginBottom: 4 }}>
-            {note.title || '无标题'}
-          </div>
-          <div className="sn-note-content-list" style={{ color: textColor }}>
-            {note.content || '无内容'}
-          </div>
+          {isEditing ? (
+            <input
+              className="sn-note-title-list-edit"
+              style={{ color: textColor }}
+              value={editTitle}
+              onChange={handleTitleChange}
+              placeholder="标题..."
+              autoFocus
+            />
+          ) : (
+            <div style={{ fontWeight: 600, marginBottom: 4 }}>
+              {note.title || '无标题'}
+            </div>
+          )}
+          {isEditing ? (
+            <textarea
+              className="sn-note-content-list-edit"
+              style={{ color: textColor }}
+              value={editContent}
+              onChange={handleContentChange}
+              placeholder="写点什么..."
+              rows={2}
+            />
+          ) : (
+            <div className="sn-note-content-list" style={{ color: textColor }}>
+              {note.content || '无内容'}
+            </div>
+          )}
         </div>
 
         <div className="sn-note-tags">
@@ -304,23 +374,32 @@ function NoteCard({
 
   return (
     <div
-      className={cardClass}
+      ref={cardRef}
+      className={`${cardClass} ${isEditing ? 'sn-note-editing' : ''}`}
       style={{ background: note.color, color: textColor }}
-      draggable={!isTrashed && !isArchived}
+      draggable={!isTrashed && !isArchived && !isEditing}
       onDragStart={(e) => onDragStart?.(e, note)}
       onDragEnd={onDragEnd}
       onDoubleClick={handleDoubleClick}
+      onKeyDown={handleKeyDown}
+      tabIndex={0}
     >
       <div className="sn-note-header">
-        <textarea
-          className="sn-note-title"
-          style={{ color: textColor }}
-          value={note.title}
-          onChange={handleTitleChange}
-          placeholder="标题..."
-          rows={1}
-          readOnly={isTrashed || isArchived}
-        />
+        {isEditing ? (
+          <textarea
+            className="sn-note-title"
+            style={{ color: textColor }}
+            value={editTitle}
+            onChange={handleTitleChange}
+            placeholder="标题..."
+            rows={1}
+            autoFocus
+          />
+        ) : (
+          <div className="sn-note-title sn-note-title-readonly" style={{ color: textColor }}>
+            {note.title || '无标题'}
+          </div>
+        )}
         {!isTrashed && !isArchived && (
           <ColorPicker
             selectedColor={note.color}
@@ -330,14 +409,19 @@ function NoteCard({
         )}
       </div>
 
-      <textarea
-        className="sn-note-content"
-        style={{ color: textColor }}
-        value={note.content}
-        onChange={handleContentChange}
-        placeholder="写点什么..."
-        readOnly={isTrashed || isArchived}
-      />
+      {isEditing ? (
+        <textarea
+          className="sn-note-content"
+          style={{ color: textColor }}
+          value={editContent}
+          onChange={handleContentChange}
+          placeholder="写点什么..."
+        />
+      ) : (
+        <div className="sn-note-content sn-note-content-readonly" style={{ color: textColor }}>
+          {note.content || '无内容'}
+        </div>
+      )}
 
       <div className="sn-note-tags">
         {note.tags?.map(tag => (
@@ -370,10 +454,11 @@ function NoteCard({
         <div className="sn-note-meta">
           <span>创建: {formatDate(note.createdAt)}</span>
           {note.reminderAt && (
-            <span className={`sn-reminder-badge ${note.reminderStatus === REMINDER_STATUS_TRIGGERED ? 'triggered' : ''}`}>
+            <span className={`sn-reminder-badge ${note.reminderStatus === REMINDER_STATUS_TRIGGERED ? 'triggered' : ''} ${note.reminderStatus === REMINDER_STATUS_DISMISSED ? 'dismissed' : ''}`}>
               ⏰ {formatDateTime(note.reminderAt)}
-              {timeUntil && !timeUntil.expired && ` (${timeUntil.text})`}
+              {timeUntil && !timeUntil.expired && note.reminderStatus === REMINDER_STATUS_PENDING && ` (${timeUntil.text})`}
               {note.reminderStatus === REMINDER_STATUS_TRIGGERED && ' (已提醒)'}
+              {note.reminderStatus === REMINDER_STATUS_DISMISSED && ' (已忽略)'}
             </span>
           )}
           {expired && (
@@ -389,7 +474,30 @@ function NoteCard({
         </div>
 
         <div className="sn-note-actions">
-          {isTrashed ? (
+          {isEditing && !isTrashed && !isArchived ? (
+            <>
+              <button
+                className="sn-action-btn"
+                style={{ color: textColor }}
+                onClick={handleFinishEdit}
+                title="完成编辑"
+              >
+                ✓ 完成
+              </button>
+              <button
+                className="sn-action-btn"
+                style={{ color: textColor }}
+                onClick={() => {
+                  setEditTitle(note.title)
+                  setEditContent(note.content)
+                  setIsEditing(false)
+                }}
+                title="取消编辑"
+              >
+                ✕ 取消
+              </button>
+            </>
+          ) : isTrashed ? (
             <>
               <button
                 className="sn-action-btn"
@@ -725,7 +833,13 @@ export default function StickyNotesPage() {
   }
 
   const handleCloseNotification = (notificationId) => {
-    setNotifications(prev => prev.filter(n => n.id !== notificationId))
+    setNotifications(prev => {
+      const notif = prev.find(n => n.id === notificationId)
+      if (notif && notif.noteId) {
+        setNotes(prevNotes => markReminderDismissed(prevNotes, notif.noteId))
+      }
+      return prev.filter(n => n.id !== notificationId)
+    })
   }
 
   const handleCreateNote = useCallback(() => {
@@ -777,10 +891,11 @@ export default function StickyNotesPage() {
 
   const handleSaveReminder = useCallback((reminderAt) => {
     if (reminderModalNote) {
-      setNotes(prev => updateNote(prev, reminderModalNote.id, {
-        reminderAt,
-        reminderStatus: reminderAt ? 'pending' : null,
-      }))
+      if (reminderAt) {
+        setNotes(prev => setReminder(prev, reminderModalNote.id, reminderAt))
+      } else {
+        setNotes(prev => clearReminder(prev, reminderModalNote.id))
+      }
     }
     setReminderModalNote(null)
   }, [reminderModalNote])

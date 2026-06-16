@@ -1,11 +1,10 @@
-import { useState, useCallback, useEffect, useMemo } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import ConfigPanel from './ConfigPanel'
 import ModalPreview from './ModalPreview'
 import {
   createDefaultConfig,
   createConfigByType,
-  generateCallCode,
 } from './modalGeneratorCore'
 import './modal-generator.css'
 
@@ -14,9 +13,8 @@ function ModalGenerator() {
   const [config, setConfig] = useState(createDefaultConfig())
   const [animationKey, setAnimationKey] = useState(0)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [generatedCode, setGeneratedCode] = useState('')
   const [isModalVisible, setIsModalVisible] = useState(true)
-
-  const generatedCode = useMemo(() => generateCallCode(config), [config])
 
   const handleConfigChange = useCallback((updates) => {
     setConfig((prev) => {
@@ -99,6 +97,7 @@ function ModalGenerator() {
             onConfigChange={handleConfigChange}
             onPreviewAnimation={handlePreviewAnimation}
             generatedCode={generatedCode}
+            onGeneratedCodeChange={setGeneratedCode}
           />
         </div>
 

@@ -12,12 +12,9 @@ import {
   isParagraphLocked,
   canEditParagraph,
   getParagraphLocker,
-  lockParagraph,
-  unlockParagraph,
   toggleParagraphLock,
   lockAllMyParagraphs,
-  updateParagraphContent,
-  addRevision,
+  processContentChangeWithRevision,
   getRevisionsByParagraph,
   acceptRevision,
   rejectRevision,
@@ -42,6 +39,13 @@ import {
   simulateCollaboratorEdit,
   formatDate,
   generateId,
+  lockParagraph,
+  renderContentWithRevisions,
+  getCharOffsetPosition,
+  getSelectionFromDocument,
+  applyFormatToSelection,
+  applyFormatToContent,
+  FORMAT_TYPE,
 } from './utils.js'
 import { CURRENT_USER, REVISION_TYPE } from './constants.js'
 
@@ -49,7 +53,6 @@ const SIDEBAR_TAB = {
   REVISIONS: 'revisions',
   VERSIONS: 'versions',
   COMMENTS: 'comments',
-  COLLABORATORS: 'collaborators',
 }
 
 export default function CollaborativeDocPage() {
@@ -59,10 +62,13 @@ export default function CollaborativeDocPage() {
   const [compareMode, setCompareMode] = useState(false)
   const [activeCommentId, setActiveCommentId] = useState(null)
   const [replyInputs, setReplyInputs] = useState({})
-  const [newComment, setNewComment] = useState({ paragraphId: null, text: '', content: '' })
-  const [showNewCommentInput, setShowNewCommentInput] = useState(false)
+  const [newComment, setNewComment] = useState({ paragraphId: null, text: '', content: '', start: 0, end: 0 })
+  const [selectedText, setSelectedText] = useState(null)
+  const [cursorPositions, setCursorPositions] = useState({})
   const editorRef = useRef(null)
   const paragraphRefs = useRef({})
+  const cursorOverlayRef = useRef(null)
+  const paragraphContents = useRef({})
 
   const saveTimeoutRef = useRef(null)
   const cursorTimerRef = useRef(null)
@@ -70,6 +76,7 @@ export default function CollaborativeDocPage() {
   const editTimerRef = useRef(null)
   const lockTimerRef = useRef(null)
   const notificationTimersRef = useRef({})
+  const positionUpdateRef = useRef(null)
 
   const debouncedSave = useCallback((dataToSave) => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
@@ -82,15 +89,21 @@ export default function CollaborativeDocPage() {
     debouncedSave(data)
   }, [data, debouncedSave])
 
-  useEffect(() => {
-    cursorTimerRef.current = setInterval(() => {
+  const scheduleRandomCursorMove = useCallback(() => {
+    const delay = 3000 + Math.random() * 5000
+    cursorTimerRef.current = setTimeout(() => {
       setData((prev) => {
         const online = getOnlineCollaborators(prev).filter((c) => c.id !== CURRENT_USER.id)
         if (online.length === 0) return prev
         const randomUser = online[Math.floor(Math.random() * online.length)]
         return moveRandomCursor(prev, randomUser.id)
       })
-    }, 3000 + Math.random() * 5000)
+      scheduleRandomCursorMove()
+    }, delay)
+  }, [])
+
+  useEffect(() => {
+    scheduleRandomCursorMove()
 
     presenceTimerRef.current = setInterval(() => {
       setData((prev) => {
@@ -154,13 +167,43 @@ export default function CollaborativeDocPage() {
 
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
-      if (cursorTimerRef.current) clearInterval(cursorTimerRef.current)
+      if (cursorTimerRef.current) clearTimeout(cursorTimerRef.current)
       if (presenceTimerRef.current) clearInterval(presenceTimerRef.current)
       if (editTimerRef.current) clearInterval(editTimerRef.current)
       if (lockTimerRef.current) clearInterval(lockTimerRef.current)
+      if (positionUpdateRef.current) clearInterval(positionUpdateRef.current)
       Object.values(notificationTimersRef.current).forEach((t) => clearTimeout(t))
     }
-  }, [])
+  }, [scheduleRandomCursorMove])
+
+  useEffect(() => {
+    const updateCursorPositions = () => {
+      if (!editorRef.current) return
+
+      const positions = {}
+      for (const cursor of data.cursors) {
+        const paraEl = paragraphRefs.current[cursor.paragraphId]
+        if (paraEl) {
+          const pos = getCharOffsetPosition(paraEl, cursor.offset)
+          const paraRect = paraEl.getBoundingClientRect()
+          const editorRect = editorRef.current.getBoundingClientRect()
+          positions[cursor.userId] = {
+            x: pos.x + (paraRect.left - editorRect.left),
+            y: pos.y + (paraRect.top - editorRect.top),
+            paragraphId: cursor.paragraphId,
+          }
+        }
+      }
+      setCursorPositions(positions)
+    }
+
+    updateCursorPositions()
+    positionUpdateRef.current = setInterval(updateCursorPositions, 500)
+
+    return () => {
+      if (positionUpdateRef.current) clearInterval(positionUpdateRef.current)
+    }
+  }, [data.cursors, data.paragraphs])
 
   useEffect(() => {
     data.notifications.forEach((notif) => {
@@ -172,6 +215,19 @@ export default function CollaborativeDocPage() {
       }
     })
   }, [data.notifications])
+
+  useEffect(() => {
+    const handleSelectionChange = () => {
+      if (!editorRef.current) return
+      const selection = getSelectionFromDocument(editorRef.current)
+      if (selection) {
+        setSelectedText(selection)
+      }
+    }
+
+    document.addEventListener('selectionchange', handleSelectionChange)
+    return () => document.removeEventListener('selectionchange', handleSelectionChange)
+  }, [])
 
   const onlineCollaborators = useMemo(() => getOnlineCollaborators(data), [data])
   const onlineCount = useMemo(() => getOnlineCount(data), [data])
@@ -187,7 +243,17 @@ export default function CollaborativeDocPage() {
     setData((prev) => lockAllMyParagraphs(prev, CURRENT_USER.id))
   }, [])
 
-  const handleParagraphChange = useCallback((paragraphId, newContent) => {
+  const handleParagraphFocus = useCallback((paragraphId) => {
+    const para = getParagraphById(data, paragraphId)
+    if (para) {
+      paragraphContents.current[paragraphId] = para.content
+    }
+  }, [data])
+
+  const handleParagraphBlur = useCallback((paragraphId, newContent) => {
+    const oldContent = paragraphContents.current[paragraphId]
+    if (oldContent === newContent) return
+
     setData((prev) => {
       if (!canEditParagraph(prev, paragraphId, CURRENT_USER.id)) {
         const locker = getParagraphLocker(prev, paragraphId)
@@ -196,37 +262,52 @@ export default function CollaborativeDocPage() {
         }
         return prev
       }
-      const oldPara = getParagraphById(prev, paragraphId)
-      if (prev.revisionMode && oldPara && oldPara.content !== newContent) {
-        if (newContent.length > oldPara.content.length) {
-          const addedText = newContent.slice(oldPara.content.length)
-          const withRev = addRevision(
-            prev,
-            paragraphId,
-            REVISION_TYPE.ADD,
-            addedText,
-            oldPara.content.length,
-            newContent.length,
-            CURRENT_USER.id
-          )
-          return updateParagraphContent(withRev, paragraphId, newContent, CURRENT_USER.id)
-        } else if (newContent.length < oldPara.content.length) {
-          const deletedText = oldPara.content.slice(newContent.length)
-          const withRev = addRevision(
-            prev,
-            paragraphId,
-            REVISION_TYPE.DELETE,
-            deletedText,
-            newContent.length,
-            oldPara.content.length,
-            CURRENT_USER.id
-          )
-          return updateParagraphContent(withRev, paragraphId, newContent, CURRENT_USER.id)
-        }
-      }
-      return updateParagraphContent(prev, paragraphId, newContent, CURRENT_USER.id)
+      return processContentChangeWithRevision(prev, paragraphId, oldContent || '', newContent, CURRENT_USER.id)
     })
+
+    paragraphContents.current[paragraphId] = newContent
   }, [])
+
+  const handleFormat = useCallback((format) => {
+    if (!selectedText) {
+      alert('请先选中要格式化的文字')
+      return
+    }
+
+    if (!canEditParagraph(data, selectedText.paragraphId, CURRENT_USER.id)) {
+      const locker = getParagraphLocker(data, selectedText.paragraphId)
+      if (locker) {
+        alert(`此段落已被 ${locker.name} 锁定`)
+      }
+      return
+    }
+
+    setData((prev) => {
+      const para = getParagraphById(prev, selectedText.paragraphId)
+      if (!para) return prev
+
+      let result = prev
+      if (prev.revisionMode) {
+        result = applyFormatToSelection(
+          result,
+          selectedText.paragraphId,
+          selectedText.text,
+          selectedText.start,
+          selectedText.end,
+          format,
+          CURRENT_USER.id
+        )
+      }
+
+      const newContent = applyFormatToContent(para.content, selectedText.start, selectedText.end, format)
+      return processContentChangeWithRevision(result, selectedText.paragraphId, para.content, newContent, CURRENT_USER.id)
+    })
+
+    setSelectedText(null)
+    if (window.getSelection()) {
+      window.getSelection().removeAllRanges()
+    }
+  }, [selectedText, data])
 
   const handleTitleChange = useCallback((e) => {
     setData((prev) => updateTitle(prev, e.target.value))
@@ -274,19 +355,45 @@ export default function CollaborativeDocPage() {
   }, [selectedVersionId])
 
   const handleAddComment = useCallback(() => {
-    if (!newComment.paragraphId || !newComment.content.trim()) return
+    if (!newComment.content.trim()) return
+
+    const paragraphId = newComment.paragraphId || selectedText?.paragraphId
+    const text = newComment.text || selectedText?.text || ''
+
+    if (!paragraphId) {
+      alert('请先在文档中选中要批注的文字')
+      return
+    }
+
     setData((prev) =>
       createComment(
         prev,
-        newComment.paragraphId,
-        newComment.text || getParagraphById(prev, newComment.paragraphId)?.content.slice(0, 30),
+        paragraphId,
+        text,
         newComment.content.trim(),
         CURRENT_USER.id
       )
     )
-    setNewComment({ paragraphId: null, text: '', content: '' })
-    setShowNewCommentInput(false)
-  }, [newComment])
+    setNewComment({ paragraphId: null, text: '', content: '', start: 0, end: 0 })
+    setSelectedText(null)
+    if (window.getSelection()) {
+      window.getSelection().removeAllRanges()
+    }
+  }, [newComment, selectedText])
+
+  const handleQuickComment = useCallback(() => {
+    if (!selectedText) {
+      alert('请先在文档中选中要批注的文字')
+      return
+    }
+    setNewComment({
+      paragraphId: selectedText.paragraphId,
+      text: selectedText.text,
+      content: '',
+      start: selectedText.start,
+      end: selectedText.end,
+    })
+  }, [selectedText])
 
   const handleReply = useCallback((commentId) => {
     const content = replyInputs[commentId]
@@ -340,19 +447,59 @@ export default function CollaborativeDocPage() {
     })
   }
 
-  const renderParagraphWithCursors = (paragraph, idx) => {
-    const paragraphCursors = data.cursors.filter((c) => c.paragraphId === paragraph.id)
+  const renderContentSegments = (paragraph, revisions) => {
+    const segments = renderContentWithRevisions(paragraph.content, revisions, data)
+
+    return segments.map((seg, idx) => {
+      if (seg.type === 'text') {
+        return <span key={idx}>{seg.value}</span>
+      }
+
+      const rev = seg.revision
+      const author = seg.author
+      const time = formatDate(rev.createdAt)
+
+      let className = ''
+      if (rev.type === REVISION_TYPE.ADD) {
+        className = 'cd-revision-add'
+      } else if (rev.type === REVISION_TYPE.DELETE) {
+        className = 'cd-revision-delete'
+      } else if (rev.type === REVISION_TYPE.FORMAT) {
+        className = 'cd-revision-format'
+      }
+
+      const tooltip = rev.type === REVISION_TYPE.ADD
+        ? `添加: ${author?.name || '未知'} · ${time}`
+        : rev.type === REVISION_TYPE.DELETE
+          ? `删除: ${author?.name || '未知'} · ${time}`
+          : `格式(${rev.format}): ${author?.name || '未知'} · ${time}`
+
+      return (
+        <span key={idx} className={className} title={tooltip}>
+          {seg.value}
+          <span className="cd-revision-tooltip">{tooltip}</span>
+        </span>
+      )
+    })
+  }
+
+  const renderParagraph = (paragraph, idx) => {
     const revisions = data.revisionMode ? getRevisionsByParagraph(data, paragraph.id) : []
     const paragraphComments = sortedComments.filter((c) => c.paragraphId === paragraph.id && !c.resolved)
     const locker = getParagraphLocker(data, paragraph.id)
     const locked = isParagraphLocked(data, paragraph.id)
     const canEdit = canEditParagraph(data, paragraph.id, CURRENT_USER.id)
 
+    const paraStyle = idx === 0
+      ? { fontWeight: 600, fontSize: 18 }
+      : idx === 3 || idx === 5
+        ? { fontWeight: 600, fontSize: 16, marginTop: 20 }
+        : {}
+
     return (
       <div
         key={paragraph.id}
         className="cd-paragraph-wrapper"
-        style={{ marginLeft: paragraph.content.length < 20 ? '0' : '0' }}
       >
         <button
           className="cd-paragraph-lock-btn"
@@ -364,24 +511,15 @@ export default function CollaborativeDocPage() {
 
         <div
           ref={(el) => (paragraphRefs.current[paragraph.id] = el)}
+          data-paragraph-id={paragraph.id}
           className={`cd-paragraph ${locked ? 'locked' : ''}`}
           contentEditable={canEdit}
           suppressContentEditableWarning
-          onBlur={(e) => handleParagraphChange(paragraph.id, e.target.innerText)}
-          style={idx === 0 ? { fontWeight: 600, fontSize: 18 } : idx === 3 || idx === 5 ? { fontWeight: 600, fontSize: 16, marginTop: 20 } : {}}
+          onFocus={() => handleParagraphFocus(paragraph.id)}
+          onBlur={(e) => handleParagraphBlur(paragraph.id, e.target.innerText)}
+          style={paraStyle}
         >
-          {paragraph.content}
-          {paragraphCursors.map((cursor) => {
-            const collab = getCollaboratorById(data, cursor.userId)
-            if (!collab) return null
-            return (
-              <span key={cursor.userId} className="cd-cursor" style={{ left: `${Math.min(cursor.offset * 0.6, 95)}%`, background: collab.color }}>
-                <span className="cd-cursor-label" style={{ background: collab.color }}>
-                  {collab.name}
-                </span>
-              </span>
-            )
-          })}
+          {revisions.length > 0 ? renderContentSegments(paragraph, revisions) : paragraph.content}
         </div>
 
         {locked && locker && (
@@ -406,6 +544,33 @@ export default function CollaborativeDocPage() {
         )}
       </div>
     )
+  }
+
+  const renderCursors = () => {
+    return data.cursors.map((cursor) => {
+      const collab = getCollaboratorById(data, cursor.userId)
+      const pos = cursorPositions[cursor.userId]
+      if (!collab || !pos) return null
+
+      return (
+        <div
+          key={cursor.userId}
+          className="cd-cursor"
+          style={{
+            position: 'absolute',
+            left: `${pos.x}px`,
+            top: `${pos.y}px`,
+            background: collab.color,
+            pointerEvents: 'none',
+            zIndex: 50,
+          }}
+        >
+          <span className="cd-cursor-label" style={{ background: collab.color }}>
+            {collab.name}
+          </span>
+        </div>
+      )
+    })
   }
 
   return (
@@ -458,6 +623,39 @@ export default function CollaborativeDocPage() {
           🔒 锁定所有我的段落
         </button>
         <div className="cd-toolbar-separator" />
+        <button
+          className="cd-toolbar-btn"
+          onClick={() => handleFormat(FORMAT_TYPE.BOLD)}
+          title="加粗 (选中文字后点击)"
+          style={{ fontWeight: 'bold' }}
+        >
+          B
+        </button>
+        <button
+          className="cd-toolbar-btn"
+          onClick={() => handleFormat(FORMAT_TYPE.ITALIC)}
+          title="斜体 (选中文字后点击)"
+          style={{ fontStyle: 'italic' }}
+        >
+          I
+        </button>
+        <button
+          className="cd-toolbar-btn"
+          onClick={() => handleFormat(FORMAT_TYPE.UNDERLINE)}
+          title="下划线 (选中文字后点击)"
+          style={{ textDecoration: 'underline' }}
+        >
+          U
+        </button>
+        <button
+          className="cd-toolbar-btn"
+          onClick={() => handleFormat(FORMAT_TYPE.STRIKETHROUGH)}
+          title="删除线 (选中文字后点击)"
+          style={{ textDecoration: 'line-through' }}
+        >
+          S
+        </button>
+        <div className="cd-toolbar-separator" />
         <button className="cd-toolbar-btn" onClick={handleSaveVersion}>
           💾 保存版本
         </button>
@@ -472,33 +670,32 @@ export default function CollaborativeDocPage() {
           </>
         )}
         <div style={{ flex: 1 }} />
+        {selectedText && (
+          <span style={{ fontSize: 12, color: '#666', marginRight: 8 }}>
+            已选中: "{selectedText.text.slice(0, 15)}{selectedText.text.length > 15 ? '...' : ''}"
+          </span>
+        )}
         <button
           className="cd-add-comment-btn"
-          onClick={() => setShowNewCommentInput(!showNewCommentInput)}
+          onClick={handleQuickComment}
         >
           💬 添加批注
         </button>
       </div>
 
-      {showNewCommentInput && (
+      {newComment.content !== '' || newComment.paragraphId ? (
         <div style={{ padding: '8px 24px', background: '#fffde7', borderBottom: '1px solid #fbc02d', display: 'flex', gap: 8, alignItems: 'center' }}>
-          <select
-            value={newComment.paragraphId}
-            onChange={(e) => setNewComment((p) => ({ ...p, paragraphId: e.target.value }))}
-            style={{ padding: '6px 8px', border: '1px solid #ddd', borderRadius: 4 }}
-          >
-            <option value="">选择段落...</option>
-            {data.paragraphs.map((p, i) => (
-              <option key={p.id} value={p.id}>第 {i + 1} 段 - {p.content.slice(0, 20)}...</option>
-            ))}
-          </select>
+          <span style={{ fontSize: 13, color: '#666', whiteSpace: 'nowrap' }}>
+            批注原文: "{newComment.text?.slice(0, 20) || selectedText?.text?.slice(0, 20) || ''}..."
+          </span>
           <input
             type="text"
-            placeholder="批注内容..."
+            placeholder="输入批注内容..."
             value={newComment.content}
             onChange={(e) => setNewComment((p) => ({ ...p, content: e.target.value }))}
             style={{ flex: 1, padding: '6px 8px', border: '1px solid #ddd', borderRadius: 4 }}
             onKeyDown={(e) => e.key === 'Enter' && handleAddComment()}
+            autoFocus
           />
           <button
             onClick={handleAddComment}
@@ -506,8 +703,17 @@ export default function CollaborativeDocPage() {
           >
             添加
           </button>
+          <button
+            onClick={() => {
+              setNewComment({ paragraphId: null, text: '', content: '', start: 0, end: 0 })
+              setSelectedText(null)
+            }}
+            style={{ padding: '6px 10px', background: '#f0f0f0', border: '1px solid #ddd', borderRadius: 4, cursor: 'pointer' }}
+          >
+            取消
+          </button>
         </div>
-      )}
+      ) : null}
 
       <div className="cd-main">
         <div className="cd-sidebar-left">
@@ -580,7 +786,10 @@ export default function CollaborativeDocPage() {
         ) : (
           <div className="cd-editor-container" ref={editorRef}>
             <div className="cd-document">
-              {data.paragraphs.map((p, idx) => renderParagraphWithCursors(p, idx))}
+              {data.paragraphs.map((p, idx) => renderParagraph(p, idx))}
+            </div>
+            <div ref={cursorOverlayRef} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, pointerEvents: 'none' }}>
+              {renderCursors()}
             </div>
           </div>
         )}
@@ -610,7 +819,7 @@ export default function CollaborativeDocPage() {
           {activeTab === SIDEBAR_TAB.COMMENTS && (
             <div className="cd-comment-list">
               {sortedComments.length === 0 && (
-                <div className="cd-empty-state">暂无批注，选中文字后添加批注</div>
+                <div className="cd-empty-state">暂无批注，在文档中选中文字后点击"添加批注"</div>
               )}
               {sortedComments.map((comment) => {
                 const author = getCommentAuthor(data, comment)
@@ -691,7 +900,7 @@ export default function CollaborativeDocPage() {
                   <div key={rev.id} className="cd-revision-item">
                     <div>
                       <span className={`cd-revision-type-badge ${rev.type}`}>
-                        {rev.type === REVISION_TYPE.ADD ? '+ 新增' : rev.type === REVISION_TYPE.DELETE ? '- 删除' : '~ 格式'}
+                        {rev.type === REVISION_TYPE.ADD ? '+ 新增' : rev.type === REVISION_TYPE.DELETE ? '- 删除' : `~ 格式(${rev.format})`}
                       </span>
                       <span style={{ fontSize: 12, color: '#666' }}>
                         {author?.name} · {formatDate(rev.createdAt)}

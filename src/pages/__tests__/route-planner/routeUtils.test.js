@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   generateId,
   clampZoom,
@@ -43,6 +43,8 @@ import {
   initializeDefaultWaypoints,
   saveLastState,
   loadLastState,
+  downloadJSON,
+  copyToClipboard,
 } from '@/pages/route-planner/routeUtils.js';
 import {
   MIN_ZOOM,
@@ -249,7 +251,11 @@ describe('routeUtils', () => {
   describe('formatting functions', () => {
     it('formatDistance should show meters for <1km', () => {
       expect(formatDistance(0.5)).toBe('500 m');
+    });
+
+    it('formatDistance should show 0 km for <=0', () => {
       expect(formatDistance(0)).toBe('0 km');
+      expect(formatDistance(-5)).toBe('0 km');
     });
 
     it('formatDistance should show km for >=1km', () => {
@@ -723,6 +729,258 @@ describe('routeUtils', () => {
       expect(TRAVEL_MODES.bike.speedKmh).toBe(15);
       expect(TRAVEL_MODES.car.speedKmh).toBe(40);
       expect(TRAVEL_MODES.bus.speedKmh).toBe(25);
+    });
+  });
+
+  describe('downloadJSON', () => {
+    let originalBlob;
+    let originalURL;
+    let originalDocument;
+    let originalWindow;
+    let createObjectURLSpy;
+    let revokeObjectURLSpy;
+    let createElementSpy;
+    let appendChildSpy;
+    let removeChildSpy;
+    let clickSpy;
+    let blobSpy;
+
+    beforeEach(() => {
+      clickSpy = vi.fn();
+      createElementSpy = vi.fn(() => ({
+        href: '',
+        download: '',
+        click: clickSpy,
+        style: {},
+      }));
+      appendChildSpy = vi.fn();
+      removeChildSpy = vi.fn();
+      createObjectURLSpy = vi.fn(() => 'blob:test-url');
+      revokeObjectURLSpy = vi.fn();
+      blobSpy = vi.fn(function(content, opts) {
+        return { content, opts, size: content.length, type: opts ? opts.type : '' };
+      });
+
+      originalBlob = global.Blob;
+      originalURL = global.URL;
+      originalDocument = global.document;
+      originalWindow = global.window;
+
+      Object.defineProperty(global, 'Blob', { value: blobSpy, writable: true, configurable: true });
+      Object.defineProperty(global, 'URL', {
+        value: {
+          createObjectURL: createObjectURLSpy,
+          revokeObjectURL: revokeObjectURLSpy,
+        },
+        writable: true,
+        configurable: true,
+      });
+      Object.defineProperty(global, 'document', {
+        value: {
+          createElement: createElementSpy,
+          body: {
+            appendChild: appendChildSpy,
+            removeChild: removeChildSpy,
+          },
+        },
+        writable: true,
+        configurable: true,
+      });
+      Object.defineProperty(global, 'window', {
+        value: {
+          Blob: blobSpy,
+          URL: global.URL,
+          document: global.document,
+        },
+        writable: true,
+        configurable: true,
+      });
+    });
+
+    afterEach(() => {
+      Object.defineProperty(global, 'Blob', { value: originalBlob, writable: true, configurable: true });
+      Object.defineProperty(global, 'URL', { value: originalURL, writable: true, configurable: true });
+      Object.defineProperty(global, 'document', { value: originalDocument, writable: true, configurable: true });
+      Object.defineProperty(global, 'window', { value: originalWindow, writable: true, configurable: true });
+    });
+
+    it('should return false when window is undefined', () => {
+      Object.defineProperty(global, 'window', { value: undefined, writable: true, configurable: true });
+      const result = downloadJSON('{}', 'test.json');
+      expect(result).toBe(false);
+    });
+
+    it('should create Blob with JSON content and correct type', () => {
+      downloadJSON('{"key":"value"}', 'data.json');
+      expect(blobSpy).toHaveBeenCalledWith(
+        ['{"key":"value"}'],
+        { type: 'application/json' }
+      );
+    });
+
+    it('should create object URL from Blob', () => {
+      downloadJSON('{}', 'route.json');
+      expect(createObjectURLSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('should create anchor element with correct attributes', () => {
+      downloadJSON('{"a":1}', 'custom.json');
+      expect(createElementSpy).toHaveBeenCalledWith('a');
+      const mockAnchor = createElementSpy.mock.results[0].value;
+      expect(mockAnchor.href).toBe('blob:test-url');
+      expect(mockAnchor.download).toBe('custom.json');
+    });
+
+    it('should use default filename when not provided', () => {
+      downloadJSON('{}');
+      const mockAnchor = createElementSpy.mock.results[0].value;
+      expect(mockAnchor.download).toBe('route.json');
+    });
+
+    it('should trigger click on anchor, append and remove from body', () => {
+      downloadJSON('{}', 'test.json');
+      const mockAnchor = createElementSpy.mock.results[0].value;
+      expect(clickSpy).toHaveBeenCalledTimes(1);
+      expect(appendChildSpy).toHaveBeenCalledWith(mockAnchor);
+      expect(removeChildSpy).toHaveBeenCalledWith(mockAnchor);
+    });
+
+    it('should revoke object URL after download', () => {
+      downloadJSON('{}', 'test.json');
+      expect(revokeObjectURLSpy).toHaveBeenCalledWith('blob:test-url');
+    });
+
+    it('should return true on successful download', () => {
+      const result = downloadJSON('{}', 'test.json');
+      expect(result).toBe(true);
+    });
+
+    it('should catch and handle exceptions, returning false', () => {
+      createElementSpy.mockImplementation(() => {
+        throw new Error('DOM error');
+      });
+      const result = downloadJSON('{}', 'test.json');
+      expect(result).toBe(false);
+      expect(() => downloadJSON('{}', 'test.json')).not.toThrow();
+    });
+
+    it('should handle Blob constructor throwing', () => {
+      blobSpy.mockImplementation(() => {
+        throw new Error('Blob error');
+      });
+      const result = downloadJSON('{}', 'test.json');
+      expect(result).toBe(false);
+      expect(() => downloadJSON('{}', 'test.json')).not.toThrow();
+    });
+
+    it('should handle revokeObjectURL throwing gracefully', () => {
+      revokeObjectURLSpy.mockImplementation(() => {
+        throw new Error('Revoke error');
+      });
+      const result = downloadJSON('{}', 'test.json');
+      expect(result).toBe(true);
+      expect(() => downloadJSON('{}', 'test.json')).not.toThrow();
+    });
+  });
+
+  describe('copyToClipboard', () => {
+    let originalNavigator;
+
+    beforeEach(() => {
+      originalNavigator = global.navigator;
+    });
+
+    afterEach(() => {
+      Object.defineProperty(global, 'navigator', { value: originalNavigator, writable: true, configurable: true });
+    });
+
+    it('should return false when navigator is undefined', async () => {
+      Object.defineProperty(global, 'navigator', { value: undefined, writable: true, configurable: true });
+      const result = await copyToClipboard('test');
+      expect(result).toBe(false);
+    });
+
+    it('should return false when navigator.clipboard is unavailable', async () => {
+      Object.defineProperty(global, 'navigator', { value: {}, writable: true, configurable: true });
+      const result = await copyToClipboard('test');
+      expect(result).toBe(false);
+    });
+
+    it('should call clipboard.writeText with correct content', async () => {
+      const writeTextSpy = vi.fn(() => Promise.resolve(undefined));
+      Object.defineProperty(global, 'navigator', {
+        value: { clipboard: { writeText: writeTextSpy } },
+        writable: true,
+        configurable: true,
+      });
+      await copyToClipboard('hello world');
+      expect(writeTextSpy).toHaveBeenCalledWith('hello world');
+    });
+
+    it('should return true on successful copy', async () => {
+      Object.defineProperty(global, 'navigator', {
+        value: { clipboard: { writeText: vi.fn(() => Promise.resolve(undefined)) } },
+        writable: true,
+        configurable: true,
+      });
+      const result = await copyToClipboard('content');
+      expect(result).toBe(true);
+    });
+
+    it('should return false and not throw when writeText rejects', async () => {
+      Object.defineProperty(global, 'navigator', {
+        value: {
+          clipboard: {
+            writeText: vi.fn(() => Promise.reject(new Error('Permission denied'))),
+          },
+        },
+        writable: true,
+        configurable: true,
+      });
+      await expect(async () => {
+        await copyToClipboard('text');
+      }).not.toThrow();
+      const result = await copyToClipboard('text');
+      expect(result).toBe(false);
+    });
+
+    it('should handle copy with empty string', async () => {
+      const writeTextSpy = vi.fn(() => Promise.resolve(undefined));
+      Object.defineProperty(global, 'navigator', {
+        value: { clipboard: { writeText: writeTextSpy } },
+        writable: true,
+        configurable: true,
+      });
+      const result = await copyToClipboard('');
+      expect(writeTextSpy).toHaveBeenCalledWith('');
+      expect(result).toBe(true);
+    });
+
+    it('should handle copy with special characters', async () => {
+      const writeTextSpy = vi.fn(() => Promise.resolve(undefined));
+      Object.defineProperty(global, 'navigator', {
+        value: { clipboard: { writeText: writeTextSpy } },
+        writable: true,
+        configurable: true,
+      });
+      const special = '测试\n换行\t制表符 & 特殊 <符号>';
+      const result = await copyToClipboard(special);
+      expect(writeTextSpy).toHaveBeenCalledWith(special);
+      expect(result).toBe(true);
+    });
+
+    it('should catch generic exceptions from clipboard API', async () => {
+      Object.defineProperty(global, 'navigator', {
+        value: {
+          get clipboard() {
+            throw new Error('Corrupted clipboard');
+          },
+        },
+        configurable: true,
+        writable: true,
+      });
+      const result = await copyToClipboard('text');
+      expect(result).toBe(false);
     });
   });
 });

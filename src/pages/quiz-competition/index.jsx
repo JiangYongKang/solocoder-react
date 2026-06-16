@@ -32,7 +32,11 @@ export default function QuizCompetition() {
   const [showNicknameModal, setShowNicknameModal] = useState(false)
   const [multiRoundData, setMultiRoundData] = useState(null)
   const [gameKey, setGameKey] = useState(0)
-  const [coins] = useState(() => loadCoins())
+  const [coins, setCoins] = useState(() => loadCoins())
+
+  const handleCoinsChange = (newCoins) => {
+    setCoins(newCoins)
+  }
 
   const handleStartGame = (multiRound = false) => {
     const ranking = loadRanking()
@@ -219,7 +223,9 @@ export default function QuizCompetition() {
 
       {view === VIEWS.RANKING && <Leaderboard />}
 
-      {view === VIEWS.SHOP && <ItemShop />}
+      {view === VIEWS.SHOP && (
+        <ItemShop coins={coins} onCoinsChange={handleCoinsChange} />
+      )}
 
       {showNicknameModal && (
         <div className="quiz-modal-overlay" onClick={() => setShowNicknameModal(false)}>

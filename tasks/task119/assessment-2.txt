@@ -1,0 +1,9 @@
+产物不满意：
+1. 模型在 index.jsx 的 swapPieces 函数中调用 countIncorrectAfterSwap 时传入了 stateRef.current.pieces（交换前的状态），但该函数命名为"交换后计数"，调用时机与函数名暗示的"交换后"语义不一致。虽然在此场景下必须在交换前调用才能得出正确的计步判断（交换后调用会导致越成功的交换越不计步），但模型在集成时没有添加任何注释说明这一命名与用法的矛盾，后续维护者可能因函数名误导而将调用移到 setPieces 回调内部造成计步逻辑错误。正确做法是在调用处添加简短注释说明该函数虽然名为 AfterSwap 但在此必须在交换前调用。
+2. 模型在 swapPieces 中新增了 shouldCount 变量接收 countIncorrectAfterSwap 的返回值，该函数返回 1 或 0 的数值而非布尔值，后续的 `if (shouldCount)` 依赖 JavaScript 的隐式类型转换进行 truthy/falsy 判断。这种写法虽然功能正确，但 shouldCount 这个布尔语义的变量名与实际存储的数值类型不匹配，可读性欠佳。正确做法是将赋值改为 `const shouldCount = countIncorrectAfterSwap(...) === 1`，使变量类型为明确的布尔值。
+
+过程不满意：
+1. 模型在首次运行 pnpm run test 发现 route-planner/routeUtils.test.js 测试失败后，没有先确认 puzzle-game 包自身的测试状态，而是直接投入大量精力修复 route-planner、package-manager、sticky-notes 三个非本任务包的测试和源码。从思考过程第 255 行至第 770 行，超过六成的工具调用都在处理其他包的代码，先后修改了 routeUtils.test.js、routeUtils.js、stickyNotesUtils.js 等文件。这种跨包操作违反了任务隔离原则，正确做法是先单独运行 puzzle-game 包的测试确认本包产物合格，其他包的测试失败属于既有项目问题，不应纳入本任务的修复范围。
+2. 模型在修复 route-planner 测试时表现出典型的试错式调试模式：第一次运行后发现 afterEach 未定义，添加导入后再运行又发现 vi 未导入，第三次运行又发现 global.navigator 只读报错，第四次运行遇到 Blob 构造函数报错，第五次遇到 mockImplementation 箭头函数无法用 new 调用，第六次又遇到 revokeObjectURL 异常测试失败。模型每遇到一个错误就做一次局部修补后重新运行全量测试，重复了六轮"运行失败修复"的循环，反映出模型在收到首次测试失败报告时没有通读完整终端输出、一次性列出所有失败项并制定系统性修复方案，而是采用逐错修补的低效策略。
+3. 模型为了通过 route-planner 测试中"revokeObjectURL 抛异常时 downloadJSON 仍应返回 true"的用例，直接修改了 routeUtils.js 中的生产函数 downloadJSON，将 `URL.revokeObjectURL(url)` 用独立的 try-catch 包裹以吞掉异常。这属于生产代码向测试妥协的典型行为，标注规范中明确要求"应调整测试方案而非改变生产代码的架构"。正确做法是评估该测试用例的合理性，如果 revokeObjectURL 在测试环境中抛异常是因为缺少浏览器 API 而非业务逻辑问题，应在测试层用 mock 消除异常，而非修改生产函数的异常吞噬边界。
+4. 模型在思考过程末尾声称"拼图游戏测试: 69/69 通过、全量测试: 10566/10566 通过"，但回看整个过程，模型没有执行过一次单独针对 puzzle-game 包的测试命令来独立验证本包产物，所有测试验证都混杂在全量测试中。正确做法是在完成 puzzle-game 包的所有修改后，先运行 `npx vitest run src/pages/__tests__/puzzle-game/` 独立确认本包 69 个测试全部通过，确保对本包产物的验证路径清晰、不受其他包干扰。

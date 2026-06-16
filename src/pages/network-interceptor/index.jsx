@@ -14,6 +14,7 @@ import {
   formatJson,
   minifyJson,
   isValidJson,
+  getJsonErrorLine,
   highlightJson,
   createMockTemplate,
   createLogEntry,
@@ -37,6 +38,58 @@ import {
   saveLogs,
 } from './storage'
 import './network-interceptor.css'
+
+function JsonEditorWithLineNumbers({
+  value,
+  onChange,
+  placeholder,
+  readOnly = false,
+}) {
+  const textareaRef = useRef(null)
+  const valid = isValidJson(value)
+  const errorLine = valid ? null : getJsonErrorLine(value)
+  const lineHeight = 19.5
+
+  const lines = useMemo(() => {
+    const content = value || ''
+    const count = content.split('\n').length
+    const minLines = 15
+    const total = Math.max(count, minLines)
+    return Array.from({ length: total }, (_, i) => i + 1)
+  }, [value])
+
+  return (
+    <div className={`ni-json-editor-wrapper ${!valid && value ? 'has-error' : ''}`}>
+      <div className="ni-json-line-numbers">
+        {lines.map((n) => (
+          <span
+            key={n}
+            className={`ni-json-line-number ${errorLine === n ? 'is-error-line' : ''}`}
+          >
+            {n}
+          </span>
+        ))}
+      </div>
+      <div className="ni-json-textarea-wrapper">
+        {errorLine && (
+          <div
+            className="ni-json-error-highlight"
+            style={{ top: `${(errorLine - 1) * lineHeight + 12}px` }}
+          />
+        )}
+        <textarea
+          ref={textareaRef}
+          className={`ni-json-textarea ${!valid && value ? 'has-error' : ''}`}
+          value={value}
+          onChange={(e) => onChange && onChange(e.target.value)}
+          placeholder={placeholder}
+          spellCheck={false}
+          readOnly={readOnly}
+        />
+      </div>
+    </div>
+  )
+}
 
 function Toast({ message, type }) {
   if (!message) return null
@@ -639,6 +692,12 @@ function NetworkInterceptorPage() {
     return sortLogsByTime(filtered, true)
   }, [logs, logFilterMethod, logFilterStatus, logFilterIntercepted])
 
+  useEffect(() => {
+    if (logContainerRef.current) {
+      logContainerRef.current.scrollTop = 0
+    }
+  }, [logs.length, filteredLogs.length])
+
   const handleAddRequestRule = () => {
     setEditingRequestRule(null)
     setShowRequestDialog(true)
@@ -1175,16 +1234,17 @@ function NetworkInterceptorPage() {
                     <button className="ni-btn ni-btn-sm" onClick={handleFormatMockOriginal}>格式化</button>
                     <button className="ni-btn ni-btn-sm" onClick={handleMinifyMockOriginal}>压缩</button>
                     {!originalValid && mockOriginal && (
-                      <span style={{ fontSize: 12, color: '#e74c3c' }}>JSON 错误</span>
+                      <span className="ni-json-error-message">
+                        JSON 错误（第 {getJsonErrorLine(mockOriginal)} 行）
+                      </span>
                     )}
                   </div>
                 </div>
-                <div className="ni-json-editor">
-                  <pre
-                    className="ni-json-highlight"
-                    dangerouslySetInnerHTML={{ __html: highlightJson(mockOriginal) }}
-                  />
-                </div>
+                <JsonEditorWithLineNumbers
+                  value={mockOriginal}
+                  onChange={setMockOriginal}
+                  placeholder="模拟服务器返回的原始 JSON..."
+                />
               </div>
 
               <div className="ni-mock-pane">
@@ -1201,19 +1261,17 @@ function NetworkInterceptorPage() {
                       保存模板
                     </button>
                     {!replacementValid && mockReplacement && (
-                      <span style={{ fontSize: 12, color: '#e74c3c' }}>JSON 错误</span>
+                      <span className="ni-json-error-message">
+                        JSON 错误（第 {getJsonErrorLine(mockReplacement)} 行）
+                      </span>
                     )}
                   </div>
                 </div>
-                <div className="ni-json-editor">
-                  <textarea
-                    className={`ni-json-textarea ${!replacementValid && mockReplacement ? 'has-error' : ''}`}
-                    value={mockReplacement}
-                    onChange={(e) => setMockReplacement(e.target.value)}
-                    placeholder="在此输入要替换的 JSON 数据..."
-                    spellCheck={false}
-                  />
-                </div>
+                <JsonEditorWithLineNumbers
+                  value={mockReplacement}
+                  onChange={setMockReplacement}
+                  placeholder="在此输入要替换的 JSON 数据..."
+                />
               </div>
             </div>
 

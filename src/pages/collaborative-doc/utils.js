@@ -206,8 +206,154 @@ export function addRevision(data, paragraphId, type, text, start, end, userId) {
     createdAt: Date.now(),
     accepted: false,
     rejected: false,
+    format: null,
   }
   return { ...data, revisions: [...data.revisions, revision] }
+}
+
+export function addFormatRevision(data, paragraphId, text, start, end, format, userId) {
+  const revision = {
+    id: generateId('rev'),
+    paragraphId,
+    type: REVISION_TYPE.FORMAT,
+    text,
+    start,
+    end,
+    userId,
+    createdAt: Date.now(),
+    accepted: false,
+    rejected: false,
+    format,
+  }
+  return { ...data, revisions: [...data.revisions, revision] }
+}
+
+export function detectContentChanges(oldText, newText) {
+  const changes = []
+
+  if (oldText === newText) {
+    return changes
+  }
+
+  const oldChars = [...oldText]
+  const newChars = [...newText]
+
+  let i = 0
+  let j = 0
+
+  while (i < oldChars.length || j < newChars.length) {
+    if (i < oldChars.length && j < newChars.length && oldChars[i] === newChars[j]) {
+      i++
+      j++
+      continue
+    }
+
+    let foundMatch = false
+
+    for (let lookahead = 1; lookahead < Math.min(oldChars.length - i, newChars.length - j) + 5; lookahead++) {
+      if (i + lookahead < oldChars.length && oldChars[i + lookahead] === newChars[j]) {
+        const delText = oldChars.slice(i, i + lookahead).join('')
+        changes.push({
+          type: 'delete',
+          text: delText,
+          start: i,
+          end: i + lookahead,
+        })
+        i += lookahead
+        foundMatch = true
+        break
+      }
+      if (j + lookahead < newChars.length && newChars[j + lookahead] === oldChars[i]) {
+        const addText = newChars.slice(j, j + lookahead).join('')
+        changes.push({
+          type: 'add',
+          text: addText,
+          start: j,
+          end: j + lookahead,
+        })
+        j += lookahead
+        foundMatch = true
+        break
+      }
+    }
+
+    if (foundMatch) continue
+
+    if (i < oldChars.length && j < newChars.length) {
+      const delText = oldChars[i]
+      const addText = newChars[j]
+      changes.push({
+        type: 'delete',
+        text: delText,
+        start: i,
+        end: i + 1,
+      })
+      changes.push({
+        type: 'add',
+        text: addText,
+        start: j,
+        end: j + 1,
+      })
+      i++
+      j++
+    } else if (i < oldChars.length) {
+      const remaining = oldChars.slice(i).join('')
+      changes.push({
+        type: 'delete',
+        text: remaining,
+        start: i,
+        end: oldChars.length,
+      })
+      break
+    } else if (j < newChars.length) {
+      const remaining = newChars.slice(j).join('')
+      changes.push({
+        type: 'add',
+        text: remaining,
+        start: j,
+        end: newChars.length,
+      })
+      break
+    }
+  }
+
+  const mergedChanges = []
+  for (const change of changes) {
+    const last = mergedChanges[mergedChanges.length - 1]
+    if (last && last.type === change.type && last.end === change.start) {
+      last.text += change.text
+      last.end = change.end
+    } else {
+      mergedChanges.push({ ...change })
+    }
+  }
+
+  return mergedChanges
+}
+
+export function processContentChangeWithRevision(data, paragraphId, oldContent, newContent, userId) {
+  if (!data.revisionMode) {
+    return updateParagraphContent(data, paragraphId, newContent, userId)
+  }
+
+  const changes = detectContentChanges(oldContent, newContent)
+
+  let result = data
+
+  for (const change of changes) {
+    const revType = change.type === 'add' ? REVISION_TYPE.ADD : REVISION_TYPE.DELETE
+    result = addRevision(
+      result,
+      paragraphId,
+      revType,
+      change.text,
+      change.start,
+      change.end,
+      userId
+    )
+  }
+
+  return updateParagraphContent(result, paragraphId, newContent, userId)
 }
 
 export function getRevisionsByParagraph(data, paragraphId) {
@@ -478,5 +624,160 @@ export function simulateCollaboratorEdit(data, userId) {
   } else {
     newContent = paragraph.content.slice(0, position) + randomText + paragraph.content.slice(position)
   }
-  return updateParagraphContent(data, paragraph.id, newContent, userId)
+  return processContentChangeWithRevision(data, paragraph.id, paragraph.content, newContent, userId)
+}
+
+export function applyFormatToSelection(data, paragraphId, text, start, end, format, userId) {
+  return addFormatRevision(data, paragraphId, text, start, end, format, userId)
+}
+
+export const FORMAT_TYPE = {
+  BOLD: 'bold',
+  ITALIC: 'italic',
+  UNDERLINE: 'underline',
+  STRIKETHROUGH: 'strikethrough',
+}
+
+export function renderContentWithRevisions(content, revisions, data) {
+  if (!revisions || revisions.length === 0) {
+    return [{ type: 'text', value: content }]
+  }
+
+  const sortedRevisions = [...revisions].sort((a, b) => {
+    if (a.start !== b.start) return a.start - b.start
+    return a.end - b.end
+  })
+
+  const segments = []
+  let currentPos = 0
+
+  for (const rev of sortedRevisions) {
+    if (rev.start > currentPos) {
+      segments.push({
+        type: 'text',
+        value: content.slice(currentPos, rev.start),
+      })
+    }
+
+    const author = getCollaboratorById(data, rev.userId)
+    const segmentValue = rev.type === REVISION_TYPE.DELETE
+      ? rev.text
+      : content.slice(rev.start, rev.end)
+
+    segments.push({
+      type: 'revision',
+      revision: rev,
+      value: segmentValue,
+      author: author,
+    })
+
+    currentPos = rev.end
+  }
+
+  if (currentPos < content.length) {
+    segments.push({
+      type: 'text',
+      value: content.slice(currentPos),
+    })
+  }
+
+  return segments
+}
+
+export function getCharOffsetPosition(element, offset) {
+  if (!element || offset < 0) return { x: 0, y: 0 }
+
+  const range = document.createRange()
+  const textNode = element.firstChild
+
+  if (!textNode) {
+    const rect = element.getBoundingClientRect()
+    return { x: rect.left, y: rect.top }
+  }
+
+  try {
+    const maxOffset = textNode.textContent?.length || 0
+    const safeOffset = Math.min(offset, maxOffset)
+
+    if (safeOffset === 0) {
+      range.setStart(textNode, 0)
+      range.setEnd(textNode, 0)
+    } else {
+      range.setStart(textNode, Math.max(0, safeOffset - 1))
+      range.setEnd(textNode, safeOffset)
+    }
+
+    const rect = range.getBoundingClientRect()
+    const containerRect = element.getBoundingClientRect()
+
+    return {
+      x: rect.left - containerRect.left,
+      y: rect.top - containerRect.top,
+    }
+  } catch {
+    const rect = element.getBoundingClientRect()
+    return { x: 0, y: 0 }
+  }
+}
+
+export function getSelectionFromDocument(editorContainer) {
+  if (!editorContainer || typeof window === 'undefined') {
+    return null
+  }
+
+  const selection = window.getSelection()
+  if (!selection || selection.isCollapsed || selection.rangeCount === 0) {
+    return null
+  }
+
+  const range = selection.getRangeAt(0)
+  if (!editorContainer.contains(range.commonAncestorContainer)) {
+    return null
+  }
+
+  const paragraphEl = range.commonAncestorContainer.closest?.('[data-paragraph-id]')
+  if (!paragraphEl) return null
+
+  const paragraphId = paragraphEl.getAttribute('data-paragraph-id')
+  const text = selection.toString().trim()
+
+  if (!text) return null
+
+  const paragraphText = paragraphEl.textContent || ''
+  const startOffset = paragraphText.indexOf(text)
+  const endOffset = startOffset >= 0 ? startOffset + text.length : -1
+
+  if (startOffset < 0) return null
+
+  return {
+    paragraphId,
+    text,
+    start: startOffset,
+    end: endOffset,
+  }
+}
+
+export function formatTextWithTags(text, format) {
+  switch (format) {
+    case FORMAT_TYPE.BOLD:
+      return `**${text}**`
+    case FORMAT_TYPE.ITALIC:
+      return `*${text}*`
+    case FORMAT_TYPE.UNDERLINE:
+      return `<u>${text}</u>`
+    case FORMAT_TYPE.STRIKETHROUGH:
+      return `~~${text}~~`
+    default:
+      return text
+  }
+}
+
+export function applyFormatToContent(content, start, end, format) {
+  if (start < 0 || end > content.length || start >= end) {
+    return content
+  }
+  const before = content.slice(0, start)
+  const selected = content.slice(start, end)
+  const after = content.slice(end)
+  return before + formatTextWithTags(selected, format) + after
 }

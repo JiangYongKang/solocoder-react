@@ -8,8 +8,8 @@ import {
   ITEM_INFO,
 } from './quizCore'
 
-export default function ItemShop() {
-  const [coins, setCoins] = useState(() => loadCoins())
+export default function ItemShop({ coins: coinsProp, onCoinsChange }) {
+  const [coins, setCoins] = useState(() => coinsProp ?? loadCoins())
   const [inventory, setInventory] = useState(() => loadInventory())
   const [message, setMessage] = useState('')
 
@@ -20,6 +20,7 @@ export default function ItemShop() {
       setInventory(result.inventory)
       saveCoins(result.coins)
       saveInventory(result.inventory)
+      onCoinsChange?.(result.coins)
       setMessage(`成功购买 ${ITEM_INFO[itemType].name}！`)
       setTimeout(() => setMessage(''), 2000)
     } else {

@@ -38,6 +38,8 @@ import {
   hasConfirmButton,
   hasCancelButton,
   hasFormFields,
+  highlightSyntax,
+  hasButtonColor,
 } from '../../modal-generator/modalGeneratorCore'
 
 describe('MODAL_TYPES', () => {
@@ -170,7 +172,7 @@ describe('createConfigByType', () => {
     const config = createConfigByType(MODAL_TYPES.FORM)
     expect(config.type).toBe(MODAL_TYPES.FORM)
     expect(config.title).toBe('表单弹窗')
-    expect(config.content).toBe('')
+    expect(config.content).toBe('请填写以下信息：')
     expect(Array.isArray(config.formFields)).toBe(true)
     expect(config.formFields).toHaveLength(DEFAULT_FORM_FIELDS)
   })
@@ -596,5 +598,150 @@ describe('hasFormFields', () => {
 
   it('should return false for info type', () => {
     expect(hasFormFields(MODAL_TYPES.INFO)).toBe(false)
+  })
+})
+
+describe('hasButtonColor', () => {
+  it('should return true for confirm type', () => {
+    expect(hasButtonColor(MODAL_TYPES.CONFIRM)).toBe(true)
+  })
+
+  it('should return true for alert type', () => {
+    expect(hasButtonColor(MODAL_TYPES.ALERT)).toBe(true)
+  })
+
+  it('should return true for form type', () => {
+    expect(hasButtonColor(MODAL_TYPES.FORM)).toBe(true)
+  })
+
+  it('should return false for info type', () => {
+    expect(hasButtonColor(MODAL_TYPES.INFO)).toBe(false)
+  })
+})
+
+describe('generateCallCode - info type color fields', () => {
+  it('should not include confirmColor for info type', () => {
+    const config = {
+      type: MODAL_TYPES.INFO,
+      title: '提示',
+      content: '内容',
+      confirmColor: '#ff0000',
+      cancelColor: '#00ff00',
+    }
+    const code = generateCallCode(config)
+    expect(code).not.toContain('confirmColor')
+    expect(code).not.toContain('cancelColor')
+  })
+
+  it('should include confirmColor and cancelColor for confirm type', () => {
+    const config = {
+      type: MODAL_TYPES.CONFIRM,
+      confirmColor: '#ff0000',
+      cancelColor: '#00ff00',
+    }
+    const code = generateCallCode(config)
+    expect(code).toContain('confirmColor')
+    expect(code).toContain('cancelColor')
+  })
+
+  it('should include confirmColor but not cancelColor for alert type', () => {
+    const config = {
+      type: MODAL_TYPES.ALERT,
+      confirmColor: '#ff0000',
+      cancelColor: '#00ff00',
+    }
+    const code = generateCallCode(config)
+    expect(code).toContain('confirmColor')
+    expect(code).not.toContain('cancelColor')
+  })
+})
+
+describe('highlightSyntax', () => {
+  it('should return empty array for empty input', () => {
+    expect(highlightSyntax('')).toEqual([])
+    expect(highlightSyntax(null)).toEqual([])
+    expect(highlightSyntax(undefined)).toEqual([])
+  })
+
+  it('should tokenize strings', () => {
+    const tokens = highlightSyntax("'hello'")
+    const stringTokens = tokens.filter((t) => t.type === 'string')
+    expect(stringTokens.length).toBeGreaterThan(0)
+    expect(stringTokens[0].value).toBe("'hello'")
+  })
+
+  it('should tokenize double-quoted strings', () => {
+    const tokens = highlightSyntax('"world"')
+    const stringTokens = tokens.filter((t) => t.type === 'string')
+    expect(stringTokens.length).toBeGreaterThan(0)
+    expect(stringTokens[0].value).toBe('"world"')
+  })
+
+  it('should tokenize numbers', () => {
+    const tokens = highlightSyntax('42')
+    const numberTokens = tokens.filter((t) => t.type === 'number')
+    expect(numberTokens.length).toBeGreaterThan(0)
+    expect(numberTokens[0].value).toBe('42')
+  })
+
+  it('should tokenize decimal numbers', () => {
+    const tokens = highlightSyntax('3.14')
+    const numberTokens = tokens.filter((t) => t.type === 'number')
+    expect(numberTokens.length).toBeGreaterThan(0)
+    expect(numberTokens[0].value).toBe('3.14')
+  })
+
+  it('should tokenize keywords (true/false/null/undefined)', () => {
+    const tokens = highlightSyntax('true')
+    const keywordTokens = tokens.filter((t) => t.type === 'keyword')
+    expect(keywordTokens.length).toBeGreaterThan(0)
+    expect(keywordTokens[0].value).toBe('true')
+  })
+
+  it('should tokenize false as keyword', () => {
+    const tokens = highlightSyntax('false')
+    const keywordTokens = tokens.filter((t) => t.type === 'keyword')
+    expect(keywordTokens.length).toBeGreaterThan(0)
+  })
+
+  it('should tokenize property names followed by colon', () => {
+    const tokens = highlightSyntax('name:')
+    const propTokens = tokens.filter((t) => t.type === 'property')
+    expect(propTokens.length).toBeGreaterThan(0)
+    expect(propTokens[0].value).toBe('name')
+  })
+
+  it('should tokenize function call (capitalized identifier)', () => {
+    const tokens = highlightSyntax('OpenModal')
+    const funcTokens = tokens.filter((t) => t.type === 'function')
+    expect(funcTokens.length).toBeGreaterThan(0)
+  })
+
+  it('should tokenize punctuation', () => {
+    const tokens = highlightSyntax('{}')
+    const punctTokens = tokens.filter((t) => t.type === 'punctuation')
+    expect(punctTokens.length).toBeGreaterThan(0)
+  })
+
+  it('should handle strings with escaped quotes', () => {
+    const tokens = highlightSyntax("'it\\'s'")
+    const stringTokens = tokens.filter((t) => t.type === 'string')
+    expect(stringTokens.length).toBeGreaterThan(0)
+  })
+
+  it('should produce tokens that can reconstruct the original code', () => {
+    const code = "openModal({ title: 'Hello', count: 42 })"
+    const tokens = highlightSyntax(code)
+    const reconstructed = tokens.map((t) => t.value).join('')
+    expect(reconstructed).toBe(code)
+  })
+})
+
+describe('createConfigByType - form type content', () => {
+  it('should have default content for form type', () => {
+    const config = createConfigByType(MODAL_TYPES.FORM)
+    expect(config.content).toBeTruthy()
+    expect(typeof config.content).toBe('string')
+    expect(config.content.length).toBeGreaterThan(0)
   })
 })

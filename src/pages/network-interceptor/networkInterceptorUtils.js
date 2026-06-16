@@ -136,7 +136,15 @@ export function createResponseRule(name = '', urlPattern = '', mockBody = '') {
 
 export function sortRulesByPriority(rules) {
   if (!Array.isArray(rules)) return []
-  return [...rules]
+  return [...rules].sort((a, b) => {
+    if (a.enabled !== b.enabled) {
+      return a.enabled ? -1 : 1
+    }
+    if (typeof a.priority === 'number' && typeof b.priority === 'number') {
+      return a.priority - b.priority
+    }
+    return 0
+  })
 }
 
 export function moveRule(rules, fromIndex, toIndex) {
@@ -196,10 +204,19 @@ export function getJsonErrorLine(jsonString) {
     JSON.parse(jsonString)
     return null
   } catch (e) {
-    const match = e.message?.match(/line (\d+)/i)
-    if (match) {
-      return parseInt(match[1], 10)
+    const lineMatch = e.message?.match(/line (\d+)/i)
+    if (lineMatch) {
+      return parseInt(lineMatch[1], 10)
     }
+
+    const positionMatch = e.message?.match(/position (\d+)/i)
+    if (positionMatch) {
+      const position = parseInt(positionMatch[1], 10)
+      const uptoError = jsonString.substring(0, position)
+      const lines = uptoError.split('\n').length
+      return lines || 1
+    }
+
     return 1
   }
 }

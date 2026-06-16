@@ -21,6 +21,7 @@ import {
   isPuzzleComplete,
   calculateScore,
   formatTime,
+  countIncorrectAfterSwap,
   loadLeaderboard,
   addToLeaderboard,
   getLeaderboardByDifficulty,
@@ -212,6 +213,7 @@ function PuzzleGamePage() {
 
   const swapPieces = useCallback((posA, posB) => {
     if (posA === posB) return
+    const shouldCount = countIncorrectAfterSwap(stateRef.current.pieces, posA, posB)
     setPieces((prev) => {
       const next = [...prev]
       ;[next[posA], next[posB]] = [next[posB], next[posA]]
@@ -226,7 +228,9 @@ function PuzzleGamePage() {
       setHasStarted(true)
       setTimerActive(true)
     }
-    setMoves((m) => m + 1)
+    if (shouldCount) {
+      setMoves((m) => m + 1)
+    }
     setSelectedPiece(null)
     setDragState(null)
   }, [handlePuzzleComplete])
@@ -619,22 +623,8 @@ function PuzzleGamePage() {
                 />
 
                 {phase === GAME_PHASE.PAUSED && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      background: 'rgba(0,0,0,0.5)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      borderRadius: 8,
-                      zIndex: 10,
-                    }}
-                  >
-                    <div style={{ color: '#fff', fontSize: 28, fontWeight: 700 }}>暂停中</div>
+                  <div className="puzzle-pause-overlay">
+                    <div className="puzzle-pause-text">暂停中</div>
                   </div>
                 )}
 

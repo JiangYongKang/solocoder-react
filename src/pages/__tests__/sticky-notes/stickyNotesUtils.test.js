@@ -9,6 +9,9 @@ import {
   isExpired,
   shouldTriggerReminder,
   markReminderTriggered,
+  markReminderDismissed,
+  clearReminder,
+  setReminder,
   filterByTags,
   searchNotes,
   filterExpiredNotes,
@@ -46,6 +49,7 @@ import {
   TRASH_RETENTION_DAYS,
   REMINDER_STATUS_PENDING,
   REMINDER_STATUS_TRIGGERED,
+  REMINDER_STATUS_DISMISSED,
   VIEW_GRID,
   VIEW_LIST,
   STORAGE_KEY_NOTES,
@@ -235,6 +239,12 @@ describe('stickyNotesUtils', () => {
       expect(shouldTriggerReminder(note)).toBe(false)
     })
 
+    it('should return false when dismissed', () => {
+      const past = Date.now() - 1000
+      const note = makeNote({ reminderAt: past, reminderStatus: REMINDER_STATUS_DISMISSED })
+      expect(shouldTriggerReminder(note)).toBe(false)
+    })
+
     it('should return false when no reminder set', () => {
       const note = makeNote()
       expect(shouldTriggerReminder(note)).toBe(false)
@@ -261,6 +271,43 @@ describe('stickyNotesUtils', () => {
       const result = markReminderTriggered([note1, note2], 'n1')
       expect(result[0].reminderStatus).toBe(REMINDER_STATUS_TRIGGERED)
       expect(result[1].reminderStatus).toBe(REMINDER_STATUS_PENDING)
+    })
+  })
+
+  describe('markReminderDismissed', () => {
+    it('should mark reminder as dismissed', () => {
+      const note1 = makeNote({ id: 'n1', reminderStatus: REMINDER_STATUS_TRIGGERED })
+      const note2 = makeNote({ id: 'n2', reminderStatus: REMINDER_STATUS_TRIGGERED })
+      const result = markReminderDismissed([note1, note2], 'n1')
+      expect(result[0].reminderStatus).toBe(REMINDER_STATUS_DISMISSED)
+      expect(result[1].reminderStatus).toBe(REMINDER_STATUS_TRIGGERED)
+    })
+  })
+
+  describe('clearReminder', () => {
+    it('should clear reminder and reset status to pending', () => {
+      const reminderAt = Date.now() + 1000
+      const note = makeNote({ id: 'n1', reminderAt, reminderStatus: REMINDER_STATUS_TRIGGERED })
+      const result = clearReminder([note], 'n1')
+      expect(result[0].reminderAt).toBeNull()
+      expect(result[0].reminderStatus).toBe(REMINDER_STATUS_PENDING)
+    })
+  })
+
+  describe('setReminder', () => {
+    it('should set reminder and set status to pending', () => {
+      const reminderAt = Date.now() + 1000
+      const note = makeNote({ id: 'n1' })
+      const result = setReminder([note], 'n1', reminderAt)
+      expect(result[0].reminderAt).toBe(reminderAt)
+      expect(result[0].reminderStatus).toBe(REMINDER_STATUS_PENDING)
+    })
+
+    it('should reset to pending when reminderAt is null', () => {
+      const note = makeNote({ id: 'n1', reminderStatus: REMINDER_STATUS_TRIGGERED })
+      const result = setReminder([note], 'n1', null)
+      expect(result[0].reminderAt).toBeNull()
+      expect(result[0].reminderStatus).toBe(REMINDER_STATUS_PENDING)
     })
   })
 
@@ -495,14 +542,46 @@ describe('stickyNotesUtils', () => {
   })
 
   describe('moveNoteById', () => {
-    it('should move note by id', () => {
+    it('should move note right by id (adjusting for self-occupation)', () => {
       const notes = [
         makeNote({ id: 'n1', order: 0 }),
         makeNote({ id: 'n2', order: 1 }),
         makeNote({ id: 'n3', order: 2 }),
       ]
       const result = moveNoteById(notes, 'n1', 2)
-      expect(result.map(n => n.id)).toEqual(['n2', 'n3', 'n1'])
+      expect(result.map(n => n.id)).toEqual(['n2', 'n1', 'n3'])
+    })
+
+    it('should move note left by id', () => {
+      const notes = [
+        makeNote({ id: 'n1', order: 0 }),
+        makeNote({ id: 'n2', order: 1 }),
+        makeNote({ id: 'n3', order: 2 }),
+      ]
+      const result = moveNoteById(notes, 'n3', 0)
+      expect(result.map(n => n.id)).toEqual(['n3', 'n1', 'n2'])
+    })
+
+    it('should move note from middle to right', () => {
+      const notes = [
+        makeNote({ id: 'n1', order: 0 }),
+        makeNote({ id: 'n2', order: 1 }),
+        makeNote({ id: 'n3', order: 2 }),
+        makeNote({ id: 'n4', order: 3 }),
+      ]
+      const result = moveNoteById(notes, 'n2', 3)
+      expect(result.map(n => n.id)).toEqual(['n1', 'n3', 'n2', 'n4'])
+    })
+
+    it('should move note from middle to left', () => {
+      const notes = [
+        makeNote({ id: 'n1', order: 0 }),
+        makeNote({ id: 'n2', order: 1 }),
+        makeNote({ id: 'n3', order: 2 }),
+        makeNote({ id: 'n4', order: 3 }),
+      ]
+      const result = moveNoteById(notes, 'n3', 1)
+      expect(result.map(n => n.id)).toEqual(['n1', 'n3', 'n2', 'n4'])
     })
 
     it('should return original if note not found', () => {

@@ -113,7 +113,7 @@ export default function DependencyTree({
     return result
   }, [filteredDeps, expandedNodes])
 
-  const directDepsCount = dependencies.length
+  const directDepsCount = flatRows.filter((d) => d.depth === 0).length
   const totalDepsCount = flatRows.length
   const upgradableCount = flatRows.filter((d) =>
     hasNewerVersion(d.installedVersion || d.version, d.latestVersion)

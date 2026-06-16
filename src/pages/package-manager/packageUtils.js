@@ -247,7 +247,7 @@ export function buildGraphNodes(deps) {
         })
       }
       if (parentName) {
-        edges.push({ source: parentName, target: key })
+        edges.push({ source: key, target: parentName })
       }
       if (dep.dependencies) {
         walk(dep.dependencies, key, false)

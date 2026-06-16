@@ -80,6 +80,12 @@ import MenuDesignerPage from '@/pages/menu-designer/index.jsx'
 import EventDebuggerPage from '@/pages/event-debugger/index.jsx'
 import LinkGamePage from '@/pages/link-game/index.jsx'
 import TimeTrackerPage from '@/pages/time-tracker/index.jsx'
+import PerformanceMonitorPage from '@/pages/performance-monitor/index.jsx'
+import TicTacToePage from '@/pages/tic-tac-toe/index.jsx'
+import SvgPathEditorPage from '@/pages/svg-path-editor/index.jsx'
+import InventoryPage from '@/pages/inventory/index.jsx'
+import IdiomChainPage from '@/pages/idiom-chain/index.jsx'
+import ExamGradingPage from '@/pages/exam-grading/index.jsx'
 
 const TASKS = [
     { id: 1, title: '用户认证系统', route: 'auth', description: '登录、注册、找回密码、修改密码完整的认证流程，基于 localStorage 存储。' },
@@ -158,6 +164,11 @@ const TASKS = [
     { id: 75, title: '连连看游戏', route: 'link-game', description: '经典连连看消除游戏，多难度网格配置、两拐弯BFS路径判定、消除动画连线、计时步数、提示与重排功能、localStorage排行榜持久化。' },
     { id: 74, title: '工时统计', route: 'time-tracker', description: '团队/个人工时记录与统计工具，支持计时器追踪、手动登记、按项目日期汇总、柱状图统计、预算进度对比、CSV导出，基于 localStorage 持久化。' },
     { id: 74, title: '待办清单', route: 'todo-list', description: '个人待办任务管理工具，支持任务分组、子任务层级管理、拖拽排序、多维筛选、过期提醒和连续打卡统计，基于 localStorage 持久化。' },
+    { id: 79, title: '性能监控面板', route: 'performance-monitor', description: '前端性能监控仪表盘，实时FPS/内存/CPU仪表盘、页面加载瀑布图、资源大小树图、告警规则配置与告警历史，所有数据会话内模拟不持久化。' },
+    { id: 80, title: 'SVG 路径编辑器', route: 'svg-path-editor', description: '可视化 SVG 路径编辑工具，支持贝塞尔曲线控制点拖拽、路径命令面板编辑、节点增删、填充描边样式设置、多路径管理与 SVG 代码导出。' },
+    { id: 81, title: '仓库库存管理', route: 'inventory', description: '多仓库 SKU 出入库管理、库存预警、批次效期追踪、仓库调拨、盘点核对与库存趋势可视化，基于 localStorage 持久化。' },
+    { id: 82, title: '成语接龙游戏', route: 'idiom-chain', description: '人机对战的成语接龙游戏，内置500+条成语词库，三难度选择、AI智能回应、计时计分、提示功能、连胜纪录持久化，所有状态前端维护。' },
+    { id: 83, title: '考试阅卷系统', route: 'exam-grading', description: '在线考试阅卷工具，逐题评阅学生答卷，支持选择题自动判分、简答题手动评分与评语、阅卷进度追踪、复查抽查标记、成绩批量导出CSV。' },
 ]
 
 function HomePage() {
@@ -271,6 +282,12 @@ function App() {
             <Route path="/event-debugger" element={<EventDebuggerPage />} />
             <Route path="/link-game" element={<LinkGamePage />} />
             <Route path="/time-tracker" element={<TimeTrackerPage />} />
+            <Route path="/performance-monitor" element={<PerformanceMonitorPage />} />
+            <Route path="/tic-tac-toe" element={<TicTacToePage />} />
+            <Route path="/svg-path-editor" element={<SvgPathEditorPage />} />
+            <Route path="/inventory" element={<InventoryPage />} />
+            <Route path="/idiom-chain" element={<IdiomChainPage />} />
+            <Route path="/exam-grading" element={<ExamGradingPage />} />
         </Routes>
     )
 }

@@ -1,0 +1,19 @@
+产物不满意：
+1. index.jsx 中第75行到第104行的倒计时 useEffect 内部调用了 handleGameOver 函数，但该 useEffect 的依赖数组只包含 `[gameStatus]`，未将 handleGameOver 列入依赖，违反 React Hooks 的 exhaustive-deps 规则。当 gameStatus 从 IDLE 切换到 PLAYING 时，effect 创建并捕获了当时的 handleGameOver 闭包引用，之后 humanScore 和 aiScore 的变化虽然导致 handleGameOver 通过 useCallback 重新创建，但 effect 不会重新运行，timer 回调中仍使用旧的 handleGameOver。触发时机是用户在游戏进行中得分后超时，实际行为是超时判负时调用 determineWinner 使用的是过期的分数值，导致胜负判定结果与实际最终分数不一致。原因是 handleGameOver 在两种不同的执行上下文中被调用（timer setTimeout 和手动提交中的 AI 回应超时），但 React 状态更新是异步的，闭包中捕获的分数值未同步更新。正确做法是将 handleGameOver 中需要最新值的 humanScore 和 aiScore 改用 useRef 存储，或者使用函数式 setState 配合最新的 score 值传入 handleGameOver。
+
+2. AI 思考状态的展示文案与提示词要求不符。index.jsx 第484行 render 中显示的是 `AI正在思考`，而提示词第2条明确要求显示 `"AI 思考中..."`。文案缺少了空格分隔和中文省略号，与需求描述不一致。虽然不影响功能，但属于未能严格遵循提示词中的字面规格。
+
+3. constants.js 第68行定义了 `WIN_STREAK_BONUS` 常量值为 5，但该常量在整个 idiom-chain 包中从未被任何文件导入或使用。index.jsx 的 handleGameOver 函数中调用 updateStreakRecord 更新连胜纪录时，仅记录了连胜场数和总场次的变化，没有将 WIN_STREAK_BONUS 作为连胜奖励加到玩家得分中。提示词第6条要求"连胜纪录持久化到 localStorage——记录当前连胜场数、最高连胜场数、总对战场次"，虽然没有明确要求连胜加分，但定义了这个常量却不使用，说明模型在规划常量和功能之间的映射时出现了遗漏，产物中存在"死代码"残留。
+
+4. CSS 文件 idiomChain.css 第251行到第459行的 dots 动画使用了 `@keyframes dots` 通过修改伪元素的 `content` 属性来实现省略号动画效果（`.` `..` `...`），但 `content` 属性在 CSS 规范中不属于可动画属性，主流浏览器对该属性的动画支持存在差异。当用户在非 Chromium 内核的浏览器（如 Firefox）中打开页面时，"AI正在思考"文字后的省略号动画可能完全静止不显示。正确做法是使用 JavaScript 定时器控制点号数量，或者使用多个 span 元素配合 opacity 动画实现逐点出现的视觉效果。
+
+5. 虽然不是严重问题，但困难难度配置 wordCount 为 800 条（constants.js 第21行），而 idiomData.js 实际只包含约 551 条成语。当用户选择困难难度时，由于 getDifficultyIdiomList 函数的 slice 逻辑最多只能取出实际存在的 551 条成语，实际上困难模式和中等模式（500条）的词库几乎相同，三个难度之间的词库区分度被严重削弱。
+
+过程不满意：
+1. 模型在思考过程中频繁使用子代理（subagent）并行创建 CSS、测试文件和页面组件，但由于主代理和子代理之间对 className 命名规范没有预先约定，导致 CSS 子代理使用无前缀的语义化类名（如 `.idiom-card`、`.game-header`），而 JSX 子代理使用了 `ic-` 前缀的类名（如 `.ic-card`、`.ic-header`）。主代理在第1094行检查文件时发现"className 使用 ic- 前缀，但 CSS 文件可能用的是不同的类名"，不得已在第1119行完全重写了 index.jsx 以匹配 CSS 类名。这种并行开发但缺乏接口约定的工作方式浪费了约一轮的开发时间。正确做法是在并行启动子代理前，先定义好统一的 className 命名规范作为各子代理的共同契约，或者由主代理先完成一个组件的骨架模板，子代理在此基础上填充具体内容。
+
+2. 模型在测试出现两个用例失败后（第967行），没有分析产品代码中 calculateScore 函数的逻辑是否正确，而是直接调整了测试用例的预期值来匹配代码的现有行为。具体表现是：HINT_PENALTY 测试中 `BASE_SCORE(10) - HINT_PENALTY(15) = -5` 但代码有 `Math.max(0, score)` 保护，模型选择修改测试预期为 0 而非确认产品代码的保底逻辑是否合理；混合 chain 测试中模型直接改 chain 数据让最后三条都以"心"结尾来凑出连续 3 次的场景。这属于典型的"测试向代码妥协"行为，虽然最终 75 个测试全部通过，但测试失去了对产品代码逻辑的独立验证能力。
+
+3. 模型在整个会话过程中创建和更新了约 8 到 9 次 TodoList（分别出现在第4行、第82行、第144行、第260行、第466行、第570行、第728行、第894行、第1066行），每次 TodoList 的项目数量和粒度都不同，从最初的 6 项到后来的 8 项又变回 2 项。频繁重置 TodoList 说明模型在任务规划阶段缺乏整体思考，采用"做一步算一步"的方式推进，而非在收到提示词后先系统性分析需求再制定一份稳定的执行计划。
+
+4. 模型在运行测试命令时出现了参数使用错误：第1246行使用了 `pnpm test -- --run src/pages/__tests__/idiom-chain/`，`--run` 和后面的文件路径被 vitest 解析为未知选项导致失败；之后第1264行改用 `pnpm vitest run src/pages/__tests__/idiom-chain/` 才成功。在同一会话更早的阶段（第376行），模型还使用过 `npx eslint src/pages/idiom-chain/idiomCore.js src/pages/idiom-chain/constants.js undefined`，命令末尾的 `undefined` 是上一个工具调用的残留参数。两次工具调用中的参数错误说明模型在拼接命令字符串时缺乏校验，将变量占位符直接拼入了命令行。

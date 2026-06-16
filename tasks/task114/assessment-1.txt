@@ -1,0 +1,9 @@
+产物不满意：
+1. buildGraphNodes 函数中依赖关系图边的方向与需求第四条语义相反。walk 函数在遍历子依赖时通过 `edges.push({ source: parentName, target: key })` 构建边，边的方向是父节点指向子节点。但需求明确要求"节点之间的有向箭头连线表示依赖关系（被依赖方指向依赖方）"，即子依赖应指向父依赖。当前实现让箭头从父指向子，用户看到的依赖流向与实际语义完全颠倒，会导致对"谁依赖谁"的理解产生混淆。正确做法是将边的 source 设为子依赖节点 key，target 设为父依赖节点 parentName。
+2. Lock Diff 视图仅覆盖生产依赖的版本对比，遗漏了 devDependencies。LockDiff 组件在 index.jsx 中接收的 upgradedDependencies 参数是 upgradedDepsPreview，它通过 `applyUpgrades(dependencies, allUpgradedDeps)` 仅对生产依赖计算升级结果，开发依赖完全没有参与对比构建。当用户在 devDependencies 标签页选中了 eslint、vite 等包并标记升级后，切换到 Lock Diff 视图时这些开发依赖的版本变更完全不会出现在左右对比面板中，变更统计也为零。正确做法是在构建升级预览数据时应将 dependencies 和 devDependencies 合并后一起传入，使 Lock Diff 能覆盖全部依赖类型的变更。
+3. DependencyTree.jsx 中的统计数字存在计算口径不一致的问题。`directDepsCount` 直接取 `dependencies.length` 始终为未过滤前的直接依赖数量，而 `totalDepsCount` 取的是 `flatRows.length` 即经过搜索过滤后的扁平化结果数量。当用户在搜索框中输入关键词进行过滤后，页面顶部显示的"共 N 个包（直接依赖 M 个）"中总包数是过滤后数量但直接依赖数仍是过滤前数量，两个数字来自不同计算基准，导致统计信息自相矛盾。正确做法是统一统计来源，要么都基于过滤前数据，要么都基于过滤后数据。
+
+过程不满意：
+1. 模型在编写 DependencyTree.jsx 后运行 ESLint 发现解析错误，先用 edit_file_search_replace 修补了一处语法问题，运行 ESLint 后仍然报错，然后读取文件看了一眼就说"可能有隐藏字符"，随后用 Write 工具重写了整个 DependencyTree.jsx 文件才最终通过。同一个文件因为一处 JSX 模板字符串未闭合的语法错误，经历了"初写→修补→重写"三次修改才修复，说明首次写入时对 JSX 语法的闭合检查不够仔细。正确做法是在写完文件后立即回读确认语法完整性，避免用重写整文件的方式修复局部语法错误。
+2. 模型在 App.jsx 中注册路由时进行了两次编辑：先添加 import 语句，再添加 Route 配置，然后读取文件发现"文件结构有问题"，又执行了第三次编辑来修复。这表明前两次编辑不够精确，可能在首次插入时破坏了已有的 JSX 结构或引用链。对于高度模板化的路由配置文件，应该先通读获取完整上下文，将 import 和 Route 的增补在一次精确操作中完成，而不是分步编辑后再回头修补结构损伤。
+3. 模型在完成所有开发和测试后，总结中写道"你可以通过 npm run dev 启动开发服务器，访问 /package-manager 路径查看效果"，这句话暗示模型实际并未启动 dev server 进行运行时验证。对于一个涉及树形表格递归展开、SVG 依赖关系图渲染与交互、左右分栏同步滚动、状态联动更新等大量 UI 交互逻辑的复杂页面，仅靠 65 个纯 JS 单元测试通过和 ESLint 零报错就声称功能全部完成是不够的。应在提交前至少启动一次 dev server 确认页面正常渲染、视图切换无报错、核心交互链路可走通。

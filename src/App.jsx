@@ -86,6 +86,13 @@ import SvgPathEditorPage from '@/pages/svg-path-editor/index.jsx'
 import InventoryPage from '@/pages/inventory/index.jsx'
 import IdiomChainPage from '@/pages/idiom-chain/index.jsx'
 import ExamGradingPage from '@/pages/exam-grading/index.jsx'
+import PackageManagerPage from '@/pages/package-manager/index.jsx'
+import StockDashboardPage from '@/pages/stock-dashboard/index.jsx'
+import RoutePlannerPage from '@/pages/route-planner/index.jsx'
+import ModalGenerator from '@/pages/modal-generator/index.jsx'
+import PuzzleGamePage from '@/pages/puzzle-game/index.jsx'
+import MessageQueuePage from '@/pages/message-queue/index.jsx'
+import StickyNotesPage from '@/pages/sticky-notes/index.jsx'
 
 const TASKS = [
     { id: 1, title: '用户认证系统', route: 'auth', description: '登录、注册、找回密码、修改密码完整的认证流程，基于 localStorage 存储。' },
@@ -169,6 +176,9 @@ const TASKS = [
     { id: 81, title: '仓库库存管理', route: 'inventory', description: '多仓库 SKU 出入库管理、库存预警、批次效期追踪、仓库调拨、盘点核对与库存趋势可视化，基于 localStorage 持久化。' },
     { id: 82, title: '成语接龙游戏', route: 'idiom-chain', description: '人机对战的成语接龙游戏，内置500+条成语词库，三难度选择、AI智能回应、计时计分、提示功能、连胜纪录持久化，所有状态前端维护。' },
     { id: 83, title: '考试阅卷系统', route: 'exam-grading', description: '在线考试阅卷工具，逐题评阅学生答卷，支持选择题自动判分、简答题手动评分与评语、阅卷进度追踪、复查抽查标记、成绩批量导出CSV。' },
+    { id: 84, title: '拼图游戏', route: 'puzzle-game', description: '完整拼图益智游戏，上传图片切分网格拼块、拖拽交换完成拼图、计时计步、多难度选择、完成庆祝动画、排行榜 localStorage 持久化。' },
+    { id: 85, title: '消息队列模拟', route: 'message-queue', description: '消息队列系统管理界面，主题管理、消息发布与延迟送达、消费者组订阅与消费位点、积压监控折线图、死信队列与重试配置，基于 localStorage 持久化。' },
+    { id: 86, title: '便签提醒应用', route: 'sticky-notes', description: '带定时提醒功能的便签管理工具，支持多彩便签、设置提醒闹钟、分类标签管理、网格/列表视图切换、拖拽排序、归档回收站、过期自动清理，所有数据基于 localStorage 持久化。' },
 ]
 
 function HomePage() {
@@ -288,6 +298,9 @@ function App() {
             <Route path="/inventory" element={<InventoryPage />} />
             <Route path="/idiom-chain" element={<IdiomChainPage />} />
             <Route path="/exam-grading" element={<ExamGradingPage />} />
+            <Route path="/stock-dashboard" element={<StockDashboardPage />} />
+            <Route path="/package-manager" element={<PackageManagerPage />} />
+            <Route path="/sticky-notes" element={<StickyNotesPage />} />
         </Routes>
     )
 }

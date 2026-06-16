@@ -26,6 +26,9 @@ import {
   paginateList,
   getStatistics,
   getStockByWarehouse,
+  buildStockHistory,
+  buildStockHistoryByWarehouse,
+  buildStockHistoryBySku,
 } from '@/pages/inventory/utils.js';
 import {
   STOCK_STATUS,
@@ -640,6 +643,215 @@ describe('inventory/utils', () => {
       const r = paginateList(null, 1, 10);
       expect(r.items).toEqual([]);
       expect(r.total).toBe(0);
+    });
+  });
+
+  describe('stock history (retrograde algorithm)', () => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const todayMs = now.getTime();
+    const DAY = 86400000;
+
+    const batches = [
+      { id: 'b1', skuId: 'sku1', warehouseId: 'wh1', quantity: 100 },
+      { id: 'b2', skuId: 'sku1', warehouseId: 'wh2', quantity: 30 },
+      { id: 'b3', skuId: 'sku2', warehouseId: 'wh1', quantity: 50 },
+    ];
+
+    describe('buildStockHistory', () => {
+      it('returns current stock for each day when flowLogs is empty', () => {
+        const history = buildStockHistory([], batches, 5);
+        expect(history.length).toBe(5);
+        history.forEach((day) => {
+          expect(day.totalStock).toBe(180);
+          expect(day.inbound).toBe(0);
+          expect(day.outbound).toBe(0);
+        });
+      });
+
+      it('returns current stock for each day when flowLogs is null', () => {
+        const history = buildStockHistory(null, batches, 3);
+        expect(history.length).toBe(3);
+        history.forEach((day) => {
+          expect(day.totalStock).toBe(180);
+        });
+      });
+
+      it('returns 0 stock when batches is empty', () => {
+        const history = buildStockHistory([], [], 3);
+        expect(history.length).toBe(3);
+        history.forEach((day) => {
+          expect(day.totalStock).toBe(0);
+        });
+      });
+
+      it('computes single-day inbound correctly', () => {
+        const flowLogs = [
+          { skuId: 'sku1', warehouseId: 'wh1', type: FLOW_LOG_TYPES.INBOUND, quantityChange: 20, createdAt: todayMs + 3600000 },
+        ];
+        const history = buildStockHistory(flowLogs, batches, 3);
+        expect(history.length).toBe(3);
+        const today = history[2];
+        expect(today.inbound).toBe(20);
+        expect(today.outbound).toBe(0);
+        expect(today.totalStock).toBe(180);
+        const yesterday = history[1];
+        expect(yesterday.totalStock).toBe(160);
+      });
+
+      it('computes single-day outbound correctly', () => {
+        const flowLogs = [
+          { skuId: 'sku1', warehouseId: 'wh1', type: FLOW_LOG_TYPES.OUTBOUND, quantityChange: -30, createdAt: todayMs + 3600000 },
+        ];
+        const history = buildStockHistory(flowLogs, batches, 3);
+        const today = history[2];
+        expect(today.outbound).toBe(30);
+        expect(today.totalStock).toBe(180);
+        const yesterday = history[1];
+        expect(yesterday.totalStock).toBe(210);
+      });
+
+      it('retrogrades multi-day flow correctly', () => {
+        const flowLogs = [
+          { skuId: 'sku1', warehouseId: 'wh1', type: FLOW_LOG_TYPES.INBOUND, quantityChange: 50, createdAt: todayMs - DAY * 3 + 3600000 },
+          { skuId: 'sku2', warehouseId: 'wh1', type: FLOW_LOG_TYPES.OUTBOUND, quantityChange: -20, createdAt: todayMs - DAY + 3600000 },
+          { skuId: 'sku1', warehouseId: 'wh2', type: FLOW_LOG_TYPES.TRANSFER_IN, quantityChange: 10, createdAt: todayMs - DAY * 2 + 3600000 },
+        ];
+        const history = buildStockHistory(flowLogs, batches, 5);
+        expect(history.length).toBe(5);
+        const day0 = history[0];
+        expect(day0.totalStock).toBe(180 - 50 + 20 - 10);
+        const day4 = history[4];
+        expect(day4.totalStock).toBe(180);
+      });
+
+      it('includes stocktake adjustments in net change', () => {
+        const flowLogs = [
+          { skuId: 'sku1', warehouseId: 'wh1', type: FLOW_LOG_TYPES.STOCKTAKE, quantityChange: 5, createdAt: todayMs + 3600000 },
+          { skuId: 'sku2', warehouseId: 'wh1', type: FLOW_LOG_TYPES.STOCKTAKE, quantityChange: -10, createdAt: todayMs + 7200000 },
+        ];
+        const history = buildStockHistory(flowLogs, batches, 3);
+        const today = history[2];
+        expect(today.totalStock).toBe(180);
+        const yesterday = history[1];
+        expect(yesterday.totalStock).toBe(180 - 5 + 10);
+      });
+
+      it('clamps negative stock to 0 during retrograde', () => {
+        const flowLogs = [
+          { skuId: 'sku1', warehouseId: 'wh1', type: FLOW_LOG_TYPES.INBOUND, quantityChange: 200, createdAt: todayMs - DAY + 3600000 },
+        ];
+        const smallBatches = [
+          { id: 'b1', skuId: 'sku1', warehouseId: 'wh1', quantity: 10 },
+        ];
+        const history = buildStockHistory(flowLogs, smallBatches, 3);
+        expect(history[2].totalStock).toBe(10);
+        expect(history[1].totalStock).toBe(10);
+        expect(history[0].totalStock).toBe(0);
+      });
+    });
+
+    describe('buildStockHistoryByWarehouse', () => {
+      it('returns current warehouse stock when flowLogs is empty', () => {
+        const history = buildStockHistoryByWarehouse([], 'wh1', batches, 3);
+        expect(history.length).toBe(3);
+        history.forEach((day) => {
+          expect(day.totalStock).toBe(150);
+        });
+      });
+
+      it('filters flow logs by warehouse', () => {
+        const flowLogs = [
+          { skuId: 'sku1', warehouseId: 'wh1', type: FLOW_LOG_TYPES.INBOUND, quantityChange: 30, createdAt: todayMs + 3600000 },
+          { skuId: 'sku1', warehouseId: 'wh2', type: FLOW_LOG_TYPES.INBOUND, quantityChange: 50, createdAt: todayMs + 3600000 },
+        ];
+        const history = buildStockHistoryByWarehouse(flowLogs, 'wh1', batches, 3);
+        const today = history[2];
+        expect(today.inbound).toBe(30);
+        expect(today.totalStock).toBe(150);
+        const yesterday = history[1];
+        expect(yesterday.totalStock).toBe(120);
+      });
+
+      it('retrogrades multi-day for warehouse correctly', () => {
+        const flowLogs = [
+          { skuId: 'sku1', warehouseId: 'wh1', type: FLOW_LOG_TYPES.OUTBOUND, quantityChange: -40, createdAt: todayMs - DAY + 3600000 },
+          { skuId: 'sku2', warehouseId: 'wh1', type: FLOW_LOG_TYPES.INBOUND, quantityChange: 20, createdAt: todayMs - DAY * 2 + 3600000 },
+        ];
+        const history = buildStockHistoryByWarehouse(flowLogs, 'wh1', batches, 4);
+        expect(history.length).toBe(4);
+        expect(history[3].totalStock).toBe(150);
+        expect(history[2].totalStock).toBe(150);
+        expect(history[1].totalStock).toBe(190);
+        expect(history[0].totalStock).toBe(170);
+      });
+
+      it('ignores flow logs from other warehouses', () => {
+        const flowLogs = [
+          { skuId: 'sku1', warehouseId: 'wh2', type: FLOW_LOG_TYPES.INBOUND, quantityChange: 999, createdAt: todayMs + 3600000 },
+        ];
+        const history = buildStockHistoryByWarehouse(flowLogs, 'wh1', batches, 3);
+        history.forEach((day) => {
+          expect(day.inbound).toBe(0);
+        });
+      });
+    });
+
+    describe('buildStockHistoryBySku', () => {
+      it('returns current SKU stock when flowLogs is empty', () => {
+        const history = buildStockHistoryBySku([], 'sku1', batches, 3);
+        expect(history.length).toBe(3);
+        history.forEach((day) => {
+          expect(day.totalStock).toBe(130);
+        });
+      });
+
+      it('filters flow logs by skuId', () => {
+        const flowLogs = [
+          { skuId: 'sku1', warehouseId: 'wh1', type: FLOW_LOG_TYPES.INBOUND, quantityChange: 30, createdAt: todayMs + 3600000 },
+          { skuId: 'sku2', warehouseId: 'wh1', type: FLOW_LOG_TYPES.INBOUND, quantityChange: 50, createdAt: todayMs + 3600000 },
+        ];
+        const history = buildStockHistoryBySku(flowLogs, 'sku1', batches, 3);
+        const today = history[2];
+        expect(today.inbound).toBe(30);
+        expect(today.totalStock).toBe(130);
+        const yesterday = history[1];
+        expect(yesterday.totalStock).toBe(100);
+      });
+
+      it('retrogrades multi-day for SKU correctly', () => {
+        const flowLogs = [
+          { skuId: 'sku1', warehouseId: 'wh1', type: FLOW_LOG_TYPES.OUTBOUND, quantityChange: -20, createdAt: todayMs - DAY + 3600000 },
+          { skuId: 'sku1', warehouseId: 'wh2', type: FLOW_LOG_TYPES.TRANSFER_IN, quantityChange: 15, createdAt: todayMs - DAY * 2 + 3600000 },
+        ];
+        const history = buildStockHistoryBySku(flowLogs, 'sku1', batches, 4);
+        expect(history[3].totalStock).toBe(130);
+        expect(history[2].totalStock).toBe(130);
+        expect(history[1].totalStock).toBe(150);
+        expect(history[0].totalStock).toBe(135);
+      });
+
+      it('ignores flow logs from other SKUs', () => {
+        const flowLogs = [
+          { skuId: 'sku2', warehouseId: 'wh1', type: FLOW_LOG_TYPES.INBOUND, quantityChange: 999, createdAt: todayMs + 3600000 },
+        ];
+        const history = buildStockHistoryBySku(flowLogs, 'sku1', batches, 3);
+        history.forEach((day) => {
+          expect(day.inbound).toBe(0);
+        });
+      });
+
+      it('handles transfer operations correctly', () => {
+        const flowLogs = [
+          { skuId: 'sku1', warehouseId: 'wh1', type: FLOW_LOG_TYPES.TRANSFER_OUT, quantityChange: -25, createdAt: todayMs + 3600000 },
+          { skuId: 'sku1', warehouseId: 'wh2', type: FLOW_LOG_TYPES.TRANSFER_IN, quantityChange: 25, createdAt: todayMs + 7200000 },
+        ];
+        const history = buildStockHistoryBySku(flowLogs, 'sku1', batches, 3);
+        const today = history[2];
+        expect(today.outbound).toBe(25);
+        expect(today.inbound).toBe(25);
+        expect(today.totalStock).toBe(130);
+      });
     });
   });
 

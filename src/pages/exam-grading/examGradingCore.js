@@ -293,6 +293,16 @@ export function updateStudentStatus(gradingState, studentId, status) {
   }
 }
 
+export function initStudentStartedAt(gradingState, studentId) {
+  if (!gradingState || !gradingState[studentId]) return gradingState
+  const current = gradingState[studentId]
+  if (current.startedAt !== null) return gradingState
+  return {
+    ...gradingState,
+    [studentId]: { ...current, startedAt: Date.now() },
+  }
+}
+
 export function toggleStudentReview(gradingState, studentId) {
   if (!gradingState || !gradingState[studentId]) return gradingState
   const current = gradingState[studentId]

@@ -231,6 +231,5 @@ export function getDifficultyIdiomList(fullList, difficulty) {
 
 export function calculateStreakBonus(streakRecord, playerWon) {
   if (!playerWon || !streakRecord) return 0
-  const newStreak = streakRecord.currentStreak + 1
-  return newStreak * WIN_STREAK_BONUS
+  return WIN_STREAK_BONUS
 }

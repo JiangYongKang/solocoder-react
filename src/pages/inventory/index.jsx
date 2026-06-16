@@ -118,14 +118,12 @@ export default function InventoryPage() {
     setDocuments((prev) => [result.document, ...prev]);
 
     const warehouseStock = getSkuStockInWarehouse(result.updatedBatches, data.skuId, data.warehouseId);
-    const totalStock = getSkuTotalStock(result.updatedBatches, data.skuId);
     const log = createFlowLog({
       skuId: data.skuId,
       warehouseId: data.warehouseId,
       type: FLOW_LOG_TYPES.INBOUND,
       quantityChange: data.quantity,
       balanceAfter: warehouseStock,
-      balanceAfterTotal: totalStock,
       refId: result.document.id,
       refType: 'document',
       batchNo: data.batchNo,
@@ -147,14 +145,12 @@ export default function InventoryPage() {
     setDocuments((prev) => [result.document, ...prev]);
 
     const warehouseStock = getSkuStockInWarehouse(result.updatedBatches, data.skuId, data.warehouseId);
-    const totalStock = getSkuTotalStock(result.updatedBatches, data.skuId);
     const log = createFlowLog({
       skuId: data.skuId,
       warehouseId: data.warehouseId,
       type: FLOW_LOG_TYPES.OUTBOUND,
       quantityChange: -data.quantity,
       balanceAfter: warehouseStock,
-      balanceAfterTotal: totalStock,
       refId: result.document.id,
       refType: 'document',
       remark: data.remark || '出库',
@@ -176,7 +172,6 @@ export default function InventoryPage() {
 
     const sourceStock = getSkuStockInWarehouse(result.updatedBatches, data.skuId, data.sourceWarehouseId);
     const targetStock = getSkuStockInWarehouse(result.updatedBatches, data.skuId, data.targetWarehouseId);
-    const totalStock = getSkuTotalStock(result.updatedBatches, data.skuId);
 
     const outLog = createFlowLog({
       skuId: data.skuId,
@@ -184,7 +179,6 @@ export default function InventoryPage() {
       type: FLOW_LOG_TYPES.TRANSFER_OUT,
       quantityChange: -data.quantity,
       balanceAfter: sourceStock,
-      balanceAfterTotal: totalStock,
       refId: result.transfer.id,
       refType: 'transfer',
       remark: `调拨至${warehouses.find((w) => w.id === data.targetWarehouseId)?.name || ''}`,
@@ -197,7 +191,6 @@ export default function InventoryPage() {
       type: FLOW_LOG_TYPES.TRANSFER_IN,
       quantityChange: data.quantity,
       balanceAfter: targetStock,
-      balanceAfterTotal: totalStock,
       refId: result.transfer.id,
       refType: 'transfer',
       remark: `从${warehouses.find((w) => w.id === data.sourceWarehouseId)?.name || ''}调拨`,

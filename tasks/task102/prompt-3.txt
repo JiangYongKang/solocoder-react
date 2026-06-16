@@ -1,0 +1,3 @@
+你实现的简历模板市场页面还存在一些残留问题，需要进行修复：
+1. setRating 评分归零 bug 已在上一轮修复（评分 ≤ 0 时从对象中 delete），但 getAverageRating 函数中仍保留了 `v > 0` 的防御性过滤逻辑和对应的 should filter out zero ratings 测试用例。这个过滤逻辑是旧版 bug 的 workaround，修复后 rating 对象中不会存在值为 0 的条目，该过滤逻辑成为死代码。需要移除 getAverageRating 中的冗余过滤，并同步更新或删除测试文件中不再需要的防御性用例。
+2. 修复后重新运行 pnpm run test，确保所有测试通过。

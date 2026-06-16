@@ -507,10 +507,14 @@ describe('path building functions', () => {
     const path = buildBezierPath(from, to, 'right', 'left')
     expect(path.startsWith('M 0 50')).toBe(true)
     expect(path).toContain('C ')
-    const parts = path.split('C ')[1].split(', ')
-    const c1 = parts[0].split(' ')
+    const afterC = path.split('C ')[1]
+    const [c1Str, c2Str] = afterC.split(', ')
+    const c1 = c1Str.trim().split(' ')
+    const c2 = c2Str.trim().split(' ')
     expect(Number(c1[0])).toBeGreaterThan(0)
     expect(Number(c1[1])).toBe(50)
+    expect(Number(c2[0])).toBeLessThan(300)
+    expect(Number(c2[1])).toBe(50)
   })
 
   it('buildBezierPath with vertical ports should have vertical control points', () => {
@@ -518,10 +522,28 @@ describe('path building functions', () => {
     const bottom = { x: 150, y: 300 }
     const path = buildBezierPath(top, bottom, 'bottom', 'top')
     expect(path.startsWith('M 150 0')).toBe(true)
-    const parts = path.split('C ')[1].split(', ')
-    const c1 = parts[0].split(' ')
+    const afterC = path.split('C ')[1]
+    const [c1Str, c2Str] = afterC.split(', ')
+    const c1 = c1Str.trim().split(' ')
+    const c2 = c2Str.trim().split(' ')
     expect(Number(c1[0])).toBe(150)
     expect(Number(c1[1])).toBeGreaterThan(0)
+    expect(Number(c2[0])).toBe(150)
+    expect(Number(c2[1])).toBeLessThan(300)
+  })
+
+  it('buildBezierPath with opposite diagonal ports should have correct control point directions', () => {
+    const a = { x: 0, y: 0 }
+    const b = { x: 300, y: 300 }
+    const path = buildBezierPath(a, b, 'right', 'left')
+    const afterC = path.split('C ')[1]
+    const [c1Str, c2Str] = afterC.split(', ')
+    const c1 = c1Str.trim().split(' ')
+    const c2 = c2Str.trim().split(' ')
+    expect(Number(c1[0])).toBeGreaterThan(0)
+    expect(Number(c1[1])).toBe(0)
+    expect(Number(c2[0])).toBeLessThan(300)
+    expect(Number(c2[1])).toBe(300)
   })
 
   it('buildDirectPath should return SVG line string', () => {
@@ -858,6 +880,18 @@ describe('importFromJson', () => {
   it('should reject link with invalid curveStyle', () => {
     const data = makeValidData()
     data.links[0].curveStyle = 'invalid_curve'
+    expect(importFromJson(data).valid).toBe(false)
+  })
+
+  it('should reject link with empty string style', () => {
+    const data = makeValidData()
+    data.links[0].style = ''
+    expect(importFromJson(data).valid).toBe(false)
+  })
+
+  it('should reject link with empty string curveStyle', () => {
+    const data = makeValidData()
+    data.links[0].curveStyle = ''
     expect(importFromJson(data).valid).toBe(false)
   })
 

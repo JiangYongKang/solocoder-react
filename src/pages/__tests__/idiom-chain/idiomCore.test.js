@@ -615,18 +615,25 @@ describe('idiomCore', () => {
       expect(calculateStreakBonus(null, true)).toBe(0)
     })
 
-    it('should calculate bonus as (currentStreak + 1) * WIN_STREAK_BONUS on first win', () => {
+    it('should return WIN_STREAK_BONUS when player wins (first win)', () => {
       const record = { currentStreak: 0, maxStreak: 0, totalGames: 0 }
-      expect(calculateStreakBonus(record, true)).toBe(1 * WIN_STREAK_BONUS)
+      expect(calculateStreakBonus(record, true)).toBe(WIN_STREAK_BONUS)
     })
 
-    it('should calculate bonus for ongoing streak', () => {
-      const record = { currentStreak: 3, maxStreak: 5, totalGames: 10 }
-      expect(calculateStreakBonus(record, true)).toBe(4 * WIN_STREAK_BONUS)
+    it('should return the same WIN_STREAK_BONUS regardless of current streak length', () => {
+      const record1 = { currentStreak: 0, maxStreak: 0, totalGames: 0 }
+      const record3 = { currentStreak: 3, maxStreak: 5, totalGames: 10 }
+      const record10 = { currentStreak: 10, maxStreak: 10, totalGames: 20 }
+      const bonus1 = calculateStreakBonus(record1, true)
+      const bonus3 = calculateStreakBonus(record3, true)
+      const bonus10 = calculateStreakBonus(record10, true)
+      expect(bonus1).toBe(bonus3)
+      expect(bonus3).toBe(bonus10)
+      expect(bonus10).toBe(WIN_STREAK_BONUS)
     })
 
-    it('should use WIN_STREAK_BONUS constant value', () => {
-      const record = { currentStreak: 0, maxStreak: 0, totalGames: 0 }
+    it('should match the WIN_STREAK_BONUS constant value', () => {
+      const record = { currentStreak: 5, maxStreak: 10, totalGames: 20 }
       const bonus = calculateStreakBonus(record, true)
       expect(bonus).toBe(WIN_STREAK_BONUS)
     })

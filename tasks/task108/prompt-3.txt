@@ -1,0 +1,5 @@
+你实现的考试阅卷系统页面还存在一些残留问题，需要进行修复：
+1. index.jsx 中新增的 useEffect 在监听 currentStudentId 变化时调用 updateStudentStatus(prev, currentStudentId, STUDENT_STATUS.UNGRADED) 来设置 startedAt 字段。但 updateStudentStatus 内部会无条件覆盖状态对象，当学生已被标记为 REVIEW 状态且 startedAt 为 null 时，切换回该学生会将 REVIEW 状态强制覆盖为 UNGRADED，待复查标记丢失。需要用一种不改变 status 字段的方式仅写入 startedAt，例如新增一个专用于初始化开始时间的函数，或直接在 setGradingState 中只改 startedAt 字段。
+2. handleGradeQuestion 函数中 allGraded 为 true 时使用 setTimeout 延迟 300ms 切换到下一个学生，但这个 setTimeout 没有在组件卸载时清理，快速切换学生时可能出现已卸载组件上的状态更新。需要使用 useRef 保存定时器 ID 并在 useEffect cleanup 中清除。
+3. handleGradeQuestion 函数内部仍然保留了 startedAt 的防御性检查代码，但 useEffect 已经在学生切换时完成了相同的初始化操作。需要清理这段冗余的 startedAt 检查逻辑。
+4. 修复后重新运行 pnpm run test，确保所有测试通过。

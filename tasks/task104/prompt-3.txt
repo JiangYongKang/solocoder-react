@@ -1,0 +1,3 @@
+你实现的成语接龙游戏页面还存在一个残留问题，需要进行修复：
+1. idiomCore.js 中新增的 calculateStreakBonus 函数将 WIN_STREAK_BONUS 常量实现为累进倍数公式 `(currentStreak + 1) * WIN_STREAK_BONUS`，导致 3 连胜奖励 20 分、10 连胜高达 55 分，分数膨胀远超常数字面值 5 分。该常量的命名是 BONUS 而非 MULTIPLIER，需求只要求"加入 WIN_STREAK_BONUS 的奖励计算"，没有提到累进倍数。需要将 calculateStreakBonus 修正为每次连胜固定加 WIN_STREAK_BONUS 分（即直接返回常量值），并同步更新测试文件中的用例以匹配修正后的公式。
+2. 修复后重新运行 pnpm run test，确保所有测试通过。

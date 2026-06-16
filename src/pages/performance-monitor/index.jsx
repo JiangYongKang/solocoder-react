@@ -92,6 +92,9 @@ const PerformanceMonitorPage = () => {
         for (const id of inactiveRuleIds) {
           delete alertingRulesRef.current[id]
         }
+        setAlertRecords((prevRecords) =>
+          resolveAlertRecords(prevRecords, inactiveRuleIds, now)
+        )
       }
 
       if (newlyTriggeredIds.length > 0) {

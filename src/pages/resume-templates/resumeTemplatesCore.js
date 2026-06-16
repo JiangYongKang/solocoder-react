@@ -268,7 +268,7 @@ export function getRating(ratings, templateId) {
 
 export function getAverageRating(ratings) {
   if (!ratings || typeof ratings !== 'object') return 0
-  const values = Object.values(ratings).filter((v) => typeof v === 'number' && v > 0)
+  const values = Object.values(ratings).filter((v) => typeof v === 'number')
   if (values.length === 0) return 0
   const sum = values.reduce((acc, v) => acc + v, 0)
   return sum / values.length

@@ -313,7 +313,6 @@ export function applyStocktake(batches, warehouseId, differences) {
         updatedBatches = allocResult.updatedBatches;
       }
     }
-    const totalAfter = getSkuTotalStock(updatedBatches, diff.skuId);
     flowLogs.push({
       id: generateId('fl_'),
       skuId: diff.skuId,
@@ -321,7 +320,6 @@ export function applyStocktake(batches, warehouseId, differences) {
       type: FLOW_LOG_TYPES.STOCKTAKE,
       quantityChange: changeQty,
       balanceAfter: targetQty,
-      balanceAfterTotal: totalAfter,
       refId: '',
       refType: 'stocktake',
       remark: diff.remark || '盘点调整',
@@ -346,7 +344,6 @@ export function createFlowLog(data) {
     type: data.type,
     quantityChange: data.quantityChange || 0,
     balanceAfter: data.balanceAfter || 0,
-    balanceAfterTotal: data.balanceAfterTotal != null ? data.balanceAfterTotal : (data.balanceAfter || 0),
     refId: data.refId || '',
     refType: data.refType || '',
     batchNo: data.batchNo || '',
@@ -377,17 +374,13 @@ export function getWarningSkus(skus, batches) {
   });
 }
 
-export function buildStockHistory(flowLogs, batches, days = CHART_DAYS) {
+function buildStockHistoryCore(flowLogs, currentStock, logFilter, days) {
   const history = [];
   const now = new Date();
   now.setHours(0, 0, 0, 0);
 
   if (!Array.isArray(flowLogs)) flowLogs = [];
 
-  const currentTotalStock = Array.isArray(batches)
-    ? batches.reduce((sum, b) => sum + (Number(b.quantity) || 0), 0)
-    : 0;
-
   const netChanges = [];
   for (let i = 0; i < days; i++) {
     const date = new Date(now);
@@ -395,7 +388,9 @@ export function buildStockHistory(flowLogs, batches, days = CHART_DAYS) {
     const dateStr = formatDate(date);
     const dayStart = date.getTime();
     const dayEnd = dayStart + 24 * 60 * 60 * 1000 - 1;
-    const dayLogs = flowLogs.filter((l) => l.createdAt >= dayStart && l.createdAt <= dayEnd);
+    const dayLogs = flowLogs.filter(
+      (l) => logFilter(l) && l.createdAt >= dayStart && l.createdAt <= dayEnd
+    );
     const inbound = dayLogs
       .filter((l) => l.type === FLOW_LOG_TYPES.INBOUND || l.type === FLOW_LOG_TYPES.TRANSFER_IN)
       .reduce((sum, l) => sum + (l.quantityChange || 0), 0);
@@ -417,7 +412,7 @@ export function buildStockHistory(flowLogs, batches, days = CHART_DAYS) {
     });
   }
 
-  let runningStock = currentTotalStock;
+  let runningStock = currentStock;
   for (let i = days - 1; i >= 0; i--) {
     const info = netChanges[i];
     history.unshift({
@@ -431,116 +426,27 @@ export function buildStockHistory(flowLogs, batches, days = CHART_DAYS) {
     if (runningStock < 0) runningStock = 0;
   }
   return history;
+}
+
+export function buildStockHistory(flowLogs, batches, days = CHART_DAYS) {
+  const currentStock = Array.isArray(batches)
+    ? batches.reduce((sum, b) => sum + (Number(b.quantity) || 0), 0)
+    : 0;
+  return buildStockHistoryCore(flowLogs, currentStock, () => true, days);
 }
 
 export function buildStockHistoryByWarehouse(flowLogs, warehouseId, batches, days = CHART_DAYS) {
-  const history = [];
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-
-  const whBatches = batches.filter((b) => b.warehouseId === warehouseId);
-  let currentWhStock = whBatches.reduce((sum, b) => sum + (Number(b.quantity) || 0), 0);
-
-  const netChanges = [];
-  for (let i = 0; i < days; i++) {
-    const date = new Date(now);
-    date.setDate(date.getDate() - i);
-    const dateStr = formatDate(date);
-    const dayStart = date.getTime();
-    const dayEnd = dayStart + 24 * 60 * 60 * 1000 - 1;
-    const dayLogs = flowLogs.filter(
-      (l) => l.warehouseId === warehouseId && l.createdAt >= dayStart && l.createdAt <= dayEnd
-    );
-    const inbound = dayLogs
-      .filter((l) => l.type === FLOW_LOG_TYPES.INBOUND || l.type === FLOW_LOG_TYPES.TRANSFER_IN)
-      .reduce((sum, l) => sum + (l.quantityChange || 0), 0);
-    const outbound = Math.abs(
-      dayLogs
-        .filter((l) => l.type === FLOW_LOG_TYPES.OUTBOUND || l.type === FLOW_LOG_TYPES.TRANSFER_OUT || (l.type === FLOW_LOG_TYPES.STOCKTAKE && l.quantityChange < 0))
-        .reduce((sum, l) => sum + (l.quantityChange || 0), 0)
-    );
-    const stocktakeIn = dayLogs
-      .filter((l) => l.type === FLOW_LOG_TYPES.STOCKTAKE && l.quantityChange > 0)
-      .reduce((sum, l) => sum + (l.quantityChange || 0), 0);
-    netChanges.unshift({
-      dateStr,
-      dayStart,
-      inbound,
-      outbound,
-      stocktakeIn,
-      net: inbound + stocktakeIn - outbound,
-    });
-  }
-
-  let runningStock = currentWhStock;
-  for (let i = days - 1; i >= 0; i--) {
-    const info = netChanges[i];
-    history.unshift({
-      date: info.dateStr,
-      timestamp: info.dayStart,
-      inbound: info.inbound,
-      outbound: info.outbound,
-      totalStock: runningStock,
-    });
-    runningStock -= info.net;
-    if (runningStock < 0) runningStock = 0;
-  }
-  return history;
+  const currentStock = Array.isArray(batches)
+    ? batches.filter((b) => b.warehouseId === warehouseId).reduce((sum, b) => sum + (Number(b.quantity) || 0), 0)
+    : 0;
+  return buildStockHistoryCore(flowLogs, currentStock, (l) => l.warehouseId === warehouseId, days);
 }
 
 export function buildStockHistoryBySku(flowLogs, skuId, batches, days = CHART_DAYS) {
-  const history = [];
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-
-  const skuBatches = batches.filter((b) => b.skuId === skuId);
-  let currentSkuStock = skuBatches.reduce((sum, b) => sum + (Number(b.quantity) || 0), 0);
-
-  const netChanges = [];
-  for (let i = 0; i < days; i++) {
-    const date = new Date(now);
-    date.setDate(date.getDate() - i);
-    const dateStr = formatDate(date);
-    const dayStart = date.getTime();
-    const dayEnd = dayStart + 24 * 60 * 60 * 1000 - 1;
-    const dayLogs = flowLogs.filter(
-      (l) => l.skuId === skuId && l.createdAt >= dayStart && l.createdAt <= dayEnd
-    );
-    const inbound = dayLogs
-      .filter((l) => l.type === FLOW_LOG_TYPES.INBOUND || l.type === FLOW_LOG_TYPES.TRANSFER_IN)
-      .reduce((sum, l) => sum + (l.quantityChange || 0), 0);
-    const outbound = Math.abs(
-      dayLogs
-        .filter((l) => l.type === FLOW_LOG_TYPES.OUTBOUND || l.type === FLOW_LOG_TYPES.TRANSFER_OUT || (l.type === FLOW_LOG_TYPES.STOCKTAKE && l.quantityChange < 0))
-        .reduce((sum, l) => sum + (l.quantityChange || 0), 0)
-    );
-    const stocktakeIn = dayLogs
-      .filter((l) => l.type === FLOW_LOG_TYPES.STOCKTAKE && l.quantityChange > 0)
-      .reduce((sum, l) => sum + (l.quantityChange || 0), 0);
-    netChanges.unshift({
-      dateStr,
-      dayStart,
-      inbound,
-      outbound,
-      stocktakeIn,
-      net: inbound + stocktakeIn - outbound,
-    });
-  }
-
-  let runningStock = currentSkuStock;
-  for (let i = days - 1; i >= 0; i--) {
-    const info = netChanges[i];
-    history.unshift({
-      date: info.dateStr,
-      timestamp: info.dayStart,
-      inbound: info.inbound,
-      outbound: info.outbound,
-      totalStock: runningStock,
-    });
-    runningStock -= info.net;
-    if (runningStock < 0) runningStock = 0;
-  }
-  return history;
+  const currentStock = Array.isArray(batches)
+    ? batches.filter((b) => b.skuId === skuId).reduce((sum, b) => sum + (Number(b.quantity) || 0), 0)
+    : 0;
+  return buildStockHistoryCore(flowLogs, currentStock, (l) => l.skuId === skuId, days);
 }
 
 export function getStockByWarehouse(batches, warehouses) {

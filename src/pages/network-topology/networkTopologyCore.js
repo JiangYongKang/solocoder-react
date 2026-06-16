@@ -572,10 +572,10 @@ export function importFromJson(jsonData) {
     if (!validPorts.includes(link.toPort)) {
       return { valid: false, error: `连线 ${link.id} 目标端口无效: ${link.toPort}` }
     }
-    if (link.style && !validLineStyles.includes(link.style)) {
+    if (typeof link.style === 'string' && !validLineStyles.includes(link.style)) {
       return { valid: false, error: `连线 ${link.id} 线型无效: ${link.style}` }
     }
-    if (link.curveStyle && !validCurveStyles.includes(link.curveStyle)) {
+    if (typeof link.curveStyle === 'string' && !validCurveStyles.includes(link.curveStyle)) {
       return { valid: false, error: `连线 ${link.id} 曲线类型无效: ${link.curveStyle}` }
     }
     if (link.width !== undefined && (typeof link.width !== 'number' || link.width < 0)) {

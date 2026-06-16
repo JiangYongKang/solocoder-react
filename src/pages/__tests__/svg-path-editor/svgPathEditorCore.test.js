@@ -478,6 +478,38 @@ describe('deleteNode', () => {
     expect(result[1].type).toBe('L')
     expect(result[1].params).toEqual([250, 0])
   })
+
+  it('correctly deletes second anchor when two anchors share the same coordinates', () => {
+    const cmds = parsePathCommands('M 0 0 L 100 0 L 100 0 L 200 0')
+    const result = deleteNode(cmds, 2)
+    expect(result.length).toBe(3)
+    expect(result[0].type).toBe('M')
+    expect(result[0].params).toEqual([0, 0])
+    expect(result[1].type).toBe('L')
+    expect(result[1].params).toEqual([100, 0])
+    expect(result[2].type).toBe('L')
+    expect(result[2].params).toEqual([200, 0])
+  })
+
+  it('correctly deletes first anchor when second anchor has same coordinates', () => {
+    const cmds = parsePathCommands('M 0 0 L 0 0 L 100 50')
+    const result = deleteNode(cmds, 0)
+    expect(result.length).toBe(2)
+    expect(result[0].type).toBe('M')
+    expect(result[0].params).toEqual([0, 0])
+    expect(result[1].type).toBe('L')
+    expect(result[1].params).toEqual([100, 50])
+  })
+
+  it('deletes curve node at same coordinates as another anchor using cmdIndex', () => {
+    const cmds = parsePathCommands('M 0 0 C 10 10 20 20 50 50 L 50 50 L 100 0')
+    const result = deleteNode(cmds, 2)
+    expect(result.length).toBe(3)
+    expect(result[0].type).toBe('M')
+    expect(result[1].type).toBe('C')
+    expect(result[2].type).toBe('L')
+    expect(result[2].params).toEqual([100, 0])
+  })
 })
 
 describe('mergeStyles', () => {
@@ -566,6 +598,26 @@ describe('buildSvgString', () => {
     const paths = [{ d: 'M 0 0 L 100 0', style: { stroke: '#000', fill: 'none' }, visible: true }]
     const svg = buildSvgString(paths)
     expect(svg).toContain('xmlns="http://www.w3.org/2000/svg"')
+  })
+
+  it('includes stroke-width:0 when strokeWidth is 0', () => {
+    const paths = [{
+      d: 'M 0 0 L 100 0',
+      style: { stroke: '#333', fill: 'none', strokeWidth: 0 },
+      visible: true,
+    }]
+    const svg = buildSvgString(paths)
+    expect(svg).toContain('stroke-width:0')
+  })
+
+  it('omits stroke-width when strokeWidth is undefined', () => {
+    const paths = [{
+      d: 'M 0 0 L 100 0',
+      style: { stroke: '#333', fill: 'none' },
+      visible: true,
+    }]
+    const svg = buildSvgString(paths)
+    expect(svg).not.toContain('stroke-width')
   })
 })
 

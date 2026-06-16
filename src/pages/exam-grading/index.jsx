@@ -17,6 +17,7 @@ import {
   calculateStudentScore,
   isStudentAllGraded,
   updateStudentStatus,
+  initStudentStartedAt,
   toggleStudentReview,
   getGradingProgress,
   filterStudents,
@@ -403,6 +404,7 @@ export default function ExamGradingPage() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [filter, setFilter] = useState(FILTER_OPTIONS.ALL)
   const [showCSVPreview, setShowCSVPreview] = useState(false)
+  const switchStudentTimerRef = useRef(null)
 
   const progress = useMemo(
     () => getGradingProgress(gradingState, MOCK_STUDENTS),
@@ -415,12 +417,17 @@ export default function ExamGradingPage() {
   )
 
   useEffect(() => {
+    return () => {
+      if (switchStudentTimerRef.current) {
+        clearTimeout(switchStudentTimerRef.current)
+        switchStudentTimerRef.current = null
+      }
+    }
+  }, [])
+
+  useEffect(() => {
     if (!currentStudentId) return
-    setGradingState((prev) => {
-      const g = prev[currentStudentId]
-      if (!g || g.startedAt !== null) return prev
-      return updateStudentStatus(prev, currentStudentId, STUDENT_STATUS.UNGRADED)
-    })
+    setGradingState((prev) => initStudentStartedAt(prev, currentStudentId))
   }, [currentStudentId])
 
   const handleSelectStudent = useCallback((studentId) => {
@@ -435,12 +442,7 @@ export default function ExamGradingPage() {
       let allGraded = false
 
       setGradingState((prev) => {
-        let next = prev
-        const currentGrading = next[currentStudentId]
-        if (currentGrading && currentGrading.startedAt === null) {
-          next = updateStudentStatus(next, currentStudentId, STUDENT_STATUS.UNGRADED)
-        }
-        next = updateQuestionGrade(next, currentStudentId, questionId, {
+        let next = updateQuestionGrade(prev, currentStudentId, questionId, {
           result,
           score,
         })
@@ -455,7 +457,11 @@ export default function ExamGradingPage() {
       const qIndex = MOCK_QUESTIONS.findIndex((q) => q.id === questionId)
       if (allGraded) {
         if (nextStudent) {
-          setTimeout(() => {
+          if (switchStudentTimerRef.current) {
+            clearTimeout(switchStudentTimerRef.current)
+          }
+          switchStudentTimerRef.current = setTimeout(() => {
+            switchStudentTimerRef.current = null
             setCurrentStudentId(nextStudent.id)
             setCurrentQuestionIndex(0)
           }, 300)

@@ -20,6 +20,7 @@ import {
   calculateStudentScore,
   isStudentAllGraded,
   updateStudentStatus,
+  initStudentStartedAt,
   toggleStudentReview,
   getGradingProgress,
   filterStudents,
@@ -475,6 +476,90 @@ describe('updateStudentStatus', () => {
 
   it('should handle null state', () => {
     expect(updateStudentStatus(null, 's1', STUDENT_STATUS.GRADED)).toBe(null)
+  })
+})
+
+describe('initStudentStartedAt', () => {
+  it('should return original state for null gradingState', () => {
+    expect(initStudentStartedAt(null, 's1')).toBe(null)
+  })
+
+  it('should return original state for missing student', () => {
+    const state = {}
+    expect(initStudentStartedAt(state, 's1')).toBe(state)
+  })
+
+  it('should return original state if startedAt is already set', () => {
+    const originalStartedAt = Date.now() - 60000
+    const state = {
+      s1: {
+        status: STUDENT_STATUS.REVIEW,
+        startedAt: originalStartedAt,
+        completedAt: null,
+        needsReview: true,
+      },
+    }
+    const result = initStudentStartedAt(state, 's1')
+    expect(result).toBe(state)
+    expect(result.s1.startedAt).toBe(originalStartedAt)
+  })
+
+  it('should set startedAt without changing status when status is REVIEW', () => {
+    const state = {
+      s1: {
+        status: STUDENT_STATUS.REVIEW,
+        startedAt: null,
+        completedAt: null,
+        needsReview: true,
+      },
+    }
+    const next = initStudentStartedAt(state, 's1')
+    expect(next.s1.startedAt).toBeGreaterThan(0)
+    expect(next.s1.status).toBe(STUDENT_STATUS.REVIEW)
+    expect(next.s1.needsReview).toBe(true)
+  })
+
+  it('should set startedAt without changing status when status is GRADED', () => {
+    const state = {
+      s1: {
+        status: STUDENT_STATUS.GRADED,
+        startedAt: null,
+        completedAt: 2000,
+        needsReview: false,
+      },
+    }
+    const next = initStudentStartedAt(state, 's1')
+    expect(next.s1.startedAt).toBeGreaterThan(0)
+    expect(next.s1.status).toBe(STUDENT_STATUS.GRADED)
+    expect(next.s1.completedAt).toBe(2000)
+  })
+
+  it('should set startedAt without changing status when status is UNGRADED', () => {
+    const state = {
+      s1: {
+        status: STUDENT_STATUS.UNGRADED,
+        startedAt: null,
+        completedAt: null,
+        needsReview: false,
+      },
+    }
+    const next = initStudentStartedAt(state, 's1')
+    expect(next.s1.startedAt).toBeGreaterThan(0)
+    expect(next.s1.status).toBe(STUDENT_STATUS.UNGRADED)
+  })
+
+  it('should not mutate the original state', () => {
+    const state = {
+      s1: {
+        status: STUDENT_STATUS.REVIEW,
+        startedAt: null,
+        completedAt: null,
+        needsReview: true,
+      },
+    }
+    const original = JSON.parse(JSON.stringify(state))
+    initStudentStartedAt(state, 's1')
+    expect(state.s1.startedAt).toBe(original.s1.startedAt)
   })
 })
 

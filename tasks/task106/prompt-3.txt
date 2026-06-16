@@ -1,0 +1,4 @@
+你实现的 SVG 路径编辑器页面还存在一些残留问题，需要进行修复：
+1. svgPathEditorCore.js 中重写后的 deleteNode 函数使用了基于坐标值比较的方式定位待删除命令，而 getAnchorNodes 辅助函数已经为每个锚点保存了 cmdIndex 字段。当路径中不同锚点的坐标恰好相同时，坐标扫描会错误匹配到前面的命令而非用户选中的目标锚点。需要将 deleteNode 中的定位方式改为使用 `anchors[anchorIdx].cmdIndex` 索引直接定位。
+2. buildSvgString 函数中使用 `if (style.strokeWidth)` 判断是否输出 stroke-width 属性，但 strokeWidth 值为 0 是合法的 SVG 值（表示无描边）同时也是 JavaScript falsy 值。当用户设描边宽度为 0 后导出 SVG 会缺少该属性，浏览器默认使用 1px 渲染。需要改用 `typeof style.strokeWidth === 'number'` 或 `!== undefined` 进行判断，正确处理数字 0 的情况。
+3. 修复后重新运行 pnpm run test，确保所有测试通过。

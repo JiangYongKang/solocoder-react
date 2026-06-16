@@ -1,0 +1,4 @@
+你实现的网络拓扑图编辑器页面还存在一些残留问题，需要进行修复：
+1. networkTopologyCore.test.js 中为 buildBezierPath 新增的曲线样式测试用例只验证了 c1 控制点的坐标，完全没有检查 c2 控制点。当 fromPort 和 toPort 参数不同时（如 fromPort='top' toPort='bottom'），c2 控制点的坐标方向与 c1 对称且同等关键。如果 toPort 方向的处理分支被意外破坏导致 c2 坐标错误，现有测试依然全部通过。需要在曲线路径测试中补充 c2 控制点的断言。
+2. importFromJson 函数中对 link 的 curveStyle 字段校验使用了 `link.curveStyle &&` 的 truthiness 短路判断。当用户导入的 JSON 中 curveStyle 为空字符串 "" 时被静默接受而非拒绝，下次重新导入同一份数据时空字符串仍然存在。需要改用精确的类型检查（先判断 typeof === 'string' 再 includes 校验），确保空字符串和非法值都能被拦截。
+3. 修复后重新运行 pnpm run test，确保所有测试通过。

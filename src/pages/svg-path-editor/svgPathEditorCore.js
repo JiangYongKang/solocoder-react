@@ -482,79 +482,48 @@ export function deleteNode(commands, nodeIndex) {
   if (nodeIndex < 0 || nodeIndex >= anchors.length) return commands
   if (anchors[nodeIndex].isClosePoint) return commands
 
-  const deleted = anchors[nodeIndex]
-  let newCmds = []
+  const deletedCmdIdx = anchors[nodeIndex].cmdIndex
 
   if (nodeIndex === 0) {
     const secondAnchor = anchors[1]
-    let foundFirst = false
-    for (let i = 0; i < absCmds.length; i++) {
-      const cmd = absCmds[i]
-      if (!foundFirst) {
-        if (cmd.type === 'M' || cmd.type === 'L' || cmd.type === 'C' || cmd.type === 'Q' || cmd.type === 'A') {
-          const endPt = getCmdEndPoint(cmd)
-          if (endPt.x === secondAnchor.x && endPt.y === secondAnchor.y) {
-            foundFirst = true
-          }
-        }
-      } else {
-        if (cmd.type === 'Z') {
-          newCmds.push({ type: 'M', relative: false, params: [secondAnchor.x, secondAnchor.y] })
-        }
-        newCmds.push(cmd)
-      }
+    const secondCmdIdx = secondAnchor.cmdIndex
+    const newCmds = []
+    newCmds.push({ type: 'M', relative: false, params: [secondAnchor.x, secondAnchor.y] })
+    for (let i = secondCmdIdx + 1; i < absCmds.length; i++) {
+      newCmds.push(absCmds[i])
     }
-    if (newCmds.length > 0 && newCmds[0].type !== 'M') {
-      newCmds.unshift({ type: 'M', relative: false, params: [secondAnchor.x, secondAnchor.y] })
-    }
-  } else {
-    const nextAnchor = nodeIndex + 1 < anchors.length ? anchors[nodeIndex + 1] : null
-    let skipUntil = -1
+    if (newCmds.length > 0 && newCmds[0].type !== 'M') return commands
+    return newCmds
+  }
 
-    for (let i = 0; i < absCmds.length; i++) {
-      if (i <= skipUntil) continue
+  const nextAnchor = nodeIndex + 1 < anchors.length ? anchors[nodeIndex + 1] : null
 
-      const cmd = absCmds[i]
-      const endPt = getCmdEndPoint(cmd)
+  const indicesToRemove = new Set()
+  indicesToRemove.add(deletedCmdIdx)
+  if (nextAnchor) {
+    indicesToRemove.add(nextAnchor.cmdIndex)
+  }
 
-      if (endPt.x === deleted.x && endPt.y === deleted.y && cmd.type !== 'M') {
+  const newCmds = []
+  let bridgeInserted = false
+
+  for (let i = 0; i < absCmds.length; i++) {
+    if (indicesToRemove.has(i)) {
+      if (!bridgeInserted) {
         if (nextAnchor && !nextAnchor.isClosePoint) {
           newCmds.push({ type: 'L', relative: false, params: [nextAnchor.x, nextAnchor.y] })
-          for (let j = i + 1; j < absCmds.length; j++) {
-            const nextCmdEnd = getCmdEndPoint(absCmds[j])
-            if (nextCmdEnd.x === nextAnchor.x && nextCmdEnd.y === nextAnchor.y) {
-              skipUntil = j
-              break
-            }
-          }
         } else if (nextAnchor && nextAnchor.isClosePoint) {
           newCmds.push({ type: 'Z', relative: false, params: [] })
-          break
         }
-      } else {
-        newCmds.push(cmd)
+        bridgeInserted = true
       }
+      continue
     }
+    newCmds.push(absCmds[i])
   }
 
   if (newCmds.length === 0 || newCmds[0].type !== 'M') return commands
   return newCmds
-}
-
-function getCmdEndPoint(cmd) {
-  if (cmd.type === 'M' || cmd.type === 'L') {
-    return { x: cmd.params[0], y: cmd.params[1] }
-  }
-  if (cmd.type === 'C') {
-    return { x: cmd.params[4], y: cmd.params[5] }
-  }
-  if (cmd.type === 'Q') {
-    return { x: cmd.params[2], y: cmd.params[3] }
-  }
-  if (cmd.type === 'A') {
-    return { x: cmd.params[5], y: cmd.params[6] }
-  }
-  return { x: 0, y: 0 }
 }
 
 function getAnchorNodes(absCmds) {
@@ -682,7 +651,7 @@ export function buildSvgString(paths, exportAll = true) {
     if (style.fill && style.fill !== 'none') styleParts.push(`fill:${style.fill}`)
     else styleParts.push('fill:none')
     if (style.stroke) styleParts.push(`stroke:${style.stroke}`)
-    if (style.strokeWidth) styleParts.push(`stroke-width:${style.strokeWidth}`)
+    if (typeof style.strokeWidth === 'number') styleParts.push(`stroke-width:${style.strokeWidth}`)
     if (style.linecap && style.linecap !== 'butt') styleParts.push(`stroke-linecap:${style.linecap}`)
     if (style.linejoin && style.linejoin !== 'miter') styleParts.push(`stroke-linejoin:${style.linejoin}`)
     if (style.dasharray) styleParts.push(`stroke-dasharray:${style.dasharray}`)

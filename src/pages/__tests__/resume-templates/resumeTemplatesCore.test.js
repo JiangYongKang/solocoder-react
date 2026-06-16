@@ -516,8 +516,8 @@ describe('getAverageRating', () => {
     expect(getAverageRating(ratings)).toBe(4)
   })
 
-  it('should ignore non-numeric and zero ratings', () => {
-    const ratings = { tpl1: 4, tpl2: 0, tpl3: 'bad' }
+  it('should ignore non-numeric ratings', () => {
+    const ratings = { tpl1: 4, tpl3: 'bad' }
     expect(getAverageRating(ratings)).toBe(4)
   })
 })

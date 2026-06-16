@@ -1,0 +1,3 @@
+你实现的性能监控面板页面还存在一个残留问题，需要进行修复：
+1. index.jsx 的 processAlerts 函数中 resolveAlertRecords 调用只添加在了 else 全解除分支中，但 if 分支内虽然通过 inactiveRuleIds 变量正确识别了哪些规则已不再触发告警，却仅做了 delete 清理引用而没有同步调用 resolveAlertRecords。当多个告警同时触发但只有部分解除时，已解除告警的持续时间不会被计算，duration 保持为 null，表格中持续时间列始终显示"-"。需要在 if 分支的 inactiveRuleIds 清理逻辑后同步调用 resolveAlertRecords 计算持续时间并写回记录。
+2. 修复后重新运行 pnpm run test，确保所有测试通过。

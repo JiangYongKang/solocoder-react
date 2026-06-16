@@ -1,0 +1,6 @@
+产物不满意：
+模型在重写 canvasRenderer.test.js 时，在文件第 9 行导入了 `generateQRMatrix` 但该函数在整个测试文件中从未被任何测试用例调用。ESLint 对文件会报出 no-unused-vars 警告，说明模型在编写测试时计划了直接验证 QR 矩阵生成的场景，但最终所有 QR 相关测试都通过 drawQRCode 的 canvas mock 间接完成，导致这个导入成为残留代码。根本原因是修改完成后没有用 lint 工具或搜索来检查未使用的导入标识符。正确做法是在完成文件重写后运行 lint 检查，或逐行审查 import 语句确认每个导入都在测试用例中被实际使用，删除无用的 `generateQRMatrix` 导入。
+
+过程不满意：
+1. 模型在正式重写测试文件之前，先创建了一个名为 `_diagnostic.test.js` 的临时诊断文件，试图通过运行测试来统计 drawQRCode 的实际 API 调用次数。但 vitest 默认过滤了 console.log 输出，诊断文件未能获取有效数据，模型随后直接删除了该文件并开始全量重写。这轮创建和删除诊断文件的操作完全是无效劳动，因为 roundRect 函数的源文件就在 canvasRenderer.js 中（第 232 到 245 行），模型只需直接阅读 roundRect 的实现就能精确数出每个 roundRect 产生 1 个 moveTo、4 个 lineTo 和 4 个 quadraticCurveTo。正确做法是直接分析产品代码中 roundRect 的绘制路径，根据代码逻辑推断调用次数，而非通过运行时探测来反推已知信息。
+2. 模型在重写测试文件时，对 drawQRCode 中 roundRect 的 lineTo 调用次数做了错误假设。模型首次写入的断言为 `lineTo.length === 9`，即假设每个 roundRect 有 3 个 lineTo（三条直边）。运行测试失败后才从报错信息中发现实际值为 12，然后将断言修正为正确的 12。但 roundRect 函数在源文件中已明确展示：moveTo 定位到起点后依次绘制顶边、右上角曲线、右边、右下角曲线、底边、左下角曲线、左边和左上角曲线，共 4 条直边，每个 roundRect 产生 4 个 lineTo，三个 roundRect 调用总计 12 个。模型不需要先写出错误值再靠测试反馈修正，应该在写断言前直接分析 roundRect 源码得出正确数量，避免这轮试错式调试。

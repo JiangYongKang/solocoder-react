@@ -720,7 +720,7 @@ describe('inventory/utils', () => {
         const history = buildStockHistory(flowLogs, batches, 5);
         expect(history.length).toBe(5);
         const day0 = history[0];
-        expect(day0.totalStock).toBe(180 - 50 + 20 - 10);
+        expect(day0.totalStock).toBe(140);
         const day4 = history[4];
         expect(day4.totalStock).toBe(180);
       });
@@ -734,7 +734,7 @@ describe('inventory/utils', () => {
         const today = history[2];
         expect(today.totalStock).toBe(180);
         const yesterday = history[1];
-        expect(yesterday.totalStock).toBe(180 - 5 + 10);
+        expect(yesterday.totalStock).toBe(185);
       });
 
       it('clamps negative stock to 0 during retrograde', () => {

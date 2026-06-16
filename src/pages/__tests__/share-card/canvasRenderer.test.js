@@ -6,7 +6,7 @@ import {
   renderShareCard,
   downloadCanvasAsPNG,
 } from '@/pages/share-card/canvasRenderer.js'
-import { createDefaultConfig, generateQRMatrix } from '@/pages/share-card/utils.js'
+import { createDefaultConfig } from '@/pages/share-card/utils.js'
 import { BACKGROUND_MODES, GRADIENT_DIRECTIONS } from '@/pages/share-card/constants.js'
 
 function createMockCtx() {

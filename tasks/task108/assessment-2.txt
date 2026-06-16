@@ -1,9 +1,9 @@
 产物不满意：
-1. index.jsx 中新增的 useEffect 在监听 currentStudentId 变化时调用 updateStudentStatus(prev, currentStudentId, STUDENT_STATUS.UNGRADED) 来设置 startedAt 字段，但 updateStudentStatus 内部通过 `const updates = { status }` 无条件覆盖状态对象。当学生被随机抽查标记为 REVIEW 状态后，其 startedAt 仍为 null，如果此时选中该学生，useEffect 会将 REVIEW 状态强制覆盖为 UNGRADED，待复查标记丢失。触发条件是：先对已有评阅结果的学生标记为需要复查，然后切换回该学生时 startedAt 为空，计时器设置逻辑会覆盖 review 状态。根本原因是模型使用了一个用于更新状态枚举的函数来完成仅设置时间戳的目的，updateStudentStatus 的语义是"改变学生状态"而非"补写缺失字段"。正确做法是新增一个专用于初始化 startedAt 的函数，或直接在 setGradingState 中只修改 startedAt 而不触碰 status 字段。
-2. 模型在思考过程中明确表示"现在让我也清理 handleGradeQuestion 中重复的 startedAt 设置（因为 useEffect 已经处理了）"，并调用了一次 view_files 读取 index.jsx 后说已完成清理。但 checkout 到最终代码后发现 index.jsx 中 handleGradeQuestion 内部的 startedAt 防御性检查代码仍然保留在第 440-442 行，即 useEffect 已处理的情况下又做了一次 startedAt 的冗余检查。这属于模型的"宣称完成但未实际执行"的虚假完成问题，总结中的修复描述与实际文件内容不一致。正确做法是在修改完成后逐文件审查确认每次编辑是否真正落盘。
-3. 修复后的 handleGradeQuestion 函数中 allGraded 标志和 nextStudent 变量定义在 setGradingState 的回调函数外部，但在回调函数内部被赋值。由于 setGradingState 的回调是同步执行的（React 的 setState 函数式更新在调用时同步运行回调），这些外部变量确实能被正确赋值，但这个写法依赖于 React 内部实现细节，代码意图不够显式。当 allGraded 为 true 时使用 setTimeout 延迟 300ms 切换到下一个学生，但没有在组件卸载时清理这个 setTimeout，快速切换学生时可能出现已卸载组件上的状态更新。正确做法是使用 useRef 保存定时器 ID 并在 cleanup 中清除。
+1. useEffect 监听 currentStudentId 变化时用 updateStudentStatus 设置 startedAt，但该函数无条件覆盖 status 字段。学生被标记 REVIEW 后 startedAt 仍为 null，此时选中该学生 REVIEW 会被覆盖为 UNGRADED，标记丢失。根本原因是复用状态变更函数来完成仅补写时间戳的目的，语义错配。应新增专用于初始化 startedAt 的函数，只修改时间戳不触碰 status。
+2. 模型在思考中明确表示清理 handleGradeQuestion 中重复的 startedAt 设置并声称完成，但最终代码中该防御性检查仍保留在第 440-442 行，useEffect 已处理的情况下又做了冗余检查。属于虚假完成问题，总结中的修复描述与实际文件不一致。应在修改完成后逐文件审查确认每次编辑是否真正落盘。
+3. 修复后的 handleGradeQuestion 中 allGraded 和 nextStudent 定义在 setGradingState 回调外部但在回调内赋值，依赖 React 同步执行函数式更新的内部实现细节，代码意图隐晦。allGraded 为 true 时用 setTimeout 延迟 300ms 切换学生但未在组件卸载时清理，快速切换可能触发已卸载组件上的状态更新。应使用 useRef 保存定时器 ID 并在 cleanup 中清除。
 
 过程不满意：
 1. 模型在刚收到任务后立即创建了 3 个 TodoList 条目才开始分析问题，违反了标注规范中"不能在刚收到任务时就直接创建 TodoList，应先分析问题再规划"的要求。正确做法是先读取 examGradingCore.js 和 index.jsx 理解 startedAt 未写入和跳题逻辑冲突的具体原因，再基于分析结果制定修复计划。
 2. 模型在分析阶段重复读取了 examGradingCore.js 两次（两次 view_files 传入完全相同的文件路径），index.jsx 在不同的编辑阶段被读取了至少三次。虽然分批查看同一文件的不同行是合理的，但连续两次读取同一文件相同区域说明模型没有在第一次读取后吸收信息，推理效率低下。
-3. 模型在完成修复后调用 pnpm run test 运行了全部 9562 个测试并通过，但总结时声称"9562 个测试全部通过（123 个测试文件）"，实际项目只有 124 个测试文件。这个差异虽然不大，但反映出模型在总结成果时没有核对测试报告的实际数字，而是凭记忆或估计汇报结果。正确做法是直接从 `pnpm run test` 的输出中复制准确的测试文件数和测试通过数。
+3. 模型完成修复后运行全部 9562 个测试并通过，但总结时声称"9562 个测试全部通过（123 个测试文件）"，实际项目只有 124 个测试文件。反映模型未核对测试报告实际数字，凭记忆汇报结果。应从 pnpm run test 输出中直接复制准确的测试文件数和通过数。

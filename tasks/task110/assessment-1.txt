@@ -1,7 +1,7 @@
 产物不满意：
-1. generateId 修改后测试未同步更新导致测试失败。模型在 utils.js 的 generateId 函数中加入 _idCounter 计数器段来解决 StrictMode 双重调用问题，ID 格式从 `前缀_时间戳_随机数` 变为 `前缀_时间戳_计数器_随机数`，如 `test_mqfyyv6b_1_wzxw8`。但 utils.test.js 第 49 行的测试断言仍使用旧正则 `/^test_[a-z0-9]+_[a-z0-9]+$/` 匹配两段格式，实际运行报错 `expected 'test_mqfyyv6b_1_wzxw8' to match`。根本原因是修改生产代码后未运行测试，也未同步更新测试正则。正确做法是修改后立即执行全量测试并修正断言正则以匹配新增的计数器段。
-2. ResourceStats.jsx 中资源类型徽章样式失效。第 226 行 `className="resource-type-badge resource-type-{res.type}"` 使用了双引号包裹的普通字符串而非反引号模板字符串，JSX 将 `{res.type}` 当作字面文本而非表达式插值。导致所有资源类型徽章的 CSS 类名都是 `resource-type-{res.type}` 这个字面值，CSS 中定义的 `.resource-type-js`、`.resource-type-css` 等按类型着色的样式规则完全不生效，JS、CSS、图片等不同类型的徽章显示相同样式。根本原因是 JSX 语法错误，正确做法是使用模板字符串 `{`resource-type-badge resource-type-${res.type}`}`。
-3. 告警记录缺少"持续时间"列且 duration 始终为空。提示词需求第 5 条明确要求列表显示"持续时间"，但 AlertHistoryPanel.jsx 的表头列仅包含触发时间、规则描述、触发信息、状态、确认时间、操作六列，无持续时间列。createAlertRecord 函数中 duration 设为 null 后从未更新，processAlerts 函数在告警条件恢复时仅清空 alertingRulesRef 而未计算持续时间写回记录。导致用户无法获知每次告警持续了多久，统计功能缺失。正确做法是增加持续时间列，并在告警解除时计算 `Date.now() - triggeredAt` 更新到记录的 duration 字段。
+1. generateId 修改后测试未同步更新导致测试失败。utils.js 的 generateId 为解决 StrictMode 双重调用问题加入了 _idCounter 计数器，ID 格式从两段变为三段。但 utils.test.js 的测试断言仍使用两段匹配的旧正则，运行报错 expected to match。原因是修改生产代码后未运行测试也未同步更新正则。正确做法是修改后执行全量测试并修正断言正则。
+2. ResourceStats.jsx 中资源类型徽章样式失效。className 使用了双引号字符串而非反引号模板字符串，JSX 将花括号表达式当作字面文本不执行插值。导致 .resource-type-js 等按类型着色的 CSS 规则完全不生效，所有徽章显示相同样式。根本原因是 JSX 语法错误，应使用模板字符串。
+3. 告警记录缺少持续时间列且 duration 始终为空。提示词需求第 5 条明确要求列表显示持续时间，但 AlertHistoryPanel.jsx 表头列无持续时间列。createAlertRecord 中 duration 设为 null 后从未更新，processAlerts 在告警解除时仅清空引用未计算持续时间。导致用户无法获知每次告警持续了多久。正确做法是增加表头列并在告警解除时计算时间差更新 duration 字段。
 过程不满意：
 1. 模型在收到提示词后的第一步就直接创建了 10 项 TodoList，尚未查看项目结构或阅读任何现有页面代码。提示词包含 6 大块需求且每块有多个子要求，模型跳过了需求分析和方案设计直接进入编码，违背了标注规范中"应先分析问题再规划"的要求。这一跳步导致后续多次返工，例如瀑布图并行阶段的排序逻辑、告警去重机制在 StrictMode 下的架构问题等，都是因为前期未充分理解需求边界就仓促实现。
 2. 模型修改 App.jsx 时引入了无辜破坏。首次编辑时在 TASKS 数组和 Routes 中插入了不存在的导入路径和重复路由，需要回滚并多次修正。根本原因是未先完整读取 App.jsx 文件确认插入位置的上下文，也未精确验证替换字符串的唯一性。正确做法是先完整读取文件定位插入点，再执行精确的字符串替换。

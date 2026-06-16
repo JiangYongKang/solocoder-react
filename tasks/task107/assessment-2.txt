@@ -1,7 +1,7 @@
 产物不满意：
-模型在验证修复时只运行了 error-monitor 子集的 76 个测试，没有执行提示词第 3 条明确要求的 pnpm run test 全量测试。虽然代码修改本身正确（成功从 mockData.js 移除重复的 generateDailySummaries 并统一 index.jsx 的三张摘要卡片数据源），但仅运行子包测试无法验证本次修改是否破坏了其他包中依赖 mockData.js 导出或 getTodayCount 的代码。此外模型在运行测试命令时末尾出现了 `undefined` 字符串参数（`pnpm exec eslint src/pages/error-monitor/index.jsx ... ; pnpm test -- src/pages/__tests__/error-monitor/utils.test.js undefined`），这暴露了工具调用参数存在未初始化变量的序列化问题，虽然该 undefined 对测试执行结果无影响，但说明模型的命令构造不够严谨。正确做法是按照提示词原文执行 `pnpm run test` 全量命令验证所有测试通过。
+模型在验证修复时只运行了 error-monitor 子集的测试，未执行提示词第 3 条要求的 pnpm run test 全量测试。代码修改本身正确但仅跑子包测试无法验证是否破坏了其他包依赖 mockData.js 或 getTodayCount 的代码。此外测试命令末尾出现了 undefined 字符串参数，暴露了工具调用参数存在未初始化变量的序列化问题，虽然不影响执行结果但命令构造不够严谨。正确做法是按提示词执行 pnpm run test 全量命令验证所有测试通过。
 
 过程不满意：
 1. 模型在收到提示词后第一步就直接创建了 3 个 TodoList 条目才开始读取源文件，此时尚未分析 mockData.js 和 index.jsx 中 generateDailySummaries 的两份实现差异。这违反了标注规范中"不能在刚收到任务时就直接创建 TodoList，应先分析问题再规划"的要求。正确做法是先搜索 generateDailySummaries 在 error-monitor 包中的定义位置，确认两份实现在哪些文件中，再针对性读取并比对差异后制定修复计划。
-2. 模型在修复时只读取了 error-monitor 包下 6 个文件中的 2 个（mockData.js 和 index.jsx），完全没有读取 utils.js 和测试文件 utils.test.js 来确认 utils 版本的 generateDailySummaries 签名和默认参数是否与组件调用方兼容。虽然结果正确（utils 版本有默认参数和安全检查，直接替换无问题），但模型跳过了验证兼容性的步骤，属于运气好的巧合而非系统性的修复方法。正确做法是在替换导入路径前读取 utils.js 的目标函数签名，确认与 mockData 版本在参数列表和默认值上兼容。
-3. 模型在总结中称"ESLint 检查：无错误，单元测试：76 个测试全部通过"，但没有明确说明这 76 个测试的具体范围——是只跑了 error-monitor 子包还是全量。实际执行的命令 `pnpm test -- src/pages/__tests__/error-monitor/utils.test.js undefined` 仅运行了 utils.test.js 一个测试文件，而非 error-monitor 下的全部测试文件。模型的总结表述模糊、范围不明确，掩盖了测试覆盖不完整的事实。正确做法是明确列出运行的测试文件数量和路径，或按提示词要求执行全量测试。
+2. 模型修复时只读了包下 6 个文件中的 2 个，未读 utils.js 和测试文件确认签名兼容性。虽然结果正确（utils 版有默认参数直接替换无问题），但跳过了验证步骤，属于运气巧合而非系统性修复。正确做法是先读取目标函数签名确认与旧版参数兼容再替换。
+3. 模型在总结中称"ESLint 无错误，76 个测试全部通过"，但未说明这 76 个测试的范围是子包还是全量。实际执行的命令仅运行了 utils.test.js 一个测试文件而非 error-monitor 下全部测试，总结表述模糊掩盖了测试覆盖不完整的事实。正确做法是明确列出运行的测试文件数量和路径，或按提示词要求执行全量测试。

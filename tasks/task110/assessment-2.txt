@@ -1,6 +1,6 @@
 产物不满意：
-processAlerts 函数中持续时间计算的覆盖场景存在遗漏。index.jsx 的 processAlerts 函数有 if 和 else 两个分支，if 分支处理仍有告警触发的情况，else 分支处理全部告警解除的情况。模型新增的 resolveAlertRecords 调用只添加在了 else 全解除分支中，而 if 分支内虽然通过 inactiveRuleIds 变量正确识别了哪些规则已不再触发告警，但仅做了 delete 清理引用而没有同步调用 resolveAlertRecords 来更新对应记录的 duration 字段。当多个告警同时触发但只有部分解除时，已解除告警的持续时间永远不会被计算，duration 保持为 null，表格中持续时间列始终显示"-"，用户无法得知告警实际持续了多久。根本原因是模型在添加 resolveAlertRecords 调用时只关注了显式的全解除路径，没有对比检查 if 分支中的部分解除路径也需要同样处理。正确做法是在 if 分支的 inactiveRuleIds 清理逻辑后同步调用 resolveAlertRecords 计算持续时间并写回记录。
+processAlerts 函数持续时间计算覆盖场景存在遗漏。函数有 if 和 else 两分支，resolveAlertRecords 仅加在 else 全解除分支。if 分支内虽通过 inactiveRuleIds 识别了部分解除的规则，仅做了 delete 清理未调用 resolveAlertRecords。当部分告警解除时 duration 保持 null 列始终"-"。根因是只关注全解除路径未检查部分解除。应在 if 分支 inactiveRuleIds 清理后同步调用 resolveAlertRecords。
 
 过程不满意：
-1. 模型在收到第 2 轮提示词后的第一步就直接创建了包含 4 个任务的 TodoList，此时尚未读取任何源文件，不知道当前代码的实际状态。这违反了标注规范中"不能在刚收到任务时就直接创建 TodoList，应先分析问题再规划"的要求。缺少对现有代码的理解就制定修复计划，容易导致任务拆分不合理或遗漏关键步骤。正确流程应该是先用搜索工具定位提示词中涉及的关键标识对应的文件路径，再逐一读取文件理解现有实现，最后基于分析结果制定修改计划。
-2. 模型在实现持续时间计算修复时，只审查了 processAlerts 函数中 else 分支的"全解除"路径并在此处添加了 resolveAlertRecords 调用，但没有完整审视 if 分支是否存在相同需求。if 分支中的 inactiveRuleIds 变量已经精确识别了部分解除的规则 ID，模型本应在同一位置同步添加 resolveAlertRecords 调用，却只做了引用清理而未更新记录。这说明模型修改代码时缺乏"修改一处后检查同类位置是否需要同步修改"的习惯，导致修复不完整。此外模型运行 82 个测试全部通过后就声称修复完成，但现有测试只覆盖了 resolveAlertRecords 工具函数的单元测试，缺少 processAlerts 在部分告警解除时的集成测试用例，模型未辨别测试通过不等于功能完整。
+1. 模型收到提示词后第一步就创建了 TodoList，此时尚未读取任何源文件，不知道当前代码实际状态。这违反"应先分析问题再规划"的标注规范。缺少对现有代码的理解就制定修复计划，容易导致任务拆分不合理或遗漏关键步骤。正确流程是先用搜索工具定位相关文件路径，再读取文件理解现有实现，最后基于分析结果制定修改计划。
+2. 模型实现持续时间计算修复时，只审查了 else 全解除路径并添加了 resolveAlertRecords，未审视 if 分支中 inactiveRuleIds 已识别部分解除的规则 ID 也应同步调用。这导致部分解除时 duration 仍不更新，修复不完整。说明模型缺乏修改一处后检查同类位置的习惯。此外模型运行 82 个测试通过后就声称完成，但现有测试只覆盖工具函数单元测试，缺少部分告警解除的集成测试，未辨别测试通过不等于功能完整。

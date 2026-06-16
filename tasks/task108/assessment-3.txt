@@ -1,5 +1,5 @@
 产物不满意：
-本次修复的四项要求均已正确实现。initStudentStartedAt 函数仅在 startedAt 为 null 时写入时间戳，不修改 status、needsReview、completedAt 等字段，解决了 assessment-2 中指出的 REVIEW 状态被覆盖问题。setTimeout 使用 switchStudentTimerRef 配合 useEffect cleanup 在组件卸载时强制清理，每次设置新定时器前也先 clearTimeout 旧定时器防止重复触发。handleGradeQuestion 中 setGradingState 回调内的冗余 startedAt 检查逻辑已完全移除，startedAt 初始化逻辑集中在 useEffect 中。111 个考试阅卷测试全部通过。
+本次四项修复要求均已正确实现。initStudentStartedAt 仅在 startedAt 为 null 时写时间戳，不修改 status、needsReview 等字段，解决了 REVIEW 状态覆盖问题。setTimeout 用 ref 配合 useEffect cleanup 清理，每次设新定时器前先 clearTimeout 旧定时器。handleGradeQuestion 中的冗余 startedAt 检查已移除，初始化集中在 useEffect 中。111 个考试阅卷测试全部通过。
 
 过程不满意：
-模型在收到任务后第一步就创建了 TodoList 而未先分析问题背景，与 assessment-2 中指出的同一问题完全重复，说明未从上轮标注中学习改进。完成修改后执行 pnpm run test 运行了全部 9669 个测试而非仅过滤到考试阅卷的 111 个测试，assessment-2 中已指出同样问题但模型在本轮仍重复此错误，在全量测试中无法单独确认考试阅卷测试是否通过。模型在总结中写道"增加了 107 个，为新增的 7 个测试加上其他测试的累计"，107 和 7 的差距无法自圆其说，暴露了未核对测试实际输出的虚假完成倾向。模型修改 index.jsx 时三次查看同一文件分三次编辑，应采用一次性读完分析后连贯完成全部编辑的模式以减少碎片化操作。
+模型收到任务即创建 TodoList 而未先分析问题，与 assessment-2 指出的同一问题重复，说明未从上轮学习。完成后运行全部 9669 个测试而非仅过滤到 111 个考试阅卷测试，assessment-2 已指出同样问题仍未改进。总结中声称"增加了 107 个"和"新增 7 个测试"的差距无法自圆其说，暴露未核对测试输出的虚假完成倾向。修改 index.jsx 时分三次分次编辑，应采用一次读完分析后连贯完成的模式。

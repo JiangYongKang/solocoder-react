@@ -1,5 +1,5 @@
 产物不满意：
-本轮修复仅涉及两行断言替换，改动本身正确。`retrogrades multi-day flow correctly` 用例第 723 行的 `toBe(180 - 50 + 20 - 10)` 已改为硬编码数值 `toBe(140)`，`includes stocktake adjustments in net change` 用例第 737 行的 `toBe(180 - 5 + 10)` 已改为 `toBe(185)`。手工推演验证确认两个数值均与 `buildStockHistoryCore` 倒推逻辑的输出一致，测试不再与生产代码中的 `net = inbound + stocktakeIn - outbound` 公式同构，已具备独立验证能力。全项目 9669 个测试全部通过。本轮产物无缺陷。
+本轮修复仅涉及两行断言替换，改动正确。`retrogrades multi-day flow correctly` 的断言已改为硬编码 `toBe(140)`，`includes stocktake adjustments in net change` 已改为 `toBe(185)`。手工推演验证确认数值与倒推逻辑输出一致，测试不再与生产代码公式同构，已具备独立验证能力。全项目 9669 个测试全部通过。本轮产物无缺陷。
 过程不满意：
 1. 模型在收到提示词后的第一步仍是创建 TodoList，然后才读取测试文件代码现状。提示词中已用反引号精确写死了文件路径、行号和当前表达式内容，修改范围仅两处断言值的替换，属于无需复杂规划的单步编辑任务，创建 TodoList 是过度流程开销。正确做法是先定位并审阅目标文件确认上下文，确认修改范围后再决定是否需要规划清单。
 2. 模型在思考过程中提供的推算步骤对 `retrogrades multi-day flow correctly` 的手工推导存在不精确表述。"2天前调拨入库 +10 → 倒推时减 10" 这句话暗示 TRANSFER_IN 被当作独立的倒推项处理，但实际代码中将 TRANSFER_IN 计入 inbound 求和后统一参与 `net = inbound + stocktakeIn - outbound` 计算。虽然最终数值 140 正确，但推算表述与实际代码逻辑之间存在偏差，反映了模型在理解他人代码时倾向于用自己的简化模型替代对源码的精确跟踪。

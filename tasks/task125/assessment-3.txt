@@ -1,5 +1,5 @@
 产物不满意：
-模型在 utils.js 中新增了 shouldResetOnPhoneChange 纯函数来封装"倒计时中且手机号变更"的判定逻辑，并在 handlePhoneChange 中正确添加了 setHasRequestedBefore(false) 调用来修复按钮文案不重置的 BUG，修复方案本身正确。但提示词第 2 条明确要求"为 handlePhoneChange 中重置 hasRequestedBefore 的逻辑补充单元测试"，而模型新增的 4 个测试用例全部针对 shouldResetOnPhoneChange 纯函数的布尔返回值做验证，完全没有覆盖 handlePhoneChange 函数内部 setHasRequestedBefore(false) 的实际调用行为。当倒计时中更换手机号时，handlePhoneChange 需要同时执行条件判断和状态重置两个动作，但测试只验证了条件判断部分，状态重置部分没有任何测试保护。正确做法是补充测试用例验证更换手机号触发条件命中后 hasRequestedBefore 确实被置为 false，而非仅测试条件本身的真值。
+模型新增了 shouldResetOnPhoneChange 纯函数并在 handlePhoneChange 中正确添加了 hasRequestedBefore 重置修复。但提示词要求为 handlePhoneChange 中重置 hasRequestedBefore 的逻辑补充测试，而 4 个新增测试全部针对纯函数返回值，未覆盖 handlePhoneChange 内部 setHasRequestedBefore 的实际调用。测试只验证条件判断部分，状态重置无保护。正确做法是补充测试验证换号后 hasRequestedBefore 确实被置为 false。
 
 过程不满意：
-模型在修复过程中多次重复读取同一文件，步骤 1 已读取 index.jsx 全文，步骤 5 又完整读取了一次 index.jsx 才进行编辑，步骤 3 已读取 utils.test.js，步骤 7 再次读取 utils.test.js 后才添加测试用例。同一文件被完整读取两次却没有增量阅读的必要，属于不必要的重复操作。此外，模型对 index.jsx 的修改拆分为两次独立编辑：步骤 6 只改了 import 语句和条件表达式替换，步骤 7 才补充 setHasRequestedBefore(false) 这行核心修复。第一次编辑时模型似乎遗漏了提示词要求的最主要修复点，随后才回过头补上，这表明在动手编辑前对代码修改方案的组织不够完整，应该在编辑前梳理出该文件需要变更的全部位置，一次性完成修改。
+模型多次重复读取同一文件：index.jsx 被完整读两次才编辑，utils.test.js 也被重复读两次才添加测试，属于无增量阅读需要的不必要重复。此外对 index.jsx 的修改分两次编辑——第一次只改 import 和条件替换，第二次才补充核心修复。表明动手编辑前修改方案组织不完整，应梳理全部变更位置后一次性完成。

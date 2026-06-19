@@ -1,9 +1,13 @@
 产物不满意：
-1. utils.js 的 switchBackgroundMode 函数在切换背景模式时通过 result.background._previousMode = oldMode 将内部状态写入了配置对象的 background 字段中。当用户保存配置到 localStorage 或导出为 JSON 文件时，这个 _previousMode 字段会作为用户数据的一部分被序列化输出，导出的 JSON 里包含了不应出现的内部实现细节。触发时机是每次切换背景模式后执行保存或导出操作时。根本原因是将临时状态直接附着在持久化数据结构上，没有区分 UI 内部控制状态和用户配置数据。正确做法是在组件层用独立的 useState 或 useRef 追踪上一个模式，不要把 _previousMode 写入配置对象。
-2. utils.js 的 sanitizeConfig 函数在校验失败时直接返回 createDefaultConfig() 创建的全新默认配置，采用全有或全无的策略。当用户配置中只有一个字段超出范围（例如 Logo 尺寸被滑块拖到 200px、倒计时秒数设为 100），但其他所有字段都是用户精心调整的值时，调用 sanitizeConfig 会将全部用户配置丢弃并用默认配置替换。saveLastConfig 在每次配置变更时调用 serializeConfig，而 serializeConfig 内部调用 sanitizeConfig，这意味着一个字段越界会导致整个配置静默丢失。根本原因是 sanitizeConfig 缺少逐字段修正逻辑，应该对每个字段独立校验并通过 normalizeLogoSize、normalizeFontSize、normalizeCountdownSeconds 等函数做局部修正，而非整体回退到默认配置。
-3. index.jsx 的 ColorPicker 组件在渲染函数体中直接调用 setLastValue 和 setHexValue，主组件 SplashConfigPage 也在渲染体中调用 setLastTemplateId、setLastFullscreen、setPreviewCountdown 和 setResetCounter。在 React 组件的 render 阶段调用 setState 属于不规范用法，虽然 React 18 对同步 setState 有一定容错，但这种写法破坏了"渲染应为纯函数"的原则，后续维护者难以理解状态变更的触发时机，在并发模式下可能导致预期外的重复渲染。根本原因是模型为了绕过 ESLint 对渲染期间访问 ref 的限制，将 ref 对比改为了 state 对比加 setState，但没有将 setState 移入 useEffect。正确做法是在 useEffect 中监听依赖变化后执行状态同步。
+1. switchBackgroundMode 将 _previousMode 内部状态写入配置对象的 background 字段中。用户保存或导出配置时该字段作为用户数据被序列化，JSON 中包含不应出现的内部细节。原因是将临时状态附着在持久化数据结构上未区分 UI 状态和用户数据。正确做法是组件层用独立 useState 或 useRef 追踪上一个模式。
+
+2. sanitizeConfig 校验失败时直接返回全新默认配置采用全有全无策略。用户仅一个字段超出范围其他精心调整的值被整体丢弃，saveLastConfig 每次变更都会触发，一个字段越界导致整个配置静默丢失。原因是缺少逐字段修正逻辑。正确做法是对每个字段独立校验并用 normalize 函数做局部修正。
+
+3. ColorPicker 和主组件在 render 阶段直接调用 setState，破坏了渲染应为纯函数的原则，并发模式下可能导致预期外重复渲染。原因是模型为绕过 ESLint 对渲染期间访问 ref 的限制将 ref 对比改为 state 对比但未移入 useEffect。正确做法是在 useEffect 中监听依赖变化后执行状态同步。
 
 过程不满意：
-1. 模型在收到提示词后直接创建了包含 12 个项目的 TodoList，然后才开始探索项目结构查看 package.json 和已有页面。TodoList 的创建时机过早，此时模型对项目技术栈、现有代码风格、路由注册方式都还不了解，TodoList 的内容必然是基于猜测而非对实际项目的理解，导致后续执行中多次调整和修复。正确做法是先通读项目结构、理解路由注册模式、参考已有页面的代码组织方式，对任务的技术要求和潜在难点形成完整认知后再规划 TodoList。
-2. 模型在 ESLint 修复阶段对 index.jsx 和 utils.js 进行了至少五轮的反复修改和重新读取：第一轮修复导入和组件问题后运行 ESLint，第二轮修复 ColorPicker 和 previewKey 问题，第三轮找未使用的 val 变量，第四轮改 ref 访问为 state 对比模式，每轮都重新调用了 view_files 读取同一个文件。index.jsx 在 ESLint 修复阶段被完整读取了至少 6 次，utils.js 也被读取了 4 次。这种反复读取同一个文件同一区域的模式说明模型缺乏"先规划所有修复点、再一次性修改"的意识，每次只处理 ESLint 输出中的一个错误类别，改完重新 lint 发现新问题再改，效率极低。
-3. 模型执行 pnpm build 后终端输出了 bill-splitter 模块的构建错误，模型在思考过程中写道"构建错误是 bill-splitter 页面的已有问题，与我的代码无关"，随后没有做任何验证就直接进入了总结阶段。模型的结论缺乏证据支撑：bill-splitter 的错误可能与 splash-config 的新增代码无关，但也可能是因为 splash-config 的导入或路由注册引入了新的编译问题，而模型没有做任何区分性检查（如单独编译 splash-config 相关文件、检查构建错误中是否包含 splash-config 的文件路径），就直接排除自身责任并声称完成。
+1. 模型收到提示词后直接创建了 12 项 TodoList 然后才探索项目结构。创建时机过早，对技术栈和代码风格不了解时 TodoList 基于猜测导致后续多次调整。正确做法是先通读项目结构理解路由注册模式后再规划。
+
+2. 模型在 ESLint 修复阶段对 index.jsx 和 utils.js 进行了五轮反复修改和重读：每轮只处理一个错误类别，改完重新 lint 再改。index.jsx 被完整读至少 6 次，utils.js 被读 4 次。缺乏先规划所有修复点再一次性修改的意识。正确做法是汇总所有 ESLint 警告后列出完整修复清单一次完成。
+
+3. 模型执行构建后看到其他页面构建错误直接判断与自身代码无关就进入总结，未做区分性检查排除自身责任。应独立编译自身文件或检查错误路径确认无干。

@@ -1,15 +1,13 @@
 产物不满意：
+notifyUser 函数中无论浏览器通知是否成功，addToast 在两个分支中都被调用。当通知正常弹出时页面同时出现 Toast 弹窗产生双重通知。提示词要求 Toast 应为浏览器通知不可用时的降级方案。原因是函数未区分通知渠道互斥关系。正确做法是仅 showBrowserNotification 返回 false 时调用 addToast。
 
-在 index.jsx 的 notifyUser 函数中，无论 showBrowserNotification 是否成功发送浏览器通知，addToast 在两个分支中都被调用了。当浏览器通知正常弹出时，页面右上角也会同时出现 Toast 弹窗，用户会看到双重通知。不符合提示词第5条"浏览器不支持或未授权时，页面右上角显示 Toast 弹窗"的要求——Toast 应仅为浏览器通知不可用时的降级方案，而非与浏览器通知并存。根本原因是 notifyUser 函数未区分通知渠道的互斥关系，在 else 分支中也错误保留了 addToast 调用。正确做法是仅在 showBrowserNotification 返回 false 时才调用 addToast。
+recalculateNextExecutionForOverdueTasks 在初始化 useEffect 中仅重算了逾期任务的 nextExecutionTime，未调用 executeExport 触发实际导出。提示词要求有逾期任务则立即补执行一次，但只更新调度时间无导出记录，时间线缺失执行条目。原因是函数职责缺失只做时间重算。正确做法是找到逾期任务后调用 executeExport 立即执行。
 
-当用户刷新页面重新打开调度器时，recalculateNextExecutionForOverdueTasks 函数在 index.jsx 的初始化 useEffect 中被调用，但该函数在 storage.js 中的实现仅重新计算了逾期任务的 nextExecutionTime 字段并更新到状态中，完全没有调用 executeExport 触发实际的导出执行。不符合提示词第6条"有则立即补执行一次"的需求——逾期任务应该被立即执行导出，而不是只把下次执行时间挪到未来。后果是用户关闭页面一段时间后重新打开，原本到期的任务只更新了调度时间但没有实际产生导出记录，时间线中缺失了本应存在的执行条目。根本原因是函数设计职责缺失，只做了时间重算而未做补执行调度。正确做法是找到逾期任务后对其调用 executeExport 立即执行一次导出。
+retryStateMachine 的 retry_fail 分支耗尽判断为 s.retryCount + 1 >= MAX_RETRY_COUNT，而外部传入初始 retryCount=1。第二次重试失败后即判定耗尽，实际只执行 2 次而非提示词要求的 3 次。原因是 +1 判断与外部初始值不一致导致计数偏多。正确做法是改为 s.retryCount >= MAX_RETRY_COUNT。
 
-在 utils.js 的 retryStateMachine 函数中，retry_fail 分支的耗尽判断条件为 `s.retryCount + 1 >= MAX_RETRY_COUNT`，而 executeExport 中初始失败后调用 startRetrySequence 时传入 retryCount 参数为 1。由于 retryCount 从 1 开始计数，第一次重试失败后变为 2，第二次重试失败后 2+1>=3 即判定耗尽，实际只执行了 2 次重试而非提示词第4条要求的"最多 3 次"重试。后果是任务在 2 次重试失败后就被标记为已暂停并显示红色警告，少了一次重试机会。根本原因是 retry_fail 中 +1 的判断逻辑与外部传入的初始 retryCount=1 不一致，导致计数偏多一。正确做法是将判断条件改为 `s.retryCount >= MAX_RETRY_COUNT`。
-
-utils.js 中定义了 isOverdueTask 函数用于判断任务是否超过执行时间一分钟以上，但该函数在整个 export-scheduler 包内未被任何文件 import 或调用，属于废弃代码。模型在开发 recalculateNextExecutionForOverdueTasks 时采用了内联的判断方式而未能复用 isOverdueTask，写完后也没有清理这个未被引用的导出函数。后果是代码库中存在无用导出增加维护负担，且可能误导后续阅读者认为逾期判断逻辑有不同的实现版本。根本原因是开发完成后没有对整个包做一次导出函数引用检查。正确做法是完成开发后 grep 搜索所有导出的函数名，清除未被引用的代码。
+isOverdueTask 函数在整个 export-scheduler 包内未被任何文件 import 或调用，属于废弃代码。recalculateNextExecutionForOverdueTasks 采用了内联判断未能复用该函数。原因是开发完成后未对整个包做导出函数引用检查。正确做法是 grep 搜索所有导出函数名清除未被引用的代码。
 
 过程不满意：
+模型查看项目目录和一个参考页面后直接创建了 8 项 TodoList 按列表逐项写文件。按规范应先对 7 条需求逐条分析理解业务边界后再制定计划。过早创建导致对逾期补执行和通知降级等关键边界场景缺乏预分析，实现出错误逻辑。正确做法是先梳理全部需求明确关键流程状态转换再规划。
 
-模型在查看项目目录结构和一个参考页面后，直接创建了包含 8 个子任务的 TodoList，然后按列表逐项开始写文件。根据标注规范，模型不应在刚收到任务时就直接创建 TodoList，应先对提示词的 7 条需求进行逐条分析和分解，理解每条需求的业务边界后再制定执行计划。过早创建 TodoList 导致模型对逾期任务补执行和 Toast 通知降级逻辑等关键边界场景缺乏预先分析，最终在这些边界行为上实现了错误或不完整的逻辑。正确做法是先静默梳理全部需求，明确调度循环、重试状态机、通知降级、逾期补执行等关键流程的完整状态转换，再规划实现步骤并创建 TodoList。
-
-模型完成代码编写和 75 个单元测试全部通过后，仅运行了 GetDiagnostics 检查诊断信息，但从未执行 pnpm run dev 启动开发服务器进行页面可视化验证。这导致双通知弹窗和逾期任务补执行缺失等肉眼可观测的问题未被发现，模型在总结中声称"所有任务已完成"时并不知晓这些功能缺陷的存在。根本原因是过度依赖单元测试作为质量验证的唯一手段，忽略了可视化验证对交互逻辑和通知行为的检查价值——测试全部通过不代表功能全部正确。正确做法是在单元测试通过后启动项目，对创建任务、触发导出、关闭重开页面等关键操作路径逐一实际操作确认交互行为是否符合预期。
+模型 75 个测试通过后仅运行 GetDiagnostics 未启动 dev server 做页面可视化验证，双通知弹窗和逾期补执行缺失等肉眼可观测问题未被发现。过度依赖单元测试忽略可视化验证对交互逻辑和通知行为的检查价值。正确做法是测试通过后启动项目逐一操作确认关键路径。

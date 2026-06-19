@@ -1,9 +1,9 @@
 产物不满意：
-getHeatmapLevel 函数中存在冗余计算 Math.log(count + 1) 除以 Math.log(Math.E)，JavaScript 的 Math.log 本身就是以 e 为底的自然对数，Math.log(Math.E) 恒等于 1，该除法操作实际等效于 Math.log(count + 1) 本身。代码中保留这段无意义的除法和 Math.log(Math.E) 调用，不仅增加了不必要的运算开销，也让阅读者误以为模型在进行显式的对数底数转换。根本原因是模型在编写对数分级逻辑时错误套用了对数换底公式 Math.log(x) / Math.log(base)，但 base 参数又被设成了 Math.E 这个自然对数的默认底数，导致公式完全冗余。正确做法是直接使用 Math.floor(Math.log(count + 1)) 计算等级，去除无意义的除法操作。
+getHeatmapLevel 函数中 Math.log(count + 1) / Math.log(Math.E) 存在冗余计算。Math.log 本身以 e 为底，Math.log(Math.E) 恒等于 1，除法等效于 Math.log(count + 1) 本身。这段无意义代码增加了运算开销且让阅读者误解。原因是错误套用了换底公式但 base 被设为 Math.E。正确做法是直接使用 Math.floor(Math.log(count + 1))。
 
 过程不满意：
-模型在收到提示词后的第一步就直接创建了 Todo 列表，完全没有先阅读 flashcardUtils.js 的代码来分析各个函数的当前实现和耦合程度。按照标注规范，正确做法是先理解代码现状、确认每个函数的具体逻辑和改动范围，再制定修改计划创建 Todo。模型跳过分析环节直接规划的行为，可能导致修改方案与实际代码状况脱节，增加后续反复修改的风险。
+模型收到提示词后第一步直接创建 TodoList，完全没有先阅读 flashcardUtils.js 分析当前实现和耦合程度。按规范应先理解代码现状再制定计划。跳过分析直接规划，修改方案可能与实际代码脱节。
 
-模型在实现 getHeatmapLevel 的对数分级逻辑时，写下了 Math.log(count + 1) / Math.log(Math.E) 这段代码，其中除以 Math.log(Math.E) 是完全没有意义的操作。这说明模型在不熟悉 Math.log 默认底数是 e 的情况下直接编写了生产代码，试图套用对数换底公式但用错了参数。正确做法是在使用不太熟悉的 API 前查阅文档或直接验证 API 的行为，确保写出的代码逻辑简洁正确，而非写出冗余的分母为 1 的除法运算。
+模型实现 getHeatmapLevel 时写了 Math.log(count + 1) / Math.log(Math.E) 这段分母恒为 1 的无意义代码。说明在不熟悉 Math.log 默认底数的情况下直接写生产代码，试图套用换底公式但用错参数。正确做法是查阅文档确认 API 默认底数后再编写。
 
-模型在运行 npx eslint src/pages/flashcard/ 后看到终端输出了其他任务包的 ESLint 错误，直接在思考过程中将其归类为 color-toolkit 的测试失败等无关问题，没有单独确认 flashcard 目录下的文件是否也存在任何 Lint 警告。随后模型又执行了一个带有 --no-eslintrc 参数且命令末尾拼接了 undefined 字符串的畸形 eslint 命令，命令构造本身存在明显的语法错误。正确做法是用 ESLint 仅针对 flashcard 目录输出诊断结果，逐条检查是否存在未使用变量、代码风格等问题，确保修复代码在提交前零警告。
+模型运行 ESLint 后看到其他任务包报错，直接归类为无关问题而未单独确认 flashcard 目录自身是否有 lint 警告，随后又执行了末尾拼接 undefined 字符串的畸形 eslint 命令，命令构造存在语法错误。正确做法是仅针对 flashcard 目录输出诊断并逐条检查。

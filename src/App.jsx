@@ -102,6 +102,13 @@ import LogAnalyzerPage from '@/pages/log-analyzer/index.jsx'
 import SplashConfigPage from '@/pages/splash-config/index.jsx'
 import BillSplitterPage from '@/pages/bill-splitter/index.jsx'
 import ColorToolkitPage from '@/pages/color-toolkit/index.jsx'
+import SmsTemplatePage from '@/pages/sms-template/index.jsx'
+import HealthTrackerPage from '@/pages/health-tracker/index.jsx'
+import FeedbackPage from '@/pages/feedback/index.jsx'
+import OrgChartPage from '@/pages/org-chart/index.jsx'
+import ChatbotPage from '@/pages/chatbot/index.jsx'
+import KeyTesterPage from '@/pages/key-tester/index.jsx'
+import ImageCompressorPage from '@/pages/image-compressor/index.jsx'
 
 const TASKS = [
     { id: 1, title: '用户认证系统', route: 'auth', description: '登录、注册、找回密码、修改密码完整的认证流程，基于 localStorage 存储。' },
@@ -195,6 +202,9 @@ const TASKS = [
     { id: 90, title: '数据导出调度器', route: 'export-scheduler', description: '数据导出定时调度管理工具，创建导出任务配置数据源/字段/格式/调度频率，执行时间线与历史下载，失败自动重试与完成通知，基于 localStorage 持久化。' },
     { id: 91, title: '账单分摊计算器', route: 'bill-splitter', description: '多人账单分摊计算工具，支持参与者增删与拖拽排序、费用录入（平分/自定义比例）、最简结算方案生成，历史记录 localStorage 持久化。' },
     { id: 92, title: '颜色工具集', route: 'color-toolkit', description: '前端开发者颜色工具箱，调色板生成、HEX/RGB/HSL互转、色盲模拟、渐变色CSS、品牌色提取，收藏与导出功能，基于 localStorage 持久化。' },
+    { id: 93, title: '个人健康档案', route: 'health-tracker', description: '个人健康数据记录和追踪工具，支持身高/体重/血压/血糖录入、趋势折线图、BMI计算与标准范围对比、异常值标记、健康报告生成、目标设定追踪，基于 localStorage 持久化。' },
+    { id: 93, title: '组织架构图编辑器', route: 'org-chart', description: '可视化组织架构图编辑工具，支持部门/职位/人员三种节点，拖拽增删改、横向纵向布局切换、缩放平移、属性编辑、JSON/PNG导入导出，数据 localStorage 持久化。' },
+    { id: 94, title: '图片压缩工具', route: 'image-compressor', description: '纯前端图片压缩工具，支持质量/尺寸/格式参数调节、并排对比预览、批量处理、压缩级别预设、localStorage 历史记录持久化。' },
 ]
 
 function HomePage() {
@@ -322,6 +332,11 @@ function App() {
             <Route path="/loading-animation" element={<LoadingAnimationPage />} />
             <Route path="/bill-splitter" element={<BillSplitterPage />} />
             <Route path="/color-toolkit" element={<ColorToolkitPage />} />
+            <Route path="/sms-template" element={<SmsTemplatePage />} />
+            <Route path="/feedback" element={<FeedbackPage />} />
+            <Route path="/health-tracker" element={<HealthTrackerPage />} />
+            <Route path="/org-chart" element={<OrgChartPage />} />
+            <Route path="/image-compressor" element={<ImageCompressorPage />} />
         </Routes>
     )
 }

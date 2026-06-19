@@ -1,0 +1,10 @@
+产物不满意：
+1. buildPreviewContent 函数中 `const signature = template.signature || DEFAULT_SIGNATURE` 使用 `||` 运算符判断签名值，当调用方传入空字符串 `''` 作为 signature 时，由于空字符串是 falsy 值，函数会回退到 `DEFAULT_SIGNATURE`（`【XX平台】`）。而 index.jsx 中预览渲染代码 `(editingSignature || '') + buildPreviewContent({ content: editingContent, signature: '' }, editingSamples)` 已在外部拼接了 editingSignature，导致默认签名场景下预览内容出现两个 `【XX平台】` 前缀，如"【XX平台】【XX平台】尊敬的张三…"。根本原因是空字符串与未提供签名在语义上不同但代码未能区分，应改用 `template.signature !== undefined ? template.signature : DEFAULT_SIGNATURE` 修复。
+2. 提示词第 1 条明确要求"变量名在编辑区中以蓝色高亮背景标记"，模型在 index.jsx 的编辑区域使用了原生 `<textarea>` 组件，textarea 无法渲染内嵌 HTML 样式。变量蓝色高亮仅实现在右侧预览面板的 `renderHighlightedContent` 函数中（CSS 类 `.sms-variable`），编辑区仍然是纯文本没有任何高亮效果。原因是模型直接用 textarea 承载模板内容编辑，未采用 contentEditable div 或 overlay 方案来支持富文本渲染。导致用户编辑模板时无法直观辨别哪些是变量占位符、哪些是普通文本。
+3. App.jsx 中虽然注册了 `<Route path="/sms-template" element={<SmsTemplatePage />} />` 路由并在文件顶部 import 了 SmsTemplatePage 组件，但 TASKS 数组中未添加 sms-template 对应的任务卡片条目。用户从首页无法看到"短信模板编辑器"的入口卡片，只能通过手动输入 URL 地址 `/sms-template` 访问该页面，不符合项目约定中每个二级页面均需在首页卡片列表中可点击进入的一贯做法。
+4. index.jsx 第 984 行预览面板的"自定义示例值"按钮使用了非标准 HTML 属性 `size="small"`，该属性不是 button 元素的合法属性，React 会将其作为自定义 DOM 属性传递给底层元素，可能在浏览器控制台产生警告，也反映出代码规范检查不够细致。
+
+过程不满意：
+1. 模型在收到提示词后第一步就调用 todo_write 创建了 TodoList（6 项子任务），然后才开始查看项目目录结构。根据标注规范，模型不应在刚收到任务时就直接创建 TodoList，应先分析问题、阅读现有代码约定、梳理需求复杂度，再规划执行步骤。先创建 TodoList 再探索项目会导致规划与实际情况脱节，模型后续也确实将 TodoList 从 6 项调整为 8 项才最终完成。
+2. 模型运行单元测试后遇到 3 个失败用例，其中"混合内容应正确统计"用例的 billingChars 期望值，模型第一次修改为错误值、测试仍不通过、第二次重新数了"您的验证码为"六个字后才修正正确。同一行断言值被修改了两次才通过，反映出模型在面对计费字数计算验证时采取了"改完就跑测试看结果"的试错方式，而不是先静态推演 `calculateCharCount` 函数的逐字符计数过程再修正期望值。这种试错式调试在计费字数这类确定性计算问题上不够高效。
+3. 模型在任务总结中声称"ESLint 检查——无错误"，但实际执行的命令是 `npm run lint 2>&1 | Select-String -Pattern "sms-template"`，仅仅从 lint 全量输出中 grep 了包含 sms-template 字符串的行，并未确认 lint 命令本身是否返回了非零退出码或存在其他文件的编译警告影响全局构建。同时模型声称"Vite 生产构建——成功"但也未提供构建输出的具体内容或退出码验证。总结描述与验证手段的严谨程度不匹配，存在对验证结果过度乐观的倾向。

@@ -1,0 +1,59 @@
+export const STORAGE_KEY = 'feedback_list'
+
+export const FEEDBACK_CATEGORIES = {
+  FEATURE: 'feature',
+  BUG: 'bug',
+  EXPERIENCE: 'experience',
+  CONTENT: 'content',
+  OTHER: 'other',
+}
+
+export const CATEGORY_LABELS = {
+  [FEEDBACK_CATEGORIES.FEATURE]: '功能建议',
+  [FEEDBACK_CATEGORIES.BUG]: 'BUG 报告',
+  [FEEDBACK_CATEGORIES.EXPERIENCE]: '体验问题',
+  [FEEDBACK_CATEGORIES.CONTENT]: '内容问题',
+  [FEEDBACK_CATEGORIES.OTHER]: '其他',
+}
+
+export const CATEGORY_COLORS = {
+  [FEEDBACK_CATEGORIES.FEATURE]: '#6366f1',
+  [FEEDBACK_CATEGORIES.BUG]: '#ef4444',
+  [FEEDBACK_CATEGORIES.EXPERIENCE]: '#f59e0b',
+  [FEEDBACK_CATEGORIES.CONTENT]: '#10b981',
+  [FEEDBACK_CATEGORIES.OTHER]: '#6b7280',
+}
+
+export const FEEDBACK_STATUS = {
+  SUBMITTED: 'submitted',
+  PROCESSING: 'processing',
+  RESOLVED: 'resolved',
+}
+
+export const STATUS_LABELS = {
+  [FEEDBACK_STATUS.SUBMITTED]: '已提交',
+  [FEEDBACK_STATUS.PROCESSING]: '处理中',
+  [FEEDBACK_STATUS.RESOLVED]: '已解决',
+}
+
+export const STATUS_COLORS = {
+  [FEEDBACK_STATUS.SUBMITTED]: '#9ca3af',
+  [FEEDBACK_STATUS.PROCESSING]: '#3b82f6',
+  [FEEDBACK_STATUS.RESOLVED]: '#22c55e',
+}
+
+export const PAGE_SIZE = 10
+
+export const MAX_TITLE_LENGTH = 100
+export const MAX_DESCRIPTION_LENGTH = 2000
+export const MAX_ATTACHMENTS = 3
+export const MAX_ATTACHMENT_SIZE = 5 * 1024 * 1024
+export const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+
+export const STATUS_TRANSITIONS = {
+  [FEEDBACK_STATUS.SUBMITTED]: FEEDBACK_STATUS.PROCESSING,
+  [FEEDBACK_STATUS.PROCESSING]: FEEDBACK_STATUS.RESOLVED,
+  [FEEDBACK_STATUS.RESOLVED]: null,
+}
+
+export const TREND_DAYS = 7

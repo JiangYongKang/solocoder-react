@@ -1,54 +1,75 @@
-import { useCallback, useMemo, useRef, useState, useEffect } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import './text-diff.css'
 import {
-  DIFF_TYPE,
-  buildSideBySideDiff,
-  extractChangeBlocks,
-  getChangeTypeLabel,
-  getDiffStats,
-  isSupportedFileType,
-  readClipboardText,
-  readFileAsText,
-  splitLines,
-} from './diffUtils'
+  computeAllDiffStats,
+  computeCombinedWordFrequency,
+  buildLineDiffPairs,
+  computeCharDiffForLine,
+  getSimilarityColor,
+} from './textDiffStats'
+import { loadHistory, addHistoryItem, removeHistoryItem, clearHistory } from './storage'
 
-const VIEW_MODE = {
-  SIDE_BY_SIDE: 'side-by-side',
-  UNIFIED: 'unified',
+const SAMPLE_TEXT_A = `The quick brown fox jumps over the lazy dog.
+This is a sample text for testing.
+Hello world!
+Programming is fun.
+Learning React components.`
+
+const SAMPLE_TEXT_B = `The quick brown cat jumps over the lazy dog.
+This is a example text for testing.
+Hello there!
+Coding is fun.
+Building React applications.`
+
+const SimilarityRing = ({ value, label, size = 80, strokeWidth = 6 }) => {
+  const radius = (size - strokeWidth) / 2
+  const circumference = 2 * Math.PI * radius
+  const offset = circumference - (value / 100) * circumference
+  const color = getSimilarityColor(value)
+
+  return (
+    <div className="tds-similarity-ring" title={`相似度: ${value}%`}>
+      <svg width={size} height={size}>
+        <circle
+          className="tds-ring-bg"
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          strokeWidth={strokeWidth}
+        />
+        <circle
+          className="tds-ring-progress"
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          strokeWidth={strokeWidth}
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          stroke={color}
+        />
+      </svg>
+      <div className="tds-ring-content">
+        <span className="tds-ring-value" style={{ color }}>{value}%</span>
+        <span className="tds-ring-label">{label}</span>
+      </div>
+    </div>
+  )
 }
 
-const SAMPLE_OLD = `function hello(name) {
-  console.log("Hello, " + name);
-  return true;
-}
-
-const users = ["Alice", "Bob"];
-for (let i = 0; i < users.length; i++) {
-  hello(users[i]);
-}`
-
-const SAMPLE_NEW = `function greet(name, greeting = "Hello") {
-  console.log(greeting + ", " + name + "!");
-  return name.length > 0;
-}
-
-const people = ["Alice", "Bob", "Charlie"];
-for (const person of people) {
-  greet(person, "Hi");
-}`
-
-const renderCharDiff = (charDiff) => {
+const CharDiffSpan = ({ charDiff, side }) => {
   if (!charDiff || charDiff.length === 0) return null
   return charDiff.map((segment, idx) => {
+    if (segment.type === 'added' && side === 'left') return null
+    if (segment.type === 'removed' && side === 'right') return null
+
     let className = ''
-    if (segment.type === DIFF_TYPE.ADDED) {
-      className = 'td-char-added'
-    } else if (segment.type === DIFF_TYPE.REMOVED) {
-      className = 'td-char-removed'
-    } else if (segment.type === DIFF_TYPE.MODIFIED) {
-      className = 'td-char-modified'
+    if (side === 'left' && segment.type === 'removed') {
+      className = 'tds-char-removed'
+    } else if (side === 'right' && segment.type === 'added') {
+      className = 'tds-char-added'
     }
+
     if (className) {
       return (
         <span key={idx} className={className}>
@@ -60,309 +81,377 @@ const renderCharDiff = (charDiff) => {
   })
 }
 
-const getLineClassName = (type) => {
-  switch (type) {
-    case DIFF_TYPE.ADDED:
-      return 'td-line-added'
-    case DIFF_TYPE.REMOVED:
-      return 'td-line-removed'
-    case DIFF_TYPE.MODIFIED:
-      return 'td-line-modified'
-    default:
-      return ''
-  }
-}
+const TextDiffStatsPage = () => {
+  const [titleA, setTitleA] = useState('文本 A')
+  const [titleB, setTitleB] = useState('文本 B')
+  const [textA, setTextA] = useState(SAMPLE_TEXT_A)
+  const [textB, setTextB] = useState(SAMPLE_TEXT_B)
+  const [showDiffOnly, setShowDiffOnly] = useState(false)
+  const [syncScroll, setSyncScroll] = useState(true)
+  const [wordFreqTopN, setWordFreqTopN] = useState(20)
+  const [showDiffWordsOnly, setShowDiffWordsOnly] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
+  const [history, setHistory] = useState(() => {
+    if (typeof window === 'undefined') return []
+    return loadHistory()
+  })
 
-const TextDiffPage = () => {
-  const [oldText, setOldText] = useState(SAMPLE_OLD)
-  const [newText, setNewText] = useState(SAMPLE_NEW)
-  const [viewMode, setViewMode] = useState(VIEW_MODE.SIDE_BY_SIDE)
-  const [activeBlockIndex, setActiveBlockIndex] = useState(-1)
-  const [error, setError] = useState('')
-
-  const diffContentRef = useRef(null)
+  const leftTextareaRef = useRef(null)
+  const rightTextareaRef = useRef(null)
+  const leftDiffRef = useRef(null)
+  const rightDiffRef = useRef(null)
   const leftFileInputRef = useRef(null)
   const rightFileInputRef = useRef(null)
+  const isSyncingRef = useRef(false)
 
-  const diffResult = useMemo(() => {
-    return buildSideBySideDiff(oldText, newText)
-  }, [oldText, newText])
+  const saveToHistory = useCallback(() => {
+    const updated = addHistoryItem({ titleA, titleB, textA, textB })
+    setHistory(updated)
+  }, [titleA, titleB, textA, textB])
 
-  const changeBlocks = useMemo(() => {
-    return extractChangeBlocks(diffResult.lineDiff)
-  }, [diffResult])
+  const diffStats = useMemo(() => {
+    return computeAllDiffStats(textA, textB)
+  }, [textA, textB])
 
-  const stats = useMemo(() => {
-    return getDiffStats(diffResult.lineDiff)
-  }, [diffResult])
+  const lineDiffResult = useMemo(() => {
+    return buildLineDiffPairs(textA, textB)
+  }, [textA, textB])
+
+  const wordFrequency = useMemo(() => {
+    return computeCombinedWordFrequency(textA, textB, wordFreqTopN, showDiffWordsOnly)
+  }, [textA, textB, wordFreqTopN, showDiffWordsOnly])
+
+  const filteredPairs = useMemo(() => {
+    if (!showDiffOnly) return lineDiffResult.pairs
+    return lineDiffResult.pairs.filter((p) => p.type !== 'equal')
+  }, [lineDiffResult.pairs, showDiffOnly])
+
+  const handleClear = useCallback(() => {
+    setTextA('')
+    setTextB('')
+  }, [])
+
+  const handleLoadSample = useCallback(() => {
+    setTextA(SAMPLE_TEXT_A)
+    setTextB(SAMPLE_TEXT_B)
+    setTitleA('文本 A')
+    setTitleB('文本 B')
+  }, [])
 
   const handleFileSelect = useCallback(async (e, side) => {
     const file = e.target.files?.[0]
     e.target.value = ''
-    setError('')
-
     if (!file) return
-
-    if (!isSupportedFileType(file)) {
-      setError('仅支持 .txt 和 .md 文件')
-      return
-    }
-
     try {
-      const content = await readFileAsText(file)
+      const content = await file.text()
       if (side === 'left') {
-        setOldText(content)
+        setTextA(content)
       } else {
-        setNewText(content)
+        setTextB(content)
       }
     } catch {
-      setError('文件读取失败')
+      // ignore
     }
   }, [])
 
-  const handleClipboardPaste = useCallback(async (side) => {
-    setError('')
-    const result = await readClipboardText()
-    if (result.success) {
-      if (side === 'left') {
-        setOldText(result.text)
-      } else {
-        setNewText(result.text)
+  const handleScrollSync = useCallback((sourceSide, e) => {
+    if (!syncScroll || isSyncingRef.current) return
+    isSyncingRef.current = true
+
+    const source = e.target
+    const scrollRatio = source.scrollTop / (source.scrollHeight - source.clientHeight)
+
+    const targets = []
+    if (sourceSide === 'left-input') {
+      if (rightTextareaRef.current) targets.push(rightTextareaRef.current)
+    } else if (sourceSide === 'right-input') {
+      if (leftTextareaRef.current) targets.push(leftTextareaRef.current)
+    } else if (sourceSide === 'left-diff') {
+      if (rightDiffRef.current) targets.push(rightDiffRef.current)
+    } else if (sourceSide === 'right-diff') {
+      if (leftDiffRef.current) targets.push(leftDiffRef.current)
+    }
+
+    targets.forEach((target) => {
+      const targetScrollTop = scrollRatio * (target.scrollHeight - target.clientHeight)
+      target.scrollTop = targetScrollTop
+    })
+
+    requestAnimationFrame(() => {
+      isSyncingRef.current = false
+    })
+  }, [syncScroll])
+
+  const handleHistorySelect = useCallback((item) => {
+    setTitleA(item.titleA)
+    setTitleB(item.titleB)
+    setTextA(item.textA)
+    setTextB(item.textB)
+    setShowHistory(false)
+  }, [])
+
+  const handleHistoryDelete = useCallback((id, e) => {
+    e.stopPropagation()
+    const updated = removeHistoryItem(id)
+    setHistory(updated)
+  }, [])
+
+  const handleClearHistory = useCallback(() => {
+    clearHistory()
+    setHistory([])
+  }, [])
+
+  const renderLineDiff = () => {
+    return filteredPairs.map((pair, idx) => {
+      const charDiff = pair.type === 'equal'
+        ? null
+        : computeCharDiffForLine(pair.leftContent, pair.rightContent)
+
+      let leftRowClass = ''
+      let rightRowClass = ''
+      if (pair.type === 'removed') {
+        leftRowClass = 'tds-line-removed'
+      } else if (pair.type === 'added') {
+        rightRowClass = 'tds-line-added'
+      } else if (pair.type === 'equal') {
+        // no highlight
+      } else if (pair.type === 'modified' || (pair.leftContent && pair.rightContent && pair.leftContent !== pair.rightContent)) {
+        leftRowClass = 'tds-line-modified'
+        rightRowClass = 'tds-line-modified'
       }
-    } else {
-      setError(result.error || '无法读取剪贴板')
-    }
-  }, [])
-
-  const scrollToBlock = useCallback((blockIndex) => {
-    if (blockIndex < 0 || blockIndex >= changeBlocks.length) return
-
-    const block = changeBlocks[blockIndex]
-    if (!block) return
-
-    setActiveBlockIndex(blockIndex)
-
-    const contentEl = diffContentRef.current
-    if (!contentEl) return
-
-    const targetRow = block.startIndex
-    const rows = contentEl.querySelectorAll('[data-row-index]')
-    if (rows && rows.length > 0) {
-      const targetEl = rows[targetRow]
-      if (targetEl) {
-        targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      }
-    }
-  }, [changeBlocks])
-
-  const handleSwap = useCallback(() => {
-    setOldText(newText)
-    setNewText(oldText)
-  }, [oldText, newText])
-
-  const handleClear = useCallback(() => {
-    setOldText('')
-    setNewText('')
-  }, [])
-
-  const handleLoadSample = useCallback(() => {
-    setOldText(SAMPLE_OLD)
-    setNewText(SAMPLE_NEW)
-  }, [])
-
-  useEffect(() => {
-    if (activeBlockIndex >= 0 && activeBlockIndex < changeBlocks.length) {
-      const timer = setTimeout(() => setActiveBlockIndex(-1), 1500)
-      return () => clearTimeout(timer)
-    }
-  }, [activeBlockIndex, changeBlocks.length])
-
-  const renderSideBySide = () => {
-    const { leftRows, rightRows } = diffResult
-    const rowCount = Math.max(leftRows.length, rightRows.length)
-    const rows = []
-
-    for (let i = 0; i < rowCount; i++) {
-      const leftRow = leftRows[i] || {}
-      const rightRow = rightRows[i] || {}
-      const isEmptyRow = leftRow.empty && rightRow.empty
-      const lineClass = getLineClassName(leftRow.type !== DIFF_TYPE.EQUAL ? leftRow.type : rightRow.type)
-
-      if (isEmptyRow) continue
-
-      rows.push(
-        <div key={i} data-row-index={i} style={{ display: 'contents' }}>
-          <div className={`td-line-num ${leftRow.lineNum ? '' : 'td-line-num-empty'}`}>
-            {leftRow.lineNum || ''}
-          </div>
-          <div className={`td-line-content ${leftRow.empty ? 'td-line-empty' : ''} ${lineClass}`}>
-            {leftRow.charDiff ? renderCharDiff(leftRow.charDiff) : (leftRow.content || '\u00A0')}
-          </div>
-          <div className={`td-line-num ${rightRow.lineNum ? '' : 'td-line-num-empty'}`}>
-            {rightRow.lineNum || ''}
-          </div>
-          <div className={`td-line-content ${rightRow.empty ? 'td-line-empty' : ''} ${lineClass}`}>
-            {rightRow.charDiff ? renderCharDiff(rightRow.charDiff) : (rightRow.content || '\u00A0')}
-          </div>
-        </div>
-      )
-    }
-
-    return rows
-  }
-
-  const renderUnified = () => {
-    const { unifiedRows } = diffResult
-    return unifiedRows.map((row, idx) => {
-      const lineClass = getLineClassName(row.type)
-      const prefixClass = row.prefix === '+'
-        ? 'td-unified-prefix-added'
-        : row.prefix === '-'
-          ? 'td-unified-prefix-removed'
-          : ''
 
       return (
-        <div key={idx} data-row-index={idx} style={{ display: 'contents' }}>
-          <div className={`td-line-num ${row.leftLineNum ? '' : 'td-line-num-empty'}`}>
-            {row.leftLineNum || ''}
+        <div key={idx} className="tds-diff-row" style={{ display: 'contents' }}>
+          <div className={`tds-line-num ${pair.leftIndex != null ? '' : 'tds-line-num-empty'}`}>
+            {pair.leftIndex != null ? pair.leftIndex + 1 : ''}
           </div>
-          <div className={`td-line-num ${row.rightLineNum ? '' : 'td-line-num-empty'}`}>
-            {row.rightLineNum || ''}
+          <div className={`tds-line-content ${leftRowClass}`}>
+            {charDiff ? (
+              <CharDiffSpan charDiff={charDiff} side="left" />
+            ) : (
+              <span>{pair.leftContent || '\u00A0'}</span>
+            )}
           </div>
-          <div className={`td-unified-prefix ${prefixClass}`}>
-            {row.prefix}
+          <div className={`tds-line-num ${pair.rightIndex != null ? '' : 'tds-line-num-empty'}`}>
+            {pair.rightIndex != null ? pair.rightIndex + 1 : ''}
           </div>
-          <div className={`td-unified-content ${lineClass}`}>
-            {row.charDiff ? renderCharDiff(row.charDiff) : (row.content || '\u00A0')}
+          <div className={`tds-line-content ${rightRowClass}`}>
+            {charDiff ? (
+              <CharDiffSpan charDiff={charDiff} side="right" />
+            ) : (
+              <span>{pair.rightContent || '\u00A0'}</span>
+            )}
           </div>
         </div>
       )
     })
   }
 
-  const oldLineCount = splitLines(oldText).length
-  const newLineCount = splitLines(newText).length
-
   return (
-    <div className="td-page">
-      <div className="td-container">
-        <header className="td-header">
-          <Link to="/" className="td-back-link">← 返回首页</Link>
-          <h1 className="td-title">文本差异对比工具</h1>
-          <div className="td-stats">
-            <span className="td-stat td-stat-added">+{stats.added}</span>
-            <span className="td-stat td-stat-removed">-{stats.removed}</span>
-            {stats.modified > 0 && (
-              <span className="td-stat td-stat-modified">~{stats.modified}</span>
-            )}
+    <div className="tds-page">
+      <div className="tds-container">
+        <header className="tds-header">
+          <Link to="/" className="tds-back-link">← 返回首页</Link>
+          <h1 className="tds-title">文本差异统计工具</h1>
+          <div className="tds-header-actions">
+            <button
+              type="button"
+              className="tds-btn tds-btn-secondary"
+              onClick={() => setShowHistory(!showHistory)}
+            >
+              📜 历史记录
+            </button>
+            <button
+              type="button"
+              className="tds-btn tds-btn-primary"
+              onClick={saveToHistory}
+            >
+              💾 保存
+            </button>
           </div>
         </header>
 
-        <div className="td-toolbar">
-          <div className="td-toolbar-group">
-            <button
-              type="button"
-              className={`td-toolbar-btn ${viewMode === VIEW_MODE.SIDE_BY_SIDE ? 'active' : ''}`}
-              onClick={() => setViewMode(VIEW_MODE.SIDE_BY_SIDE)}
-            >
-              左右对比
-            </button>
-            <button
-              type="button"
-              className={`td-toolbar-btn ${viewMode === VIEW_MODE.UNIFIED ? 'active' : ''}`}
-              onClick={() => setViewMode(VIEW_MODE.UNIFIED)}
-            >
-              统一视图
-            </button>
+        {showHistory && (
+          <div className="tds-history-panel">
+            <div className="tds-history-header">
+              <span className="tds-history-title">历史记录</span>
+              <button
+                type="button"
+                className="tds-btn tds-btn-ghost"
+                onClick={handleClearHistory}
+              >
+                清空全部
+              </button>
+            </div>
+            <div className="tds-history-list">
+              {history.length === 0 ? (
+                <div className="tds-history-empty">暂无历史记录</div>
+              ) : (
+                history.map((item) => (
+                  <div
+                    key={item.id}
+                    className="tds-history-item"
+                    onClick={() => handleHistorySelect(item)}
+                  >
+                    <div className="tds-history-item-content">
+                      <div className="tds-history-item-titles">
+                        <span className="tds-history-item-title">{item.titleA}</span>
+                        <span className="tds-history-item-vs">vs</span>
+                        <span className="tds-history-item-title">{item.titleB}</span>
+                      </div>
+                      <div className="tds-history-item-time">
+                        {new Date(item.timestamp).toLocaleString()}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="tds-history-item-delete"
+                      onClick={(e) => handleHistoryDelete(item.id, e)}
+                      title="删除"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
-          <div className="td-toolbar-group">
-            <button
-              type="button"
-              className="td-toolbar-btn"
-              onClick={handleSwap}
-            >
-              ⇄ 交换
-            </button>
-            <button
-              type="button"
-              className="td-toolbar-btn"
-              onClick={handleClear}
-            >
+        )}
+
+        <div className="tds-stats-bar">
+          <div className="tds-stats-counts">
+            <div className="tds-stat-item">
+              <span className="tds-stat-label">字符差异</span>
+              <span className="tds-stat-value tds-stat-diff">{diffStats.char.diff}</span>
+            </div>
+            <div className="tds-stat-item">
+              <span className="tds-stat-label">单词差异</span>
+              <span className="tds-stat-value tds-stat-diff">{diffStats.word.diff}</span>
+            </div>
+            <div className="tds-stat-item">
+              <span className="tds-stat-label">行差异</span>
+              <span className="tds-stat-value tds-stat-diff">{diffStats.line.diff}</span>
+            </div>
+          </div>
+          <div className="tds-similarity-rings">
+            <SimilarityRing value={diffStats.char.similarity} label="字符" />
+            <SimilarityRing value={diffStats.word.similarity} label="单词" />
+            <SimilarityRing value={diffStats.line.similarity} label="行" />
+          </div>
+        </div>
+
+        <div className="tds-toolbar">
+          <div className="tds-toolbar-left">
+            <label className="tds-toggle">
+              <input
+                type="checkbox"
+                checked={syncScroll}
+                onChange={(e) => setSyncScroll(e.target.checked)}
+              />
+              <span>锁定同步滚动</span>
+            </label>
+            <label className="tds-toggle">
+              <input
+                type="checkbox"
+                checked={showDiffOnly}
+                onChange={(e) => setShowDiffOnly(e.target.checked)}
+              />
+              <span>仅显示差异行</span>
+            </label>
+          </div>
+          <div className="tds-toolbar-right">
+            <button type="button" className="tds-btn tds-btn-ghost" onClick={handleClear}>
               清空
             </button>
-            <button
-              type="button"
-              className="td-toolbar-btn"
-              onClick={handleLoadSample}
-            >
-              示例
+            <button type="button" className="tds-btn tds-btn-ghost" onClick={handleLoadSample}>
+              使用示例文本
             </button>
           </div>
         </div>
 
-        {error && <div className="td-error">{error}</div>}
-
-        <div className="td-input-section">
-          <div className="td-input-pane">
-            <div className="td-pane-header">
-              <span className="td-pane-title">原始文本 · {oldLineCount} 行</span>
-              <div className="td-pane-actions">
+        <div className="tds-input-section">
+          <div className="tds-input-pane">
+            <div className="tds-pane-header">
+              <input
+                type="text"
+                className="tds-title-input"
+                value={titleA}
+                onChange={(e) => setTitleA(e.target.value)}
+                placeholder="输入标题..."
+              />
+              <div className="tds-pane-actions">
                 <button
                   type="button"
-                  className="td-pane-action-btn"
-                  onClick={() => handleClipboardPaste('left')}
-                  title="从剪贴板粘贴"
+                  className="tds-pane-btn"
+                  onClick={() => leftFileInputRef.current?.click()}
+                  title="从文件加载"
                 >
-                  📋 粘贴
+                  📁 文件
                 </button>
                 <button
                   type="button"
-                  className="td-pane-action-btn"
-                  onClick={() => leftFileInputRef.current?.click()}
-                  title="上传 .txt 或 .md 文件"
+                  className="tds-pane-btn"
+                  onClick={handleClear}
+                  title="清空"
                 >
-                  📁 上传
+                  🗑️ 清空
                 </button>
               </div>
             </div>
             <textarea
-              className="td-textarea"
-              value={oldText}
-              onChange={(e) => setOldText(e.target.value)}
-              placeholder="在此输入或粘贴原始文本..."
+              ref={leftTextareaRef}
+              className="tds-textarea"
+              value={textA}
+              onChange={(e) => setTextA(e.target.value)}
+              onScroll={(e) => handleScrollSync('left-input', e)}
+              placeholder="在此输入或粘贴文本..."
               spellCheck={false}
             />
+            <div className="tds-pane-footer">
+              <span>{textA.length} 字符 · {textA.split('\n').length} 行</span>
+            </div>
           </div>
 
-          <div className="td-input-pane">
-            <div className="td-pane-header">
-              <span className="td-pane-title">修改后文本 · {newLineCount} 行</span>
-              <div className="td-pane-actions">
+          <div className="tds-input-pane">
+            <div className="tds-pane-header">
+              <input
+                type="text"
+                className="tds-title-input"
+                value={titleB}
+                onChange={(e) => setTitleB(e.target.value)}
+                placeholder="输入标题..."
+              />
+              <div className="tds-pane-actions">
                 <button
                   type="button"
-                  className="td-pane-action-btn"
-                  onClick={() => handleClipboardPaste('right')}
-                  title="从剪贴板粘贴"
+                  className="tds-pane-btn"
+                  onClick={() => rightFileInputRef.current?.click()}
+                  title="从文件加载"
                 >
-                  📋 粘贴
+                  📁 文件
                 </button>
                 <button
                   type="button"
-                  className="td-pane-action-btn"
-                  onClick={() => rightFileInputRef.current?.click()}
-                  title="上传 .txt 或 .md 文件"
+                  className="tds-pane-btn"
+                  onClick={handleClear}
+                  title="清空"
                 >
-                  📁 上传
+                  🗑️ 清空
                 </button>
               </div>
             </div>
             <textarea
-              className="td-textarea"
-              value={newText}
-              onChange={(e) => setNewText(e.target.value)}
-              placeholder="在此输入或粘贴修改后的文本..."
+              ref={rightTextareaRef}
+              className="tds-textarea"
+              value={textB}
+              onChange={(e) => setTextB(e.target.value)}
+              onScroll={(e) => handleScrollSync('right-input', e)}
+              placeholder="在此输入或粘贴文本..."
               spellCheck={false}
             />
+            <div className="tds-pane-footer">
+              <span>{textB.length} 字符 · {textB.split('\n').length} 行</span>
+            </div>
           </div>
         </div>
 
@@ -370,111 +459,97 @@ const TextDiffPage = () => {
           ref={leftFileInputRef}
           type="file"
           accept=".txt,.md,.markdown,text/plain,text/markdown"
-          className="td-hidden-file"
+          className="tds-hidden-file"
           onChange={(e) => handleFileSelect(e, 'left')}
         />
         <input
           ref={rightFileInputRef}
           type="file"
           accept=".txt,.md,.markdown,text/plain,text/markdown"
-          className="td-hidden-file"
+          className="tds-hidden-file"
           onChange={(e) => handleFileSelect(e, 'right')}
         />
 
-        <div className="td-main-layout">
-          <div className="td-diff-area">
-            {viewMode === VIEW_MODE.SIDE_BY_SIDE ? (
-              <>
-                <div className="td-diff-headers-row">
-                  <div className="td-diff-header-col">#</div>
-                  <div className="td-diff-header-col">原始</div>
-                  <div className="td-diff-header-col">#</div>
-                  <div className="td-diff-header-col">修改后</div>
-                </div>
+        <div className="tds-main-content">
+          <div className="tds-diff-section">
+            <div className="tds-section-header">
+              <h2 className="tds-section-title">差异对比视图</h2>
+            </div>
+            <div className="tds-diff-container">
+              <div className="tds-diff-headers-row">
+                <div className="tds-diff-header-col">#</div>
+                <div className="tds-diff-header-col">{titleA || '文本 A'}</div>
+                <div className="tds-diff-header-col">#</div>
+                <div className="tds-diff-header-col">{titleB || '文本 B'}</div>
+              </div>
+              <div className="tds-diff-scroll-container">
                 <div
-                  ref={diffContentRef}
-                  className="td-diff-content"
+                  ref={leftDiffRef}
+                  className="tds-diff-content tds-diff-left"
+                  onScroll={(e) => handleScrollSync('left-diff', e)}
                 >
-                  <div className="td-side-by-side">
-                    {renderSideBySide()}
+                  <div className="tds-side-by-side">
+                    {renderLineDiff()}
                   </div>
                 </div>
-              </>
-            ) : (
-              <>
-                <div className="td-diff-headers-row" style={{ gridTemplateColumns: '50px 50px 24px 1fr' }}>
-                  <div className="td-diff-header-col">原</div>
-                  <div className="td-diff-header-col">新</div>
-                  <div className="td-diff-header-col"></div>
-                  <div className="td-diff-header-col">内容</div>
-                </div>
-                <div
-                  ref={diffContentRef}
-                  className="td-diff-content"
-                >
-                  <div className="td-unified">
-                    {renderUnified()}
-                  </div>
-                </div>
-              </>
-            )}
+              </div>
+            </div>
           </div>
 
-          <div className="td-nav-panel">
-            <div className="td-nav-header">
-              变更块 · {changeBlocks.length}
+          <div className="tds-wordfreq-section">
+            <div className="tds-section-header">
+              <h2 className="tds-section-title">词频统计</h2>
+              <div className="tds-section-actions">
+                <label className="tds-toggle">
+                  <input
+                    type="checkbox"
+                    checked={showDiffWordsOnly}
+                    onChange={(e) => setShowDiffWordsOnly(e.target.checked)}
+                  />
+                  <span>只显示差异词语</span>
+                </label>
+                <select
+                  className="tds-select"
+                  value={wordFreqTopN}
+                  onChange={(e) => setWordFreqTopN(Number(e.target.value))}
+                >
+                  <option value={20}>Top 20</option>
+                  <option value={50}>Top 50</option>
+                  <option value={0}>全部</option>
+                </select>
+              </div>
             </div>
-            <div className="td-nav-list">
-              {changeBlocks.length === 0 ? (
-                <div className="td-nav-empty">暂无差异</div>
-              ) : (
-                changeBlocks.map((block, idx) => {
-                  const firstRow = block.rows?.[0] || {}
-                  const previewText = firstRow.oldLine || firstRow.newLine || ''
-                  const preview = previewText.length > 40
-                    ? previewText.slice(0, 40) + '...'
-                    : previewText
-
-                  let badgeClass = ''
-                  switch (block.type) {
-                    case DIFF_TYPE.ADDED:
-                      badgeClass = 'td-nav-badge-added'
-                      break
-                    case DIFF_TYPE.REMOVED:
-                      badgeClass = 'td-nav-badge-removed'
-                      break
-                    case DIFF_TYPE.MODIFIED:
-                      badgeClass = 'td-nav-badge-modified'
-                      break
-                    default:
-                      break
-                  }
-
-                  const location = firstRow.oldIndex != null && firstRow.newIndex != null
-                    ? `行 ${firstRow.oldIndex + 1} → ${firstRow.newIndex + 1}`
-                    : firstRow.oldIndex != null
-                      ? `行 ${firstRow.oldIndex + 1}`
-                      : firstRow.newIndex != null
-                        ? `行 ${firstRow.newIndex + 1}`
-                        : ''
-
-                  return (
-                    <div
-                      key={idx}
-                      className={`td-nav-item ${activeBlockIndex === idx ? 'active' : ''}`}
-                      onClick={() => scrollToBlock(idx)}
-                    >
-                      <span className={`td-nav-badge ${badgeClass}`}>
-                        {getChangeTypeLabel(block.type)}
-                      </span>
-                      <div className="td-nav-info">
-                        <div className="td-nav-location">{location}</div>
-                        <div className="td-nav-preview">{preview || '(空行)'}</div>
-                      </div>
-                    </div>
-                  )
-                })
-              )}
+            <div className="tds-wordfreq-table-container">
+              <table className="tds-wordfreq-table">
+                <thead>
+                  <tr>
+                    <th>排名</th>
+                    <th>词语</th>
+                    <th className="tds-text-right">文本 A</th>
+                    <th className="tds-text-right">文本 B</th>
+                    <th className="tds-text-right">A 占比</th>
+                    <th className="tds-text-right">B 占比</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {wordFrequency.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="tds-empty-cell">暂无数据</td>
+                    </tr>
+                  ) : (
+                    wordFrequency.map((item, idx) => (
+                      <tr key={item.word}>
+                        <td>{idx + 1}</td>
+                        <td className="tds-word-cell">{item.word}</td>
+                        <td className="tds-text-right">{item.countA}</td>
+                        <td className="tds-text-right">{item.countB}</td>
+                        <td className="tds-text-right">{item.percentageA}%</td>
+                        <td className="tds-text-right">{item.percentageB}%</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -483,4 +558,4 @@ const TextDiffPage = () => {
   )
 }
 
-export default TextDiffPage
+export default TextDiffStatsPage

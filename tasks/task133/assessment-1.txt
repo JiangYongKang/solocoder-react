@@ -1,0 +1,6 @@
+产物不满意：
+1. App.jsx 虽然导入了 ChatbotPage 组件，但 Routes 部分缺少对应的 `<Route path="/chatbot" element={<ChatbotPage />} />` 路由注册，同时 TASKS 数组中也缺少 chatbot 的任务卡片条目。导致用户访问首页时看不到「IM 聊天机器人模拟」入口卡片，直接输入 `/#/chatbot` 路径也无法渲染页面，页面完全不可达。原因是模型在编辑 App.jsx 时，import 语句成功插入但 Route 标签和 TASKS 条目的编辑操作未生效，且模型在编辑后未回读文件验证结果，误以为路由已正确添加。正确做法是在执行字符串替换后立即读取文件，确认 Route 和 TASKS 条目均已正确插入且无语法错误。
+2. index.jsx 的 handleSend 函数中，当用户输入「人工」等关键词触发 `matchFAQ` 返回 human 类别后，handleSend 先将包含用户消息的 newUserMessages 写入会话，再调用 handleTransferToHuman。但 handleTransferToHuman 内部使用闭包中过期的 `currentSession?.messages` 构造 withWaiting 变量，该变量缺失刚写入的用户消息。随后 handleTransferToHuman 通过 setSessions 用 withWaiting 覆写会话消息，导致用户发送的「人工」被完全丢弃，聊天记录出现断档。原因是 handleTransferToHuman 未从 setSessions 的 prev 参数中获取最新消息，而是依赖了外部闭包中的过期状态。正确做法是在 handleTransferToHuman 内部改用 `setSessions((prev) => { const msgs = getSessionById(prev, currentSessionId).messages; const withWaiting = [...msgs, waitingMsg]; ... })` 确保始终基于最新消息操作。
+
+过程不满意：
+模型在编辑 App.jsx 添加路由时，先添加了 ChatbotPage 的 import 语句，随后尝试添加 Route 标签和 TASKS 条目。第二次编辑操作失败后模型定位到问题并提示"文件有问题，让我重新读取并修复"，重新读了 App.jsx 后又执行了一次编辑。但此后模型未再做文件回读验证就直接跳到了测试步骤，并在最终总结中声称"路由注册：App.jsx — 添加了 /chatbot 路由"。实际上当前 App.jsx 中仅有 import 语句，Routes 和 TASKS 中均无 chatbot 相关内容，模型总结与实际文件状态严重不符。这反映出模型在输出最终总结时未对已编辑的关键文件做逐文件确认，存在幻觉描述问题。正确做法是在所有编辑操作完成后，对每个被编辑过的关键文件做一轮完整的重读和内容核对，确保总结描述与实际文件内容一致。

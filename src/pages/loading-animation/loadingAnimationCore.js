@@ -525,34 +525,35 @@ function deduplicateKeyframes(entries) {
   const seen = new Map()
   let cssOutput = ''
   const elementRenameMap = {}
-  const processedGroups = new Set()
+  const processedGroups = new Map()
+  let nextGroupIndex = 0
 
   entries.forEach(({ name, config, elementIndex }) => {
     const isWave = name.startsWith('wave-')
-    const groupKey = isWave ? `wave::${configSignature(config)}` : null
     const sig = `${name}::${configSignature(config)}`
 
     if (isWave) {
-      if (!processedGroups.has(groupKey)) {
-        processedGroups.add(groupKey)
+      const groupSig = `wave::${configSignature(config)}`
+      if (!processedGroups.has(groupSig)) {
+        const groupIndex = nextGroupIndex++
+        processedGroups.set(groupSig, groupIndex)
         const builder = KEYFRAME_BUILDERS.wave
         if (builder) {
           const raw = builder(config)
           const generatedNames = parseKeyframeNames(raw)
           let replaced = raw
-          generatedNames.forEach((genName, idx) => {
+          generatedNames.forEach((genName) => {
             const genSig = `${genName}::${configSignature(config)}`
-            if (seen.size === 0 && idx === 0) {
-              seen.set(genSig, genName)
-            } else {
-              const renamed = `${genName}-${seen.size}`
-              seen.set(genSig, renamed)
+            const renamedName = groupIndex === 0
+              ? genName
+              : `${genName}-${groupIndex}`
+            seen.set(genSig, renamedName)
+            if (groupIndex > 0) {
               replaced = replaced.replace(
                 new RegExp(`@keyframes\\s+${escapeRegex(genName)}\\s*\\{`, 'g'),
-                `@keyframes ${renamed} {`
+                `@keyframes ${renamedName} {`
               )
             }
-            seen.set(`${genName}::${configSignature(config)}`, seen.get(genSig) || genName)
           })
           cssOutput += replaced.trim() + '\n\n'
         }

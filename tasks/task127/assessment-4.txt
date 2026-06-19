@@ -1,0 +1,5 @@
+产物不满意：
+本轮修复正确完成了提示词全部三项要求。第一，deduplicateKeyframes 函数中旧版死代码 `seen.set(genSig, seen.get(genSig) || genName)` 已完整删除，该回退分支永远不可达，当前代码中不再存在冗余写入。第二，wave 组命名通过 nextGroupIndex 计数器实现组级统一策略，processedGroups 从 Set 改为 Map 存储组序号，第 0 组五个 bar 全部保留原名如 wave-0 到 wave-4，第 1 组五个 bar 全部统一加 -1 后缀如 wave-0-1 到 wave-4-1，组内不再出现混合命名。第三，测试文件同步修正了旧预期值，并新增了 `should use uniform naming within the same wave group (no mixed naming)` 用例，用正则分类验证同一组内后缀完全一致，100 个测试全部通过，lint 无警告。本轮产物代码无可见缺陷。
+
+过程不满意：
+模型在完成 loadingAnimationCore.js 的代码修改后直接运行测试，未在改动前先读取测试文件了解哪些用例会受到命名策略变更的影响，对受影响的测试缺少前置预判。首次测试失败后模型将预期值从 wave-0-5 修正为 wave-0-1，但这次修正仍然假定 wave 组的后缀编号会跟随全局 seen.size 计算，忽略了自身刚刚实现的 nextGroupIndex 是独立于 seen.size 的组级计数器这一关键设计。第二次测试运行再次失败后，模型才意识到组内编号独立的行为特征，将断言方式从硬编码具体后缀值改为正则模式分组验证，完成了最终修正。两轮迭代过程说明模型在代码实现后未充分消化自身逻辑中组级编号与全局编号分离的设计涵义，测试修正时仍基于旧有假设推算预期值。正确做法是在代码改完之后先梳理清楚 nextGroupIndex 的赋值规则和边界情况，确认对同一测试场景的实际输出，再一次性修正所有受影响的断言，避免多轮试错。

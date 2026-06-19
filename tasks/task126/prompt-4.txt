@@ -1,0 +1,3 @@
+你实现的账单分摊计算器在上轮修复中还存在修复不彻底的问题，需要进行修复：
+1. validateAllExpenses 函数返回的 message 字段只取了 errors 中第一个键对应的错误信息来拼接提示（通过 Object.keys(errors)[0]），当一条费用同时存在多个字段不完整时——比如描述为空且金额为0——message 只显示一项错误，用户修正第一个字段后再次提交才会看到第二个字段的错误，需要多轮提交才能发现同一费用的所有问题。同时 validateAllExpenses 返回的 errors 和 expenseIndex 字段在调用方 index.jsx 的 openSaveModal 中完全未被使用，调用方只消费了 validation.message，新增的字段级错误对象和费用索引成了死代码。需要让 message 包含所有字段级错误信息，或修改调用方使其逐字段渲染 errors 中每项校验失败的提示。
+2. 修复后需要补充和修正单元测试，确保所有测试通过。

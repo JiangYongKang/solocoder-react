@@ -5,7 +5,6 @@ import {
 import {
   transitionStatus,
   addLifecycleStage,
-  clearLifecycleStages,
   simulateResourceLoad,
 } from './utils.js';
 
@@ -77,32 +76,42 @@ export function finishUnmountApp(app, manager, timestamp = Date.now()) {
   return { app: appWithStage, manager: newManager, duration };
 }
 
-export function startLoadingResources(app, timestamp = Date.now()) {
-  if (!app) return { app, error: '应用不存在' };
-  void timestamp;
+export function startLoadingResources(app, manager, timestamp = Date.now()) {
+  if (!app) return { app, manager, error: '应用不存在' };
+  if (!manager) return { app, manager, error: '生命周期管理器不存在' };
   const result = transitionStatus(app, APP_STATUS.LOADING);
-  if (result.error) return { app, error: result.error };
-  return { app: { ...result.app, failedResources: [] }, error: null };
+  if (result.error) return { app, manager, error: result.error };
+  const newManager = beginLifecycleStage(manager, app.id, LIFECYCLE_STAGES.LOADING, timestamp);
+  return {
+    app: { ...result.app, failedResources: [] },
+    manager: newManager,
+    error: null,
+  };
 }
 
-export function finishLoadingResources(app, loadResult, timestamp = Date.now()) {
-  if (!app) return { app, error: '应用不存在' };
-  if (!loadResult) return { app, error: '加载结果为空' };
-  void timestamp;
+export function finishLoadingResources(app, manager, loadResult, timestamp = Date.now()) {
+  if (!app) return { app, manager, duration: 0, error: '应用不存在' };
+  if (!manager) return { app, manager, duration: 0, error: '生命周期管理器不存在' };
+  if (!loadResult) return { app, manager, duration: 0, error: '加载结果为空' };
+
+  const { manager: newManager, duration } = completeLifecycleStage(manager, app.id, timestamp);
+  const appWithStage = addLifecycleStage(app, LIFECYCLE_STAGES.LOADING, duration, timestamp);
 
   if (!loadResult.success) {
-    const failedResult = transitionStatus(app, APP_STATUS.LOAD_FAILED);
-    if (failedResult.error) return { app, error: failedResult.error };
+    const failedResult = transitionStatus(appWithStage, APP_STATUS.LOAD_FAILED);
+    if (failedResult.error) return { app, manager, duration: 0, error: failedResult.error };
     return {
       app: {
         ...failedResult.app,
         failedResources: loadResult.failedResources || [],
       },
+      manager: newManager,
+      duration,
       error: null,
     };
   }
 
-  return { app, error: null };
+  return { app: appWithStage, manager: newManager, duration, error: null };
 }
 
 export function resetFailedApp(app) {
@@ -122,11 +131,22 @@ export function resetFailedApp(app) {
 
 export function resetAppForRestart(app) {
   if (!app) return app;
-  return clearLifecycleStages({
+  const stages = (app.lifecycle?.stages || []).filter(
+    (s) => s.stage === LIFECYCLE_STAGES.LOADING
+  );
+  const currentStage =
+    app.lifecycle?.currentStage === LIFECYCLE_STAGES.LOADING
+      ? app.lifecycle.currentStage
+      : null;
+  return {
     ...app,
     status: APP_STATUS.STOPPED,
     failedResources: [],
-  });
+    lifecycle: {
+      stages,
+      currentStage,
+    },
+  };
 }
 
 export { simulateResourceLoad };

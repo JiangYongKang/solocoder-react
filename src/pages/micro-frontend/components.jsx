@@ -173,6 +173,7 @@ export function UpgradeModal({ app, onClose, onUpgrade }) {
 
 export function LifecycleSteps({ app }) {
   const stages = [
+    { key: 'loading', label: 'loading' },
     { key: 'bootstrap', label: 'bootstrap' },
     { key: 'mount', label: 'mount' },
     { key: 'ready', label: 'ready' },

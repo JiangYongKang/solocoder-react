@@ -26,7 +26,7 @@ export default function BillSplitterPage() {
   const [saveModalOpen, setSaveModalOpen] = useState(false)
   const [saveModalKey, setSaveModalKey] = useState(0)
   const [saveInitialName, setSaveInitialName] = useState('')
-  const [saveError, setSaveError] = useState('')
+  const [saveErrors, setSaveErrors] = useState(null)
 
   useEffect(() => {
     saveHistory(history)
@@ -41,10 +41,10 @@ export default function BillSplitterPage() {
   const openSaveModal = () => {
     const validation = validateAllExpenses(expenses, participants)
     if (!validation.valid) {
-      setSaveError(validation.message)
+      setSaveErrors({ message: validation.message, errors: validation.errors, expenseIndex: validation.expenseIndex })
       return
     }
-    setSaveError('')
+    setSaveErrors(null)
     setSaveInitialName(`账单 ${formatDateTime(Date.now()).slice(0, 10)}`)
     setSaveModalKey((k) => k + 1)
     setSaveModalOpen(true)
@@ -70,7 +70,7 @@ export default function BillSplitterPage() {
     if (confirm('确认清空当前所有参与者和费用吗？')) {
       setParticipants([])
       setExpenses([])
-      setSaveError('')
+      setSaveErrors(null)
     }
   }
 
@@ -110,9 +110,16 @@ export default function BillSplitterPage() {
             保存账单
           </button>
         </div>
-        {saveError && (
-          <div className="error-text" style={{ width: '100%', marginTop: 8 }}>
-            {saveError}
+        {saveErrors && (
+          <div style={{ width: '100%', marginTop: 8 }}>
+            <div className="error-text" style={{ fontWeight: 600, marginBottom: 4 }}>
+              {saveErrors.message}
+            </div>
+            {Object.entries(saveErrors.errors).map(([field, msg]) => (
+              <div key={field} className="error-text" style={{ paddingLeft: 12 }}>
+                · {msg}
+              </div>
+            ))}
           </div>
         )}
       </div>

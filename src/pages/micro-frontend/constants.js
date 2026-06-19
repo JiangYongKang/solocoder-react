@@ -19,6 +19,7 @@ export const APP_STATUS_LABELS = {
 };
 
 export const LIFECYCLE_STAGES = {
+  LOADING: 'loading',
   BOOTSTRAP: 'bootstrap',
   MOUNT: 'mount',
   READY: 'ready',
@@ -26,6 +27,7 @@ export const LIFECYCLE_STAGES = {
 };
 
 export const LIFECYCLE_STAGE_LABELS = {
+  [LIFECYCLE_STAGES.LOADING]: 'loading',
   [LIFECYCLE_STAGES.BOOTSTRAP]: 'bootstrap',
   [LIFECYCLE_STAGES.MOUNT]: 'mount',
   [LIFECYCLE_STAGES.READY]: 'ready',

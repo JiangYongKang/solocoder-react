@@ -583,9 +583,40 @@ describe('Composition', () => {
         createCompositionElement('wave', waveConfigB, { x: 75, y: 50 }),
       ]
       const result = generateCompositionCSS(elements)
-      const waveKf0Count = (result.match(/@keyframes\s+wave-0/g) || []).length
+      const waveKf0Count = (result.match(/@keyframes\s+wave-0\b/g) || []).length
       expect(waveKf0Count).toBe(2)
-      expect(result).toContain('@keyframes wave-0-5')
+      expect(result).toContain('@keyframes wave-0-1')
+      expect(result).toContain('@keyframes wave-4-1')
+    })
+
+    it('should use uniform naming within the same wave group (no mixed naming)', () => {
+      const waveConfigA = { ...defaultTestConfig, count: 5, speed: 1 }
+      const waveConfigB = { ...defaultTestConfig, count: 5, speed: 2 }
+      const elements = [
+        createCompositionElement('wave', waveConfigA, { x: 25, y: 50 }),
+        createCompositionElement('wave', waveConfigB, { x: 75, y: 50 }),
+      ]
+      const result = generateCompositionCSS(elements)
+
+      const kfDefs = result.match(/@keyframes\s+([^\s{]+)\s*\{/g) || []
+      const waveDefs = kfDefs.filter(d => d.includes('wave-'))
+
+      const group0Names = []
+      const group1Names = []
+      waveDefs.forEach(def => {
+        const name = def.replace('@keyframes ', '').replace(' {', '').trim()
+        if (/^wave-\d+$/.test(name)) {
+          group0Names.push(name)
+        } else if (/^wave-\d+-\d+$/.test(name)) {
+          group1Names.push(name)
+        }
+      })
+
+      expect(group0Names.length).toBe(5)
+      expect(group1Names.length).toBe(5)
+
+      const group1Suffixes = [...new Set(group1Names.map(n => n.split('-')[2]))]
+      expect(group1Suffixes.length).toBe(1)
     })
 
     it('should reuse wave keyframes for identical wave configs across elements', () => {

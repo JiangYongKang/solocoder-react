@@ -184,8 +184,9 @@ export default function MicroFrontendSandbox() {
     if (!startingApp) return;
 
     const startTs = Date.now();
-    const loadStart = startLoadingResources(startingApp, startTs);
+    const loadStart = startLoadingResources(startingApp, lifecycleManagerRef.current, startTs);
     if (loadStart.error) return;
+    lifecycleManagerRef.current = loadStart.manager;
 
     setApps((prev) => prev.map((a) => (a.id === appId ? loadStart.app : a)));
 
@@ -216,12 +217,20 @@ export default function MicroFrontendSandbox() {
 
     const loadFinishTs = Date.now();
     let loadFailed = false;
+    let loadDuration = 0;
 
     setApps((prev) => {
       const prevApp = prev.find((a) => a.id === appId);
       if (!prevApp) return prev;
-      const finishLoad = finishLoadingResources(prevApp, loadResult, loadFinishTs);
+      const finishLoad = finishLoadingResources(
+        prevApp,
+        lifecycleManagerRef.current,
+        loadResult,
+        loadFinishTs
+      );
       if (finishLoad.error) return prev;
+      lifecycleManagerRef.current = finishLoad.manager;
+      loadDuration = finishLoad.duration;
       if (finishLoad.app.status === APP_STATUS.LOAD_FAILED) {
         loadFailed = true;
       }
@@ -229,6 +238,10 @@ export default function MicroFrontendSandbox() {
     });
 
     await Promise.resolve();
+
+    if (loadDuration > 0) {
+      publishLifecycleEvent(appId, LIFECYCLE_STAGES.LOADING, loadDuration, loadFinishTs);
+    }
 
     if (loadFailed) {
       setLoadProgress((prev) => {

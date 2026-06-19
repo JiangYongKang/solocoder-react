@@ -561,25 +561,52 @@ describe('micro-frontend/lifecycle', () => {
 
   describe('resource loading flow', () => {
     it('should mark success when all resources load', () => {
+      let mgr = createLifecycleManager();
       let app = { ...baseApp };
-      const start = startLoadingResources(app, 1000);
+      const start = startLoadingResources(app, mgr, 1000);
       expect(start.error).toBeNull();
       expect(start.app.status).toBe(APP_STATUS.LOADING);
+      expect(start.manager.activeStages.has(app.id)).toBe(true);
+      expect(start.manager.activeStages.get(app.id).stage).toBe(LIFECYCLE_STAGES.LOADING);
+      mgr = start.manager;
 
       const loadResult = simulateResourceLoad([], { failProbability: 0 });
-      const finish = finishLoadingResources(start.app, loadResult, 1000);
+      const finish = finishLoadingResources(start.app, mgr, loadResult, 1500);
       expect(finish.error).toBeNull();
       expect(finish.app.failedResources).toEqual([]);
+      expect(finish.duration).toBe(500);
+      const loadingStages = finish.app.lifecycle.stages.filter((s) => s.stage === LIFECYCLE_STAGES.LOADING);
+      expect(loadingStages).toHaveLength(1);
+      expect(loadingStages[0].duration).toBe(500);
+      expect(loadingStages[0].timestamp).toBe(1500);
     });
 
-    it('should set LOAD_FAILED status when resources fail', () => {
+    it('should set LOAD_FAILED status when resources fail and still record loading stage', () => {
+      let mgr = createLifecycleManager();
       let app = { ...baseApp };
-      const start = startLoadingResources(app, 1000);
+      const start = startLoadingResources(app, mgr, 1000);
+      mgr = start.manager;
       const loadResult = simulateResourceLoad(['a.js'], { forceFail: true });
-      const finish = finishLoadingResources(start.app, loadResult, 1000);
+      const finish = finishLoadingResources(start.app, mgr, loadResult, 1800);
       expect(finish.error).toBeNull();
       expect(finish.app.status).toBe(APP_STATUS.LOAD_FAILED);
       expect(finish.app.failedResources).toEqual(['a.js']);
+      expect(finish.duration).toBe(800);
+      const loadingStages = finish.app.lifecycle.stages.filter((s) => s.stage === LIFECYCLE_STAGES.LOADING);
+      expect(loadingStages).toHaveLength(1);
+      expect(loadingStages[0].duration).toBe(800);
+    });
+
+    it('startLoadingResources requires manager', () => {
+      const app = { ...baseApp };
+      const result = startLoadingResources(app);
+      expect(result.error).toBe('生命周期管理器不存在');
+    });
+
+    it('finishLoadingResources requires manager', () => {
+      const app = { ...baseApp };
+      const result = finishLoadingResources(app, null, { success: true });
+      expect(result.error).toBe('生命周期管理器不存在');
     });
   });
 
@@ -598,19 +625,38 @@ describe('micro-frontend/lifecycle', () => {
       expect(result.error).toBeTruthy();
     });
 
-    it('should fully reset app for restart', () => {
+    it('resetAppForRestart preserves loading stage but clears later stages', () => {
       const appWithLifecycle = {
         ...baseApp,
         status: APP_STATUS.RUNNING,
         failedResources: ['a.js'],
         lifecycle: {
-          stages: [{ stage: 'bootstrap', duration: 100, timestamp: 1000 }],
+          stages: [
+            { stage: 'loading', duration: 500, timestamp: 1000 },
+            { stage: 'bootstrap', duration: 100, timestamp: 2000 },
+            { stage: 'mount', duration: 80, timestamp: 3000 },
+            { stage: 'ready', duration: 0, timestamp: 3000 },
+          ],
           currentStage: 'ready',
         },
       };
       const reset = resetAppForRestart(appWithLifecycle);
       expect(reset.status).toBe(APP_STATUS.STOPPED);
       expect(reset.failedResources).toEqual([]);
+      const keptStages = reset.lifecycle.stages.map((s) => s.stage);
+      expect(keptStages).toEqual(['loading']);
+      expect(reset.lifecycle.stages[0].duration).toBe(500);
+      expect(reset.lifecycle.currentStage).toBeNull();
+    });
+
+    it('resetAppForRestart handles no lifecycle stages gracefully', () => {
+      const plain = {
+        ...baseApp,
+        status: APP_STATUS.RUNNING,
+        failedResources: [],
+      };
+      const reset = resetAppForRestart(plain);
+      expect(reset.status).toBe(APP_STATUS.STOPPED);
       expect(reset.lifecycle.stages).toEqual([]);
       expect(reset.lifecycle.currentStage).toBeNull();
     });
@@ -1041,41 +1087,54 @@ describe('micro-frontend/load-failed reset flow (non-recursive)', () => {
 
 describe('micro-frontend/loading - timestamp parameter consistency', () => {
   it('startLoadingResources accepts timestamp parameter without error', () => {
+    const mgr = createLifecycleManager();
     const app = createMicroApp({ name: 'App', appId: 'app', entryPath: '/app' });
     const customTs = 1234567890;
-    const result = startLoadingResources(app, customTs);
+    const result = startLoadingResources(app, mgr, customTs);
     expect(result.error).toBeNull();
     expect(result.app.status).toBe(APP_STATUS.LOADING);
+    expect(result.manager.activeStages.get(app.id).startTime).toBe(customTs);
   });
 
   it('finishLoadingResources accepts timestamp parameter without error', () => {
+    const mgr = createLifecycleManager();
     const app = createMicroApp({ name: 'App', appId: 'app', entryPath: '/app' });
-    const loadStart = startLoadingResources(app);
+    const loadStart = startLoadingResources(app, mgr, 1000);
     const loadResult = simulateResourceLoad(['a.js'], { failProbability: 0 });
     const customTs = 2345678901;
-    const finish = finishLoadingResources(loadStart.app, loadResult, customTs);
+    const finish = finishLoadingResources(loadStart.app, loadStart.manager, loadResult, customTs);
     expect(finish.error).toBeNull();
+    expect(finish.duration).toBe(customTs - 1000);
+    const loadingStage = finish.app.lifecycle.stages.find((s) => s.stage === LIFECYCLE_STAGES.LOADING);
+    expect(loadingStage.timestamp).toBe(customTs);
   });
 
   it('finishLoadingResources handles timestamp for failed load case', () => {
+    const mgr = createLifecycleManager();
     const app = createMicroApp({ name: 'App', appId: 'app', entryPath: '/app' });
-    const loadStart = startLoadingResources(app);
+    const loadStart = startLoadingResources(app, mgr, 1000);
     const loadResult = simulateResourceLoad(['a.js'], { forceFail: true });
     const customTs = 3456789012;
-    const finish = finishLoadingResources(loadStart.app, loadResult, customTs);
+    const finish = finishLoadingResources(loadStart.app, loadStart.manager, loadResult, customTs);
     expect(finish.error).toBeNull();
     expect(finish.app.status).toBe(APP_STATUS.LOAD_FAILED);
     expect(finish.app.failedResources).toEqual(['a.js']);
+    expect(finish.duration).toBe(customTs - 1000);
+    const loadingStage = finish.app.lifecycle.stages.find((s) => s.stage === LIFECYCLE_STAGES.LOADING);
+    expect(loadingStage).toBeDefined();
+    expect(loadingStage.duration).toBe(customTs - 1000);
   });
 
   it('startLoadingResources uses default timestamp when not provided', () => {
+    const mgr = createLifecycleManager();
     const app = createMicroApp({ name: 'App', appId: 'app', entryPath: '/app' });
     const before = Date.now();
-    const result = startLoadingResources(app);
+    const result = startLoadingResources(app, mgr);
     const after = Date.now();
     expect(result.error).toBeNull();
-    expect(result.app.createdAt).toBeLessThanOrEqual(after);
-    expect(result.app.createdAt).toBeGreaterThanOrEqual(before - 1000);
+    const activeStage = result.manager.activeStages.get(app.id);
+    expect(activeStage.startTime).toBeGreaterThanOrEqual(before);
+    expect(activeStage.startTime).toBeLessThanOrEqual(after);
   });
 });
 

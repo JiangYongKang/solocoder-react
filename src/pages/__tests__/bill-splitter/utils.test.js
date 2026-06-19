@@ -570,7 +570,7 @@ describe('历史记录', () => {
 describe('validateAllExpenses', () => {
   const participants = [{ id: 'p1' }, { id: 'p2' }]
 
-  it('所有费用完整时校验通过，返回空错误对象', () => {
+  it('所有费用完整时校验通过，返回空错误对象和-1索引', () => {
     const expenses = [
       {
         id: 'e1',
@@ -586,13 +586,15 @@ describe('validateAllExpenses', () => {
     expect(result.valid).toBe(true)
     expect(result.message).toBe('')
     expect(result.errors).toEqual({})
+    expect(result.expenseIndex).toBe(-1)
   })
 
-  it('空费用列表校验不通过', () => {
+  it('空费用列表校验不通过，索引为-1', () => {
     const result = validateAllExpenses([], participants)
     expect(result.valid).toBe(false)
     expect(result.message).toBeTruthy()
     expect(result.errors).toEqual({})
+    expect(result.expenseIndex).toBe(-1)
   })
 
   it('null费用列表校验不通过', () => {
@@ -711,6 +713,49 @@ describe('validateAllExpenses', () => {
     expect(result.message).toContain('费用 #2')
     expect(result.expenseIndex).toBe(1)
     expect(result.errors.description).toBeTruthy()
+  })
+
+  it('同一费用多个字段不完整时，message包含所有字段错误', () => {
+    const expenses = [
+      {
+        id: 'e1',
+        description: '',
+        amount: 0,
+        payerId: '',
+        sharedWith: [],
+        splitMode: SPLIT_MODE.EQUAL,
+      },
+    ]
+    const result = validateAllExpenses(expenses, participants)
+    expect(result.valid).toBe(false)
+    expect(result.errors.description).toBeTruthy()
+    expect(result.errors.amount).toBeTruthy()
+    expect(result.errors.payerId).toBeTruthy()
+    expect(result.errors.sharedWith).toBeTruthy()
+    expect(result.message).toContain('费用 #1')
+    expect(result.message).toContain('请输入费用描述')
+    expect(result.message).toContain('金额必须大于0')
+    expect(result.message).toContain('请选择支付人')
+    expect(result.message).toContain('请至少选择一个分摊人')
+  })
+
+  it('同一费用两个字段不完整时，errors包含两个字段且message同时展示', () => {
+    const expenses = [
+      {
+        id: 'e1',
+        description: '',
+        amount: 0,
+        payerId: 'p1',
+        sharedWith: ['p1', 'p2'],
+        splitMode: SPLIT_MODE.EQUAL,
+      },
+    ]
+    const result = validateAllExpenses(expenses, participants)
+    expect(result.valid).toBe(false)
+    expect(Object.keys(result.errors).length).toBe(2)
+    expect(result.message).toContain('请输入费用描述')
+    expect(result.message).toContain('金额必须大于0')
+    expect(result.message).toContain('；')
   })
 })
 

@@ -525,16 +525,57 @@ function deduplicateKeyframes(entries) {
   const seen = new Map()
   let cssOutput = ''
   const elementRenameMap = {}
+  const processedGroups = new Set()
 
   entries.forEach(({ name, config, elementIndex }) => {
+    const isWave = name.startsWith('wave-')
+    const groupKey = isWave ? `wave::${configSignature(config)}` : null
     const sig = `${name}::${configSignature(config)}`
+
+    if (isWave) {
+      if (!processedGroups.has(groupKey)) {
+        processedGroups.add(groupKey)
+        const builder = KEYFRAME_BUILDERS.wave
+        if (builder) {
+          const raw = builder(config)
+          const generatedNames = parseKeyframeNames(raw)
+          let replaced = raw
+          generatedNames.forEach((genName, idx) => {
+            const genSig = `${genName}::${configSignature(config)}`
+            if (seen.size === 0 && idx === 0) {
+              seen.set(genSig, genName)
+            } else {
+              const renamed = `${genName}-${seen.size}`
+              seen.set(genSig, renamed)
+              replaced = replaced.replace(
+                new RegExp(`@keyframes\\s+${escapeRegex(genName)}\\s*\\{`, 'g'),
+                `@keyframes ${renamed} {`
+              )
+            }
+            seen.set(`${genName}::${configSignature(config)}`, seen.get(genSig) || genName)
+          })
+          cssOutput += replaced.trim() + '\n\n'
+        }
+      }
+
+      const renamedName = seen.get(sig) || name
+      if (renamedName !== name) {
+        if (!elementRenameMap[elementIndex]) {
+          elementRenameMap[elementIndex] = {}
+        }
+        elementRenameMap[elementIndex][name] = renamedName
+      }
+      return
+    }
+
     if (!seen.has(sig)) {
       const renamedName = seen.size === 0
         ? name
         : `${name}-${seen.size}`
       seen.set(sig, renamedName)
 
-      const builder = KEYFRAME_BUILDERS[findAnimationTypeForKeyframe(name)]
+      const animationType = findAnimationTypeForKeyframe(name)
+      const builder = KEYFRAME_BUILDERS[animationType]
       if (builder) {
         const raw = builder(config)
         let replaced = raw
@@ -544,7 +585,7 @@ function deduplicateKeyframes(entries) {
             `@keyframes ${renamedName} {`
           )
         }
-        cssOutput += replaced + '\n\n'
+        cssOutput += replaced.trim() + '\n\n'
       }
     }
 

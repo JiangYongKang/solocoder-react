@@ -234,6 +234,10 @@ export function isCountdownActive(countdown) {
   return countdown > 0
 }
 
+export function shouldResetOnPhoneChange(oldPhone, newPhone, countdown) {
+  return isCountdownActive(countdown) && oldPhone !== newPhone
+}
+
 export function canRequestCode(phoneValid, countdown) {
   return phoneValid && !isCountdownActive(countdown)
 }

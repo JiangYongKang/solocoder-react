@@ -21,6 +21,7 @@ import {
   getCountdownButtonText,
   getNextCountdownValue,
   isCountdownActive,
+  shouldResetOnPhoneChange,
   canRequestCode,
   getLockButtonText,
   getNextLockValue,
@@ -230,8 +231,9 @@ export default function PhoneLoginPage() {
     if (phoneTouched) {
       runPhoneValidation(formatted)
     }
-    if (isCountdownActive(countdown) && rawPhone !== digits) {
+    if (shouldResetOnPhoneChange(rawPhone, digits, countdown)) {
       setCountdown(0)
+      setHasRequestedBefore(false)
       if (countdownRef.current) {
         clearInterval(countdownRef.current)
         countdownRef.current = null

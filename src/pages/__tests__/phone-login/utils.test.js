@@ -21,6 +21,7 @@ import {
   getCountdownButtonText,
   getNextCountdownValue,
   isCountdownActive,
+  shouldResetOnPhoneChange,
   canRequestCode,
   getLockButtonText,
   getNextLockValue,
@@ -433,6 +434,28 @@ describe('isCountdownActive', () => {
 
   it('小于 0 应返回 false', () => {
     expect(isCountdownActive(-1)).toBe(false)
+  })
+})
+
+describe('shouldResetOnPhoneChange', () => {
+  it('倒计时中手机号变更应返回 true', () => {
+    expect(shouldResetOnPhoneChange('13800138000', '15912345678', 60)).toBe(true)
+    expect(shouldResetOnPhoneChange('13800138000', '15912345678', 1)).toBe(true)
+    expect(shouldResetOnPhoneChange('13800138000', '13800138001', 30)).toBe(true)
+  })
+
+  it('倒计时中手机号未变更应返回 false', () => {
+    expect(shouldResetOnPhoneChange('13800138000', '13800138000', 60)).toBe(false)
+    expect(shouldResetOnPhoneChange('13800138000', '13800138000', 1)).toBe(false)
+  })
+
+  it('不在倒计时中手机号变更应返回 false', () => {
+    expect(shouldResetOnPhoneChange('13800138000', '15912345678', 0)).toBe(false)
+    expect(shouldResetOnPhoneChange('13800138000', '15912345678', -1)).toBe(false)
+  })
+
+  it('不在倒计时中手机号未变更应返回 false', () => {
+    expect(shouldResetOnPhoneChange('13800138000', '13800138000', 0)).toBe(false)
   })
 })
 

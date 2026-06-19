@@ -1,0 +1,8 @@
+产物不满意：
+normalizeFontSize 函数在统一兜底策略后对非法输入返回 DEFAULT_TITLE_FONT_SIZE（28px），但该函数同时被标题字号和副标题字号的规范化逻辑共用，sanitizeConfig 中两处都调用了 normalizeFontSize。副标题的默认字号为 DEFAULT_SUBTITLE_FONT_SIZE（16px），而函数返回的兜底值是标题场景的默认值。虽然 sanitizeConfig 在传参前通过 typeof number 判断绕过了非法输入分支，实践中几乎不会触发该路径，但 normalizeFontSize 的返回值隐含了"标题专属"的语义偏向，与其普适性的函数名不匹配，降低了代码自文档化程度和可维护性。更好的做法是为 normalizeFontSize 增加可选的 defaultValue 参数，或拆分为 normalizeTitleFontSize 与 normalizeSubtitleFontSize 两个函数以消除上下文歧义。
+
+过程不满意：
+1. 模型在接到任务后第 5 步直接创建了 TodoList，此时尚未读取任何代码文件，也未分析当前代码状态和四个问题的具体根因。根据标注规范，模型应先阅读代码理解问题全貌后再做任务规划，在信息不足时过早制定计划容易导致后续执行中反复推翻和调整 TodoList 条目，反映出目标理解阶段的深度不足。
+2. 模型在修复 ColorPicker 的 hex 输入交互时，从第 44 步到第 109 步连续评估了至少五种方案：useEffect 同步 state、完全受控模式、useSyncExternalStore 配合 ref、key 强制重挂载、非受控 input 配合 useRef。每种方案都只做了粗略推理就推翻转向下一种，最终回到第一种方案（useEffect 加 eslint-disable 注释）并落地实施。同一段逻辑在思考过程中反复推倒从未实际试运行，浪费了约六十步的推理时间。正确做法是快速过滤明显不合适的方案后选定一到两种候选方案实际修改代码并验证效果。
+3. 模型在编写 eslint-disable 注释时连续三次尝试才写对格式：第一次在 116 步写入后因注释格式错误 ESLint 仍然报错，第二次在 134 步修正后运行 ESLint 依然弹出警告，第三次在 480 步再次调整注释位置才最终通过检查。同一个 eslint-disable 注释反复修复三次，说明模型在编写代码后没有第一时间运行 lint 验证，而是等到所有修复都完成后才检查，导致一次修复动作分多轮来回才收敛。
+4. 模型在完成所有修改后仅运行了 `pnpm test src/pages/__tests__/splash-config/utils.test.js` 针对单个测试文件的验证，没有执行全量测试套件来确认修改未引入跨包的回归问题。虽然有 132 个测试通过且 ESLint 零报错，但未验证 ColorPicker 组件改动是否影响了 splash-config 包内其他依赖该组件的使用者，测试验证的覆盖面偏窄。

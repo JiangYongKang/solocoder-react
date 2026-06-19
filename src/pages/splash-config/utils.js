@@ -16,6 +16,9 @@ import {
   STORAGE_KEY_CONFIGS,
   STORAGE_KEY_LAST,
   PRESET_SCREEN_RATIOS,
+  DEFAULT_LOGO_SIZE,
+  DEFAULT_TITLE_FONT_SIZE,
+  DEFAULT_COUNTDOWN_SECONDS,
 } from './constants.js'
 
 export function generateId() {
@@ -85,7 +88,7 @@ export function validateLogoSize(size) {
 }
 
 export function normalizeLogoSize(size) {
-  if (typeof size !== 'number' || Number.isNaN(size)) return DEFAULT_CONFIG.brand.logo.size
+  if (typeof size !== 'number' || Number.isNaN(size)) return DEFAULT_LOGO_SIZE
   return clamp(size, MIN_LOGO_SIZE, MAX_LOGO_SIZE)
 }
 
@@ -95,7 +98,7 @@ export function validateFontSize(size) {
 }
 
 export function normalizeFontSize(size) {
-  if (typeof size !== 'number' || Number.isNaN(size)) return MIN_FONT_SIZE
+  if (typeof size !== 'number' || Number.isNaN(size)) return DEFAULT_TITLE_FONT_SIZE
   return clamp(size, MIN_FONT_SIZE, MAX_FONT_SIZE)
 }
 
@@ -105,7 +108,7 @@ export function validateCountdownSeconds(seconds) {
 }
 
 export function normalizeCountdownSeconds(seconds) {
-  if (typeof seconds !== 'number' || Number.isNaN(seconds)) return MIN_COUNTDOWN_SECONDS
+  if (typeof seconds !== 'number' || Number.isNaN(seconds)) return DEFAULT_COUNTDOWN_SECONDS
   const intVal = Math.round(seconds)
   return clamp(intVal, MIN_COUNTDOWN_SECONDS, MAX_COUNTDOWN_SECONDS)
 }

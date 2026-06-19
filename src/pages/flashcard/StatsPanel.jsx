@@ -1,7 +1,7 @@
 import {
   calculateStreakDays,
   getStudyDatesFromStats,
-  buildHeatmapData,
+  buildHeatmapFromStats,
   getHeatmapCellColor,
   calculateTotalStats,
   calculateDailyProgress,
@@ -10,7 +10,7 @@ import {
 export default function StatsPanel({ cards, stats, settings, onSettingsChange }) {
   const studyDates = getStudyDatesFromStats(stats)
   const streak = calculateStreakDays(studyDates)
-  const heatmap = buildHeatmapData(stats, 30)
+  const heatmap = buildHeatmapFromStats(stats, 30)
   const totalStats = calculateTotalStats(cards)
   const dailyProgress = calculateDailyProgress(cards, stats, settings.dailyGoal)
 

@@ -53,6 +53,9 @@ import {
   STORAGE_KEY_CONFIGS,
   STORAGE_KEY_LAST,
   PRESET_SCREEN_RATIOS,
+  DEFAULT_LOGO_SIZE,
+  DEFAULT_TITLE_FONT_SIZE,
+  DEFAULT_COUNTDOWN_SECONDS,
 } from '@/pages/splash-config/constants.js'
 
 function createMockStorage() {
@@ -291,6 +294,15 @@ describe('Splash Config - Utility Functions', () => {
       expect(typeof normalizeLogoSize(null)).toBe('number')
       expect(typeof normalizeLogoSize(undefined)).toBe('number')
     })
+
+    it('normalizeLogoSize should return default logo size for invalid inputs (consistent fallback strategy)', () => {
+      expect(normalizeLogoSize(NaN)).toBe(DEFAULT_LOGO_SIZE)
+      expect(normalizeLogoSize('80')).toBe(DEFAULT_LOGO_SIZE)
+      expect(normalizeLogoSize(null)).toBe(DEFAULT_LOGO_SIZE)
+      expect(normalizeLogoSize(undefined)).toBe(DEFAULT_LOGO_SIZE)
+      expect(normalizeLogoSize({})).toBe(DEFAULT_LOGO_SIZE)
+      expect(normalizeLogoSize([])).toBe(DEFAULT_LOGO_SIZE)
+    })
   })
 
   describe('Font Size Validation', () => {
@@ -322,6 +334,14 @@ describe('Splash Config - Utility Functions', () => {
       expect(typeof normalizeFontSize(NaN)).toBe('number')
       expect(typeof normalizeFontSize(null)).toBe('number')
     })
+
+    it('normalizeFontSize should return default title font size for invalid inputs (consistent fallback strategy)', () => {
+      expect(normalizeFontSize(NaN)).toBe(DEFAULT_TITLE_FONT_SIZE)
+      expect(normalizeFontSize('28')).toBe(DEFAULT_TITLE_FONT_SIZE)
+      expect(normalizeFontSize(null)).toBe(DEFAULT_TITLE_FONT_SIZE)
+      expect(normalizeFontSize(undefined)).toBe(DEFAULT_TITLE_FONT_SIZE)
+      expect(normalizeFontSize({})).toBe(DEFAULT_TITLE_FONT_SIZE)
+    })
   })
 
   describe('Countdown Seconds Validation', () => {
@@ -349,6 +369,40 @@ describe('Splash Config - Utility Functions', () => {
       expect(normalizeCountdownSeconds(1.8)).toBe(2)
       expect(normalizeCountdownSeconds(0)).toBe(MIN_COUNTDOWN_SECONDS)
       expect(normalizeCountdownSeconds(20)).toBe(MAX_COUNTDOWN_SECONDS)
+    })
+
+    it('normalizeCountdownSeconds should return default countdown for invalid inputs (consistent fallback strategy)', () => {
+      expect(normalizeCountdownSeconds(NaN)).toBe(DEFAULT_COUNTDOWN_SECONDS)
+      expect(normalizeCountdownSeconds('5')).toBe(DEFAULT_COUNTDOWN_SECONDS)
+      expect(normalizeCountdownSeconds(null)).toBe(DEFAULT_COUNTDOWN_SECONDS)
+      expect(normalizeCountdownSeconds(undefined)).toBe(DEFAULT_COUNTDOWN_SECONDS)
+      expect(normalizeCountdownSeconds({})).toBe(DEFAULT_COUNTDOWN_SECONDS)
+    })
+  })
+
+  describe('Normalize Functions Consistency', () => {
+    it('all normalizeXxx functions should return their respective DEFAULT_* constant for invalid inputs', () => {
+      expect(normalizeLogoSize(NaN)).toBe(DEFAULT_LOGO_SIZE)
+      expect(normalizeFontSize(NaN)).toBe(DEFAULT_TITLE_FONT_SIZE)
+      expect(normalizeCountdownSeconds(NaN)).toBe(DEFAULT_COUNTDOWN_SECONDS)
+    })
+
+    it('all normalizeXxx functions should return their respective DEFAULT_* constant for string inputs', () => {
+      expect(normalizeLogoSize('not-a-number')).toBe(DEFAULT_LOGO_SIZE)
+      expect(normalizeFontSize('not-a-number')).toBe(DEFAULT_TITLE_FONT_SIZE)
+      expect(normalizeCountdownSeconds('not-a-number')).toBe(DEFAULT_COUNTDOWN_SECONDS)
+    })
+
+    it('all normalizeXxx functions should return their respective DEFAULT_* constant for null', () => {
+      expect(normalizeLogoSize(null)).toBe(DEFAULT_LOGO_SIZE)
+      expect(normalizeFontSize(null)).toBe(DEFAULT_TITLE_FONT_SIZE)
+      expect(normalizeCountdownSeconds(null)).toBe(DEFAULT_COUNTDOWN_SECONDS)
+    })
+
+    it('all normalizeXxx functions should return their respective DEFAULT_* constant for undefined', () => {
+      expect(normalizeLogoSize(undefined)).toBe(DEFAULT_LOGO_SIZE)
+      expect(normalizeFontSize(undefined)).toBe(DEFAULT_TITLE_FONT_SIZE)
+      expect(normalizeCountdownSeconds(undefined)).toBe(DEFAULT_COUNTDOWN_SECONDS)
     })
   })
 

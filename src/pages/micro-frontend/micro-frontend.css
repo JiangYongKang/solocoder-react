@@ -561,6 +561,12 @@
 .mf-log-type.custom { background: #e6f7ff; color: #1890ff; }
 .mf-log-type.broadcast { background: #fff7e6; color: #fa8c16; }
 .mf-log-type.lifecycle { background: #f9f0ff; color: #722ed1; }
+.mf-log-type.error { background: #fff1f0; color: #ff4d4f; }
+
+.mf-log-item:has(.mf-log-type.error) {
+  border-color: #ffa39e;
+  background: #fffafa;
+}
 
 .mf-lifecycle-section {
   margin-top: 16px;

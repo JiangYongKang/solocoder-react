@@ -558,6 +558,46 @@ describe('Composition', () => {
       expect(result).toContain('3s')
       expect(result).toContain('0.5s')
     })
+
+    it('should NOT duplicate wave keyframes (call builder once per wave config, not per bar)', () => {
+      const waveConfig = { ...defaultTestConfig, count: 5 }
+      const elements = [
+        createCompositionElement('wave', waveConfig, { x: 50, y: 50 }),
+      ]
+      const result = generateCompositionCSS(elements)
+      const waveKfCount = (result.match(/@keyframes\s+wave-0/g) || []).length
+      expect(waveKfCount).toBe(1)
+      const waveKf1Count = (result.match(/@keyframes\s+wave-1/g) || []).length
+      expect(waveKf1Count).toBe(1)
+      const waveKf4Count = (result.match(/@keyframes\s+wave-4/g) || []).length
+      expect(waveKf4Count).toBe(1)
+      const allKfCount = (result.match(/@keyframes\s+wave/g) || []).length
+      expect(allKfCount).toBe(5)
+    })
+
+    it('should generate unique wave keyframes for different wave configs', () => {
+      const waveConfigA = { ...defaultTestConfig, count: 5, speed: 1 }
+      const waveConfigB = { ...defaultTestConfig, count: 5, speed: 2 }
+      const elements = [
+        createCompositionElement('wave', waveConfigA, { x: 25, y: 50 }),
+        createCompositionElement('wave', waveConfigB, { x: 75, y: 50 }),
+      ]
+      const result = generateCompositionCSS(elements)
+      const waveKf0Count = (result.match(/@keyframes\s+wave-0/g) || []).length
+      expect(waveKf0Count).toBe(2)
+      expect(result).toContain('@keyframes wave-0-5')
+    })
+
+    it('should reuse wave keyframes for identical wave configs across elements', () => {
+      const waveConfig = { ...defaultTestConfig, count: 5 }
+      const elements = [
+        createCompositionElement('wave', waveConfig, { x: 25, y: 50 }),
+        createCompositionElement('wave', waveConfig, { x: 75, y: 50 }),
+      ]
+      const result = generateCompositionCSS(elements)
+      const waveKfCount = (result.match(/@keyframes\s+wave/g) || []).length
+      expect(waveKfCount).toBe(5)
+    })
   })
 
   describe('generateCompositionHTML', () => {

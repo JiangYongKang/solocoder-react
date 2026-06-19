@@ -1,0 +1,5 @@
+你实现的微前端沙箱演示还存在一些问题，需要进行修复：
+1. handleStartApp 函数中计算了 startTs 和 loadFinishTs 两个时间戳并传递给 startLoadingResources 和 finishLoadingResources，但这两个函数的签名中已经没有 timestamp 参数了，导致这两个时间戳被静默丢弃，成为死代码。需要同步清理调用方中无意义的计算和传参，或恢复函数签名使其正确接收时间戳。
+2. eventBus.js 的 publish 方法中三处 try-catch 虽然修复了 ESLint 报错，但仍然是静默吞错。当 postMessage 因为 iframe 已销毁或安全策略冲突而抛错时，用户完全无法感知消息投递失败的情况。应该至少将错误信息记录到消息日志面板中，让用户能够发现通信故障。
+3. index.jsx 中对 constants.js 的导入被拆分成了两个独立的 import 语句，应该合并为一个。
+4. 修复后需要补充或修正单元测试，确保所有测试通过。

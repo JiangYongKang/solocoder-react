@@ -36,6 +36,7 @@ export const MESSAGE_TYPE = {
   CUSTOM: 'custom',
   BROADCAST: 'broadcast',
   LIFECYCLE: 'lifecycle',
+  ERROR: 'error',
 };
 
 export const HOME_APP_ID = '__home__';

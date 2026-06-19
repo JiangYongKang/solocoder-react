@@ -287,15 +287,21 @@ export function createBillRecord(name, participants, expenses) {
 
 export function validateAllExpenses(expenses, participants) {
   if (!expenses || expenses.length === 0) {
-    return { valid: false, message: '至少需要一条费用条目' }
+    return { valid: false, message: '至少需要一条费用条目', errors: {} }
   }
   for (let i = 0; i < expenses.length; i++) {
     const errors = validateExpense(expenses[i], participants)
     if (Object.keys(errors).length > 0) {
-      return { valid: false, message: `费用 #${i + 1} 信息不完整，请检查后重试` }
+      const firstError = errors[Object.keys(errors)[0]]
+      return {
+        valid: false,
+        message: `费用 #${i + 1}：${firstError}`,
+        errors,
+        expenseIndex: i,
+      }
     }
   }
-  return { valid: true, message: '' }
+  return { valid: true, message: '', errors: {} }
 }
 
 export function formatDateTime(timestamp) {

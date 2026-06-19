@@ -570,7 +570,7 @@ describe('历史记录', () => {
 describe('validateAllExpenses', () => {
   const participants = [{ id: 'p1' }, { id: 'p2' }]
 
-  it('所有费用完整时校验通过', () => {
+  it('所有费用完整时校验通过，返回空错误对象', () => {
     const expenses = [
       {
         id: 'e1',
@@ -585,12 +585,14 @@ describe('validateAllExpenses', () => {
     const result = validateAllExpenses(expenses, participants)
     expect(result.valid).toBe(true)
     expect(result.message).toBe('')
+    expect(result.errors).toEqual({})
   })
 
   it('空费用列表校验不通过', () => {
     const result = validateAllExpenses([], participants)
     expect(result.valid).toBe(false)
     expect(result.message).toBeTruthy()
+    expect(result.errors).toEqual({})
   })
 
   it('null费用列表校验不通过', () => {
@@ -598,7 +600,7 @@ describe('validateAllExpenses', () => {
     expect(result.valid).toBe(false)
   })
 
-  it('费用描述为空时校验不通过', () => {
+  it('费用描述为空时返回字段级错误信息', () => {
     const expenses = [
       {
         id: 'e1',
@@ -612,9 +614,12 @@ describe('validateAllExpenses', () => {
     const result = validateAllExpenses(expenses, participants)
     expect(result.valid).toBe(false)
     expect(result.message).toContain('费用 #1')
+    expect(result.message).toContain('请输入费用描述')
+    expect(result.errors.description).toBeTruthy()
+    expect(result.expenseIndex).toBe(0)
   })
 
-  it('金额为0时校验不通过', () => {
+  it('金额为0时返回金额字段错误信息', () => {
     const expenses = [
       {
         id: 'e1',
@@ -627,9 +632,11 @@ describe('validateAllExpenses', () => {
     ]
     const result = validateAllExpenses(expenses, participants)
     expect(result.valid).toBe(false)
+    expect(result.message).toContain('金额必须大于0')
+    expect(result.errors.amount).toBeTruthy()
   })
 
-  it('未选择支付人时校验不通过', () => {
+  it('未选择支付人时返回支付人字段错误信息', () => {
     const expenses = [
       {
         id: 'e1',
@@ -642,9 +649,45 @@ describe('validateAllExpenses', () => {
     ]
     const result = validateAllExpenses(expenses, participants)
     expect(result.valid).toBe(false)
+    expect(result.message).toContain('请选择支付人')
+    expect(result.errors.payerId).toBeTruthy()
   })
 
-  it('多条费用中第二条有问题时提示正确序号', () => {
+  it('分摊人为空时返回分摊人字段错误信息', () => {
+    const expenses = [
+      {
+        id: 'e1',
+        description: '午餐',
+        amount: 100,
+        payerId: 'p1',
+        sharedWith: [],
+        splitMode: SPLIT_MODE.EQUAL,
+      },
+    ]
+    const result = validateAllExpenses(expenses, participants)
+    expect(result.valid).toBe(false)
+    expect(result.errors.sharedWith).toBeTruthy()
+  })
+
+  it('自定义比例不等于100%时返回比例字段错误信息', () => {
+    const expenses = [
+      {
+        id: 'e1',
+        description: '午餐',
+        amount: 100,
+        payerId: 'p1',
+        sharedWith: ['p1', 'p2'],
+        splitMode: SPLIT_MODE.CUSTOM,
+        ratios: { p1: 30, p2: 60 },
+      },
+    ]
+    const result = validateAllExpenses(expenses, participants)
+    expect(result.valid).toBe(false)
+    expect(result.message).toContain('分摊比例之和必须为100%')
+    expect(result.errors.ratios).toBeTruthy()
+  })
+
+  it('多条费用中第二条有问题时返回正确序号和索引', () => {
     const expenses = [
       {
         id: 'e1',
@@ -666,6 +709,8 @@ describe('validateAllExpenses', () => {
     const result = validateAllExpenses(expenses, participants)
     expect(result.valid).toBe(false)
     expect(result.message).toContain('费用 #2')
+    expect(result.expenseIndex).toBe(1)
+    expect(result.errors.description).toBeTruthy()
   })
 })
 

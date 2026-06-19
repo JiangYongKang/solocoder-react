@@ -33,10 +33,11 @@ import {
     TOOL_TABS,
 } from './constants.js'
 import {
-    generateFullGradientCSS,
-    generateGradientCSS,
-    GRADIENT_TYPES,
-    LINEAR_DIRECTIONS,
+  generateGradientCSS,
+  generateFullGradientCSS,
+  GRADIENT_TYPES,
+  LINEAR_DIRECTIONS,
+  isValidDirection,
 } from './gradientGenerator.js'
 import { generateAllPalettes } from './paletteGenerator.js'
 import {
@@ -191,6 +192,11 @@ const ColorToolkitPage = () => {
   const gradientFullCSS = useMemo(() => {
     return generateFullGradientCSS(gradientStart, gradientEnd, gradientType, gradientDirection)
   }, [gradientStart, gradientEnd, gradientType, gradientDirection])
+
+  const gradientDirectionWarning = useMemo(() => {
+    if (gradientType !== GRADIENT_TYPES.LINEAR) return false
+    return !isValidDirection(gradientDirection)
+  }, [gradientType, gradientDirection])
 
   const handleCopyToClipboard = useCallback(async (hex) => {
     try {
@@ -629,6 +635,12 @@ const ColorToolkitPage = () => {
         )}
       </div>
 
+      {gradientDirectionWarning && (
+        <div className="ct-warning-msg">
+          方向参数无效，已回退到默认方向「向右」
+        </div>
+      )}
+
       <div
         className="ct-gradient-preview"
         style={{ background: gradientCSS }}
@@ -701,9 +713,6 @@ const ColorToolkitPage = () => {
                   </span>
                 </div>
                 <div className="ct-brand-info">
-                  <div className="ct-brand-hex">
-                    {color.hex}
-                  </div>
                   <div className="ct-brand-percentage">{color.percentage}%</div>
                 </div>
                 <button

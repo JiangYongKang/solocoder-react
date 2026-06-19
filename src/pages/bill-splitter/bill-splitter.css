@@ -497,7 +497,7 @@
   color: var(--text-h);
 }
 
-.settlement-arrow {
+.settlement-action {
   color: var(--accent);
   font-weight: 600;
 }

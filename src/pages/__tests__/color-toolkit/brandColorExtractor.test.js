@@ -192,7 +192,12 @@ describe('quantizeColor', () => {
   it('should quantize colors with given factor', () => {
     expect(quantizeColor(15, 20, 30, 16)).toEqual({ r: 16, g: 16, b: 32 })
     expect(quantizeColor(128, 128, 128, 32)).toEqual({ r: 128, g: 128, b: 128 })
-    expect(quantizeColor(255, 255, 255, 32)).toEqual({ r: 256, g: 256, b: 256 })
+    expect(quantizeColor(255, 255, 255, 32)).toEqual({ r: 255, g: 255, b: 255 })
+  })
+
+  it('should clamp output to 0-255 range', () => {
+    expect(quantizeColor(255, 255, 255, 32)).toEqual({ r: 255, g: 255, b: 255 })
+    expect(quantizeColor(250, 250, 250, 64)).toEqual({ r: 255, g: 255, b: 255 })
   })
 
   it('should handle zero values', () => {
@@ -204,6 +209,13 @@ describe('quantizeColor', () => {
     const result2 = quantizeColor(100, 150, 200, 64)
     expect(result1.r % 8).toBe(0)
     expect(result2.r % 64).toBe(0)
+  })
+
+  it('should not exceed 255 even with large factor', () => {
+    const result = quantizeColor(255, 255, 255, 48)
+    expect(result.r).toBeLessThanOrEqual(255)
+    expect(result.g).toBeLessThanOrEqual(255)
+    expect(result.b).toBeLessThanOrEqual(255)
   })
 })
 
@@ -356,6 +368,37 @@ describe('mergeSimilarColors', () => {
     const result = mergeSimilarColors(sortedColors, 3, 100)
 
     expect(result.length).toBeLessThanOrEqual(3)
+  })
+
+  it('should process all colors without early break', () => {
+    const sortedColors = [
+      { hex: '#FF0000', rgb: { r: 255, g: 0, b: 0 }, count: 10, percentage: 33 },
+      { hex: '#00FF00', rgb: { r: 0, g: 255, b: 0 }, count: 10, percentage: 33 },
+      { hex: '#0000FF', rgb: { r: 0, g: 0, b: 255 }, count: 10, percentage: 33 },
+      { hex: '#FFFF00', rgb: { r: 255, g: 255, b: 0 }, count: 5, percentage: 17 },
+      { hex: '#FF00FF', rgb: { r: 255, g: 0, b: 255 }, count: 5, percentage: 17 },
+      { hex: '#00FFFF', rgb: { r: 0, g: 255, b: 255 }, count: 5, percentage: 17 },
+    ]
+
+    const totalInputCount = sortedColors.reduce((sum, c) => sum + c.count, 0)
+    const result = mergeSimilarColors(sortedColors, 6, 10)
+    const totalResultCount = result.reduce((sum, c) => sum + c.count, 0)
+
+    expect(totalResultCount).toBe(totalInputCount)
+  })
+
+  it('should maintain accurate percentages after merging', () => {
+    const sortedColors = [
+      { hex: '#FF0000', rgb: { r: 255, g: 0, b: 0 }, count: 80, percentage: 40 },
+      { hex: '#FA0505', rgb: { r: 250, g: 5, b: 5 }, count: 20, percentage: 10 },
+      { hex: '#00FF00', rgb: { r: 0, g: 255, b: 0 }, count: 100, percentage: 50 },
+    ]
+
+    const result = mergeSimilarColors(sortedColors, 2, 50)
+
+    const totalCount = result.reduce((sum, c) => sum + c.count, 0)
+    expect(totalCount).toBe(200)
+    expect(result[0].count + result[1].count).toBe(200)
   })
 
   it('should sort merged colors by count descending', () => {

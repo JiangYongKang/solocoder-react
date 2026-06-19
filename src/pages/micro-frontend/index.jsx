@@ -7,6 +7,9 @@ import {
   APP_STATUS_LABELS,
   HOME_APP_ID,
   MAX_MESSAGE_LOGS,
+  LIFECYCLE_STAGES,
+  MESSAGE_TYPE,
+  BROADCAST_TARGET,
 } from './constants.js';
 
 import {
@@ -19,12 +22,6 @@ import {
   getInitialActiveAppFromHash,
   buildHashForApp,
 } from './utils.js';
-
-import {
-  LIFECYCLE_STAGES,
-  MESSAGE_TYPE,
-  BROADCAST_TARGET,
-} from './constants.js';
 
 import {
   createLifecycleManager,

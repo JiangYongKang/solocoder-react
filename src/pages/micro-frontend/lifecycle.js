@@ -77,16 +77,18 @@ export function finishUnmountApp(app, manager, timestamp = Date.now()) {
   return { app: appWithStage, manager: newManager, duration };
 }
 
-export function startLoadingResources(app) {
+export function startLoadingResources(app, timestamp = Date.now()) {
   if (!app) return { app, error: '应用不存在' };
+  void timestamp;
   const result = transitionStatus(app, APP_STATUS.LOADING);
   if (result.error) return { app, error: result.error };
   return { app: { ...result.app, failedResources: [] }, error: null };
 }
 
-export function finishLoadingResources(app, loadResult) {
+export function finishLoadingResources(app, loadResult, timestamp = Date.now()) {
   if (!app) return { app, error: '应用不存在' };
   if (!loadResult) return { app, error: '加载结果为空' };
+  void timestamp;
 
   if (!loadResult.success) {
     const failedResult = transitionStatus(app, APP_STATUS.LOAD_FAILED);

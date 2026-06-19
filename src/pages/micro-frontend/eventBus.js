@@ -1,11 +1,32 @@
-import { routeMessage, createMessageLogEntry } from './utils.js';
-import { BROADCAST_TARGET } from './constants.js';
+import { routeMessage, createMessageLogEntry, generateId } from './utils.js';
+import { BROADCAST_TARGET, MESSAGE_TYPE } from './constants.js';
 
 export class EventBus {
   constructor() {
     this._listeners = new Map();
     this._logListeners = new Set();
     this._apps = new Map();
+  }
+
+  _emitLog(entry) {
+    this._logListeners.forEach((cb) => {
+      try { cb(entry); } catch (err) { void err; }
+    });
+  }
+
+  _emitErrorLog(from, to, body, timestamp = Date.now()) {
+    const entry = {
+      id: generateId('err_'),
+      timestamp,
+      from,
+      to,
+      type: MESSAGE_TYPE.ERROR,
+      body,
+      summary: typeof body === 'string'
+        ? body.slice(0, 50) + (body.length > 50 ? '...' : '')
+        : (body?.message || JSON.stringify(body || '').slice(0, 50)),
+    };
+    this._emitLog(entry);
   }
 
   registerApp(appId, iframeWindow) {
@@ -51,22 +72,52 @@ export class EventBus {
     const targets = routeMessage(message, this.getAppIds());
     const logEntry = createMessageLogEntry(message);
 
-    this._logListeners.forEach((cb) => {
-      try { cb(logEntry); } catch (err) { void err; }
-    });
+    this._emitLog(logEntry);
 
     targets.forEach((targetId) => {
       const iframeWindow = this._apps.get(targetId);
       if (iframeWindow && typeof iframeWindow.postMessage === 'function') {
         try {
           iframeWindow.postMessage(message, '*');
-        } catch (err) { void err; }
+        } catch (err) {
+          this._emitErrorLog(
+            message.from,
+            targetId,
+            {
+              reason: 'postMessage 投递失败',
+              target: targetId,
+              error: err?.message || String(err),
+            },
+            Date.now()
+          );
+        }
+      } else if (iframeWindow) {
+        this._emitErrorLog(
+          message.from,
+          targetId,
+          {
+            reason: '目标 iframe 缺少 postMessage 方法',
+            target: targetId,
+          },
+          Date.now()
+        );
       }
 
       const listeners = this._listeners.get(targetId);
       if (listeners) {
         listeners.forEach((cb) => {
-          try { cb(message); } catch (err) { void err; }
+          try { cb(message); } catch (err) {
+            this._emitErrorLog(
+              message.from,
+              targetId,
+              {
+                reason: '监听器回调执行异常',
+                target: targetId,
+                error: err?.message || String(err),
+              },
+              Date.now()
+            );
+          }
         });
       }
     });

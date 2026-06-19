@@ -1038,3 +1038,163 @@ describe('micro-frontend/load-failed reset flow (non-recursive)', () => {
     expect(reset.lifecycle.currentStage).toBeNull();
   });
 });
+
+describe('micro-frontend/loading - timestamp parameter consistency', () => {
+  it('startLoadingResources accepts timestamp parameter without error', () => {
+    const app = createMicroApp({ name: 'App', appId: 'app', entryPath: '/app' });
+    const customTs = 1234567890;
+    const result = startLoadingResources(app, customTs);
+    expect(result.error).toBeNull();
+    expect(result.app.status).toBe(APP_STATUS.LOADING);
+  });
+
+  it('finishLoadingResources accepts timestamp parameter without error', () => {
+    const app = createMicroApp({ name: 'App', appId: 'app', entryPath: '/app' });
+    const loadStart = startLoadingResources(app);
+    const loadResult = simulateResourceLoad(['a.js'], { failProbability: 0 });
+    const customTs = 2345678901;
+    const finish = finishLoadingResources(loadStart.app, loadResult, customTs);
+    expect(finish.error).toBeNull();
+  });
+
+  it('finishLoadingResources handles timestamp for failed load case', () => {
+    const app = createMicroApp({ name: 'App', appId: 'app', entryPath: '/app' });
+    const loadStart = startLoadingResources(app);
+    const loadResult = simulateResourceLoad(['a.js'], { forceFail: true });
+    const customTs = 3456789012;
+    const finish = finishLoadingResources(loadStart.app, loadResult, customTs);
+    expect(finish.error).toBeNull();
+    expect(finish.app.status).toBe(APP_STATUS.LOAD_FAILED);
+    expect(finish.app.failedResources).toEqual(['a.js']);
+  });
+
+  it('startLoadingResources uses default timestamp when not provided', () => {
+    const app = createMicroApp({ name: 'App', appId: 'app', entryPath: '/app' });
+    const before = Date.now();
+    const result = startLoadingResources(app);
+    const after = Date.now();
+    expect(result.error).toBeNull();
+    expect(result.app.createdAt).toBeLessThanOrEqual(after);
+    expect(result.app.createdAt).toBeGreaterThanOrEqual(before - 1000);
+  });
+});
+
+describe('micro-frontend/eventBus - error logging on delivery failures', () => {
+  let bus;
+
+  beforeEach(() => {
+    bus = createEventBus();
+  });
+
+  afterEach(() => {
+    bus.clear();
+  });
+
+  it('should log error when postMessage throws exception', () => {
+    const logs = [];
+    bus.onLog((entry) => logs.push(entry));
+
+    const brokenWindow = {
+      postMessage: () => {
+        throw new Error('iframe destroyed');
+      },
+    };
+
+    bus.registerApp('app1', brokenWindow);
+    bus.registerApp('app2', { postMessage: () => {} });
+
+    const result = bus.sendTo('app2', 'app1', 'test message');
+    expect(result).not.toBeNull();
+
+    const errorLogs = logs.filter((l) => l.type === 'error');
+    expect(errorLogs.length).toBeGreaterThanOrEqual(1);
+    expect(errorLogs[0].from).toBe('app2');
+    expect(errorLogs[0].to).toBe('app1');
+    expect(errorLogs[0].body.error).toContain('iframe destroyed');
+  });
+
+  it('should log error when listener callback throws', () => {
+    const logs = [];
+    bus.onLog((entry) => logs.push(entry));
+
+    bus.registerApp('app1', { postMessage: () => {} });
+    bus.registerApp('app2', { postMessage: () => {} });
+
+    bus.onMessage('app1', () => {
+      throw new Error('listener crashed');
+    });
+
+    bus.sendTo('app2', 'app1', 'hello');
+
+    const errorLogs = logs.filter((l) => l.type === 'error');
+    expect(errorLogs.length).toBeGreaterThanOrEqual(1);
+    expect(errorLogs[0].from).toBe('app2');
+    expect(errorLogs[0].to).toBe('app1');
+    expect(errorLogs[0].body.error).toContain('listener crashed');
+  });
+
+  it('should log error when registered iframe lacks postMessage method', () => {
+    const logs = [];
+    bus.onLog((entry) => logs.push(entry));
+
+    const badWindow = {};
+    bus.registerApp('app1', badWindow);
+    bus.registerApp('app2', { postMessage: () => {} });
+
+    bus.sendTo('app2', 'app1', 'test');
+
+    const errorLogs = logs.filter((l) => l.type === 'error');
+    expect(errorLogs.length).toBeGreaterThanOrEqual(1);
+    expect(errorLogs[0].body.reason).toBe('目标 iframe 缺少 postMessage 方法');
+  });
+
+  it('should emit regular message log even without errors', () => {
+    const logs = [];
+    bus.onLog((entry) => logs.push(entry));
+    bus.registerApp('app1', { postMessage: () => {} });
+    bus.registerApp('app2', { postMessage: () => {} });
+
+    bus.sendTo('app1', 'app2', 'ok message');
+
+    const customLogs = logs.filter((l) => l.type === 'custom');
+    const errorLogs = logs.filter((l) => l.type === 'error');
+    expect(customLogs).toHaveLength(1);
+    expect(errorLogs).toHaveLength(0);
+  });
+
+  it('error log entries use MESSAGE_TYPE.ERROR type', () => {
+    const logs = [];
+    bus.onLog((entry) => logs.push(entry));
+
+    const brokenWindow = {
+      postMessage: () => { throw new Error('boom'); },
+    };
+    bus.registerApp('app1', brokenWindow);
+    bus.registerApp('app2', { postMessage: () => {} });
+
+    bus.sendTo('app2', 'app1', 'x');
+
+    const errorLog = logs.find((l) => l.type === 'error');
+    expect(errorLog).toBeDefined();
+    expect(errorLog.id).toMatch(/^err_/);
+    expect(typeof errorLog.timestamp).toBe('number');
+  });
+
+  it('error log unsubscription stops receiving error logs', () => {
+    const logs = [];
+    const unsub = bus.onLog((entry) => logs.push(entry));
+
+    const broken = { postMessage: () => { throw new Error('e1'); } };
+    bus.registerApp('app1', broken);
+    bus.registerApp('app2', { postMessage: () => {} });
+
+    bus.sendTo('app2', 'app1', 'msg1');
+    const countAfterFirst = logs.filter((l) => l.type === 'error').length;
+    expect(countAfterFirst).toBeGreaterThanOrEqual(1);
+
+    unsub();
+
+    bus.sendTo('app2', 'app1', 'msg2');
+    expect(logs.filter((l) => l.type === 'error').length).toBe(countAfterFirst);
+  });
+});

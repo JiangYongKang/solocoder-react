@@ -1,0 +1,7 @@
+产物不满意：
+1. deduplicateKeyframes 函数 wave 分支第 555 行是冗余死代码。genSig 在第 544 行定义为同一字符串，该 key 已在 546 行或 549 行赋值完毕，555 行用 seen.get 取回刚写入的值再覆盖同一 key，`|| genName` 回退分支永不会触发。原因是模型写完去重逻辑后未回溯审查每行是否存在重复写入，应删除该行。
+2. 单一 wave 元素生成的五个 keyframe 中 wave-0 保留原名但 wave-1 到 wave-4 被重命名为 wave-1-1 到 wave-4-4，同一组 keyframe 出现混合命名。根因是第 545 行条件 `seen.size === 0 && idx === 0` 只保护了首个名称，wave-0 入 seen 后 size 变 1 致使后续名称全进 else 分支。CSS 虽正常运行但可读性差，应对同组统一命名策略。
+
+过程不满意：
+1. 模型读 prompt 后直接编辑 loadingAnimationCore.js，未先 trace 一下 generateCompositionCSS 中 462-464 行 keyframeEntries 的构建逻辑——buildWaveKeyframes 产生 5 个 keyframe，每个名称独立 push 进 entries，这决定去重的粒度。缺上游分析导致 555 行死代码残留，暴露了"边写边改"而非先理解架构再动笔的方式问题。
+2. 模型新增的三个测试只覆盖了 wave-only 场景，未编写混合类型的交叉测试。当 spinner 先进入 seen 使 size 在 wave 分支前已大于零时，wave-0 也会被重命名，当前用例无法验证此路径下 keyframes 命名是否冲突。应至少补一个 spinner 加 wave 的混合用例确保交叉场景正确性。

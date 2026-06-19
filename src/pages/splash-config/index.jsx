@@ -296,10 +296,16 @@ function TemplateThumbnail({ template }) {
 }
 
 function ColorPicker({ value, onChange, showPresets = true }) {
-  const hexValue = /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(value) ? value : value
+  const [hexValue, setHexValue] = useState(value)
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setHexValue(value)
+  }, [value])
 
   const handleHexChange = (e) => {
     const v = e.target.value
+    setHexValue(v)
     if (/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(v)) {
       onChange(v)
     }
@@ -314,6 +320,7 @@ function ColorPicker({ value, onChange, showPresets = true }) {
             value={/^#([0-9A-Fa-f]{6})$/.test(hexValue) ? hexValue : '#ffffff'}
             onChange={(e) => {
               onChange(e.target.value)
+              setHexValue(e.target.value)
             }}
           />
           <div className="color-picker-display" style={{ backgroundColor: value }} />
@@ -335,6 +342,7 @@ function ColorPicker({ value, onChange, showPresets = true }) {
               style={{ backgroundColor: c }}
               onClick={() => {
                 onChange(c)
+                setHexValue(c)
               }}
               title={c}
             />
@@ -1383,7 +1391,7 @@ export default function SplashConfigPage() {
             </div>
           </div>
           <SplashScreenPreview
-            key={`${config.templateId}-${isFullscreen}-${config.interaction.countdown.seconds}`}
+            key={`${config.templateId}-${config.interaction.countdown.seconds}`}
             config={config}
             countdownValue={previewCountdown}
             onSkip={() => showToast('已跳过启动页', 'info')}

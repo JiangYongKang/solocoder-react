@@ -1,10 +1,12 @@
 import { rgbToHex } from './colorUtils.js'
 
+const clampByte = (value) => Math.max(0, Math.min(255, value))
+
 const quantizeColor = (r, g, b, factor) => {
   return {
-    r: Math.round(r / factor) * factor,
-    g: Math.round(g / factor) * factor,
-    b: Math.round(b / factor) * factor,
+    r: clampByte(Math.round(r / factor) * factor),
+    g: clampByte(Math.round(g / factor) * factor),
+    b: clampByte(Math.round(b / factor) * factor),
   }
 }
 
@@ -129,8 +131,6 @@ const mergeSimilarColors = (sortedColors, maxColors, mergeThreshold) => {
         colors: [color],
       })
     }
-
-    if (clusters.length >= maxColors * 3) break
   }
 
   clusters.sort((a, b) => b.totalCount - a.totalCount)

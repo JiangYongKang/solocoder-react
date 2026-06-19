@@ -21,6 +21,9 @@ import {
   getUniqueTags,
   calculateStreakDays,
   buildHeatmapData,
+  buildHeatmapFromDates,
+  buildHeatmapFromStats,
+  getHeatmapLevel,
   getHeatmapCellColor,
   calculateTotalStats,
   calculateDailyProgress,
@@ -526,6 +529,24 @@ describe('新卡片与到期卡片优先级排序', () => {
       expect(tags).toHaveLength(1)
       expect(tags[0]).toEqual({ text: '易错', color: '#6b7280' })
     })
+
+    it('对象格式缺 color 时使用默认值兜底', () => {
+      const cards = [
+        { tags: [{ text: '重点' }] },
+        { tags: [{ text: '生词', color: '' }] },
+        { tags: [{ text: '其他', color: null }] },
+      ]
+      const tags = getUniqueTags(cards)
+      expect(tags).toHaveLength(3)
+      tags.forEach(t => {
+        expect(t.color).toBeDefined()
+        expect(typeof t.color).toBe('string')
+        expect(t.color.length).toBeGreaterThan(0)
+      })
+      expect(tags.find(t => t.text === '重点').color).toBe('#6b7280')
+      expect(tags.find(t => t.text === '生词').color).toBe('#6b7280')
+      expect(tags.find(t => t.text === '其他').color).toBe('#6b7280')
+    })
   })
 })
 
@@ -609,22 +630,23 @@ describe('统计和进度计算', () => {
     })
   })
 
-  describe('buildHeatmapData', () => {
-    it('传入日期数组生成30天数据', () => {
-      const result = buildHeatmapData([], 30)
+  describe('buildHeatmapFromDates', () => {
+    it('从日期数组生成30天数据，count 为 0 或 1', () => {
+      const result = buildHeatmapFromDates([], 30)
       expect(result.length).toBe(30)
       result.forEach(item => {
         expect(item).toHaveProperty('date')
         expect(item).toHaveProperty('studied')
         expect(item).toHaveProperty('count')
+        expect([0, 1]).toContain(item.count)
         expect(item).toHaveProperty('dayOfWeek')
       })
     })
 
-    it('传入日期数组时正确标记学习日，count 为 1', () => {
+    it('正确标记学习日并设置 count=1', () => {
       const today = getTodayKey()
       const yesterday = addDays(today, -1)
-      const result = buildHeatmapData([today, yesterday], 30)
+      const result = buildHeatmapFromDates([today, yesterday], 30)
       const todayItem = result.find(r => r.date === today)
       const yesterdayItem = result.find(r => r.date === yesterday)
       expect(todayItem.studied).toBe(true)
@@ -633,14 +655,24 @@ describe('统计和进度计算', () => {
       expect(yesterdayItem.count).toBe(1)
     })
 
-    it('传入 stats 对象时 count 为每日学习总数', () => {
+    it('未学习的日期 count=0', () => {
+      const today = getTodayKey()
+      const result = buildHeatmapFromDates([], 30)
+      const todayItem = result.find(r => r.date === today)
+      expect(todayItem.studied).toBe(false)
+      expect(todayItem.count).toBe(0)
+    })
+  })
+
+  describe('buildHeatmapFromStats', () => {
+    it('从 stats 对象生成30天数据，count 为每日学习总数', () => {
       const today = getTodayKey()
       const yesterday = addDays(today, -1)
       const stats = {
         [today]: { total: 25, studied: 10, reviewed: 15 },
         [yesterday]: { total: 5, studied: 3, reviewed: 2 },
       }
-      const result = buildHeatmapData(stats, 30)
+      const result = buildHeatmapFromStats(stats, 30)
       const todayItem = result.find(r => r.date === today)
       const yesterdayItem = result.find(r => r.date === yesterday)
       expect(todayItem.studied).toBe(true)
@@ -649,9 +681,18 @@ describe('统计和进度计算', () => {
       expect(yesterdayItem.count).toBe(5)
     })
 
-    it('传入 stats 对象时无学习记录的日期 count 为 0', () => {
-      const stats = {}
-      const result = buildHeatmapData(stats, 30)
+    it('无学习记录的日期 count=0 且 studied=false', () => {
+      const result = buildHeatmapFromStats({}, 30)
+      result.forEach(item => {
+        expect(item.studied).toBe(false)
+        expect(item.count).toBe(0)
+      })
+    })
+
+    it('stats 为 null/undefined 时不报错，全部返回未学习', () => {
+      expect(() => buildHeatmapFromStats(null, 30)).not.toThrow()
+      expect(() => buildHeatmapFromStats(undefined, 30)).not.toThrow()
+      const result = buildHeatmapFromStats(null, 30)
       result.forEach(item => {
         expect(item.studied).toBe(false)
         expect(item.count).toBe(0)
@@ -659,19 +700,83 @@ describe('统计和进度计算', () => {
     })
   })
 
-  describe('getHeatmapCellColor', () => {
-    it('未学习返回浅灰', () => {
-      expect(getHeatmapCellColor(false)).toBe('#ebedf0')
-      expect(getHeatmapCellColor(false, 10)).toBe('#ebedf0')
+  describe('buildHeatmapData（兼容入口）', () => {
+    it('传入数组时委托给 buildHeatmapFromDates', () => {
+      const today = getTodayKey()
+      const fromArray = buildHeatmapData([today], 30)
+      const fromDates = buildHeatmapFromDates([today], 30)
+      expect(fromArray).toEqual(fromDates)
     })
 
-    it('学习后根据数量返回不同绿色（四级）', () => {
-      expect(getHeatmapCellColor(true, 0)).toBe('#9be9a8')
-      expect(getHeatmapCellColor(true, 1)).toBe('#40c463')
-      expect(getHeatmapCellColor(true, 2)).toBe('#30a14e')
-      expect(getHeatmapCellColor(true, 3)).toBe('#216e39')
-      expect(getHeatmapCellColor(true, 5)).toBe('#216e39')
-      expect(getHeatmapCellColor(true, 100)).toBe('#216e39')
+    it('传入对象时委托给 buildHeatmapFromStats', () => {
+      const today = getTodayKey()
+      const stats = { [today]: { total: 10 } }
+      const fromData = buildHeatmapData(stats, 30)
+      const fromStats = buildHeatmapFromStats(stats, 30)
+      expect(fromData).toEqual(fromStats)
+    })
+  })
+
+  describe('getHeatmapLevel（对数分级）', () => {
+    it('count<=0 返回等级 0', () => {
+      expect(getHeatmapLevel(0)).toBe(0)
+      expect(getHeatmapLevel(-5)).toBe(0)
+      expect(getHeatmapLevel(null)).toBe(0)
+      expect(getHeatmapLevel(undefined)).toBe(0)
+    })
+
+    it('小数量区分不同等级', () => {
+      expect(getHeatmapLevel(1)).toBe(0)
+      expect(getHeatmapLevel(2)).toBe(1)
+      expect(getHeatmapLevel(3)).toBe(1)
+    })
+
+    it('中等数量递增到更高等级', () => {
+      expect(getHeatmapLevel(7)).toBe(2)
+      expect(getHeatmapLevel(20)).toBe(3)
+    })
+
+    it('大数量不超过最高等级（对数尺度）', () => {
+      expect(getHeatmapLevel(50)).toBe(3)
+      expect(getHeatmapLevel(100)).toBe(3)
+      expect(getHeatmapLevel(1000)).toBe(3)
+    })
+
+    it('3张和50张等级不同（修复前均为最深色的问题）', () => {
+      const level3 = getHeatmapLevel(3)
+      const level50 = getHeatmapLevel(50)
+      expect(level3).not.toBe(level50)
+      expect(level50).toBeGreaterThan(level3)
+    })
+  })
+
+  describe('getHeatmapCellColor', () => {
+    it('未学习返回浅灰，无论 count 多少', () => {
+      expect(getHeatmapCellColor(false)).toBe('#ebedf0')
+      expect(getHeatmapCellColor(false, 10)).toBe('#ebedf0')
+      expect(getHeatmapCellColor(false, 100)).toBe('#ebedf0')
+    })
+
+    it('学习后按对数等级返回不同绿色', () => {
+      expect(getHeatmapCellColor(true, 1)).toBe('#9be9a8')
+      expect(getHeatmapCellColor(true, 2)).toBe('#40c463')
+      expect(getHeatmapCellColor(true, 7)).toBe('#30a14e')
+      expect(getHeatmapCellColor(true, 20)).toBe('#216e39')
+    })
+
+    it('学3张和学50张颜色不同（修复前同色的问题）', () => {
+      const color3 = getHeatmapCellColor(true, 3)
+      const color50 = getHeatmapCellColor(true, 50)
+      expect(color3).not.toBe(color50)
+    })
+
+    it('大数量被裁剪到最高等级颜色', () => {
+      const color50 = getHeatmapCellColor(true, 50)
+      const color100 = getHeatmapCellColor(true, 100)
+      const color1000 = getHeatmapCellColor(true, 1000)
+      expect(color50).toBe(color100)
+      expect(color100).toBe(color1000)
+      expect(color1000).toBe('#216e39')
     })
   })
 })

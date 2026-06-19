@@ -204,7 +204,10 @@ export function getUniqueTags(cards) {
       card.tags.forEach(tag => {
         const text = getTagText(tag)
         if (!tagMap.has(text)) {
-          const color = typeof tag === 'object' && tag ? tag.color : '#6b7280'
+          let color = '#6b7280'
+          if (tag && typeof tag === 'object' && typeof tag.color === 'string' && tag.color.trim() !== '') {
+            color = tag.color
+          }
           tagMap.set(text, { text, color })
         }
       })
@@ -251,36 +254,43 @@ export function getStudyDatesFromStats(studyStats) {
   })
 }
 
-export function buildHeatmapData(studyDatesOrStats, days = 30) {
+export function buildHeatmapFromDates(studyDates, days = 30) {
   const result = []
   const today = parseDate(getTodayKey())
-
-  const isStatsObject = studyDatesOrStats
-    && typeof studyDatesOrStats === 'object'
-    && !Array.isArray(studyDatesOrStats)
-
-  const dateSet = isStatsObject ? null : new Set(studyDatesOrStats || [])
+  const dateSet = new Set(studyDates || [])
 
   for (let i = days - 1; i >= 0; i--) {
     const d = new Date(today)
     d.setDate(d.getDate() - i)
     const dateKey = formatDate(d)
-
-    let count
-    let studied
-
-    if (isStatsObject) {
-      const dayStats = studyDatesOrStats[dateKey]
-      count = dayStats?.total || 0
-      studied = count > 0
-    } else {
-      studied = dateSet.has(dateKey)
-      count = studied ? 1 : 0
-    }
+    const studied = dateSet.has(dateKey)
 
     result.push({
       date: dateKey,
       studied,
+      count: studied ? 1 : 0,
+      dayOfWeek: d.getDay(),
+    })
+  }
+
+  return result
+}
+
+export function buildHeatmapFromStats(studyStats, days = 30) {
+  const result = []
+  const today = parseDate(getTodayKey())
+  const stats = studyStats && typeof studyStats === 'object' ? studyStats : {}
+
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today)
+    d.setDate(d.getDate() - i)
+    const dateKey = formatDate(d)
+    const dayStats = stats[dateKey]
+    const count = dayStats?.total || 0
+
+    result.push({
+      date: dateKey,
+      studied: count > 0,
       count,
       dayOfWeek: d.getDay(),
     })
@@ -289,12 +299,29 @@ export function buildHeatmapData(studyDatesOrStats, days = 30) {
   return result
 }
 
+export function buildHeatmapData(studyDatesOrStats, days = 30) {
+  const isStatsObject = studyDatesOrStats
+    && typeof studyDatesOrStats === 'object'
+    && !Array.isArray(studyDatesOrStats)
+
+  return isStatsObject
+    ? buildHeatmapFromStats(studyDatesOrStats, days)
+    : buildHeatmapFromDates(studyDatesOrStats, days)
+}
+
+const HEATMAP_LEVEL_COLORS = ['#9be9a8', '#40c463', '#30a14e', '#216e39']
+const HEATMAP_LEVELS = HEATMAP_LEVEL_COLORS.length
+
+export function getHeatmapLevel(count) {
+  if (!count || count <= 0) return 0
+  const level = Math.floor(Math.log(count + 1) / Math.log(Math.E))
+  return Math.min(level, HEATMAP_LEVELS - 1)
+}
+
 export function getHeatmapCellColor(studied, count = 0) {
   if (!studied) return '#ebedf0'
-  if (count <= 0) return '#9be9a8'
-  if (count === 1) return '#40c463'
-  if (count === 2) return '#30a14e'
-  return '#216e39'
+  const level = getHeatmapLevel(count)
+  return HEATMAP_LEVEL_COLORS[level]
 }
 
 export function calculateTotalStats(cards) {

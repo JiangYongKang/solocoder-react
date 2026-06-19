@@ -25,16 +25,52 @@ export function loadPlans(storage = globalThis.localStorage) {
 
 function normalizePlansNextBackupTime(plans) {
   const now = Date.now();
-  return plans.map((plan, index) => {
+  const OFFSET_MINUTES = 15;
+  const MAX_SPREAD_MINUTES = 120;
+
+  const computedPlans = plans.map((plan) => {
     if (!plan.nextBackupTime || plan.nextBackupTime <= now) {
-      const baseNextTime = calculateNextBackupTime(plan, now);
-      const offsetMinutes = (index * 15) % 120;
-      const nextBackupTime = baseNextTime + offsetMinutes * 60 * 1000;
-      return { ...plan, nextBackupTime };
+      return { ...plan, nextBackupTime: calculateNextBackupTime(plan, now) };
     }
     return plan;
   });
+
+  const sortedWithIndex = computedPlans
+    .map((plan, originalIndex) => ({ plan, originalIndex }))
+    .sort((a, b) => {
+      const timeDiff = a.plan.nextBackupTime - b.plan.nextBackupTime;
+      if (timeDiff !== 0) return timeDiff;
+      return a.originalIndex - b.originalIndex;
+    });
+
+  const collisionCount = new Map();
+
+  sortedWithIndex.forEach(({ plan }) => {
+    const key = plan.nextBackupTime;
+    collisionCount.set(key, (collisionCount.get(key) || 0) + 1);
+  });
+
+  const perKeyOffset = new Map();
+
+  const normalized = sortedWithIndex.map(({ plan, originalIndex }) => {
+    const key = plan.nextBackupTime;
+    const count = collisionCount.get(key);
+    if (count <= 1) {
+      return { ...plan, _originalIndex: originalIndex };
+    }
+    const offsetSoFar = perKeyOffset.get(key) || 0;
+    const addMinutes = offsetSoFar;
+    perKeyOffset.set(key, offsetSoFar + OFFSET_MINUTES);
+    const nextBackupTime = key + addMinutes * 60 * 1000;
+    return { ...plan, nextBackupTime, _originalIndex: originalIndex };
+  });
+
+  normalized.sort((a, b) => a._originalIndex - b._originalIndex);
+
+  return normalized.map(({ _originalIndex, ...plan }) => plan);
 }
+
+export { normalizePlansNextBackupTime as _normalizePlansNextBackupTime };
 
 export function savePlans(plans, storage = globalThis.localStorage) {
   try {
@@ -110,10 +146,13 @@ export function createPlan(plans, planData) {
 
   newPlan.nextBackupTime = calculateNextBackupTime(newPlan, now);
 
+  const newPlans = normalizePlansNextBackupTime([...plans, newPlan]);
+  const finalPlan = newPlans.find((p) => p.id === newPlan.id);
+
   return {
     success: true,
-    plan: newPlan,
-    plans: [...plans, newPlan],
+    plan: finalPlan || newPlan,
+    plans: newPlans,
   };
 }
 
@@ -134,12 +173,14 @@ export function updatePlan(plans, planId, updates) {
     updatedPlan.nextBackupTime = calculateNextBackupTime(updatedPlan, Date.now());
   }
 
-  const newPlans = [...plans];
-  newPlans[planIndex] = updatedPlan;
+  const newPlansMutable = [...plans];
+  newPlansMutable[planIndex] = updatedPlan;
+  const newPlans = normalizePlansNextBackupTime(newPlansMutable);
+  const finalPlan = newPlans.find((p) => p.id === planId) || updatedPlan;
 
   return {
     success: true,
-    plan: updatedPlan,
+    plan: finalPlan,
     plans: newPlans,
   };
 }

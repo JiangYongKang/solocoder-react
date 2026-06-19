@@ -10,12 +10,12 @@ import {
   formatFrequencyDisplay,
 } from './utils.js';
 
-export default function PlanList({ onEdit, onDelete, onManualRun, onCreate }) {
+export default function PlanList({ onEdit, onUpdatePlan, onDelete, onManualRun, onCreate }) {
   const { plans, isTaskRunning, runningTaskCount } = useBackup();
 
   const handleTogglePlanStatus = (plan) => {
     const newStatus = plan.status === PLAN_STATUS.ACTIVE ? PLAN_STATUS.PAUSED : PLAN_STATUS.ACTIVE;
-    onEdit(plan.id, { status: newStatus });
+    onUpdatePlan(plan.id, { status: newStatus });
   };
 
   return (

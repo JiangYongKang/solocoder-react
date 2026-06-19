@@ -695,51 +695,28 @@ const SmsTemplatePage = () => {
     }
   }, [state.groups, state.templates])
 
-  const renderHighlightedContent = (content) => {
-    if (!content) return null
+  const renderContentWithVars = (content, { varClassName = 'sms-variable', keyPrefix = 'v', fallback = null, trailingNewline = false } = {}) => {
+    if (!content) return fallback
     const parts = []
     let lastIndex = 0
     const regex = /\{([^{}]+)\}/g
     let match
     while ((match = regex.exec(content)) !== null) {
       if (match.index > lastIndex) {
-        parts.push(<span key={`text-${lastIndex}`}>{content.slice(lastIndex, match.index)}</span>)
+        parts.push(<span key={`${keyPrefix}-text-${lastIndex}`}>{content.slice(lastIndex, match.index)}</span>)
       }
       parts.push(
-        <span key={`var-${match.index}`} className="sms-variable">
+        <span key={`${keyPrefix}-var-${match.index}`} className={varClassName}>
           {match[0]}
         </span>
       )
       lastIndex = match.index + match[0].length
     }
     if (lastIndex < content.length) {
-      parts.push(<span key={`text-${lastIndex}`}>{content.slice(lastIndex)}</span>)
+      parts.push(<span key={`${keyPrefix}-text-${lastIndex}`}>{content.slice(lastIndex)}</span>)
     }
-    return parts
-  }
-
-  const renderEditorHighlight = (content) => {
-    if (!content) return '\n'
-    const parts = []
-    let lastIndex = 0
-    const regex = /\{([^{}]+)\}/g
-    let match
-    while ((match = regex.exec(content)) !== null) {
-      if (match.index > lastIndex) {
-        parts.push(<span key={`et-${lastIndex}`}>{content.slice(lastIndex, match.index)}</span>)
-      }
-      parts.push(
-        <span key={`ev-${match.index}`} className="sms-var-highlight">
-          {match[0]}
-        </span>
-      )
-      lastIndex = match.index + match[0].length
-    }
-    if (lastIndex < content.length) {
-      parts.push(<span key={`et-${lastIndex}`}>{content.slice(lastIndex)}</span>)
-    }
-    if (content.endsWith('\n')) {
-      parts.push(<span key="newline">{'\n'}</span>)
+    if (trailingNewline && content.endsWith('\n')) {
+      parts.push(<span key={`${keyPrefix}-newline`}>{'\n'}</span>)
     }
     return parts
   }
@@ -918,9 +895,9 @@ const SmsTemplatePage = () => {
                           </span>
                         )}
                       </div>
-                      <div className="sms-template-textarea-wrapper">
+                      <div className={`sms-template-textarea-wrapper${selectedTemplate && !capabilities.canEdit ? ' is-disabled' : ''}`}>
                         <div className="sms-template-highlight-overlay" aria-hidden="true">
-                          {renderEditorHighlight(editingContent)}
+                          {renderContentWithVars(editingContent, { varClassName: 'sms-var-highlight', keyPrefix: 'ed', fallback: '\n', trailingNewline: true })}
                         </div>
                         <textarea
                           ref={textareaRef}
@@ -1029,15 +1006,7 @@ const SmsTemplatePage = () => {
                         </div>
                         <div className="sms-template-sms-bubble">
                           {previewContent ? (
-                            renderHighlightedContent(
-                              (editingSignature ?? DEFAULT_SIGNATURE) +
-                              (selectedTemplate
-                                ? buildPreviewContent(
-                                    { content: editingContent, signature: '' },
-                                    editingSamples
-                                  )
-                                : '')
-                            )
+                            renderContentWithVars(previewContent)
                           ) : (
                             <span style={{ color: '#909399' }}>输入模板内容后显示预览...</span>
                           )}

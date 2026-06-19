@@ -718,6 +718,40 @@ describe('code generation', () => {
       expect(borderRedCount).toBe(1)
       expect(borderGreenCount).toBe(1)
     })
+
+    it('should not include redundant border declaration when only alignment changes', () => {
+      const grid = createInitialGrid(2, 1)
+      grid.cells[0] = {
+        ...grid.cells[0],
+        horizontalAlign: HORIZONTAL_ALIGN.LEFT,
+      }
+      grid.cells[1] = {
+        ...grid.cells[1],
+        verticalAlign: VERTICAL_ALIGN.TOP,
+      }
+
+      const html = generateHTML(grid)
+      const css = generateCSS(grid)
+
+      expect(html).toContain('grid-item-1')
+      expect(html).toContain('grid-item-2')
+      expect(css).toContain('.grid-item-1 {')
+      expect(css).toContain('.grid-item-2 {')
+      expect(css).toContain('justify-content: flex-start')
+      expect(css).toContain('align-items: flex-start')
+
+      const gridItemMatch = css.match(/\.grid-item \{([^}]+)\}/)
+      expect(gridItemMatch).not.toBeNull()
+      const gridItemStyles = gridItemMatch[1]
+      expect(gridItemStyles).toContain('justify-content: center')
+      expect(gridItemStyles).toContain('align-items: center')
+      expect(gridItemStyles).toContain('border: 1px solid #333333')
+
+      const customSelectors = css.match(/\.grid-item-\d+ \{[^}]+\}/g) || []
+      customSelectors.forEach((selectorBlock) => {
+        expect(selectorBlock).not.toContain('border: 1px solid #333333')
+      })
+    })
   })
 
   describe('generateFullCode', () => {

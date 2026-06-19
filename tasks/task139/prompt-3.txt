@@ -1,0 +1,7 @@
+你实现的文本差异统计工具还存在一些问题，需要进行修复：
+
+1. 差异视图的布局在修复同步滚动问题时被过度重构：原来统一的四列 grid 布局（40px 1fr 40px 1fr）被拆分为左右两个独立滚动容器，而表头仍然保持四列网格结构，与下方两列内容的列宽对齐关系不一致。
+
+2. showCharDiff 的判断条件中同时包含 pair.type === 'modified' 和 pair.type !== 'equal' && pair.leftContent && pair.rightContent，两个条件在语义上完全重叠，因为只有 modified 类型的 pair 才同时拥有非空 leftContent 和 rightContent。
+
+3. 修复完成后重新运行 pnpm run test，需要让所有测试通过。

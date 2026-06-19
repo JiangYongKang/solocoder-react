@@ -454,7 +454,16 @@
 .sms-template-textarea:disabled {
   background: #f5f7fa;
   cursor: not-allowed;
+  color: transparent;
+  caret-color: transparent;
+}
+
+.sms-template-textarea-wrapper.is-disabled .sms-template-highlight-overlay {
   color: #909399;
+}
+
+.sms-template-textarea-wrapper.is-disabled .sms-template-highlight-overlay .sms-var-highlight {
+  color: transparent;
 }
 
 .sms-template-stats-bar {

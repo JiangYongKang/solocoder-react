@@ -23,14 +23,13 @@ function BackupManagerContent() {
     setFormOpen(true);
   };
 
-  const handleEditPlan = (planOrId, updates) => {
-    if (typeof planOrId === 'string' && updates) {
-      return updatePlan(planOrId, updates);
-    }
-    if (planOrId && typeof planOrId === 'object') {
-      setEditingPlan(planOrId);
-      setFormOpen(true);
-    }
+  const handleOpenPlanEditor = (plan) => {
+    setEditingPlan(plan);
+    setFormOpen(true);
+  };
+
+  const handleUpdatePlan = (planId, updates) => {
+    return updatePlan(planId, updates);
   };
 
   const handleAskDelete = (plan) => {
@@ -69,7 +68,8 @@ function BackupManagerContent() {
       <div className="main-content">
         <div className="left-panel">
           <PlanList
-            onEdit={handleEditPlan}
+            onEdit={handleOpenPlanEditor}
+            onUpdatePlan={handleUpdatePlan}
             onDelete={handleAskDelete}
             onManualRun={handleManualRun}
             onCreate={handleCreatePlan}

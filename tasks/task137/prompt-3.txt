@@ -1,0 +1,9 @@
+你实现的短信模板编辑器还存在一些问题，需要进行修复：
+
+1. 模板编辑区在不可编辑状态（如模板已审核通过导致 textarea 被 disabled）时，灰色的 textarea 背景层处于 z-index 2，完全遮挡了下层 z-index 1 的变量蓝色高亮 overlay 层，用户在 disabled 状态下看不到任何变量占位符的高亮标记。
+
+2. index.jsx 中 renderEditorHighlight 函数和 renderHighlightedContent 函数各自包含了一套完全相同的变量占位符正则解析循环，仅 CSS 类名和 React key 前缀不同，当匹配规则需要修改时两处容易遗漏不同步。
+
+3. previewContent 通过 useMemo 完成了签名拼接和变量替换的完整计算，但实际渲染时又内联重新计算了一遍完全相同的表达式，相同的逻辑被执行了两次。
+
+4. 修复完成后重新运行 pnpm run test，需要让所有测试通过。

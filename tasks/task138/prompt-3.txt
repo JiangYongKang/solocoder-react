@@ -1,0 +1,7 @@
+你实现的备份恢复管理中心还存在一些问题，需要进行修复：
+
+1. 连续快速创建两个相同备份时间的计划时，两个计划获得完全相同的 nextBackupTime，normalizePlansNextBackupTime 只在计划时间已过期时才做偏移修正，时间在未来值的新计划被跳过，导致它们在下一次调度检查时仍然同时触发，而非按预设频率错峰执行。
+
+2. handleEditPlan 函数通过 typeof planOrId 判断参数类型来决定走状态切换还是打开编辑表单，同一个函数承担了两种语义完全不同的职责。从 PlanList 中调用 onEdit(plan.id, { status: newStatus }) 时无法从函数名看出这实际是在做计划状态的直接切换而非打开编辑弹窗。
+
+3. 修复完成后重新运行 pnpm run test，需要让所有测试通过。

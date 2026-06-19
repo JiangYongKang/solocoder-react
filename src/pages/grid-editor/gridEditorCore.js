@@ -341,6 +341,9 @@ export function generateCSS(grid) {
   lines.push('.grid-item {')
   lines.push('  display: flex;')
   lines.push('  box-sizing: border-box;')
+  lines.push(`  justify-content: ${horizontalAlignToCSS(DEFAULT_HORIZONTAL_ALIGN)};`)
+  lines.push(`  align-items: ${verticalAlignToCSS(DEFAULT_VERTICAL_ALIGN)};`)
+  lines.push(`  border: ${DEFAULT_BORDER_WIDTH}px ${DEFAULT_BORDER_STYLE} ${DEFAULT_BORDER_COLOR};`)
   lines.push('}')
   lines.push('')
 
@@ -350,35 +353,35 @@ export function generateCSS(grid) {
   })
 
   sortedCells.forEach((cell, index) => {
-    const hasCustomStyle = cell.colSpan > 1 || cell.rowSpan > 1 ||
-      cell.horizontalAlign !== DEFAULT_HORIZONTAL_ALIGN ||
-      cell.verticalAlign !== DEFAULT_VERTICAL_ALIGN ||
-      cell.borderColor !== DEFAULT_BORDER_COLOR ||
+    const hasCustomAlign = cell.horizontalAlign !== DEFAULT_HORIZONTAL_ALIGN ||
+      cell.verticalAlign !== DEFAULT_VERTICAL_ALIGN
+    const hasCustomBorder = cell.borderColor !== DEFAULT_BORDER_COLOR ||
       cell.borderWidth !== DEFAULT_BORDER_WIDTH ||
       cell.borderStyle !== DEFAULT_BORDER_STYLE
+    const isMerged = cell.colSpan > 1 || cell.rowSpan > 1
+    const hasCustomStyle = isMerged || hasCustomAlign || hasCustomBorder
 
-    if (hasCustomStyle || index === 0) {
+    if (hasCustomStyle) {
       const cellLines = []
 
-      if (cell.colSpan > 1 || cell.rowSpan > 1) {
+      if (isMerged) {
         cellLines.push(`  grid-column: ${cell.col} / span ${cell.colSpan};`)
         cellLines.push(`  grid-row: ${cell.row} / span ${cell.rowSpan};`)
       }
 
-      if (cell.horizontalAlign !== DEFAULT_HORIZONTAL_ALIGN || index === 0) {
+      if (cell.horizontalAlign !== DEFAULT_HORIZONTAL_ALIGN) {
         cellLines.push(`  justify-content: ${horizontalAlignToCSS(cell.horizontalAlign)};`)
       }
-      if (cell.verticalAlign !== DEFAULT_VERTICAL_ALIGN || index === 0) {
+      if (cell.verticalAlign !== DEFAULT_VERTICAL_ALIGN) {
         cellLines.push(`  align-items: ${verticalAlignToCSS(cell.verticalAlign)};`)
       }
 
-      cellLines.push(`  border: ${cell.borderWidth}px ${cell.borderStyle} ${cell.borderColor};`)
+      if (hasCustomBorder) {
+        cellLines.push(`  border: ${cell.borderWidth}px ${cell.borderStyle} ${cell.borderColor};`)
+      }
 
       if (cellLines.length > 0) {
-        const selector = hasCustomStyle
-          ? `.grid-item-${index + 1}`
-          : '.grid-item'
-        lines.push(`${selector} {`)
+        lines.push(`.grid-item-${index + 1} {`)
         lines.push(...cellLines)
         lines.push('}')
         lines.push('')

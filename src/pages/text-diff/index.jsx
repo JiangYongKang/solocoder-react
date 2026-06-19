@@ -94,8 +94,7 @@ const TextDiffStatsPage = () => {
 
   const leftTextareaRef = useRef(null)
   const rightTextareaRef = useRef(null)
-  const leftDiffRef = useRef(null)
-  const rightDiffRef = useRef(null)
+  const diffScrollRef = useRef(null)
   const leftFileInputRef = useRef(null)
   const rightFileInputRef = useRef(null)
   const isSyncingRef = useRef(false)
@@ -160,12 +159,13 @@ const TextDiffStatsPage = () => {
     const targets = []
     if (sourceSide === 'left-input') {
       if (rightTextareaRef.current) targets.push(rightTextareaRef.current)
+      if (diffScrollRef.current) targets.push(diffScrollRef.current)
     } else if (sourceSide === 'right-input') {
       if (leftTextareaRef.current) targets.push(leftTextareaRef.current)
-    } else if (sourceSide === 'left-diff') {
-      if (rightDiffRef.current) targets.push(rightDiffRef.current)
-    } else if (sourceSide === 'right-diff') {
-      if (leftDiffRef.current) targets.push(leftDiffRef.current)
+      if (diffScrollRef.current) targets.push(diffScrollRef.current)
+    } else if (sourceSide === 'diff') {
+      if (leftTextareaRef.current) targets.push(leftTextareaRef.current)
+      if (rightTextareaRef.current) targets.push(rightTextareaRef.current)
     }
 
     targets.forEach((target) => {
@@ -432,64 +432,45 @@ const TextDiffStatsPage = () => {
                 <div className="tds-diff-header-col">#</div>
                 <div className="tds-diff-header-col">{titleB || '文本 B'}</div>
               </div>
-              <div className="tds-diff-scroll-container">
-                <div
-                  ref={leftDiffRef}
-                  className="tds-diff-content tds-diff-left"
-                  onScroll={(e) => handleScrollSync('left-diff', e)}
-                >
-                  <div className="tds-side-by-side">
-                    {filteredPairs.map((pair, idx) => {
-                      const showCharDiff = pair.type === 'modified' ||
-                        (pair.type !== 'equal' && pair.leftContent && pair.rightContent)
-                      return (
-                        <div key={`left-${idx}`} className="tds-diff-row" style={{ display: 'contents' }}>
-                          <div className={`tds-line-num tds-line-num-left ${pair.leftIndex != null ? '' : 'tds-line-num-empty'}`}>
-                            {pair.leftIndex != null ? pair.leftIndex + 1 : ''}
-                          </div>
-                          <div className={`tds-line-content tds-line-content-left ${
-                            (pair.type === 'removed' || pair.type === 'modified')
-                              ? 'tds-line-diff'
-                              : ''
-                          }`}>
-                            {showCharDiff
-                              ? <CharDiffSpan charDiff={computeCharDiffForLine(pair.leftContent, pair.rightContent)} side="left" />
-                              : <span>{pair.leftContent || '\u00A0'}</span>
-                            }
-                          </div>
+              <div
+                ref={diffScrollRef}
+                className="tds-diff-content"
+                onScroll={(e) => handleScrollSync('diff', e)}
+              >
+                <div className="tds-side-by-side">
+                  {filteredPairs.map((pair, idx) => {
+                    const showCharDiff = pair.type === 'modified'
+                    return (
+                      <div key={idx} className="tds-diff-row" style={{ display: 'contents' }}>
+                        <div className={`tds-line-num tds-line-num-left ${pair.leftIndex != null ? '' : 'tds-line-num-empty'}`}>
+                          {pair.leftIndex != null ? pair.leftIndex + 1 : ''}
                         </div>
-                      )
-                    })}
-                  </div>
-                </div>
-                <div
-                  ref={rightDiffRef}
-                  className="tds-diff-content tds-diff-right"
-                  onScroll={(e) => handleScrollSync('right-diff', e)}
-                >
-                  <div className="tds-side-by-side">
-                    {filteredPairs.map((pair, idx) => {
-                      const showCharDiff = pair.type === 'modified' ||
-                        (pair.type !== 'equal' && pair.leftContent && pair.rightContent)
-                      return (
-                        <div key={`right-${idx}`} className="tds-diff-row" style={{ display: 'contents' }}>
-                          <div className={`tds-line-num tds-line-num-right ${pair.rightIndex != null ? '' : 'tds-line-num-empty'}`}>
-                            {pair.rightIndex != null ? pair.rightIndex + 1 : ''}
-                          </div>
-                          <div className={`tds-line-content tds-line-content-right ${
-                            (pair.type === 'added' || pair.type === 'modified')
-                              ? 'tds-line-diff'
-                              : ''
-                          }`}>
-                            {showCharDiff
-                              ? <CharDiffSpan charDiff={computeCharDiffForLine(pair.leftContent, pair.rightContent)} side="right" />
-                              : <span>{pair.rightContent || '\u00A0'}</span>
-                            }
-                          </div>
+                        <div className={`tds-line-content tds-line-content-left ${
+                          (pair.type === 'removed' || pair.type === 'modified')
+                            ? 'tds-line-diff'
+                            : ''
+                        }`}>
+                          {showCharDiff
+                            ? <CharDiffSpan charDiff={computeCharDiffForLine(pair.leftContent, pair.rightContent)} side="left" />
+                            : <span>{pair.leftContent || '\u00A0'}</span>
+                          }
                         </div>
-                      )
-                    })}
-                  </div>
+                        <div className={`tds-line-num tds-line-num-right ${pair.rightIndex != null ? '' : 'tds-line-num-empty'}`}>
+                          {pair.rightIndex != null ? pair.rightIndex + 1 : ''}
+                        </div>
+                        <div className={`tds-line-content tds-line-content-right ${
+                          (pair.type === 'added' || pair.type === 'modified')
+                            ? 'tds-line-diff'
+                            : ''
+                        }`}>
+                          {showCharDiff
+                            ? <CharDiffSpan charDiff={computeCharDiffForLine(pair.leftContent, pair.rightContent)} side="right" />
+                            : <span>{pair.rightContent || '\u00A0'}</span>
+                          }
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             </div>

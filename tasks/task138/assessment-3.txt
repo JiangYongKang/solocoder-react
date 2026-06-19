@@ -1,6 +1,5 @@
 产物不满意：
-1. 模型重构的 `normalizePlansNextBackupTime` 函数中定义了 `MAX_SPREAD_MINUTES = 120` 常量但该常量在函数体内自始至终未被任何逻辑引用。从变量命名语义看，该常量本应用作碰撞偏移量的上限限制——当多个计划的 nextBackupTime 碰撞到同一时间槽后，按 15 分钟递增偏移，但模型只实现了递增偏移而缺少了 120 分钟的截断保护。这意味着如果有 9 个以上计划碰撞同一时间点，最后一个计划的偏移量会超过 2 小时，超出合理的去重范围且无上限约束。正确做法是将偏移统计循环中的递增步长与 `MAX_SPREAD_MINUTES` 绑定，当累计偏移达到上限后停止递增并保留后续计划在原时间点，或者直接移除该未使用常量以保持代码干净。
-2. `index.jsx` 中 `handleEditPlan` 已拆分为 `handleOpenPlanEditor(plan)` 用于打开编辑弹窗和 `handleUpdatePlan(planId, updates)` 用于直接更新计划字段，`PlanList.jsx` 中暂停/启动按钮改为调用 `onUpdatePlan`，编辑按钮调用 `onEdit`，函数职责分离正确。103 个测试全部通过。
+1. normalizePlansNextBackupTime 函数中定义了 MAX_SPREAD_MINUTES = 120 常量但从未被任何逻辑引用。从命名语义看该常量本应用作碰撞偏移量上限——当多个计划碰撞到同一时间槽后按步长递增偏移，但模型只实现了递增而没加截断保护。这意味着如果有 9 个以上计划碰撞同一点，最后一个的偏移量会超过 2 小时，超出合理去重范围。正确做法是将偏移递增逻辑与常量绑定，累计偏移达到上限后停止递增，或者移除未使用的常量。
+2. handleEditPlan 已拆分为 handleOpenPlanEditor 和 handleUpdatePlan，PlanList.jsx 中暂停/启动按钮改调 onUpdatePlan，编辑按钮调 onEdit，函数职责分离正确。103 个测试全部通过。
 
-过程不满意：
-模型在完成代码修改后运行了测试命令 `pnpm test src/pages/__tests__/backup-manager/` 并获得 103 个测试全部通过的结果，但从模型思考过程中的命令参数推断，该测试路径实际匹配到的测试文件为 `utils.test.js`，它与本次修改的 `storage.js` 中 `normalizePlansNextBackupTime` 函数毫无关联。模型没有为新增的碰撞去重偏移逻辑编写任何测试用例，也没有手动模拟提示词描述的"连续快速创建两个相同备份时间的计划"场景来验证两个新计划是否确实获得了不同的 `nextBackupTime`。在未验证核心修改正确性的情况下断言"修复完成"，属于测试覆盖范围与修改范围不匹配的虚假验证。正确做法是明确本次修改涉及哪些核心函数、检查已有测试是否覆盖这些函数、对未覆盖的关键路径补充测试用例后再运行验证。
+过程不满意：模型完成修改后运行测试得到 103 个全部通过的结果，但该测试路径实际只匹配到 utils.test.js，与本次修改的 storage.js 中 normalizePlansNextBackupTime 毫无关联。模型没为新增的碰撞去重偏移逻辑编写任何测试用例，也没手动模拟"连续创建两个相同时间的计划"场景验证是否获得不同的 nextBackupTime。在未验证核心修改正确性的情况下断言"修复完成"，属于测试覆盖与修改范围不匹配的虚假验证。应该明确修改涉及哪些核心函数、补充测试后再验证。

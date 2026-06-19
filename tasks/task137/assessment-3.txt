@@ -1,8 +1,8 @@
 产物不满意：
-1. 模型修复 disabled 状态下变量高亮遮挡问题的方案存在缺陷。`sms-template.css` 中新增了 `.is-disabled .sms-var-highlight { color: transparent; }` 规则，但这与 `.sms-var-highlight` 的默认 `color: transparent` 完全重复，属于冗余样式声明。更严重的是，disabled 态下 textarea 的文字颜色设为 `color: transparent` 后渲染交给了 overlay 层承担，但 overlay 层中 `.sms-var-highlight` 的文字颜色同样为 transparent，导致变量名称在 disabled 态下在两个渲染层上都完全不可见，用户只能看到蓝色背景方块而看不到变量名称如 `{用户名}`。根本原因是修复时只考虑了背景遮挡问题却忽略了变量文字的可见性。正确做法是让 disabled 态下的 `.sms-var-highlight` 文字保持可见（如设为 `#409EFF` 蓝色以匹配高亮背景），确保变量名称在 overlayed 渲染中可读。
-2. `index.jsx` 中 `renderEditorHighlight` 和 `renderHighlightedContent` 已合并为单一函数 `renderContentWithVars`，通过参数化 `varClassName`、`keyPrefix`、`fallback`、`trailingNewline` 区分调用场景，合并逻辑正确。预览面板直接使用 `previewContent` 替代内联重算，消除重复计算无误。107 个测试全部通过。
+1. 模型修复 disabled 态下变量高亮遮挡的方案存在缺陷。CSS 新增了 `.is-disabled .sms-var-highlight { color: transparent; }`，但这与默认规则完全重复。更严重的是，disabled 态下 textarea 文字透明后渲染交给 overlay 承担，但 overlay 中变量文字颜色也为 transparent，导致变量名称在两个渲染层上都不可见，用户只能看到蓝色背景方块而看不到变量名称。原因是修复时只考虑了背景遮挡忘了变量文字可见性。应该让 disabled 态下变量文字保持蓝色可见。
+2. renderEditorHighlight 和 renderHighlightedContent 已合并为单一函数，通过参数化 varClassName、keyPrefix 等区分场景，合并正确。previewContent 直接用于渲染，消除重复计算。107 个测试全部通过。
 
 过程不满意：
-1. 模型在分析阶段连续读取了 `index.jsx` 四次和 `sms-template.css` 两次，这些读取操作中有多次针对相同文件的重复查看且没有提供不同的行范围，属于低效的信息整理行为。模型应第一次读取时将完整文件内容纳入上下文，避免后续无意义的重复读取。
-2. 模型在收到提示词后第一步直接创建了 TodoList，没有先完整阅读代码、梳理问题结构再进行规划。虽然本任务修复结果大体正确，但这种"先规划后探查"的做法与标注规范要求的"先分析问题再规划"相悖。
-3. 模型在 sms-template.css 中新增 disabled 相关样式时，没有先查阅已有样式规则中是否存在相同或冲突的声明，导致写入了与默认 `.sms-var-highlight` 中 `color: transparent` 重复的红余规则。正确做法是在新增 CSS 之前用 grep 搜索相关类名，了解已有样式的完整上下文再决定新增或替换。
+1. 模型在分析阶段连续四次读取 index.jsx、两次读取 sms-template.css，这些读取中有多次针对相同文件的重复查看且没提供不同的行范围，属于低效信息整理。应该第一次读取时将完整内容纳入上下文，避免后续无意义的重复。
+2. 模型收到提示词后第一步直接建了 TodoList，没有先完整阅读代码再进行规划。虽然修复结果大体正确，但这种"先规划后探查"与规范要求的"先分析问题再规划"相悖。
+3. 模型在 CSS 中新增 disabled 相关样式时，没先查阅已有规则中是否存在相同或冲突的声明，导致写入了与默认规则重复的冗余样式。应该在新增 CSS 前用搜索了解已有样式的完整上下文。

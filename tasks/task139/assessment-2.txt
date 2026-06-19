@@ -1,9 +1,8 @@
-产物不满意：模型修复"差异视图同步滚动死代码"时，将 index.jsx 中统一的四列差异视图拆分为左右两个独立滚动容器，CSS 中 .tds-side-by-side 的 grid-template-columns 从 `40px 1fr 40px 1fr` 改为 `40px 1fr`，新增样式涉及超过 20 处修改。提示词只要求修复 rightDiffRef 未绑定 DOM 和 handleScrollSync 死代码，模型过度扩大了范围。简化方案是保留原四列布局直接绑定 ref，不重构布局。当前新布局两侧通过 flex: 1 均分且无法独立调整列宽，表头仍保持四列网格结构，与下方两列内容对齐关系脆弱。
+产物不满意：
+1. 模型修复"差异视图同步滚动死代码"时将统一的四列布局拆为左右两个独立滚动容器，新增样式超过 20 处修改。提示词只要求修复 rightDiffRef 未绑定和 handleScrollSync 死代码，模型过度扩大了范围。简化方案是保留原四列布局直接绑定 ref。当前新布局两侧 flex: 1 均分无法独立调列宽，表头仍保持四列结构，与下方两列内容的对齐关系脆弱。
+2. 修复后 index.jsx 中 showCharDiff 的判断包含 `pair.type === 'modified'` 和 `pair.type !== 'equal' && pair.leftContent && pair.rightContent` 两项，这两项在语义上完全重叠，因为 buildLineDiffPairs 中只有 modified 类型才同时拥有非空的 leftContent 和 rightContent。冗余条件不仅增加理解成本，也可能误导后续维护者。应该只保留 pair.type === 'modified' 作为触发条件。
 
-产物不满意：修复后的 index.jsx 内联 JSX 中，showCharDiff 的判断条件包含 `pair.type === 'modified'` 和 `pair.type !== 'equal' && pair.leftContent && pair.rightContent` 两项，这两个条件在语义上完全重叠，因为 buildLineDiffPairs 中只有 modified 类型的 pair 才同时拥有非空的 leftContent 和 rightContent。冗余的条件不仅增加代码理解成本，也可能在后续维护中误导开发者认为存在其他类型满足第二条条件。正确做法是只保留 `pair.type === 'modified'` 作为 showCharDiff 的触发条件，移除冗余的复合条件判断。
-
-过程不满意：模型在编写 storage.test.js 时经历了至少五轮"运行测试、失败、换方案重写"的试错式调试过程：第一轮使用了 TypeScript 类型注解语法导致 JS 项目编译报错，第二轮修复了类型但闭包引用出错，第三轮更换了 mock 方案仍失败，第四轮改用 vi.stubGlobal 加 storeRef 模式，第五轮又发现三次 addHistoryItem 调用在同一毫秒内产生相同 id 导致期望值错误，最后用 vi.useFakeTimers 才解决。整个过程没有先分析 vitest 的 mock 机制和 localStorage 的测试最佳实践就仓促编写测试，每轮只根据报错表面修复而非根治问题。正确做法是先查阅项目中已有测试（如 diffUtils.test.js）的 mock 模式，选定正确的 mock 方案后再一次性编写完整测试。
-
-过程不满意：模型在整个修复过程中反复使用 view_files 读取同一个文件，index.jsx 被查看了至少 7 次（第 626、676、733、794、1063、2114、2201 行附近），text-diff.css 被查看了至少 8 次（第 240、308、378、492、1204、1354、1432、1596 行附近），且多次是在已经打开该文件的情况下再次完整读取，而非针对性查看局部区域。这种无意义的重复读取严重降低了工作效率。正确的做法是在首次完整阅读文件后，后续只需针对性查看需要修改的片段，或利用搜索定位后精读目标代码块。
-
-过程不满意：模型在 session 第 1 行就立即创建了 todo_write 规划 6 项修复任务，此时尚未读取任何源代码文件来分析问题的实际范围和复杂度。提示词标注规范明确指出"不能在刚收到任务时就直接创建 TodoList，应先分析问题再规划"。直到第 11 行才首次查看 diffUtils.js 了解重复代码情况，第 88 行第一次编辑 computeSimilarity 就出现语法错误需要重改，说明在未充分理解代码现状的情况下匆忙规划导致后续多次返工。
+过程不满意：
+1. 模型写 storage.test.js 时经历了至少五轮"运行测试、失败、换方案重写"的试错调试：第一轮 TypeScript 语法在 JS 项目中报错，第二轮闭包引用出错，第三轮 mock 方案仍失败，第四轮改用 vi.stubGlobal 加 storeRef，第五轮因同毫秒内产生相同 id 导致期望值错误后用 vi.useFakeTimers 才解决。整个过程没有先分析 vitest 的 mock 机制和 localStorage 测试最佳实践就仓促编写。应该先查阅已有测试的 mock 模式，选定正确方案后再一次性编写完整测试。
+2. 模型反复读取同一文件，index.jsx 被查看了至少 7 次，text-diff.css 被查看了至少 8 次，且多次是在已打开文件的情况下再次完整读取而非针对性查看局部。这种无意义的重复读取严重降低了效率。应该在首次完整阅读后，后续只针对需要修改的片段精确定位阅读。
+3. 模型在第 1 行就立即建了 TodoList 规划 6 项修复任务，此时尚未读任何源代码分析问题范围。直到第 11 行才首次查看 diffUtils.js，第 88 行第一次编辑就出现语法错误需要重改，说明在未充分理解代码的情况下匆忙规划导致后续多次返工。

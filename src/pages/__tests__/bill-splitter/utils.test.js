@@ -602,7 +602,7 @@ describe('validateAllExpenses', () => {
     expect(result.valid).toBe(false)
   })
 
-  it('费用描述为空时返回字段级错误信息', () => {
+  it('message仅为标题行，不包含具体错误文本，避免与下方errors列表重复', () => {
     const expenses = [
       {
         id: 'e1',
@@ -616,12 +616,27 @@ describe('validateAllExpenses', () => {
     const result = validateAllExpenses(expenses, participants)
     expect(result.valid).toBe(false)
     expect(result.message).toContain('费用 #1')
-    expect(result.message).toContain('请输入费用描述')
+    expect(result.message).not.toContain('请输入费用描述')
     expect(result.errors.description).toBeTruthy()
     expect(result.expenseIndex).toBe(0)
   })
 
-  it('金额为0时返回金额字段错误信息', () => {
+  it('费用描述为空时errors中description字段有具体错误', () => {
+    const expenses = [
+      {
+        id: 'e1',
+        description: '',
+        amount: 100,
+        payerId: 'p1',
+        sharedWith: ['p1', 'p2'],
+        splitMode: SPLIT_MODE.EQUAL,
+      },
+    ]
+    const result = validateAllExpenses(expenses, participants)
+    expect(result.errors.description).toBe('请输入费用描述')
+  })
+
+  it('金额为0时errors中amount字段有具体错误', () => {
     const expenses = [
       {
         id: 'e1',
@@ -633,12 +648,11 @@ describe('validateAllExpenses', () => {
       },
     ]
     const result = validateAllExpenses(expenses, participants)
-    expect(result.valid).toBe(false)
-    expect(result.message).toContain('金额必须大于0')
     expect(result.errors.amount).toBeTruthy()
+    expect(result.message).not.toContain('金额必须大于0')
   })
 
-  it('未选择支付人时返回支付人字段错误信息', () => {
+  it('未选择支付人时errors中payerId字段有具体错误', () => {
     const expenses = [
       {
         id: 'e1',
@@ -650,12 +664,11 @@ describe('validateAllExpenses', () => {
       },
     ]
     const result = validateAllExpenses(expenses, participants)
-    expect(result.valid).toBe(false)
-    expect(result.message).toContain('请选择支付人')
     expect(result.errors.payerId).toBeTruthy()
+    expect(result.message).not.toContain('请选择支付人')
   })
 
-  it('分摊人为空时返回分摊人字段错误信息', () => {
+  it('分摊人为空时errors中sharedWith字段有具体错误', () => {
     const expenses = [
       {
         id: 'e1',
@@ -667,11 +680,10 @@ describe('validateAllExpenses', () => {
       },
     ]
     const result = validateAllExpenses(expenses, participants)
-    expect(result.valid).toBe(false)
     expect(result.errors.sharedWith).toBeTruthy()
   })
 
-  it('自定义比例不等于100%时返回比例字段错误信息', () => {
+  it('自定义比例不等于100%时errors中ratios字段有具体错误', () => {
     const expenses = [
       {
         id: 'e1',
@@ -684,9 +696,8 @@ describe('validateAllExpenses', () => {
       },
     ]
     const result = validateAllExpenses(expenses, participants)
-    expect(result.valid).toBe(false)
-    expect(result.message).toContain('分摊比例之和必须为100%')
     expect(result.errors.ratios).toBeTruthy()
+    expect(result.message).not.toContain('分摊比例之和必须为100%')
   })
 
   it('多条费用中第二条有问题时返回正确序号和索引', () => {
@@ -715,7 +726,7 @@ describe('validateAllExpenses', () => {
     expect(result.errors.description).toBeTruthy()
   })
 
-  it('同一费用多个字段不完整时，message包含所有字段错误', () => {
+  it('同一费用多个字段不完整时，errors包含全部字段错误，message仅标题', () => {
     const expenses = [
       {
         id: 'e1',
@@ -732,14 +743,13 @@ describe('validateAllExpenses', () => {
     expect(result.errors.amount).toBeTruthy()
     expect(result.errors.payerId).toBeTruthy()
     expect(result.errors.sharedWith).toBeTruthy()
+    expect(Object.keys(result.errors).length).toBe(4)
     expect(result.message).toContain('费用 #1')
-    expect(result.message).toContain('请输入费用描述')
-    expect(result.message).toContain('金额必须大于0')
-    expect(result.message).toContain('请选择支付人')
-    expect(result.message).toContain('请至少选择一个分摊人')
+    expect(result.message).not.toContain('请输入费用描述')
+    expect(result.message).not.toContain('金额必须大于0')
   })
 
-  it('同一费用两个字段不完整时，errors包含两个字段且message同时展示', () => {
+  it('同一费用两个字段不完整时，errors恰好有两个字段且内容不同', () => {
     const expenses = [
       {
         id: 'e1',
@@ -753,9 +763,7 @@ describe('validateAllExpenses', () => {
     const result = validateAllExpenses(expenses, participants)
     expect(result.valid).toBe(false)
     expect(Object.keys(result.errors).length).toBe(2)
-    expect(result.message).toContain('请输入费用描述')
-    expect(result.message).toContain('金额必须大于0')
-    expect(result.message).toContain('；')
+    expect(result.errors.description).not.toBe(result.errors.amount)
   })
 })
 

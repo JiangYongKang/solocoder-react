@@ -611,18 +611,74 @@ describe('micro-frontend/lifecycle', () => {
   });
 
   describe('reset helpers', () => {
-    it('should reset failed app to stopped', () => {
-      const failedApp = { ...baseApp, status: APP_STATUS.LOAD_FAILED, failedResources: ['a.js'] };
+    it('should reset failed app to stopped and clear old lifecycle data', () => {
+      const failedApp = {
+        ...baseApp,
+        status: APP_STATUS.LOAD_FAILED,
+        failedResources: ['a.js'],
+        lifecycle: {
+          stages: [{ stage: LIFECYCLE_STAGES.LOADING, duration: 300, timestamp: 1000 }],
+          currentStage: null,
+        },
+      };
       const result = resetFailedApp(failedApp);
       expect(result.error).toBeNull();
       expect(result.app.status).toBe(APP_STATUS.STOPPED);
       expect(result.app.failedResources).toEqual([]);
+      expect(result.app.lifecycle.stages).toEqual([]);
+      expect(result.app.lifecycle.currentStage).toBeNull();
+    });
+
+    it('resetFailedApp handles app without lifecycle field gracefully', () => {
+      const failedApp = {
+        ...baseApp,
+        status: APP_STATUS.LOAD_FAILED,
+        failedResources: ['a.js'],
+      };
+      delete failedApp.lifecycle;
+      const result = resetFailedApp(failedApp);
+      expect(result.error).toBeNull();
+      expect(result.app.status).toBe(APP_STATUS.STOPPED);
+      expect(result.app.failedResources).toEqual([]);
+      expect(result.app.lifecycle.stages).toEqual([]);
+      expect(result.app.lifecycle.currentStage).toBeNull();
     });
 
     it('should not reset app that is not failed', () => {
       const runningApp = { ...baseApp, status: APP_STATUS.RUNNING };
       const result = resetFailedApp(runningApp);
       expect(result.error).toBeTruthy();
+    });
+
+    it('retry after load failure results in only one loading stage', () => {
+      let mgr = createLifecycleManager();
+      let app = { ...baseApp };
+
+      // 第一次加载：失败
+      const start1 = startLoadingResources(app, mgr, 1000);
+      mgr = start1.manager;
+      const failResult = simulateResourceLoad(['a.js'], { forceFail: true });
+      const finish1 = finishLoadingResources(start1.app, mgr, failResult, 1300);
+      mgr = finish1.manager;
+      expect(finish1.app.status).toBe(APP_STATUS.LOAD_FAILED);
+      expect(finish1.app.lifecycle.stages).toHaveLength(1);
+      expect(finish1.app.lifecycle.stages[0].stage).toBe(LIFECYCLE_STAGES.LOADING);
+      expect(finish1.app.lifecycle.stages[0].duration).toBe(300);
+
+      // resetFailedApp 清除旧的 lifecycle 数据
+      const reset = resetFailedApp(finish1.app);
+      expect(reset.error).toBeNull();
+      expect(reset.app.lifecycle.stages).toEqual([]);
+
+      // 第二次加载：重试并成功
+      const start2 = startLoadingResources(reset.app, mgr, 2000);
+      mgr = start2.manager;
+      const successResult = simulateResourceLoad(['a.js'], { failProbability: 0 });
+      const finish2 = finishLoadingResources(start2.app, mgr, successResult, 2600);
+      expect(finish2.error).toBeNull();
+      expect(finish2.app.lifecycle.stages).toHaveLength(1);
+      expect(finish2.app.lifecycle.stages[0].stage).toBe(LIFECYCLE_STAGES.LOADING);
+      expect(finish2.app.lifecycle.stages[0].duration).toBe(600);
     });
 
     it('resetAppForRestart preserves loading stage but clears later stages', () => {

@@ -1,0 +1,3 @@
+你实现的微前端沙箱演示还存在一个遗留问题，需要进行修复：
+1. resetFailedApp 函数在重置 LOAD_FAILED 状态的应用时，只清除了 failedResources 并将 status 改回 STOPPED，但保留了 lifecycle.stages 中已经记录的旧加载周期数据。当用户对加载失败的应用点击"重试"按钮时，handleStartApp 会先调用 resetFailedApp 重置状态，然后 startLoadingResources 和 finishLoadingResources 完成一次新的加载，resetAppForRestart 再过滤保留 loading 阶段。这导致 lifecycle.stages 中出现两次 loading 阶段记录——一次来自旧加载周期，一次来自新加载周期。用户在 LifecycleSteps 组件中会看到两个 loading 步骤节点，各自显示不同的耗时，造成困惑。需要修复 resetFailedApp，使其不再残留旧加载周期的生命周期数据，确保重试后 lifecycle.stages 中只有当前加载周期的记录。
+2. 修复后需要补充并运行单元测试，确保所有测试通过。

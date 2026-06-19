@@ -124,6 +124,10 @@ export function resetFailedApp(app) {
       ...app,
       status: APP_STATUS.STOPPED,
       failedResources: [],
+      lifecycle: {
+        stages: [],
+        currentStage: null,
+      },
     },
     error: null,
   };

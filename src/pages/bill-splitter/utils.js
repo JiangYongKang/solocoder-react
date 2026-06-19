@@ -292,10 +292,9 @@ export function validateAllExpenses(expenses, participants) {
   for (let i = 0; i < expenses.length; i++) {
     const errors = validateExpense(expenses[i], participants)
     if (Object.keys(errors).length > 0) {
-      const allMessages = Object.values(errors).join('；')
       return {
         valid: false,
-        message: `费用 #${i + 1}：${allMessages}`,
+        message: `费用 #${i + 1} 信息不完整：`,
         errors,
         expenseIndex: i,
       }

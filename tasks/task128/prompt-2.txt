@@ -1,0 +1,9 @@
+你实现的应用启动页配置器页面还存在一些问题，需要进行修复：
+
+1. utils.js 的 switchBackgroundMode 函数将内部状态 `_previousMode` 直接写入配置对象的 background 字段中。当用户保存配置到 localStorage 或导出为 JSON 文件时，这个内部实现细节作为用户数据的一部分被序列化输出，污染了导出的配置数据。应将 previousMode 作为组件层的独立状态管理，不要将其附着在持久化数据结构上。
+
+2. utils.js 的 sanitizeConfig 函数在校验失败时采用全有或全无策略直接返回全新默认配置。当用户配置中只有一个字段超出范围（如 Logo 尺寸误设置为 200px），其他所有字段都是用户精心调整的值，sanitizeConfig 会将全部配置丢弃并替换为默认值。saveLastConfig 在每次配置变更时都会经过 sanitizeConfig 处理，一个字段越界会导致整个配置静默丢失。应对每个字段独立校验并做局部修正，而不是整体回退到默认值。
+
+3. index.jsx 中 ColorPicker 组件在渲染函数体中直接调用 setLastValue 和 setHexValue，主组件 SplashConfigPage 也在渲染体中调用 setLastTemplateId、setLastFullscreen、setPreviewCountdown 等 setState。在 render 阶段调用 setState 破坏了 React 渲染应为纯函数的原则，并发模式下可能导致预期外的重复渲染。这些状态同步应移入 useEffect 中。
+
+4. 修复后为该页面补充对应纯 JS 函数的单元测试，覆盖以上修复逻辑。确保 pnpm run test 中所有测试通过。

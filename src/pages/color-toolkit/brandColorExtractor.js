@@ -1,6 +1,6 @@
 import { rgbToHex } from './colorUtils.js'
 
-const quantizeColor = (r, g, b, factor = 32) => {
+const quantizeColor = (r, g, b, factor) => {
   return {
     r: Math.round(r / factor) * factor,
     g: Math.round(g / factor) * factor,
@@ -10,12 +10,147 @@ const quantizeColor = (r, g, b, factor = 32) => {
 
 const getColorKey = (r, g, b) => `${r},${g},${b}`
 
+const getColorDistance = (c1, c2) => {
+  const dr = c1.r - c2.r
+  const dg = c1.g - c2.g
+  const db = c1.b - c2.b
+  return Math.sqrt(dr * dr + dg * dg + db * db)
+}
+
+const estimateColorDiversity = (colors) => {
+  if (colors.length < 2) return 0
+
+  let totalDist = 0
+  let pairCount = 0
+  const sampleSize = Math.min(colors.length, 50)
+  const step = Math.floor(colors.length / sampleSize)
+
+  for (let i = 0; i < colors.length; i += step) {
+    for (let j = i + step; j < colors.length; j += step) {
+      totalDist += getColorDistance(colors[i], colors[j])
+      pairCount++
+    }
+  }
+
+  return pairCount > 0 ? totalDist / pairCount : 0
+}
+
+const computeAdaptiveQuantFactor = (imageData, samplingFactor = 4) => {
+  const { data, width, height } = imageData
+  const sampleColors = []
+
+  for (let y = 0; y < height; y += samplingFactor * 4) {
+    for (let x = 0; x < width; x += samplingFactor * 4) {
+      const idx = (y * width + x) * 4
+      const a = data[idx + 3]
+      if (a < 128) continue
+      sampleColors.push({
+        r: data[idx],
+        g: data[idx + 1],
+        b: data[idx + 2],
+      })
+    }
+  }
+
+  const diversity = estimateColorDiversity(sampleColors)
+
+  if (diversity > 150) return 16
+  if (diversity > 100) return 24
+  if (diversity > 60) return 32
+  return 48
+}
+
+const computeAdaptiveMergeThreshold = (imageData, quantFactor, samplingFactor = 4) => {
+  const { data, width, height } = imageData
+  const colorMap = new Map()
+
+  for (let y = 0; y < height; y += samplingFactor * 2) {
+    for (let x = 0; x < width; x += samplingFactor * 2) {
+      const idx = (y * width + x) * 4
+      const a = data[idx + 3]
+      if (a < 128) continue
+
+      const r = data[idx]
+      const g = data[idx + 1]
+      const b = data[idx + 2]
+      const quantized = quantizeColor(r, g, b, quantFactor)
+      const key = getColorKey(quantized.r, quantized.g, quantized.b)
+      colorMap.set(key, (colorMap.get(key) || 0) + 1)
+    }
+  }
+
+  const colorList = Array.from(colorMap.keys()).map((key) => {
+    const [r, g, b] = key.split(',').map(Number)
+    return { r, g, b }
+  })
+
+  const diversity = estimateColorDiversity(colorList)
+
+  if (diversity > 120) return 30
+  if (diversity > 80) return 45
+  if (diversity > 50) return 60
+  return 75
+}
+
+const mergeSimilarColors = (sortedColors, maxColors, mergeThreshold) => {
+  const clusters = []
+
+  for (const color of sortedColors) {
+    let nearestCluster = null
+    let nearestDist = Infinity
+
+    for (const cluster of clusters) {
+      const dist = getColorDistance(color.rgb, cluster.centroid)
+      if (dist < mergeThreshold && dist < nearestDist) {
+        nearestDist = dist
+        nearestCluster = cluster
+      }
+    }
+
+    if (nearestCluster) {
+      const totalCount = nearestCluster.totalCount + color.count
+      nearestCluster.centroid = {
+        r: Math.round(
+          (nearestCluster.centroid.r * nearestCluster.totalCount + color.rgb.r * color.count) / totalCount
+        ),
+        g: Math.round(
+          (nearestCluster.centroid.g * nearestCluster.totalCount + color.rgb.g * color.count) / totalCount
+        ),
+        b: Math.round(
+          (nearestCluster.centroid.b * nearestCluster.totalCount + color.rgb.b * color.count) / totalCount
+        ),
+      }
+      nearestCluster.totalCount = totalCount
+      nearestCluster.colors.push(color)
+    } else {
+      clusters.push({
+        centroid: { ...color.rgb },
+        totalCount: color.count,
+        colors: [color],
+      })
+    }
+
+    if (clusters.length >= maxColors * 3) break
+  }
+
+  clusters.sort((a, b) => b.totalCount - a.totalCount)
+
+  return clusters.slice(0, maxColors).map((cluster) => ({
+    rgb: cluster.centroid,
+    hex: rgbToHex(cluster.centroid.r, cluster.centroid.g, cluster.centroid.b),
+    count: cluster.totalCount,
+  }))
+}
+
 export const extractColorsFromImageData = (imageData, maxColors = 5, samplingFactor = 4) => {
   if (!imageData || !imageData.data) return []
 
   const { data, width, height } = imageData
   const colorCount = new Map()
   let totalPixels = 0
+
+  const quantFactor = computeAdaptiveQuantFactor(imageData, samplingFactor)
+  const mergeThreshold = computeAdaptiveMergeThreshold(imageData, quantFactor, samplingFactor)
 
   for (let y = 0; y < height; y += samplingFactor) {
     for (let x = 0; x < width; x += samplingFactor) {
@@ -27,10 +162,16 @@ export const extractColorsFromImageData = (imageData, maxColors = 5, samplingFac
 
       if (a < 128) continue
 
-      const quantized = quantizeColor(r, g, b)
+      const quantized = quantizeColor(r, g, b, quantFactor)
       const key = getColorKey(quantized.r, quantized.g, quantized.b)
 
-      colorCount.set(key, (colorCount.get(key) || 0) + 1)
+      const current = colorCount.get(key) || { count: 0, sumR: 0, sumG: 0, sumB: 0 }
+      current.count += 1
+      current.sumR += r
+      current.sumG += g
+      current.sumB += b
+      colorCount.set(key, current)
+
       totalPixels++
     }
   }
@@ -38,36 +179,25 @@ export const extractColorsFromImageData = (imageData, maxColors = 5, samplingFac
   if (totalPixels === 0) return []
 
   const sortedColors = Array.from(colorCount.entries())
-    .map(([key, count]) => {
-      const [r, g, b] = key.split(',').map(Number)
-      const hex = rgbToHex(r, g, b)
+    .map(([key, value]) => {
+      const avgR = Math.round(value.sumR / value.count)
+      const avgG = Math.round(value.sumG / value.count)
+      const avgB = Math.round(value.sumB / value.count)
+      const hex = rgbToHex(avgR, avgG, avgB)
       return {
         hex,
-        rgb: { r, g, b },
-        count,
-        percentage: (count / totalPixels) * 100,
+        rgb: { r: avgR, g: avgG, b: avgB },
+        count: value.count,
+        percentage: (value.count / totalPixels) * 100,
       }
     })
     .sort((a, b) => b.count - a.count)
 
-  const mergedColors = []
-  for (const color of sortedColors) {
-    const isDuplicate = mergedColors.some((existing) => {
-      const dr = Math.abs(color.rgb.r - existing.rgb.r)
-      const dg = Math.abs(color.rgb.g - existing.rgb.g)
-      const db = Math.abs(color.rgb.b - existing.rgb.b)
-      return dr < 40 && dg < 40 && db < 40
-    })
-
-    if (!isDuplicate) {
-      mergedColors.push(color)
-      if (mergedColors.length >= maxColors) break
-    }
-  }
+  const mergedColors = mergeSimilarColors(sortedColors, maxColors, mergeThreshold)
 
   return mergedColors.map((c) => ({
     ...c,
-    percentage: Math.round(c.percentage * 10) / 10,
+    percentage: Math.round((c.count / totalPixels) * 100 * 10) / 10,
   }))
 }
 
@@ -116,4 +246,13 @@ export const loadImageAndExtractColors = (file, maxColors = 5) => {
     reader.onerror = () => reject(new Error('文件读取失败'))
     reader.readAsDataURL(file)
   })
+}
+
+export {
+  quantizeColor,
+  getColorDistance,
+  estimateColorDiversity,
+  computeAdaptiveQuantFactor,
+  computeAdaptiveMergeThreshold,
+  mergeSimilarColors,
 }

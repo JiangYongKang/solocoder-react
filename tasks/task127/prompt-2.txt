@@ -1,0 +1,13 @@
+你实现的加载动画生成器页面还存在一些问题，需要进行修复：
+
+1. CompositionEditor 的元素属性面板缺少速度和辅色的调节控件。当前只提供了 X 位置、Y 位置、大小和主色四个参数，用户在组合画布上无法为每个动画元素独立设置速度和辅色，与提示词要求"每个元素可独立调节位置、颜色、大小、速度"存在差距。需补齐缺失的调节控件。
+
+2. loadingAnimationCore.js 的 buildHTML 分派函数对 circleProgress 类型丢失了 config 参数传递。buildHTML 只对 wave、skeleton、dots 转发 config，circleProgress 不在列表中导致用户调节的大小和粗细配置在 HTML 代码输出中失效，输出的 SVG 代码始终是固定尺寸。需让 circleProgress 的 HTML builder 也能获取到配置参数。
+
+3. buildCircleProgressKeyframes 函数硬编码了 stroke-dashoffset 起始值为 188.5（半径 30 的圆周长），但 buildCircleProgressCSS 已根据 config 动态计算了 dasharray 值。用户调节 size 和 thickness 后 CSS 中的周长与 keyframes 中的偏移不匹配，导致动画只完成了一部分。需让 keyframes 构建函数也根据 config 动态计算起始偏移量。
+
+4. 缩略图 CSS 中 wave 的 keyframe 使用统一的 `@keyframes wave` 命名（所有 bar 同步运动），但 JS 生成的 keyframe 是 `wave-0`、`wave-1` 等带编号命名且通过 animation-delay 错开。缩略图动画效果与实际预览效果不一致，用户在选择阶段看到的动画和点击后的实际预览不同。需统一缩略图和预览的 keyframe 命名及动画策略。
+
+5. generateCompositionCSS 在生成组合动画 CSS 时对同名 keyframe 去重后只使用第一个元素的 config 生成一份 keyframe 定义。画布中多个同类但配置不同的元素（如两个 spinner 的 speed 不同）会共享第一份 config，配置差异完全丢失。应让不同配置的同名 keyframe 生成差异化副本或使用不同的命名区分。
+
+6. 修复后为该页面补充对应纯 JS 函数的单元测试，覆盖以上修复逻辑。确保 pnpm run test 中所有测试通过。

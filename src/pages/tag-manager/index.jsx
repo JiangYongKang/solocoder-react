@@ -213,7 +213,7 @@ export default function TagManagerPage() {
         return
       }
     } else {
-      const result = splitTag(tags, data.sourceId, data.newTagName)
+      const result = splitTag(tags, data.sourceId, data.newTagName, data.newTagColor)
       if (result.success) {
         setTags(result.tags)
         setTrendData(generateTrendData(result.tags, TREND_DAYS))
@@ -304,8 +304,11 @@ export default function TagManagerPage() {
         </div>
         <div className="tag-detail-panel">
           <ResourceList tag={activeTag} />
-          <TrendChart tags={tags} trendData={trendData} />
         </div>
+      </div>
+
+      <div className="tag-manager-footer">
+        <TrendChart tags={tags} trendData={trendData} />
       </div>
 
       {formModal.open && (

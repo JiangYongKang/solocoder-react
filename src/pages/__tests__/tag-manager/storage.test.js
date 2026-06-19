@@ -13,7 +13,6 @@ import {
   MOCK_TAGS,
   DEFAULT_COLOR,
 } from '../../tag-manager/constants.js'
-import { generateTagId } from '../../tag-manager/utils.js'
 
 const createMockLocalStorage = () => {
   let store = {}

@@ -1,0 +1,8 @@
+产物不满意：
+1. utils.js 的 validateAllExpenses 函数在检测到费用条目不完整时统一返回泛化错误消息 `费用 #${i+1} 信息不完整，请检查后重试`，不区分是描述为空、金额为 0 还是未选择支付人。而 validateExpense 函数已经按字段生成了精准的中文错误提示（如 `请输入费用描述`、`金额必须大于0`、`请选择支付人`），这些详细信息在 validateAllExpenses 调用 validateExpense 后只检查了 `Object.keys(errors).length > 0`，丢弃了 errors 对象中已存在的具体字段级错误信息。用户保存时只能看到泛化提示，需要逐字段排查。
+2. SettlementPanel.jsx 将箭头符号 `→` 改为文字"需支付"后，CSS 类名仍保留为 `settlement-arrow`。类名在语义上已不匹配当前渲染的文字内容，后续维护者按类名查找样式时会感到困惑。应在修改内容时同步更新 CSS 类名。
+
+过程不满意：
+1. 模型对 index.jsx 先后执行了 5 次零散编辑：导入函数、添加校验逻辑、添加错误展示 UI、移除旧变量、添加新状态。如果先梳理出全部改动点可以合并为 1-2 次编辑完成。这种碎片化的修改模式增加了中间态的不可控性。
+2. 模型执行的测试命令是 `npx vitest run src/pages/__tests__/bill-splitter/` 按目录过滤的测试，未按提示词要求执行全量 `pnpm run test`。虽然按目录测试 61 个全部通过，但无法排除本次修改对其他包测试的潜在影响。
+3. 模型在 shell 命令末尾拼接了 `2>&1 undefined`，其中 `undefined` 是 JavaScript 保留字而非 shell 语法的一部分，暴露出模型在拼接命令时缺乏语法校验。

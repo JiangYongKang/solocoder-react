@@ -38,6 +38,7 @@ import {
   taskStatusTransition,
   retryStateMachine,
   shouldTriggerExecution,
+  isOverdueTask,
   shouldSimulateFailure,
   selectRandomFailureReason,
   randomInt,
@@ -67,6 +68,7 @@ import {
   saveSettings,
   loadEngineState,
   saveEngineState,
+  findOverdueTasks,
   recalculateNextExecutionForOverdueTasks,
 } from './storage.js'
 
@@ -353,8 +355,6 @@ export default function ExportSchedulerPage() {
     const notifSent = showBrowserNotification(title, body)
     if (!notifSent) {
       addToast(title, body, recordStatus === RECORD_STATUS_SUCCESS ? 'success' : 'failed')
-    } else {
-      addToast(title, body, recordStatus === RECORD_STATUS_SUCCESS ? 'success' : 'failed')
     }
   }, [settings, addToast])
 
@@ -584,10 +584,15 @@ export default function ExportSchedulerPage() {
   useEffect(() => {
     if (!engineState.running) return
 
-    const overdueRecalculated = recalculateNextExecutionForOverdueTasks(tasks, Date.now())
-    const hasChanges = overdueRecalculated.some((t, i) => t.nextExecutionTime !== tasks[i]?.nextExecutionTime)
-    if (hasChanges) {
-      setTasks(overdueRecalculated)
+    const now = Date.now()
+    const overdueTasks = findOverdueTasks(tasks, now)
+
+    if (overdueTasks.length > 0) {
+      const recalculated = recalculateNextExecutionForOverdueTasks(tasks, now)
+      setTasks(recalculated)
+      overdueTasks.forEach((task) => {
+        setTimeout(() => executeExport(task, false), 10)
+      })
     }
   }, [])
 

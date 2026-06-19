@@ -1,57 +1,56 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
 import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
+    closestCenter,
+    DndContext,
+    KeyboardSensor,
+    PointerSensor,
+    useSensor,
+    useSensors,
 } from '@dnd-kit/core'
 import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  useSortable,
-  verticalListSortingStrategy,
+    SortableContext,
+    sortableKeyboardCoordinates,
+    useSortable,
+    verticalListSortingStrategy
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { loadImageAndExtractColors } from './brandColorExtractor.js'
 import './color-toolkit.css'
-import {
-  parseColorInput,
-  getContrastColor,
-} from './colorUtils.js'
-import { generateAllPalettes } from './paletteGenerator.js'
 import { simulateColorBlindness } from './colorBlindness.js'
 import {
-  generateGradientCSS,
-  generateFullGradientCSS,
-  GRADIENT_TYPES,
-  LINEAR_DIRECTIONS,
-} from './gradientGenerator.js'
-import { loadImageAndExtractColors } from './brandColorExtractor.js'
+    getContrastColor,
+    parseColorInput,
+} from './colorUtils.js'
 import {
-  loadFavorites,
-  saveFavorites,
-  addFavorite,
-  deleteFavorite,
-  clearFavorites,
-  reorderFavorites,
-  isFavorite,
-  downloadFavorites,
-  copyAllHex,
-  formatDate,
-} from './storage.js'
-import {
-  TOOL_TABS,
-  TOOL_SOURCES,
-  PALETTE_TYPES,
-  DEFAULT_BASE_COLOR,
-  DEFAULT_GRADIENT_START,
-  DEFAULT_GRADIENT_END,
-  DEFAULT_COLORBLIND_COLOR,
-  CLIPBOARD_DELAY,
+    CLIPBOARD_DELAY,
+    DEFAULT_BASE_COLOR,
+    DEFAULT_COLORBLIND_COLOR,
+    DEFAULT_GRADIENT_END,
+    DEFAULT_GRADIENT_START,
+    PALETTE_TYPES,
+    TOOL_SOURCES,
+    TOOL_TABS,
 } from './constants.js'
+import {
+    generateFullGradientCSS,
+    generateGradientCSS,
+    GRADIENT_TYPES,
+    LINEAR_DIRECTIONS,
+} from './gradientGenerator.js'
+import { generateAllPalettes } from './paletteGenerator.js'
+import {
+    addFavorite,
+    clearFavorites,
+    copyAllHex,
+    deleteFavorite,
+    downloadFavorites,
+    formatDate,
+    isFavorite,
+    loadFavorites,
+    reorderFavorites,
+    saveFavorites,
+} from './storage.js'
 
 const SortableFavoriteItem = ({ item, onDelete, onCopy, isFav, onToggleFavorite }) => {
   const {
@@ -173,15 +172,15 @@ const ColorToolkitPage = () => {
     const canvas = colorblindCanvasRef.current
     const ctx = canvas.getContext('2d')
     const blockWidth = canvas.width / 4
-    const blockHeight = canvas.height / 2
+    const blockHeight = canvas.height
 
     ctx.fillStyle = colorblindResult.original.hex
-    ctx.fillRect(0, 0, canvas.width, blockHeight)
+    ctx.fillRect(0, 0, blockWidth, blockHeight)
 
     const types = ['protanopia', 'deuteranopia', 'tritanopia']
     types.forEach((type, index) => {
       ctx.fillStyle = colorblindResult[type].hex
-      ctx.fillRect(index * blockWidth, blockHeight, blockWidth, blockHeight)
+      ctx.fillRect((index + 1) * blockWidth, 0, blockWidth, blockHeight)
     })
   }, [colorblindResult])
 
@@ -698,12 +697,12 @@ const ColorToolkitPage = () => {
                   onClick={() => handleCopyToClipboard(color.hex)}
                 >
                   <span style={{ color: getContrastColor(color.hex) }}>
-                    {index + 1}
+                    {copiedHex === color.hex ? '已复制 ✓' : color.hex}
                   </span>
                 </div>
                 <div className="ct-brand-info">
                   <div className="ct-brand-hex">
-                    {copiedHex === color.hex ? '已复制 ✓' : color.hex}
+                    {color.hex}
                   </div>
                   <div className="ct-brand-percentage">{color.percentage}%</div>
                 </div>

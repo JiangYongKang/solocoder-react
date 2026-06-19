@@ -9,6 +9,17 @@ import {
   truncateText,
 } from './flashcardUtils'
 
+function getTagLabel(tag) {
+  if (typeof tag === 'string') return tag
+  if (tag && typeof tag === 'object' && tag.text) return tag.text
+  return String(tag)
+}
+
+function getTagColor(tag) {
+  if (tag && typeof tag === 'object' && tag.color) return tag.color
+  return '#6b7280'
+}
+
 export default function CardList({
   cards,
   deckId,
@@ -17,22 +28,23 @@ export default function CardList({
   onDeleteCard,
 }) {
   const [sortOrder, setSortOrder] = useState('desc')
-  const [selectedTags, setSelectedTags] = useState([])
+  const [selectedTagTexts, setSelectedTagTexts] = useState([])
 
   const deckCards = useMemo(() => getCardsByDeckId(cards, deckId), [cards, deckId])
   const allTags = useMemo(() => getUniqueTags(deckCards), [deckCards])
 
   const sortedCards = useMemo(() => {
     let result = deckCards
-    if (selectedTags.length > 0) {
-      result = filterCardsByTags(result, selectedTags)
+    if (selectedTagTexts.length > 0) {
+      result = filterCardsByTags(result, selectedTagTexts)
     }
     return sortCardsByCorrectRate(result, sortOrder === 'asc')
-  }, [deckCards, selectedTags, sortOrder])
+  }, [deckCards, selectedTagTexts, sortOrder])
 
   const toggleTag = (tag) => {
-    setSelectedTags(prev =>
-      prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+    const text = getTagLabel(tag)
+    setSelectedTagTexts(prev =>
+      prev.includes(text) ? prev.filter(t => t !== text) : [...prev, text]
     )
   }
 
@@ -58,15 +70,21 @@ export default function CardList({
 
           {allTags.length > 0 && (
             <div className="fc-tag-filter">
-              {allTags.map(tag => (
-                <span
-                  key={tag}
-                  className={`fc-tag-filter-chip ${selectedTags.includes(tag) ? 'active' : ''}`}
-                  onClick={() => toggleTag(tag)}
-                >
-                  {tag}
-                </span>
-              ))}
+              {allTags.map(tag => {
+                const text = getTagLabel(tag)
+                const isActive = selectedTagTexts.includes(text)
+                const color = getTagColor(tag)
+                return (
+                  <span
+                    key={text}
+                    className={`fc-tag-filter-chip ${isActive ? 'active' : ''}`}
+                    style={isActive ? { background: color, borderColor: color } : {}}
+                    onClick={() => toggleTag(tag)}
+                  >
+                    {text}
+                  </span>
+                )
+              })}
             </div>
           )}
         </div>
@@ -100,9 +118,9 @@ export default function CardList({
                         <span
                           key={idx}
                           className="fc-card-tag"
-                          style={{ background: '#6b7280' }}
+                          style={{ background: getTagColor(tag) }}
                         >
-                          {tag}
+                          {getTagLabel(tag)}
                         </span>
                       ))}
                     </div>

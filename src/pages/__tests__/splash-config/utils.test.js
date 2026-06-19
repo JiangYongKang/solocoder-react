@@ -474,11 +474,21 @@ describe('Splash Config - Utility Functions', () => {
       expect(result.background.gradientEnd).toBe('#0000ff')
     })
 
-    it('switchBackgroundMode should store previous mode', () => {
+    it('switchBackgroundMode should NOT write _previousMode into config (no internal state pollution)', () => {
       const config = createDefaultConfig()
       config.background.mode = BACKGROUND_MODES.COLOR
       const result = switchBackgroundMode(config, BACKGROUND_MODES.GRADIENT)
-      expect(result.background._previousMode).toBe(BACKGROUND_MODES.COLOR)
+      expect('_previousMode' in result.background).toBe(false)
+      expect(result.background).not.toHaveProperty('_previousMode')
+    })
+
+    it('serialized config should not contain internal fields like _previousMode', () => {
+      const config = createDefaultConfig()
+      const switched = switchBackgroundMode(config, BACKGROUND_MODES.GRADIENT)
+      const json = serializeConfig(switched)
+      const parsed = JSON.parse(json)
+      expect('_previousMode' in parsed.background).toBe(false)
+      expect(parsed.background).not.toHaveProperty('_previousMode')
     })
 
     it('switchBackgroundMode should ignore invalid mode', () => {
@@ -734,6 +744,135 @@ describe('Splash Config - Utility Functions', () => {
       expect(result.brand.logo.size).toBeGreaterThanOrEqual(MIN_LOGO_SIZE)
       expect(result.brand.title.fontSize).toBeGreaterThanOrEqual(MIN_FONT_SIZE)
       expect(result.interaction.countdown.seconds).toBeLessThanOrEqual(MAX_COUNTDOWN_SECONDS)
+    })
+
+    it('should preserve valid fields when ONLY one field is out of range (partial sanitization)', () => {
+      const config = createDefaultConfig()
+      config.brand.title.text = 'My Precious App'
+      config.brand.subtitle.text = 'Carefully Crafted Slogan'
+      config.brand.title.fontSize = 24
+      config.brand.title.color = '#336699'
+      config.brand.logo.size = 200
+      config.background.mode = BACKGROUND_MODES.GRADIENT
+      config.background.gradientStart = '#ff0000'
+      config.background.gradientEnd = '#0000ff'
+      config.interaction.countdown.seconds = 5
+      config.interaction.skipButton.text = '跳过'
+
+      const result = sanitizeConfig(config)
+
+      expect(result.brand.logo.size).toBe(MAX_LOGO_SIZE)
+      expect(result.brand.title.text).toBe('My Precious App')
+      expect(result.brand.subtitle.text).toBe('Carefully Crafted Slogan')
+      expect(result.brand.title.fontSize).toBe(24)
+      expect(result.brand.title.color).toBe('#336699')
+      expect(result.background.mode).toBe(BACKGROUND_MODES.GRADIENT)
+      expect(result.background.gradientStart).toBe('#ff0000')
+      expect(result.background.gradientEnd).toBe('#0000ff')
+      expect(result.interaction.countdown.seconds).toBe(5)
+      expect(result.interaction.skipButton.text).toBe('跳过')
+    })
+
+    it('should preserve most fields when title color is invalid', () => {
+      const config = createDefaultConfig()
+      config.brand.title.text = 'Keep This'
+      config.brand.title.color = 'not-a-color'
+      config.brand.subtitle.text = 'Keep This Too'
+      config.brand.logo.size = 80
+
+      const result = sanitizeConfig(config)
+
+      expect(result.brand.title.text).toBe('Keep This')
+      expect(result.brand.title.color).toBe(DEFAULT_CONFIG.brand.title.color)
+      expect(result.brand.subtitle.text).toBe('Keep This Too')
+      expect(result.brand.logo.size).toBe(80)
+    })
+
+    it('should preserve most fields when skip button position is invalid', () => {
+      const config = createDefaultConfig()
+      config.brand.title.text = 'Preserved'
+      config.brand.logo.size = 60
+      config.background.mode = BACKGROUND_MODES.IMAGE
+      config.background.imageFit = IMAGE_FIT_MODES.CONTAIN
+      config.interaction.countdown.seconds = 7
+      config.interaction.skipButton.position = 'invalid-position'
+      config.interaction.skipButton.text = 'Skip'
+
+      const result = sanitizeConfig(config)
+
+      expect(result.brand.title.text).toBe('Preserved')
+      expect(result.brand.logo.size).toBe(60)
+      expect(result.background.mode).toBe(BACKGROUND_MODES.IMAGE)
+      expect(result.background.imageFit).toBe(IMAGE_FIT_MODES.CONTAIN)
+      expect(result.interaction.countdown.seconds).toBe(7)
+      expect(result.interaction.skipButton.position).toBe(DEFAULT_CONFIG.interaction.skipButton.position)
+      expect(result.interaction.skipButton.text).toBe('Skip')
+    })
+
+    it('should not discard entire config when input is partial object with only brand.title.text', () => {
+      const partial = {
+        brand: {
+          title: { text: 'Minimal Input' },
+        },
+      }
+      const result = sanitizeConfig(partial)
+      expect(validateConfig(result)).toBe(true)
+      expect(result.brand.title.text).toBe('Minimal Input')
+      expect(result.brand.subtitle.text).toBe(DEFAULT_CONFIG.brand.subtitle.text)
+      expect(result.background.mode).toBe(DEFAULT_CONFIG.background.mode)
+      expect(result.interaction.countdown.seconds).toBe(DEFAULT_CONFIG.interaction.countdown.seconds)
+    })
+
+    it('should sanitize each nested field independently for type correctness', () => {
+      const messy = {
+        templateId: 123,
+        brand: {
+          logo: { image: 42, size: 'big' },
+          title: { text: null, fontSize: 'huge', color: null, bold: 'yes' },
+          subtitle: { text: 999, fontSize: -5, color: 123, bold: null },
+        },
+        background: {
+          mode: 'weird-mode',
+          color: 42,
+          image: {},
+          imageFit: 'bad-fit',
+          gradientStart: 'no-color',
+          gradientEnd: null,
+          gradientDirection: 'sideways',
+        },
+        interaction: {
+          countdown: { enabled: 'on', seconds: 'many', format: 123 },
+          skipButton: {
+            enabled: 'off',
+            text: 777,
+            position: 'nowhere',
+            color: [],
+            backgroundColor: {},
+          },
+        },
+      }
+      const result = sanitizeConfig(messy)
+      expect(validateConfig(result)).toBe(true)
+      expect(result.templateId).toBe(null)
+      expect(result.brand.logo.size).toBe(DEFAULT_CONFIG.brand.logo.size)
+      expect(validateLogoSize(result.brand.logo.size)).toBe(true)
+      expect(typeof result.brand.title.bold).toBe('boolean')
+      expect(result.background.mode).toBe(DEFAULT_CONFIG.background.mode)
+      expect(result.interaction.countdown.seconds).toBe(DEFAULT_CONFIG.interaction.countdown.seconds)
+    })
+
+    it('should preserve valid preview settings', () => {
+      const config = createDefaultConfig()
+      config.preview = { screenRatio: 'ANDROID' }
+      const result = sanitizeConfig(config)
+      expect(result.preview.screenRatio).toBe('ANDROID')
+    })
+
+    it('should fall back to default preview.screenRatio for invalid values', () => {
+      const config = createDefaultConfig()
+      config.preview = { screenRatio: 'INVALID_RATIO' }
+      const result = sanitizeConfig(config)
+      expect(result.preview.screenRatio).toBe(DEFAULT_CONFIG.preview.screenRatio)
     })
   })
 

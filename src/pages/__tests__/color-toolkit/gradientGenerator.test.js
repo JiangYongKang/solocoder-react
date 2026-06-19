@@ -6,6 +6,8 @@ import {
   generateFullGradientCSS,
   GRADIENT_TYPES,
   LINEAR_DIRECTIONS,
+  DEFAULT_DIRECTION,
+  isValidDirection,
 } from '../../color-toolkit/gradientGenerator.js'
 
 describe('LINEAR_DIRECTIONS', () => {
@@ -56,6 +58,21 @@ describe('generateLinearGradient', () => {
     expect(generateLinearGradient('', '#33FF57')).toBe('')
     expect(generateLinearGradient('#FF5733', '')).toBe('')
     expect(generateLinearGradient(null, '#33FF57')).toBe('')
+  })
+
+  it('should fall back to default direction for invalid direction', () => {
+    const result = generateLinearGradient('#FF5733', '#33FF57', 'invalid direction')
+    expect(result).toBe(`linear-gradient(${DEFAULT_DIRECTION}, #FF5733, #33FF57)`)
+  })
+
+  it('should fall back to default direction for empty direction string', () => {
+    const result = generateLinearGradient('#FF5733', '#33FF57', '')
+    expect(result).toBe(`linear-gradient(${DEFAULT_DIRECTION}, #FF5733, #33FF57)`)
+  })
+
+  it('should fall back to default direction for null direction', () => {
+    const result = generateLinearGradient('#FF5733', '#33FF57', null)
+    expect(result).toBe(`linear-gradient(${DEFAULT_DIRECTION}, #FF5733, #33FF57)`)
   })
 })
 
@@ -109,5 +126,34 @@ describe('GRADIENT_TYPES', () => {
   it('should have LINEAR and RADIAL types', () => {
     expect(GRADIENT_TYPES.LINEAR).toBe('linear')
     expect(GRADIENT_TYPES.RADIAL).toBe('radial')
+  })
+})
+
+describe('DEFAULT_DIRECTION', () => {
+  it('should be a valid direction', () => {
+    expect(DEFAULT_DIRECTION).toBe('to right')
+    expect(LINEAR_DIRECTIONS.some((d) => d.key === DEFAULT_DIRECTION)).toBe(true)
+  })
+})
+
+describe('isValidDirection', () => {
+  it('should return true for valid directions', () => {
+    expect(isValidDirection('to top')).toBe(true)
+    expect(isValidDirection('to bottom')).toBe(true)
+    expect(isValidDirection('to left')).toBe(true)
+    expect(isValidDirection('to right')).toBe(true)
+    expect(isValidDirection('to top left')).toBe(true)
+    expect(isValidDirection('to top right')).toBe(true)
+    expect(isValidDirection('to bottom left')).toBe(true)
+    expect(isValidDirection('to bottom right')).toBe(true)
+  })
+
+  it('should return false for invalid directions', () => {
+    expect(isValidDirection('invalid')).toBe(false)
+    expect(isValidDirection('')).toBe(false)
+    expect(isValidDirection(null)).toBe(false)
+    expect(isValidDirection(undefined)).toBe(false)
+    expect(isValidDirection('top')).toBe(false)
+    expect(isValidDirection('45deg')).toBe(false)
   })
 })

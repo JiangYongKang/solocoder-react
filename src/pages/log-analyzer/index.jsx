@@ -101,7 +101,7 @@ function LogItem({ log, pattern, caseSensitive, onToggleCollapse, defaultCollaps
 
   if (!log.isValid) {
     return (
-      <div className="log-item log-item-invalid">
+      <div className="log-item log-item-invalid" data-log-id={log.id}>
         <div className="log-invalid-badge">无法解析</div>
         <div className="log-invalid-content">
           <HighlightedText text={log.raw} pattern={pattern} caseSensitive={caseSensitive} />
@@ -111,16 +111,20 @@ function LogItem({ log, pattern, caseSensitive, onToggleCollapse, defaultCollaps
   }
 
   return (
-    <div className={`log-item ${rowCollapsed ? 'log-item-collapsed' : ''}`}>
+    <div className={`log-item ${rowCollapsed ? 'log-item-collapsed' : ''}`} data-log-id={log.id}>
       <div className="log-item-header" onClick={handleRowClick}>
         <span className="log-collapse-icon">{rowCollapsed ? '▶' : '▼'}</span>
-        <span className="log-timestamp">{log.timestampStr}</span>
+        <span className="log-timestamp">
+          <HighlightedText text={log.timestampStr} pattern={pattern} caseSensitive={caseSensitive} />
+        </span>
         <span className={`log-level-badge ${getLogLevelBadgeClass(log.level)}`}>
-          {log.level}
+          <HighlightedText text={log.level} pattern={pattern} caseSensitive={caseSensitive} />
         </span>
         {!rowCollapsed && (
           <>
-            <span className="log-module">[{log.module}]</span>
+            <span className="log-module">
+              [<HighlightedText text={log.module} pattern={pattern} caseSensitive={caseSensitive} />]
+            </span>
             <span className="log-content-preview">
               <HighlightedText
                 text={longContent ? displayContent : log.content}
@@ -149,7 +153,10 @@ function VirtualLogList({ logs, pattern, caseSensitive, allCollapsed }) {
   const containerRef = useRef(null)
   const [scrollTop, setScrollTop] = useState(0)
   const [containerHeight, setContainerHeight] = useState(0)
-  const itemHeight = 48
+  const [itemHeights, setItemHeights] = useState({})
+
+  const estimatedItemHeight = 48
+  const overscan = 5
 
   useEffect(() => {
     const container = containerRef.current
@@ -166,18 +173,107 @@ function VirtualLogList({ logs, pattern, caseSensitive, allCollapsed }) {
     return () => observer.disconnect()
   }, [])
 
+  const getItemHeight = useCallback((index) => {
+    const log = logs[index]
+    if (!log) return estimatedItemHeight
+    const cached = itemHeights[log.id]
+    return cached != null ? cached : estimatedItemHeight
+  }, [logs, itemHeights])
+
+  const getOffset = useCallback((index) => {
+    let offset = 0
+    for (let i = 0; i < index; i++) {
+      offset += getItemHeight(i)
+    }
+    return offset
+  }, [getItemHeight])
+
+  const totalHeight = useMemo(() => {
+    let h = 0
+    for (let i = 0; i < logs.length; i++) {
+      h += getItemHeight(i)
+    }
+    return h
+  }, [logs, getItemHeight])
+
+  const findStartIndex = useCallback(() => {
+    let result = 0
+    let acc = 0
+
+    for (let i = 0; i < logs.length; i++) {
+      if (acc + getItemHeight(i) > scrollTop) {
+        result = i
+        break
+      }
+      acc += getItemHeight(i)
+      result = i + 1
+    }
+
+    return Math.max(0, result - overscan)
+  }, [logs, scrollTop, getItemHeight])
+
+  const findEndIndex = useCallback((startIdx) => {
+    let acc = 0
+    for (let i = 0; i < startIdx; i++) {
+      acc += getItemHeight(i)
+    }
+
+    let endIdx = startIdx
+    while (endIdx < logs.length && acc < scrollTop + containerHeight) {
+      acc += getItemHeight(endIdx)
+      endIdx++
+    }
+
+    return Math.min(logs.length, endIdx + overscan)
+  }, [logs, scrollTop, containerHeight, getItemHeight])
+
+  const startIndex = findStartIndex()
+  const endIndex = findEndIndex(startIndex)
+  const visibleLogs = logs.slice(startIndex, endIndex)
+  const offsetY = getOffset(startIndex)
+
+  const measureItem = useCallback((logId, height) => {
+    setItemHeights((prev) => {
+      if (prev[logId] === height) return prev
+      return { ...prev, [logId]: height }
+    })
+  }, [])
+
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const node = entry.target
+        const logId = node.getAttribute('data-log-id')
+        if (logId) {
+          measureItem(logId, entry.contentRect.height)
+        }
+      }
+    })
+
+    const observeVisibleItems = () => {
+      const items = container.querySelectorAll('[data-log-id]')
+      items.forEach((item) => {
+        resizeObserver.observe(item)
+      })
+    }
+
+    observeVisibleItems()
+
+    const mutationObserver = new MutationObserver(observeVisibleItems)
+    mutationObserver.observe(container, { childList: true, subtree: true })
+
+    return () => {
+      resizeObserver.disconnect()
+      mutationObserver.disconnect()
+    }
+  }, [visibleLogs, measureItem])
+
   const handleScroll = useCallback((e) => {
     setScrollTop(e.target.scrollTop)
   }, [])
-
-  const totalHeight = logs.length * itemHeight
-  const startIndex = Math.max(0, Math.floor(scrollTop / itemHeight) - 5)
-  const endIndex = Math.min(
-    logs.length,
-    Math.ceil((scrollTop + containerHeight) / itemHeight) + 5
-  )
-  const visibleLogs = logs.slice(startIndex, endIndex)
-  const offsetY = startIndex * itemHeight
 
   return (
     <div
@@ -206,10 +302,13 @@ const CHART_LEVELS = ['ERROR', 'WARN', 'INFO', 'DEBUG']
 
 function LevelBarChart({ counts }) {
   const canvasRef = useRef(null)
+  const containerRef = useRef(null)
+  const [hoveredLevel, setHoveredLevel] = useState(null)
+  const [barRects, setBarRects] = useState([])
 
   const maxValue = useMemo(() => getStatsMax(counts), [counts])
 
-  useEffect(() => {
+  const draw = useCallback(() => {
     const canvas = canvasRef.current
     if (!canvas) return
 
@@ -251,25 +350,95 @@ function LevelBarChart({ counts }) {
       ctx.fillText(val, padL - 8, y + 4)
     }
 
+    const rects = []
     CHART_LEVELS.forEach((level, i) => {
       const count = counts[level] || 0
       const barHeight = (count / maxValue) * chartH
       const x = padL + barGap * i + (barGap - barWidth) / 2
       const y = padT + chartH - barHeight
 
-      ctx.fillStyle = LOG_LEVEL_COLORS[level]
-      ctx.fillRect(x, y, barWidth, barHeight)
+      rects.push({ level, x, y, width: barWidth, height: barHeight, count })
+
+      if (hoveredLevel === level) {
+        ctx.fillStyle = LOG_LEVEL_COLORS[level]
+        ctx.globalAlpha = 0.7
+        ctx.fillRect(x, y, barWidth, barHeight)
+        ctx.globalAlpha = 1
+      } else {
+        ctx.fillStyle = LOG_LEVEL_COLORS[level]
+        ctx.fillRect(x, y, barWidth, barHeight)
+      }
 
       ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text').trim() || '#6b6375'
       ctx.textAlign = 'center'
       ctx.font = '12px system-ui, sans-serif'
       ctx.fillText(level, x + barWidth / 2, h - 15)
     })
-  }, [counts, maxValue])
+    setBarRects(rects)
+  }, [counts, maxValue, hoveredLevel])
+
+  useEffect(() => {
+    draw()
+  }, [draw])
+
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    const observer = new ResizeObserver(() => {
+      draw()
+    })
+    observer.observe(container)
+
+    return () => observer.disconnect()
+  }, [draw])
+
+  const handleMouseMove = useCallback((e) => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    const rect = canvas.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+
+    let found = null
+    for (const bar of barRects) {
+      if (x >= bar.x && x <= bar.x + bar.width && y >= bar.y && y <= bar.y + bar.height) {
+        found = bar
+        break
+      }
+    }
+
+    setHoveredLevel(found ? found.level : null)
+  }, [barRects])
+
+  const handleMouseLeave = useCallback(() => {
+    setHoveredLevel(null)
+  }, [])
+
+  const hoveredBar = barRects.find((b) => b.level === hoveredLevel)
 
   return (
-    <div className="chart-container">
-      <canvas ref={canvasRef} className="bar-chart-canvas" />
+    <div className="chart-container" ref={containerRef}>
+      <div className="bar-chart-wrapper">
+        <canvas
+          ref={canvasRef}
+          className="bar-chart-canvas"
+          onMouseMove={handleMouseMove}
+          onMouseLeave={handleMouseLeave}
+        />
+        {hoveredBar && (
+          <div
+            className="chart-tooltip"
+            style={{
+              left: hoveredBar.x + hoveredBar.width / 2,
+              top: hoveredBar.y - 8,
+            }}
+          >
+            {hoveredBar.count} 条
+          </div>
+        )}
+      </div>
       <div className="chart-legend">
         {CHART_LEVELS.map((level) => (
           <div key={level} className="chart-legend-item">
@@ -288,6 +457,7 @@ function LevelBarChart({ counts }) {
 
 function KeywordLineChart({ keywordResults }) {
   const canvasRef = useRef(null)
+  const containerRef = useRef(null)
 
   const allHours = useMemo(() => {
     const keySet = new Set()
@@ -309,7 +479,7 @@ function KeywordLineChart({ keywordResults }) {
     return Math.max(1, max)
   }, [keywordResults])
 
-  useEffect(() => {
+  const draw = useCallback(() => {
     const canvas = canvasRef.current
     if (!canvas) return
 
@@ -404,8 +574,24 @@ function KeywordLineChart({ keywordResults }) {
     }
   }, [keywordResults, allHours, maxValue])
 
+  useEffect(() => {
+    draw()
+  }, [draw])
+
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    const observer = new ResizeObserver(() => {
+      draw()
+    })
+    observer.observe(container)
+
+    return () => observer.disconnect()
+  }, [draw])
+
   return (
-    <div className="chart-container">
+    <div className="chart-container" ref={containerRef}>
       <canvas ref={canvasRef} className="line-chart-canvas" />
       <div className="chart-legend">
         {keywordResults.map((result, idx) => (
@@ -426,6 +612,7 @@ const LogAnalyzerPage = () => {
   const navigate = useNavigate()
   const [rawText, setRawText] = useState(SAMPLE_LOGS)
   const [logs, setLogs] = useState(() => parseLogs(SAMPLE_LOGS))
+  const [parseVersion, setParseVersion] = useState(0)
 
   const [regexPattern, setRegexPattern] = useState('')
   const [caseSensitive, setCaseSensitive] = useState(true)
@@ -457,7 +644,7 @@ const LogAnalyzerPage = () => {
 
     if ((startTime || endTime) && !timeRangeError) {
       const startTs = startTime ? new Date(startTime).getTime() : null
-      const endTs = endTime ? new Date(endTime).getTime() + 24 * 60 * 60 * 1000 - 1 : null
+      const endTs = endTime ? new Date(endTime).getTime() : null
       result = filterByTimeRange(result, startTs, endTs)
     }
 
@@ -474,6 +661,7 @@ const LogAnalyzerPage = () => {
   const handleParse = useCallback(() => {
     const parsedLogs = parseLogs(rawText)
     setLogs(parsedLogs)
+    setParseVersion((v) => v + 1)
   }, [rawText])
 
   const handleClearFilter = useCallback(() => {
@@ -536,6 +724,7 @@ const LogAnalyzerPage = () => {
                 onClick={() => {
                   setRawText('')
                   setLogs([])
+                  setParseVersion((v) => v + 1)
                 }}
               >
                 清空
@@ -630,6 +819,7 @@ const LogAnalyzerPage = () => {
               <div className="log-empty">没有匹配的日志</div>
             ) : useVirtualScroll ? (
               <VirtualLogList
+                key={parseVersion}
                 logs={filteredLogs}
                 pattern={regexPattern}
                 caseSensitive={caseSensitive}

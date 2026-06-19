@@ -52,7 +52,7 @@ export class EventBus {
     const logEntry = createMessageLogEntry(message);
 
     this._logListeners.forEach((cb) => {
-      try { cb(logEntry); } catch (_) {}
+      try { cb(logEntry); } catch (err) { void err; }
     });
 
     targets.forEach((targetId) => {
@@ -60,13 +60,13 @@ export class EventBus {
       if (iframeWindow && typeof iframeWindow.postMessage === 'function') {
         try {
           iframeWindow.postMessage(message, '*');
-        } catch (_) {}
+        } catch (err) { void err; }
       }
 
       const listeners = this._listeners.get(targetId);
       if (listeners) {
         listeners.forEach((cb) => {
-          try { cb(message); } catch (_) {}
+          try { cb(message); } catch (err) { void err; }
         });
       }
     });

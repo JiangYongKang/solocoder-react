@@ -579,3 +579,186 @@ export function getRandomResourceCount() {
 export function getRandomPresetColor() {
   return PRESET_COLORS[Math.floor(Math.random() * PRESET_COLORS.length)]
 }
+
+export function computeTreeLines(flatTags, nodeId) {
+  const path = getTagPath(flatTags, nodeId)
+  if (path.length === 0) return { parentExpandedLines: [], isLast: true }
+  const lines = []
+  for (let i = 0; i < path.length; i++) {
+    const tag = path[i]
+    const parentId = tag.parentId
+    const siblings = flatTags.filter((t) => t.parentId === parentId)
+    const sortedSiblings = siblings.sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+    const currentIndex = sortedSiblings.findIndex((s) => s.id === tag.id)
+    if (i < path.length - 1) {
+      lines.push(currentIndex < sortedSiblings.length - 1)
+    }
+  }
+  const lastTag = path[path.length - 1]
+  const lastParentId = lastTag.parentId
+  const lastSiblings = flatTags.filter((t) => t.parentId === lastParentId)
+  const sortedLastSiblings = lastSiblings.sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+  const isLast = sortedLastSiblings.length > 0 && sortedLastSiblings[sortedLastSiblings.length - 1].id === nodeId
+  return { parentExpandedLines: lines, isLast }
+}
+
+export function computeChartNiceMax(trendData, tagIds) {
+  let maxVal = 0
+  if (!Array.isArray(trendData) || !Array.isArray(tagIds)) return 5
+  trendData.forEach((d) => {
+    tagIds.forEach((id) => {
+      if ((d[id] || 0) > maxVal) maxVal = d[id] || 0
+    })
+  })
+  maxVal = Math.max(maxVal, 1)
+  return Math.ceil(maxVal / 5) * 5
+}
+
+export function drawLineChart(ctx, width, height, trendData, displayTags) {
+  const dpr = window.devicePixelRatio || 1
+  ctx.clearRect(0, 0, width * dpr, height * dpr)
+  ctx.save()
+  ctx.scale(dpr, dpr)
+
+  const padding = { top: 20, right: 20, bottom: 40, left: 40 }
+  const chartW = width - padding.left - padding.right
+  const chartH = height - padding.top - padding.bottom
+
+  if (chartW <= 0 || chartH <= 0 || trendData.length === 0) {
+    ctx.restore()
+    return
+  }
+
+  let maxVal = 0
+  trendData.forEach((d) => {
+    displayTags.forEach((tag) => {
+      if ((d[tag.id] || 0) > maxVal) maxVal = d[tag.id] || 0
+    })
+  })
+  maxVal = Math.max(maxVal, 1)
+  const niceMax = Math.ceil(maxVal / 5) * 5
+
+  ctx.strokeStyle = '#e5e7eb'
+  ctx.lineWidth = 1
+  const gridLines = 5
+  for (let i = 0; i <= gridLines; i++) {
+    const y = padding.top + chartH - (chartH * i) / gridLines
+    ctx.beginPath()
+    ctx.moveTo(padding.left, y)
+    ctx.lineTo(padding.left + chartW, y)
+    ctx.stroke()
+    ctx.fillStyle = '#6b7280'
+    ctx.font = '11px sans-serif'
+    ctx.textAlign = 'right'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(String(Math.round((niceMax * i) / gridLines)), padding.left - 6, y)
+  }
+
+  const stepX = trendData.length > 1 ? chartW / (trendData.length - 1) : chartW
+  trendData.forEach((d, i) => {
+    const x = padding.left + (trendData.length > 1 ? stepX * i : chartW / 2)
+    ctx.fillStyle = '#6b7280'
+    ctx.font = '11px sans-serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'top'
+    ctx.fillText(d.date, x, padding.top + chartH + 8)
+  })
+
+  displayTags.forEach((tag) => {
+    ctx.strokeStyle = tag.color || DEFAULT_COLOR
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    trendData.forEach((d, i) => {
+      const x = padding.left + (trendData.length > 1 ? stepX * i : chartW / 2)
+      const val = d[tag.id] || 0
+      const y = padding.top + chartH - (val / niceMax) * chartH
+      if (i === 0) {
+        ctx.moveTo(x, y)
+      } else {
+        ctx.lineTo(x, y)
+      }
+    })
+    ctx.stroke()
+
+    trendData.forEach((d, i) => {
+      const x = padding.left + (trendData.length > 1 ? stepX * i : chartW / 2)
+      const val = d[tag.id] || 0
+      const y = padding.top + chartH - (val / niceMax) * chartH
+      ctx.fillStyle = tag.color || DEFAULT_COLOR
+      ctx.beginPath()
+      ctx.arc(x, y, 3, 0, Math.PI * 2)
+      ctx.fill()
+    })
+  })
+
+  ctx.restore()
+}
+
+export function drawBarChart(ctx, width, height, trendData, displayTags) {
+  const dpr = window.devicePixelRatio || 1
+  ctx.clearRect(0, 0, width * dpr, height * dpr)
+  ctx.save()
+  ctx.scale(dpr, dpr)
+
+  const padding = { top: 20, right: 20, bottom: 40, left: 40 }
+  const chartW = width - padding.left - padding.right
+  const chartH = height - padding.top - padding.bottom
+
+  if (chartW <= 0 || chartH <= 0 || trendData.length === 0) {
+    ctx.restore()
+    return
+  }
+
+  let maxVal = 0
+  trendData.forEach((d) => {
+    displayTags.forEach((tag) => {
+      if ((d[tag.id] || 0) > maxVal) maxVal = d[tag.id] || 0
+    })
+  })
+  maxVal = Math.max(maxVal, 1)
+  const niceMax = Math.ceil(maxVal / 5) * 5
+
+  ctx.strokeStyle = '#e5e7eb'
+  ctx.lineWidth = 1
+  const gridLines = 5
+  for (let i = 0; i <= gridLines; i++) {
+    const y = padding.top + chartH - (chartH * i) / gridLines
+    ctx.beginPath()
+    ctx.moveTo(padding.left, y)
+    ctx.lineTo(padding.left + chartW, y)
+    ctx.stroke()
+    ctx.fillStyle = '#6b7280'
+    ctx.font = '11px sans-serif'
+    ctx.textAlign = 'right'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(String(Math.round((niceMax * i) / gridLines)), padding.left - 6, y)
+  }
+
+  const groupWidth = chartW / trendData.length
+  const barCount = displayTags.length
+  const barGap = 2
+  const maxBarWidth = 24
+  const totalBarSpace = Math.min(groupWidth - 10, maxBarWidth * barCount + barGap * (barCount - 1))
+  const barWidth = barCount > 0 ? (totalBarSpace - barGap * (barCount - 1)) / barCount : 0
+  const groupPadding = (groupWidth - totalBarSpace) / 2
+
+  trendData.forEach((d, gi) => {
+    const groupX = padding.left + groupWidth * gi + groupPadding
+    ctx.fillStyle = '#6b7280'
+    ctx.font = '11px sans-serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'top'
+    ctx.fillText(d.date, padding.left + groupWidth * gi + groupWidth / 2, padding.top + chartH + 8)
+
+    displayTags.forEach((tag, ti) => {
+      const val = d[tag.id] || 0
+      const barH = (val / niceMax) * chartH
+      const x = groupX + ti * (barWidth + barGap)
+      const y = padding.top + chartH - barH
+      ctx.fillStyle = tag.color || DEFAULT_COLOR
+      ctx.fillRect(x, y, barWidth, barH)
+    })
+  })
+
+  ctx.restore()
+}

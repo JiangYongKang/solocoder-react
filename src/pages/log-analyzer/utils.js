@@ -92,10 +92,7 @@ export function filterByRegex(logs, pattern, caseSensitive = true) {
     const flags = caseSensitive ? '' : 'i'
     const regex = new RegExp(pattern, flags)
     return logs.filter((log) => {
-      if (!log.isValid) {
-        return regex.test(log.raw)
-      }
-      return regex.test(log.content)
+      return regex.test(log.raw)
     })
   } catch {
     return logs

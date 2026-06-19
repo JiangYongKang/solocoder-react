@@ -1,0 +1,10 @@
+产物不满意：
+1. brandColorExtractor.js 的 quantizeColor 函数在 `factor=32` 且 `r/g/b=255` 时产生 `Math.round(255/32)*32 = 256`，超出 RGB 0~255 有效范围。虽然下游 rgbToHex 可能做了 clamp 掩盖了问题，但作为底层工具函数应在自身内部用 Math.min 钳制输出。更严重的是测试文件 brandColorExtractor.test.js 直接将越界值 256 断言为期望结果，导致测试不仅没有发现 bug，反而为错误行为提供了"证据"背书。
+2. mergeSimilarColors 函数在 `clusters.length >= maxColors * 3` 时直接 break 跳出循环，sortedColors 中排在后面的颜色元素被完全跳过，对应的像素比例被丢弃，导致百分比统计偏小甚至遗漏有意义的次主色。
+3. gradientGenerator.js 的 generateLinearGradient 对非法方向做了静默回退到 DEFAULT_DIRECTION，但新增的 isValidDirection 校验函数只在测试中被调用，index.jsx 的渐变色生成区域从未集成此函数来向用户发出提示，提示词要求的"给出提示"在 UI 层完全未实现。
+4. index.jsx 品牌色色块从排名数字改为 HEX 值后，色块下方 .ct-brand-info 区域原有的 HEX 显示未移除，同一个品牌的 HEX 值同时在色块面和下方信息区重复显示，造成信息冗余。
+
+过程不满意：
+1. 模型在刚收到任务时第一步就调用了 todo_write 创建 TodoList，随后才去读取相关文件了解现状，违反了标注规范中"应先分析问题再规划"的原则。对任务范围和难度的判断依赖猜测而非实际代码状态。
+2. 模型使用 Write 工具一次性重写了整个 brandColorExtractor.js（原有约 120 行扩展至约 260 行），而非使用精确编辑逐处修改。全量重写使得 git diff 无法区分修复性变更和原有保留逻辑，增加了代码审查负担。正确做法是针对每个问题做逐处精确的 edit_file_search_replace。
+3. 模型对 index.jsx 的 import 语句进行了大规模重新排序（从按分组改为按字母排序），这部分变更与提示词的 5 条修复要求完全无关，属于非必要的代码风格调整，增加了 diff 噪音。

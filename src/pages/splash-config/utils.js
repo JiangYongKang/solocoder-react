@@ -143,8 +143,6 @@ export function switchBackgroundMode(config, newMode) {
     return config
   }
   const result = deepClone(config)
-  const oldMode = result.background.mode
-  result.background._previousMode = oldMode
   result.background.mode = newMode
   return result
 }
@@ -267,16 +265,144 @@ export function validateConfig(config) {
   return true
 }
 
-export function sanitizeConfig(config) {
-  if (!validateConfig(config)) {
-    return createDefaultConfig()
+export function sanitizeConfig(input) {
+  const defaults = createDefaultConfig()
+  const result = deepClone(defaults)
+
+  if (!input || typeof input !== 'object') {
+    return result
   }
-  const sanitized = deepMerge(createDefaultConfig(), config)
-  sanitized.brand.logo.size = normalizeLogoSize(sanitized.brand.logo.size)
-  sanitized.brand.title.fontSize = normalizeFontSize(sanitized.brand.title.fontSize)
-  sanitized.brand.subtitle.fontSize = normalizeFontSize(sanitized.brand.subtitle.fontSize)
-  sanitized.interaction.countdown.seconds = normalizeCountdownSeconds(sanitized.interaction.countdown.seconds)
-  return sanitized
+
+  if (typeof input.templateId === 'string' || input.templateId === null) {
+    result.templateId = input.templateId
+  }
+
+  if (input.brand && typeof input.brand === 'object') {
+    if (input.brand.logo && typeof input.brand.logo === 'object') {
+      if (input.brand.logo.image === null || typeof input.brand.logo.image === 'string') {
+        result.brand.logo.image = input.brand.logo.image
+      }
+      result.brand.logo.size = normalizeLogoSize(
+        typeof input.brand.logo.size === 'number' ? input.brand.logo.size : defaults.brand.logo.size
+      )
+    }
+
+    if (input.brand.title && typeof input.brand.title === 'object') {
+      result.brand.title.text =
+        typeof input.brand.title.text === 'string' ? input.brand.title.text : defaults.brand.title.text
+      result.brand.title.fontSize = normalizeFontSize(
+        typeof input.brand.title.fontSize === 'number'
+          ? input.brand.title.fontSize
+          : defaults.brand.title.fontSize
+      )
+      result.brand.title.color = isValidColor(input.brand.title.color)
+        ? input.brand.title.color
+        : defaults.brand.title.color
+      result.brand.title.bold =
+        typeof input.brand.title.bold === 'boolean' ? input.brand.title.bold : defaults.brand.title.bold
+    }
+
+    if (input.brand.subtitle && typeof input.brand.subtitle === 'object') {
+      result.brand.subtitle.text =
+        typeof input.brand.subtitle.text === 'string'
+          ? input.brand.subtitle.text
+          : defaults.brand.subtitle.text
+      result.brand.subtitle.fontSize = normalizeFontSize(
+        typeof input.brand.subtitle.fontSize === 'number'
+          ? input.brand.subtitle.fontSize
+          : defaults.brand.subtitle.fontSize
+      )
+      result.brand.subtitle.color = isValidColor(input.brand.subtitle.color)
+        ? input.brand.subtitle.color
+        : defaults.brand.subtitle.color
+      result.brand.subtitle.bold =
+        typeof input.brand.subtitle.bold === 'boolean'
+          ? input.brand.subtitle.bold
+          : defaults.brand.subtitle.bold
+    }
+  }
+
+  if (input.background && typeof input.background === 'object') {
+    result.background.mode = Object.values(BACKGROUND_MODES).includes(input.background.mode)
+      ? input.background.mode
+      : defaults.background.mode
+
+    result.background.color = isValidColor(input.background.color)
+      ? input.background.color
+      : defaults.background.color
+
+    if (input.background.image === null || typeof input.background.image === 'string') {
+      result.background.image = input.background.image
+    }
+
+    result.background.imageFit = Object.values(IMAGE_FIT_MODES).includes(input.background.imageFit)
+      ? input.background.imageFit
+      : defaults.background.imageFit
+
+    result.background.gradientStart = isValidColor(input.background.gradientStart)
+      ? input.background.gradientStart
+      : defaults.background.gradientStart
+
+    result.background.gradientEnd = isValidColor(input.background.gradientEnd)
+      ? input.background.gradientEnd
+      : defaults.background.gradientEnd
+
+    result.background.gradientDirection = Object.values(GRADIENT_DIRECTIONS).includes(
+      input.background.gradientDirection
+    )
+      ? input.background.gradientDirection
+      : defaults.background.gradientDirection
+  }
+
+  if (input.interaction && typeof input.interaction === 'object') {
+    if (input.interaction.countdown && typeof input.interaction.countdown === 'object') {
+      result.interaction.countdown.enabled =
+        typeof input.interaction.countdown.enabled === 'boolean'
+          ? input.interaction.countdown.enabled
+          : defaults.interaction.countdown.enabled
+      result.interaction.countdown.seconds = normalizeCountdownSeconds(
+        typeof input.interaction.countdown.seconds === 'number'
+          ? input.interaction.countdown.seconds
+          : defaults.interaction.countdown.seconds
+      )
+      result.interaction.countdown.format =
+        typeof input.interaction.countdown.format === 'string'
+          ? input.interaction.countdown.format
+          : defaults.interaction.countdown.format
+    }
+
+    if (input.interaction.skipButton && typeof input.interaction.skipButton === 'object') {
+      result.interaction.skipButton.enabled =
+        typeof input.interaction.skipButton.enabled === 'boolean'
+          ? input.interaction.skipButton.enabled
+          : defaults.interaction.skipButton.enabled
+      result.interaction.skipButton.text =
+        typeof input.interaction.skipButton.text === 'string'
+          ? input.interaction.skipButton.text
+          : defaults.interaction.skipButton.text
+      result.interaction.skipButton.position = Object.values(SKIP_BUTTON_POSITIONS).includes(
+        input.interaction.skipButton.position
+      )
+        ? input.interaction.skipButton.position
+        : defaults.interaction.skipButton.position
+      result.interaction.skipButton.color = isValidColor(input.interaction.skipButton.color)
+        ? input.interaction.skipButton.color
+        : defaults.interaction.skipButton.color
+      result.interaction.skipButton.backgroundColor = isValidColor(
+        input.interaction.skipButton.backgroundColor
+      )
+        ? input.interaction.skipButton.backgroundColor
+        : defaults.interaction.skipButton.backgroundColor
+    }
+  }
+
+  if (input.preview && typeof input.preview === 'object') {
+    if (Object.keys(PRESET_SCREEN_RATIOS).includes(input.preview.screenRatio)) {
+      result.preview.screenRatio = input.preview.screenRatio
+    }
+  }
+
+  return result
 }
 
 export function serializeConfig(config) {

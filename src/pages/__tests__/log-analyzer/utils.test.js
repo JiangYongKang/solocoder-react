@@ -191,21 +191,38 @@ describe('isValidRegex', () => {
 })
 
 describe('filterByRegex', () => {
-  const makeLog = (id, content, isValid = true, level = 'INFO') => ({
-    id,
-    isValid,
-    content,
-    level,
-    module: 'test',
-    timestamp: Date.now(),
-    raw: content,
-  })
+  const makeLog = (id, raw, isValid = true) => {
+    if (isValid) {
+      const match = raw.match(/^\[(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})\]\s+\[(\w+)\]\s+\[([^\]]+)\]\s+(.*)$/)
+      if (match) {
+        return {
+          id,
+          isValid: true,
+          raw,
+          timestampStr: match[1],
+          timestamp: new Date(match[1]).getTime(),
+          level: match[2].toUpperCase(),
+          module: match[3],
+          content: match[4],
+        }
+      }
+    }
+    return {
+      id,
+      isValid: false,
+      raw,
+      timestamp: null,
+      level: null,
+      module: null,
+      content: raw,
+    }
+  }
 
   const logs = [
-    makeLog('1', '用户登录成功'),
-    makeLog('2', '用户登录失败：密码错误'),
-    makeLog('3', '数据库连接超时'),
-    makeLog('4', '缓存更新完成'),
+    makeLog('1', '[2024-03-15 08:15:32] [INFO] [auth-service] 用户登录成功', true),
+    makeLog('2', '[2024-03-15 09:10:00] [ERROR] [payment-service] 支付网关超时', true),
+    makeLog('3', '[2024-03-15 10:00:00] [WARN] [inventory-service] 库存不足', true),
+    makeLog('4', '[2024-03-15 11:00:00] [DEBUG] [cache-service] 缓存命中', true),
     makeLog('5', '这是无效行', false),
   ]
 
@@ -215,8 +232,8 @@ describe('filterByRegex', () => {
 
   it('按内容过滤日志', () => {
     const result = filterByRegex(logs, '登录')
-    expect(result.length).toBe(2)
-    expect(result.map((l) => l.id)).toEqual(['1', '2'])
+    expect(result.length).toBe(1)
+    expect(result[0].id).toBe('1')
   })
 
   it('正则表达式匹配', () => {
@@ -226,22 +243,15 @@ describe('filterByRegex', () => {
   })
 
   it('大小写敏感', () => {
-    const testLogs = [
-      makeLog('a', 'ERROR message'),
-      makeLog('b', 'error message'),
-    ]
-    const result = filterByRegex(testLogs, 'ERROR', true)
+    const result = filterByRegex(logs, 'ERROR', true)
     expect(result.length).toBe(1)
-    expect(result[0].id).toBe('a')
+    expect(result[0].id).toBe('2')
   })
 
   it('大小写不敏感', () => {
-    const testLogs = [
-      makeLog('a', 'ERROR message'),
-      makeLog('b', 'error message'),
-    ]
-    const result = filterByRegex(testLogs, 'ERROR', false)
-    expect(result.length).toBe(2)
+    const result = filterByRegex(logs, 'error', false)
+    expect(result.length).toBe(1)
+    expect(result[0].id).toBe('2')
   })
 
   it('无效正则返回全部日志', () => {
@@ -253,6 +263,43 @@ describe('filterByRegex', () => {
     const result = filterByRegex(logs, '无效')
     expect(result.length).toBe(1)
     expect(result[0].id).toBe('5')
+  })
+
+  it('搜索来源模块名能匹配到有效日志', () => {
+    const result = filterByRegex(logs, 'auth-service')
+    expect(result.length).toBe(1)
+    expect(result[0].id).toBe('1')
+    expect(result[0].module).toBe('auth-service')
+  })
+
+  it('搜索级别名称能匹配到有效日志', () => {
+    const result = filterByRegex(logs, 'WARN')
+    expect(result.length).toBe(1)
+    expect(result[0].id).toBe('3')
+    expect(result[0].level).toBe('WARN')
+  })
+
+  it('搜索时间戳日期能匹配到有效日志', () => {
+    const result = filterByRegex(logs, '2024-03-15')
+    expect(result.length).toBe(4)
+  })
+
+  it('搜索具体时间能匹配到有效日志', () => {
+    const result = filterByRegex(logs, '08:15:32')
+    expect(result.length).toBe(1)
+    expect(result[0].id).toBe('1')
+  })
+
+  it('搜索 service 关键词匹配多个模块', () => {
+    const result = filterByRegex(logs, 'service')
+    expect(result.length).toBe(4)
+    expect(result.map((l) => l.id)).toEqual(['1', '2', '3', '4'])
+  })
+
+  it('整行原始文本搜索能匹配内容和模块组合', () => {
+    const result = filterByRegex(logs, 'auth.*登录')
+    expect(result.length).toBe(1)
+    expect(result[0].id).toBe('1')
   })
 })
 

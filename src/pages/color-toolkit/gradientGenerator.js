@@ -14,13 +14,19 @@ export const LINEAR_DIRECTIONS = [
   { key: 'to bottom right', name: '右下', angle: 'to bottom right' },
 ]
 
-export const generateLinearGradient = (startColor, endColor, direction = 'to right') => {
+export const DEFAULT_DIRECTION = 'to right'
+
+export const generateLinearGradient = (startColor, endColor, direction = DEFAULT_DIRECTION) => {
   if (!startColor || !endColor) return ''
 
   const validDirection = LINEAR_DIRECTIONS.find((d) => d.key === direction)
-  const dir = validDirection ? validDirection.angle : direction
+  const dir = validDirection ? validDirection.angle : DEFAULT_DIRECTION
 
   return `linear-gradient(${dir}, ${startColor}, ${endColor})`
+}
+
+export const isValidDirection = (direction) => {
+  return LINEAR_DIRECTIONS.some((d) => d.key === direction)
 }
 
 export const generateRadialGradient = (startColor, endColor) => {

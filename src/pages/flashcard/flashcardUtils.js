@@ -180,24 +180,37 @@ export function sortCardsByCorrectRate(cards, ascending = false) {
   })
 }
 
+function getTagText(tag) {
+  if (typeof tag === 'string') return tag
+  if (tag && typeof tag === 'object' && tag.text) return tag.text
+  return String(tag)
+}
+
 export function filterCardsByTags(cards, tags) {
   if (!Array.isArray(cards)) return []
   if (!Array.isArray(tags) || tags.length === 0) return cards
+  const tagTexts = tags.map(t => getTagText(t))
   return cards.filter(card => {
     if (!Array.isArray(card.tags)) return false
-    return tags.some(tag => card.tags.includes(tag))
+    return card.tags.some(cardTag => tagTexts.includes(getTagText(cardTag)))
   })
 }
 
 export function getUniqueTags(cards) {
   if (!Array.isArray(cards)) return []
-  const tagSet = new Set()
+  const tagMap = new Map()
   cards.forEach(card => {
     if (Array.isArray(card.tags)) {
-      card.tags.forEach(tag => tagSet.add(tag))
+      card.tags.forEach(tag => {
+        const text = getTagText(tag)
+        if (!tagMap.has(text)) {
+          const color = typeof tag === 'object' && tag ? tag.color : '#6b7280'
+          tagMap.set(text, { text, color })
+        }
+      })
     }
   })
-  return Array.from(tagSet)
+  return Array.from(tagMap.values())
 }
 
 export function getDayDifference(dateKey1, dateKey2) {
@@ -238,18 +251,37 @@ export function getStudyDatesFromStats(studyStats) {
   })
 }
 
-export function buildHeatmapData(studyDates, days = 30) {
+export function buildHeatmapData(studyDatesOrStats, days = 30) {
   const result = []
-  const dateSet = new Set(studyDates || [])
   const today = parseDate(getTodayKey())
+
+  const isStatsObject = studyDatesOrStats
+    && typeof studyDatesOrStats === 'object'
+    && !Array.isArray(studyDatesOrStats)
+
+  const dateSet = isStatsObject ? null : new Set(studyDatesOrStats || [])
 
   for (let i = days - 1; i >= 0; i--) {
     const d = new Date(today)
     d.setDate(d.getDate() - i)
     const dateKey = formatDate(d)
+
+    let count
+    let studied
+
+    if (isStatsObject) {
+      const dayStats = studyDatesOrStats[dateKey]
+      count = dayStats?.total || 0
+      studied = count > 0
+    } else {
+      studied = dateSet.has(dateKey)
+      count = studied ? 1 : 0
+    }
+
     result.push({
       date: dateKey,
-      studied: dateSet.has(dateKey),
+      studied,
+      count,
       dayOfWeek: d.getDay(),
     })
   }

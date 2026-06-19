@@ -7,7 +7,7 @@ import {
   TASK_STATUS_RUNNING,
   FREQUENCY_ONCE,
 } from './constants.js'
-import { calculateNextExecutionTime } from './utils.js'
+import { calculateNextExecutionTime, isOverdueTask } from './utils.js'
 
 export function loadTasks(storage) {
   if (!storage) return []
@@ -118,12 +118,13 @@ function normalizeTask(raw) {
   }
 }
 
+export function findOverdueTasks(tasks, now) {
+  return tasks.filter((task) => isOverdueTask(task, now))
+}
+
 export function recalculateNextExecutionForOverdueTasks(tasks, now) {
   return tasks.map((task) => {
-    if (task.status !== TASK_STATUS_RUNNING) return task
-    if (!task.nextExecutionTime) return task
-    if (task.nextExecutionTime > now) return task
-    if (task.retryState && task.retryState.isRetrying) return task
+    if (!isOverdueTask(task, now)) return task
 
     const newNext = calculateNextExecutionTime(
       task.frequency,

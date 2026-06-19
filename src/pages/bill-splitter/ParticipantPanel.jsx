@@ -78,7 +78,7 @@ export default function ParticipantPanel({ participants, setParticipants }) {
     const newParticipant = {
       id: generateId('p'),
       name: trimmed,
-      color: getAvatarColor(trimmed, participants.length),
+      color: getAvatarColor(trimmed),
     }
     setParticipants([...participants, newParticipant])
     setNameInput('')

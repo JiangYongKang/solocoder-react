@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, beforeAll, afterAll, vi } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import {
   generateTagId,
   validateHexColor,
@@ -30,6 +30,8 @@ import {
   batchCreateTags,
   getRandomResourceCount,
   getRandomPresetColor,
+  computeTreeLines,
+  computeChartNiceMax,
 } from '../../tag-manager/utils.js'
 import {
   DEFAULT_COLOR,
@@ -1039,5 +1041,160 @@ describe('getRandomPresetColor', () => {
       const color = getRandomPresetColor()
       expect(PRESET_COLORS.includes(color)).toBe(true)
     }
+  })
+})
+
+describe('computeTreeLines', () => {
+  const tags = makeFlatTags()
+
+  it('根标签的 isLast 根据同级位置判断', () => {
+    const result1 = computeTreeLines(tags, 'tag_1')
+    expect(result1.parentExpandedLines).toEqual([])
+    expect(result1.isLast).toBe(false)
+
+    const result2 = computeTreeLines(tags, 'tag_2')
+    expect(result2.parentExpandedLines).toEqual([])
+    expect(result2.isLast).toBe(true)
+  })
+
+  it('子节点的 parentExpandedLines 反映祖先是否还有后续兄弟', () => {
+    const resultReact = computeTreeLines(tags, 'tag_3')
+    expect(resultReact.parentExpandedLines).toEqual([true])
+    expect(resultReact.isLast).toBe(false)
+
+    const resultVue = computeTreeLines(tags, 'tag_4')
+    expect(resultVue.parentExpandedLines).toEqual([true])
+    expect(resultVue.isLast).toBe(true)
+  })
+
+  it('深层嵌套节点有多层连线', () => {
+    const resultHooks = computeTreeLines(tags, 'tag_5')
+    expect(resultHooks.parentExpandedLines).toEqual([true, true])
+    expect(resultHooks.isLast).toBe(true)
+  })
+
+  it('另一个父节点下的子节点', () => {
+    const resultNode = computeTreeLines(tags, 'tag_6')
+    expect(resultNode.parentExpandedLines).toEqual([false])
+    expect(resultNode.isLast).toBe(true)
+  })
+
+  it('空标签数组返回空连线', () => {
+    const result = computeTreeLines([], 'nonexist')
+    expect(result.parentExpandedLines).toEqual([])
+    expect(result.isLast).toBe(true)
+  })
+
+  it('不存在的节点返回空连线', () => {
+    const result = computeTreeLines(tags, 'nonexist')
+    expect(result.parentExpandedLines).toEqual([])
+    expect(result.isLast).toBe(true)
+  })
+
+  it('唯一根标签的 isLast 为 true', () => {
+    const singleRoot = [{ id: 'only', name: '唯一', parentId: null, color: '#000', resourceCount: 5, order: 0 }]
+    const result = computeTreeLines(singleRoot, 'only')
+    expect(result.isLast).toBe(true)
+    expect(result.parentExpandedLines).toEqual([])
+  })
+
+  it('多个兄弟节点的中间节点 isLast 为 false', () => {
+    const multiSiblings = [
+      { id: 'a', name: 'A', parentId: null, color: '#000', resourceCount: 1, order: 0 },
+      { id: 'b', name: 'B', parentId: null, color: '#000', resourceCount: 1, order: 1 },
+      { id: 'c', name: 'C', parentId: null, color: '#000', resourceCount: 1, order: 2 },
+      { id: 'd', name: 'D', parentId: null, color: '#000', resourceCount: 1, order: 3 },
+    ]
+    expect(computeTreeLines(multiSiblings, 'a').isLast).toBe(false)
+    expect(computeTreeLines(multiSiblings, 'b').isLast).toBe(false)
+    expect(computeTreeLines(multiSiblings, 'c').isLast).toBe(false)
+    expect(computeTreeLines(multiSiblings, 'd').isLast).toBe(true)
+  })
+})
+
+describe('computeChartNiceMax', () => {
+  it('计算5的倍数的最大值', () => {
+    const data = [{ tag_1: 3, tag_2: 7 }]
+    expect(computeChartNiceMax(data, ['tag_1', 'tag_2'])).toBe(10)
+  })
+
+  it('最大值已经是5的倍数时不变', () => {
+    const data = [{ tag_1: 10 }]
+    expect(computeChartNiceMax(data, ['tag_1'])).toBe(10)
+  })
+
+  it('所有值为0时返回5', () => {
+    const data = [{ tag_1: 0, tag_2: 0 }]
+    expect(computeChartNiceMax(data, ['tag_1', 'tag_2'])).toBe(5)
+  })
+
+  it('空数据返回5', () => {
+    expect(computeChartNiceMax([], [])).toBe(5)
+  })
+
+  it('非数组输入返回5', () => {
+    expect(computeChartNiceMax(null, null)).toBe(5)
+    expect(computeChartNiceMax(undefined, undefined)).toBe(5)
+  })
+
+  it('缺失的标签键值视为0', () => {
+    const data = [{ tag_1: 0 }]
+    expect(computeChartNiceMax(data, ['tag_1', 'tag_2'])).toBe(5)
+  })
+
+  it('多天数据取最大值', () => {
+    const data = [
+      { tag_1: 3 },
+      { tag_1: 12 },
+      { tag_1: 8 },
+    ]
+    expect(computeChartNiceMax(data, ['tag_1'])).toBe(15)
+  })
+
+  it('大数值正确向上取整', () => {
+    const data = [{ tag_1: 48 }]
+    expect(computeChartNiceMax(data, ['tag_1'])).toBe(50)
+  })
+
+  it('值为1时返回5', () => {
+    const data = [{ tag_1: 1 }]
+    expect(computeChartNiceMax(data, ['tag_1'])).toBe(5)
+  })
+})
+
+describe('splitTag with color parameter', () => {
+  const tags = makeFlatTags()
+
+  it('不传颜色参数时使用默认颜色', () => {
+    const result = splitTag(tags, 'tag_3', '新标签')
+    expect(result.newTag.color).toBe(DEFAULT_COLOR)
+  })
+
+  it('传入自定义颜色时使用指定颜色', () => {
+    const result = splitTag(tags, 'tag_3', '新标签', '#ef4444')
+    expect(result.newTag.color).toBe('#ef4444')
+  })
+
+  it('传入不同的自定义颜色', () => {
+    const result = splitTag(tags, 'tag_3', '新标签', '#22c55e')
+    expect(result.newTag.color).toBe('#22c55e')
+  })
+
+  it('拆分后资源计数正确（偶数）', () => {
+    const result = splitTag(tags, 'tag_3', '新标签', '#a855f7')
+    const original = result.tags.find((t) => t.id === 'tag_3')
+    expect(original.resourceCount).toBe(3)
+    expect(result.newTag.resourceCount).toBe(3)
+  })
+
+  it('拆分后资源计数正确（奇数）', () => {
+    const tagsOdd = [
+      { id: 't1', name: '奇数', parentId: null, color: '#000', resourceCount: 7, order: 0 },
+    ]
+    const result = splitTag(tagsOdd, 't1', '新标签', '#f59e0b')
+    const original = result.tags.find((t) => t.id === 't1')
+    expect(original.resourceCount).toBe(4)
+    expect(result.newTag.resourceCount).toBe(3)
+    expect(result.newTag.color).toBe('#f59e0b')
   })
 })

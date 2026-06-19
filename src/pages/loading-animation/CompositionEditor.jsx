@@ -238,6 +238,43 @@ export default function CompositionEditor({
               }}
             />
           </div>
+          <div className="property-row">
+            <label>辅色:</label>
+            <input
+              type="color"
+              value={selectedElement.config.secondaryColor}
+              onChange={(e) => {
+                onElementsChange(
+                  elements.map(el =>
+                    el.compositionId === selectedElementId
+                      ? { ...el, config: { ...el.config, secondaryColor: e.target.value } }
+                      : el
+                  )
+                )
+              }}
+            />
+          </div>
+          <div className="property-row">
+            <label>速度:</label>
+            <input
+              type="range"
+              min="0.3"
+              max="5"
+              step="0.1"
+              value={selectedElement.config.speed}
+              onChange={(e) => {
+                const speed = parseFloat(e.target.value)
+                onElementsChange(
+                  elements.map(el =>
+                    el.compositionId === selectedElementId
+                      ? { ...el, config: { ...el.config, speed } }
+                      : el
+                  )
+                )
+              }}
+            />
+            <span>{selectedElement.config.speed}s</span>
+          </div>
         </div>
       )}
 

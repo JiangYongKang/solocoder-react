@@ -1,0 +1,7 @@
+产物不满意：
+1. VirtualLogList 组件的 getOffset 和 findStartIndex 函数使用 O(n) 线性累加方式逐个计算行偏移量。当虚拟日志列表包含数千行数据时，用户快速滚动到底部会导致每次渲染都要遍历全部行来计算偏移，主线程出现可感知的卡顿。应该预计算行高的累积和数组或使用二分查找来降低滚动计算的时间复杂度。
+2. LevelBarChart 组件的 Canvas hover 事件处理函数在每次鼠标移动时都触发完整的 Canvas 重绘，包括遍历全部数据点重新计算和渲染柱状图。在 60fps 的鼠标 mousemove 频率下每帧都全量重绘造成不必要的 GPU 开销。应在 hover 回调中加入 requestAnimationFrame 节流或只重绘受影响的单个柱子而非整个 Canvas。
+
+过程不满意：
+1. 模型在刚收到任务时直接创建了 TodoList，未先通读相关文件理解现有代码状态和问题根因。按照标注规范应先分析代码再制定修复计划。
+2. VirtualLogList 的修复经历了三轮 ESLint 试错才通过：第一次因样式绑定方式触发 lint 警告，第二次因 useCallback 依赖数组不完整再报 lint，第三次才最终修正。这说明模型在编写 React 代码时对 Hooks 的 lint 规则预判不足，应该先理解相关 ESLint 规则再编写代码。

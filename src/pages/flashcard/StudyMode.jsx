@@ -33,18 +33,18 @@ export default function StudyMode({
 
     const wasDue = isCardDue(currentCard) && !isNewCard(currentCard)
     const updatedCard = reviewCard(currentCard, remembered)
+    const newResult = { cardId: currentCard.id, remembered, wasDue }
 
     onCardReviewed(updatedCard)
-    setResults(prev => [...prev, { cardId: currentCard.id, remembered, wasDue }])
+    setResults(prev => [...prev, newResult])
 
     if (currentIndex < learningQueue.length - 1) {
       setCurrentIndex(prev => prev + 1)
       setFlipped(false)
     } else {
       setFinished(true)
-      onFinish(results)
     }
-  }, [currentCard, currentIndex, flipped, learningQueue, onCardReviewed, onFinish, results])
+  }, [currentCard, currentIndex, flipped, learningQueue, onCardReviewed])
 
   useEffect(() => {
     const handleKeyDown = (e) => {

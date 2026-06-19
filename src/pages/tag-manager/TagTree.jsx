@@ -9,6 +9,8 @@ import {
 function TagTreeNode({
   node,
   depth,
+  isLast,
+  parentExpandedLines,
   selectedIds,
   expandedIds,
   matchedIds,
@@ -119,10 +121,18 @@ function TagTreeNode({
         <div className="tree-node-content">
           <div className="tree-node-left">
             <div className="tree-lines">
+              {depth > 0 &&
+                parentExpandedLines.map((showLine, i) => (
+                  <span
+                    key={i}
+                    className={showLine ? 'tree-line-v' : 'tree-line-v-empty'}
+                    style={{ left: i * 24 + 20 }}
+                  />
+                ))}
               {depth > 0 && (
                 <span
-                  className="tree-line"
-                  style={{ left: -16, width: 12 }}
+                  className={`tree-line-h ${isLast ? 'tree-line-h-last' : ''}`}
+                  style={{ left: (depth - 1) * 24 + 20 }}
                 />
               )}
             </div>
@@ -163,25 +173,34 @@ function TagTreeNode({
       </div>
       {hasChildren && isExpanded && (
         <div className="tag-tree-children">
-          {node.children.map((child) => (
-            <TagTreeNode
-              key={child.id}
-              node={child}
-              depth={depth + 1}
-              selectedIds={selectedIds}
-              expandedIds={expandedIds}
-              matchedIds={matchedIds}
-              searchKeyword={searchKeyword}
-              onToggleExpand={onToggleExpand}
-              onSelect={onSelect}
-              onContextMenu={onContextMenu}
-              onDragStart={onDragStart}
-              onDragOver={onDragOver}
-              onDragEnd={onDragEnd}
-              onDrop={onDrop}
-              dragState={dragState}
-            />
-          ))}
+          {node.children.map((child, childIndex) => {
+            const childIsLast = childIndex === node.children.length - 1
+            const childLines = [
+              ...parentExpandedLines,
+              !isLast,
+            ]
+            return (
+              <TagTreeNode
+                key={child.id}
+                node={child}
+                depth={depth + 1}
+                isLast={childIsLast}
+                parentExpandedLines={childLines}
+                selectedIds={selectedIds}
+                expandedIds={expandedIds}
+                matchedIds={matchedIds}
+                searchKeyword={searchKeyword}
+                onToggleExpand={onToggleExpand}
+                onSelect={onSelect}
+                onContextMenu={onContextMenu}
+                onDragStart={onDragStart}
+                onDragOver={onDragOver}
+                onDragEnd={onDragEnd}
+                onDrop={onDrop}
+                dragState={dragState}
+              />
+            )
+          })}
         </div>
       )}
     </div>
@@ -347,11 +366,13 @@ export default function TagTree({
 
       <div className="tag-tree-list">
         {treeData.length > 0 ? (
-          treeData.map((node) => (
+          treeData.map((node, index) => (
             <TagTreeNode
               key={node.id}
               node={node}
               depth={0}
+              isLast={index === treeData.length - 1}
+              parentExpandedLines={[]}
               selectedIds={selectedIds}
               expandedIds={effectiveExpandedIds}
               matchedIds={matchedIds}

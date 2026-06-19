@@ -1,0 +1,10 @@
+产物不满意：
+1. utils.js 的 computeChartNiceMax 函数被导出并编写了 9 个测试用例，但 drawLineChart 和 drawBarChart 两个 Canvas 绘图函数并没有调用它，而是在各自内部重复实现了完全相同的 maxVal/niceMax 计算逻辑。computeChartNiceMax 仅在测试文件中被引用，在生产代码中实际是死代码。这反映了模型添加辅助函数后没有回过头去重构现有绘图函数以消除代码重复。
+2. TrendChart.jsx 的 Canvas 图表在窗口 resize 事件回调中直接调用 `paintChart()` 重绘，没有做防抖处理。用户拖动窗口边框时每次像素级变化都会触发一次完整的 Canvas 重绘（包括遍历 trendData 和 displayTags），在快速拖动窗口时产生性能抖动。应加入 100-200ms 的防抖或 requestAnimationFrame 节流。
+3. TagTree.jsx 的 tree-line-v-empty 节点在 parentExpandedLines 中某祖先层级 showLine 为 false 时，仍渲染一个 background: transparent 的 span 元素，在视觉上完全不可见。深层嵌套结构中会累积大量这种无意义的 DOM 节点。当 showLine 为 false 时应直接过滤不渲染。
+4. MergeSplitModal.jsx 的 newTagColor 通过 useState(DEFAULT_COLOR) 初始化，但组件在弹窗关闭时只是返回 null 而非卸载，因此用户再次打开拆分弹窗时颜色选择器会保留上次选择的自定义颜色而非恢复默认蓝色。虽不是严重 BUG，但可能导致用户在多次拆分不同标签时期望每次都是全新默认状态的困惑。
+
+过程不满意：
+1. 模型对 utils.test.js 文件进行了 8 次以上的全量读取，但该文件内容在多次读取之间几乎没有变化。这种对同一文件的反复读取是无意义的时间消耗，正确做法是一次性读取后记住关键位置，后续只需要追加内容时方可追加读取。
+2. 模型连续执行了三次搜索命令来定位 utils.test.js 文件末尾：先用正则 `^})` 失败，再用 Unix 命令 `wc -l` 在 Windows 环境下失败，第三次用另一个正则也失败。其实直接用 Read 工具带负 offset 一次性读完文件末尾即可。这种反复试错式搜索暴露了工具使用策略上的缺陷。
+3. 模型最初将 drawLineChart 和 drawBarChart 两个 Canvas 绘图函数放在 TrendChart.jsx 组件文件中，但 ESLint 报出 react-refresh/only-export-components 规则错误后才被迫将这两个函数整体迁移到 utils.js 中。迁移过程涉及修改两个文件的导入语句、修复遗漏的 useCallback 导入等二次修补。这说明模型在最初设计时没有预先考虑 React Fast Refresh 的 ESLint 规则约束。

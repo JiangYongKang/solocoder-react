@@ -1,6 +1,5 @@
 import {
   APP_STATUS,
-  LIFECYCLE_STAGES,
   APP_ID_PATTERN,
   VERSION_PATTERN,
   BROADCAST_TARGET,
@@ -161,7 +160,7 @@ export function clearLifecycleStages(app) {
 
 export function routeMessage(message, appIds) {
   if (!message || typeof message !== 'object') return [];
-  const { from, to, type, body } = message;
+  const { from, to } = message;
   if (!from) return [];
   if (!to) return [];
   if (to === BROADCAST_TARGET) {

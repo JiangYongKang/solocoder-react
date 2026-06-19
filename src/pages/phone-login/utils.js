@@ -2,6 +2,8 @@ const PHONE_REGEX = /^1\d{10}$/
 const SMS_CODE_REGEX = /^\d{6}$/
 const LOGIN_KEY = 'phone_login_info'
 const LOGIN_EXPIRE_HOURS = 24
+const COUNTDOWN_SECONDS = 60
+const LOCK_SECONDS = 30
 
 export function validatePhone(phone) {
   if (!phone) {
@@ -207,3 +209,54 @@ export function getProtocolText(type) {
   }
   return ''
 }
+
+export const SMS_COUNTDOWN_SECONDS = COUNTDOWN_SECONDS
+export const ERROR_LOCK_SECONDS = LOCK_SECONDS
+
+export function getCountdownButtonText(countdown, hasRequestedBefore) {
+  if (countdown > 0) {
+    return `${countdown} 秒后重新发送`
+  }
+  if (hasRequestedBefore) {
+    return '重新获取验证码'
+  }
+  return '获取验证码'
+}
+
+export function getNextCountdownValue(current) {
+  if (current <= 1) {
+    return 0
+  }
+  return current - 1
+}
+
+export function isCountdownActive(countdown) {
+  return countdown > 0
+}
+
+export function canRequestCode(phoneValid, countdown) {
+  return phoneValid && !isCountdownActive(countdown)
+}
+
+export function getLockButtonText(lockCountdown) {
+  if (lockCountdown > 0) {
+    return `${lockCountdown} 秒后重试`
+  }
+  return '登录'
+}
+
+export function getNextLockValue(current) {
+  if (current <= 1) {
+    return 0
+  }
+  return current - 1
+}
+
+export function isLocked(lockCountdown) {
+  return lockCountdown > 0
+}
+
+export function shouldTriggerLock(errorCount) {
+  return errorCount >= 3
+}
+

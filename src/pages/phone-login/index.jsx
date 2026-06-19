@@ -16,6 +16,16 @@ import {
   clearLoginInfo,
   formatLoginTime,
   getProtocolText,
+  SMS_COUNTDOWN_SECONDS,
+  ERROR_LOCK_SECONDS,
+  getCountdownButtonText,
+  getNextCountdownValue,
+  isCountdownActive,
+  canRequestCode,
+  getLockButtonText,
+  getNextLockValue,
+  isLocked,
+  shouldTriggerLock,
 } from './utils'
 
 const CANVAS_WIDTH = 300
@@ -97,16 +107,22 @@ function drawCaptcha(canvas, targetX) {
   return gapY
 }
 
-function getInitialLoginState() {
-  const info = getLoginInfo()
-  if (info && !isLoginExpired(info.loginTime)) {
-    return { isLoggedIn: true, loginInfo: info }
-  }
-  return { isLoggedIn: false, loginInfo: null }
-}
-
 export default function PhoneLoginPage() {
-  const initialState = getInitialLoginState()
+  const initRef = useRef(false)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [loginInfo, setLoginInfo] = useState(null)
+
+  useEffect(() => {
+    if (!initRef.current) {
+      initRef.current = true
+      const info = getLoginInfo()
+      if (info && !isLoginExpired(info.loginTime)) {
+        setIsLoggedIn(true)
+        setLoginInfo(info)
+      }
+    }
+  }, [])
+
   const [phoneDisplay, setPhoneDisplay] = useState('')
   const [smsCode, setSmsCode] = useState('')
   const [phoneError, setPhoneError] = useState('')
@@ -114,11 +130,10 @@ export default function PhoneLoginPage() {
   const [phoneTouched, setPhoneTouched] = useState(false)
   const [agreed, setAgreed] = useState(false)
   const [countdown, setCountdown] = useState(0)
+  const [hasRequestedBefore, setHasRequestedBefore] = useState(false)
   const [generatedCode, setGeneratedCode] = useState('')
   const [errorCount, setErrorCount] = useState(0)
   const [lockCountdown, setLockCountdown] = useState(0)
-  const [isLoggedIn, setIsLoggedIn] = useState(initialState.isLoggedIn)
-  const [loginInfo, setLoginInfo] = useState(initialState.loginInfo)
 
   const [showSlider, setShowSlider] = useState(false)
   const [sliderTargetX, setSliderTargetX] = useState(0)
@@ -135,46 +150,68 @@ export default function PhoneLoginPage() {
 
   const countdownRef = useRef(null)
   const lockCountdownRef = useRef(null)
+  const sliderSuccessTimerRef = useRef(null)
+  const sliderFailTimerRef = useRef(null)
+  const drawCaptchaTimerRef = useRef(null)
+
+  const clearAllTimers = useCallback(() => {
+    if (countdownRef.current) {
+      clearInterval(countdownRef.current)
+      countdownRef.current = null
+    }
+    if (lockCountdownRef.current) {
+      clearInterval(lockCountdownRef.current)
+      lockCountdownRef.current = null
+    }
+    if (sliderSuccessTimerRef.current) {
+      clearTimeout(sliderSuccessTimerRef.current)
+      sliderSuccessTimerRef.current = null
+    }
+    if (sliderFailTimerRef.current) {
+      clearTimeout(sliderFailTimerRef.current)
+      sliderFailTimerRef.current = null
+    }
+    if (drawCaptchaTimerRef.current) {
+      clearTimeout(drawCaptchaTimerRef.current)
+      drawCaptchaTimerRef.current = null
+    }
+  }, [])
 
   const rawPhone = parsePhone(phoneDisplay)
 
   useEffect(() => {
-    return () => {
-      if (countdownRef.current) clearInterval(countdownRef.current)
-      if (lockCountdownRef.current) clearInterval(lockCountdownRef.current)
-    }
-  }, [])
+    return clearAllTimers
+  }, [clearAllTimers])
 
   useEffect(() => {
-    if (countdown <= 0) return
+    if (!isCountdownActive(countdown)) return
     countdownRef.current = setInterval(() => {
-      setCountdown((c) => {
-        if (c <= 1) {
-          clearInterval(countdownRef.current)
-          return 0
-        }
-        return c - 1
-      })
+      setCountdown((c) => getNextCountdownValue(c))
     }, 1000)
     return () => {
-      if (countdownRef.current) clearInterval(countdownRef.current)
+      if (countdownRef.current) {
+        clearInterval(countdownRef.current)
+        countdownRef.current = null
+      }
     }
   }, [countdown])
 
   useEffect(() => {
-    if (lockCountdown <= 0) return
+    if (!isLocked(lockCountdown)) return
     lockCountdownRef.current = setInterval(() => {
       setLockCountdown((c) => {
-        if (c <= 1) {
-          clearInterval(lockCountdownRef.current)
+        const next = getNextLockValue(c)
+        if (next === 0) {
           setErrorCount(0)
-          return 0
         }
-        return c - 1
+        return next
       })
     }, 1000)
     return () => {
-      if (lockCountdownRef.current) clearInterval(lockCountdownRef.current)
+      if (lockCountdownRef.current) {
+        clearInterval(lockCountdownRef.current)
+        lockCountdownRef.current = null
+      }
     }
   }, [lockCountdown])
 
@@ -193,9 +230,12 @@ export default function PhoneLoginPage() {
     if (phoneTouched) {
       runPhoneValidation(formatted)
     }
-    if (countdown > 0 && rawPhone !== digits) {
+    if (isCountdownActive(countdown) && rawPhone !== digits) {
       setCountdown(0)
-      if (countdownRef.current) clearInterval(countdownRef.current)
+      if (countdownRef.current) {
+        clearInterval(countdownRef.current)
+        countdownRef.current = null
+      }
     }
   }
 
@@ -215,14 +255,31 @@ export default function PhoneLoginPage() {
     setShowSlider(true)
   }
 
+  const closeSliderModal = useCallback(() => {
+    if (sliderSuccessTimerRef.current) {
+      clearTimeout(sliderSuccessTimerRef.current)
+      sliderSuccessTimerRef.current = null
+    }
+    if (sliderFailTimerRef.current) {
+      clearTimeout(sliderFailTimerRef.current)
+      sliderFailTimerRef.current = null
+    }
+    setShowSlider(false)
+  }, [])
+
   useEffect(() => {
     if (!showSlider) return
-    const timer = setTimeout(() => {
+    drawCaptchaTimerRef.current = setTimeout(() => {
       if (canvasRef.current) {
         drawCaptcha(canvasRef.current, sliderTargetX)
       }
     }, 0)
-    return () => clearTimeout(timer)
+    return () => {
+      if (drawCaptchaTimerRef.current) {
+        clearTimeout(drawCaptchaTimerRef.current)
+        drawCaptchaTimerRef.current = null
+      }
+    }
   }, [showSlider, sliderTargetX])
 
   const startDrag = (clientX) => {
@@ -269,17 +326,26 @@ export default function PhoneLoginPage() {
       if (passed) {
         setSliderMsg('验证通过')
         setSliderMsgType('success')
-        setTimeout(() => {
+        if (sliderSuccessTimerRef.current) {
+          clearTimeout(sliderSuccessTimerRef.current)
+        }
+        sliderSuccessTimerRef.current = setTimeout(() => {
+          sliderSuccessTimerRef.current = null
           setShowSlider(false)
           const code = generateSmsCode()
           console.log('[短信验证码] 发送到手机:', rawPhone, '验证码:', code)
           setGeneratedCode(code)
-          setCountdown(60)
+          setHasRequestedBefore(true)
+          setCountdown(SMS_COUNTDOWN_SECONDS)
         }, 500)
       } else {
         setSliderMsg('验证失败，请重试')
         setSliderMsgType('error')
-        setTimeout(() => {
+        if (sliderFailTimerRef.current) {
+          clearTimeout(sliderFailTimerRef.current)
+        }
+        sliderFailTimerRef.current = setTimeout(() => {
+          sliderFailTimerRef.current = null
           setSliderX(0)
           setSliderTargetX(generateSliderTarget(TRACK_WIDTH, SLIDER_WIDTH))
           setSliderMsg('')
@@ -322,7 +388,7 @@ export default function PhoneLoginPage() {
       setSmsError('请先阅读并同意相关协议')
       return
     }
-    if (lockCountdown > 0) return
+    if (isLocked(lockCountdown)) return
 
     if (verifySmsCode(smsCode, generatedCode)) {
       saveLoginInfo(rawPhone)
@@ -334,8 +400,8 @@ export default function PhoneLoginPage() {
       setSmsCode('')
       const newCount = errorCount + 1
       setErrorCount(newCount)
-      if (newCount >= 3) {
-        setLockCountdown(30)
+      if (shouldTriggerLock(newCount)) {
+        setLockCountdown(ERROR_LOCK_SECONDS)
       }
     }
   }
@@ -351,14 +417,15 @@ export default function PhoneLoginPage() {
     setPhoneTouched(false)
     setAgreed(false)
     setCountdown(0)
+    setHasRequestedBefore(false)
     setGeneratedCode('')
     setErrorCount(0)
     setLockCountdown(0)
   }
 
   const isPhoneValid = !validatePhone(rawPhone)
-  const canGetCode = isPhoneValid && countdown === 0
-  const canSubmit = isPhoneValid && smsCode.length === 6 && agreed && lockCountdown === 0
+  const _canGetCode = canRequestCode(isPhoneValid, countdown)
+  const canSubmit = isPhoneValid && smsCode.length === 6 && agreed && !isLocked(lockCountdown)
 
   if (isLoggedIn && loginInfo) {
     return (
@@ -420,13 +487,13 @@ export default function PhoneLoginPage() {
                 type="button"
                 className="phone-get-code-btn"
                 onClick={handleGetCode}
-                disabled={!canGetCode}
+                disabled={!_canGetCode}
               >
-                {countdown > 0 ? `${countdown} 秒后重新发送` : '获取验证码'}
+                {getCountdownButtonText(countdown, hasRequestedBefore)}
               </button>
             </div>
             {smsError && <div className="phone-error">{smsError}</div>}
-            {lockCountdown > 0 && (
+            {isLocked(lockCountdown) && (
               <div className="phone-tip">错误次数过多，请 {lockCountdown} 秒后重试</div>
             )}
           </div>
@@ -452,17 +519,17 @@ export default function PhoneLoginPage() {
             className="phone-submit-btn"
             disabled={!canSubmit}
           >
-            {lockCountdown > 0 ? `${lockCountdown} 秒后重试` : '登录'}
+            {getLockButtonText(lockCountdown)}
           </button>
         </form>
       </div>
 
       {showSlider && (
-        <div className="phone-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowSlider(false) }}>
+        <div className="phone-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) closeSliderModal() }}>
           <div className="phone-modal">
             <div className="phone-modal-header">
               <span className="phone-modal-title">请完成安全验证</span>
-              <button className="phone-modal-close" onClick={() => setShowSlider(false)}>×</button>
+              <button className="phone-modal-close" onClick={closeSliderModal}>×</button>
             </div>
             <div className="phone-modal-body">
               <div className="phone-slider-captcha">

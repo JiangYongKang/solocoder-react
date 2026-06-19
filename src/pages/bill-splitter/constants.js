@@ -36,8 +36,8 @@ export function formatCurrency(value) {
   return '¥' + num.toFixed(2)
 }
 
-export function getAvatarColor(name, seed = 0) {
-  let hash = seed
+export function getAvatarColor(name) {
+  let hash = 0
   for (let i = 0; i < name.length; i++) {
     hash = name.charCodeAt(i) + ((hash << 5) - hash)
   }

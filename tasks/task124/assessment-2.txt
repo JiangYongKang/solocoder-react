@@ -1,0 +1,9 @@
+产物不满意：
+1. lifecycle.js 的 startLoadingResources 和 finishLoadingResources 函数移除了 timestamp 参数，但 index.jsx 的 handleStartApp 函数中仍然计算了 `const startTs = Date.now()` 和 `const loadFinishTs = Date.now()` 并传递给这两个函数，时间戳被函数静默忽略成为死代码。这表明模型在改写函数签名时没有同步审查所有调用方，造成的意图偏差——调用方"以为"传递了有效时间戳但实际上被丢弃。
+2. eventBus.js 的 publish 方法中三处 try-catch 从 `catch (_) {}` 改为 `catch (err) { void err; }`，这只解决了 ESLint 的 no-empty 规则报错，错误处理在语义上仍然是静默吞错。当 postMessage 因 iframe 已销毁或 origin 策略冲突而抛错时，故障对用户完全不可见，消息日志面板中没有任何投递失败的感知。
+3. index.jsx 新增了 LIFECYCLE_STAGES、MESSAGE_TYPE、BROADCAST_TARGET 的导入，但创建了第二个独立的 `import from './constants.js'` 语句，与文件顶部已有的第一个 constants 导入未合并，属于不整洁的代码风格。
+
+过程不满意：
+1. 模型在编写测试前连续 4 次读取 utils.test.js 但每次读到的都是文件末尾空白区域，直到第 5 次才真正开始编辑。这种无意义的重复读取拖延了测试编写的启动时间。正确做法是第一次读取就确认文件末尾位置然后直接编辑。
+2. 模型在完成 prompt 要求的 4 个问题修复后，运行 ESLint 发现了 4 个文件的报错，随后对每个文件逐一进行 lint 修复，包括 utils.js 移除未使用变量、lifecycle.js 移除未使用参数、eventBus.js 空 catch 块修复等，占用了约一半的思考过程步骤。这些修改超出了 prompt 要求的问题范围，在缺陷修复任务中应聚焦于 prompt 列出的问题，不应主动扩展修复范围。
+3. 模型最终只运行了 `npx vitest run src/pages/__tests__/micro-frontend/` 按目录过滤的测试，未按提示词要求执行全量 `pnpm run test`。虽然修改理论上不影响其他包，但验证不充分。

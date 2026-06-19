@@ -1,4 +1,6 @@
 import { useState, useMemo } from 'react'
+import ColorPicker from './ColorPicker.jsx'
+import { DEFAULT_COLOR } from './constants.js'
 
 export default function MergeSplitModal({
   open,
@@ -10,6 +12,7 @@ export default function MergeSplitModal({
 }) {
   const [targetId, setTargetId] = useState('')
   const [newTagName, setNewTagName] = useState('')
+  const [newTagColor, setNewTagColor] = useState(DEFAULT_COLOR)
   const [errors, setErrors] = useState({})
 
   const sourceTag = selectedTags[0]
@@ -61,6 +64,7 @@ export default function MergeSplitModal({
         mode,
         sourceId: sourceTag.id,
         newTagName: newTagName.trim(),
+        newTagColor,
       })
     }
   }
@@ -174,6 +178,14 @@ export default function MergeSplitModal({
                 {errors.name && (
                   <span className="form-error">{errors.name}</span>
                 )}
+              </div>
+              <div className="form-row">
+                <label className="form-label">新标签颜色</label>
+                <ColorPicker
+                  value={newTagColor}
+                  onChange={setNewTagColor}
+                  onReset={() => setNewTagColor(DEFAULT_COLOR)}
+                />
               </div>
               {sourceTag && (
                 <div className="split-preview">

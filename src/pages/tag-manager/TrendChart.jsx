@@ -1,22 +1,11 @@
-import { useState, useMemo } from 'react'
-import {
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from 'recharts'
-import { getTopTags, calculateMaxDepth, countRootTags, getTotalResourceCount } from './utils.js'
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
+import { getTopTags, calculateMaxDepth, countRootTags, getTotalResourceCount, drawLineChart, drawBarChart } from './utils.js'
 import { TOP_TREND_TAGS } from './constants.js'
 
 export default function TrendChart({ tags, trendData }) {
   const [chartType, setChartType] = useState('line')
   const [showTop, setShowTop] = useState(true)
+  const canvasRef = useRef(null)
 
   const displayTags = useMemo(() => {
     if (showTop) {
@@ -24,14 +13,6 @@ export default function TrendChart({ tags, trendData }) {
     }
     return tags
   }, [tags, showTop])
-
-  const tagIdToName = useMemo(() => {
-    const map = {}
-    tags.forEach((t) => {
-      map[t.id] = t.name
-    })
-    return map
-  }, [tags])
 
   const stats = useMemo(() => {
     return {
@@ -42,46 +23,34 @@ export default function TrendChart({ tags, trendData }) {
     }
   }, [tags])
 
-  const renderChart = () => {
+  const paintChart = useCallback(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    const rect = canvas.parentElement.getBoundingClientRect()
+    const width = rect.width
+    const height = 300
+    const dpr = window.devicePixelRatio || 1
+    canvas.width = width * dpr
+    canvas.height = height * dpr
+    canvas.style.width = width + 'px'
+    canvas.style.height = height + 'px'
     if (chartType === 'line') {
-      return (
-        <LineChart data={trendData}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-          <XAxis dataKey="date" stroke="#6b7280" />
-          <YAxis stroke="#6b7280" />
-          <Tooltip
-            formatter={(value, name) => [value, tagIdToName[name] || name]}
-          />
-          <Legend formatter={(value) => tagIdToName[value] || value} />
-          {displayTags.map((tag) => (
-            <Line
-              key={tag.id}
-              type="monotone"
-              dataKey={tag.id}
-              stroke={tag.color}
-              strokeWidth={2}
-              dot={{ r: 4 }}
-              activeDot={{ r: 6 }}
-            />
-          ))}
-        </LineChart>
-      )
+      drawLineChart(ctx, width, height, trendData, displayTags)
+    } else {
+      drawBarChart(ctx, width, height, trendData, displayTags)
     }
-    return (
-      <BarChart data={trendData}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-        <XAxis dataKey="date" stroke="#6b7280" />
-        <YAxis stroke="#6b7280" />
-        <Tooltip
-          formatter={(value, name) => [value, tagIdToName[name] || name]}
-        />
-        <Legend formatter={(value) => tagIdToName[value] || value} />
-        {displayTags.map((tag) => (
-          <Bar key={tag.id} dataKey={tag.id} fill={tag.color} />
-        ))}
-      </BarChart>
-    )
-  }
+  }, [chartType, trendData, displayTags])
+
+  useEffect(() => {
+    paintChart()
+  }, [paintChart])
+
+  useEffect(() => {
+    const handleResize = () => paintChart()
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [paintChart])
 
   return (
     <div className="trend-chart">
@@ -132,10 +101,17 @@ export default function TrendChart({ tags, trendData }) {
         </div>
       </div>
 
+      <div className="chart-legend">
+        {displayTags.map((tag) => (
+          <span key={tag.id} className="legend-item">
+            <span className="legend-dot" style={{ backgroundColor: tag.color }} />
+            <span className="legend-label">{tag.name}</span>
+          </span>
+        ))}
+      </div>
+
       <div className="chart-container">
-        <ResponsiveContainer width="100%" height={300}>
-          {renderChart()}
-        </ResponsiveContainer>
+        <canvas ref={canvasRef} />
       </div>
     </div>
   )

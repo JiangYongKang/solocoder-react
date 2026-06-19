@@ -1,0 +1,8 @@
+产物不满意：
+1. index.jsx 的 ColorPicker 组件在修复 render 期 setState 时，模型移除了 hexValue 内部 state 和 handleHexChange 中的 setHexValue 调用，改为从父组件 prop 派生的纯值 `const hexValue = value`。这导致 hex 文本输入框失去展示输入中间状态的能力——当用户逐字符输入不完整的 hex 值如 `#ff` 时，handleHexChange 因值不合法而不调用 onChange，父组件 value 不变，hexValue 也不变，输入框始终显示旧值而无法回显用户正在键入的内容。修复方向正确但忽略了输入框需要非受控实时回显中间值这一交互需求。
+2. utils.js 的 sanitizeConfig 重写后，normalizeLogoSize 对非数字输入返回 DEFAULT_CONFIG 的 logo.size（80px）作为兜底，而 normalizeFontSize 对非数字输入返回 MIN_FONT_SIZE（12px）作为兜底。两个同类型的 normalize 函数对非法输入采用了不一致的兜底策略，降低了代码可维护性，后续开发者可能对哪个兜底策略是正确的产生困惑。
+3. index.jsx 的 SplashScreenPreview 组件的 key 属性中包含了 `isFullscreen` 变量：`key={config.templateId-${isFullscreen}-...}`。用户进入或退出全屏模式时组件因 key 变化而被卸载重建，增加了不必要的 DOM 操作开销。isFullscreen 不属于需要重置组件状态的关键因素，不应被纳入 key 的计算。
+
+过程不满意：
+1. 模型在开始修改前连续 3 次读取了 utils.js 的完整内容（路径完全相同），index.jsx 也被读取了 4 次，读取之间文件内容未变。这种同一文件的无意义重复读取浪费了大量工具调用轮次。
+2. 模型在编写 sanitizeConfig 的单元测试时，当测试期望（如期望非法 logo.size 返回 MIN_LOGO_SIZE 30px）与实际代码行为（返回 80px）不一致时，直接将测试断言从 30px 改为 80px 以匹配代码行为，没有质疑代码用 80px 兜底是否合理。这是"测试断言向产品代码妥协"的过程硬伤，正确做法是先判断产品代码的兜底值是否合理再决定改测试还是改代码。

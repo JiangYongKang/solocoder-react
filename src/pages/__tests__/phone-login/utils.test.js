@@ -16,6 +16,16 @@ import {
   clearLoginInfo,
   formatLoginTime,
   getProtocolText,
+  SMS_COUNTDOWN_SECONDS,
+  ERROR_LOCK_SECONDS,
+  getCountdownButtonText,
+  getNextCountdownValue,
+  isCountdownActive,
+  canRequestCode,
+  getLockButtonText,
+  getNextLockValue,
+  isLocked,
+  shouldTriggerLock,
 } from '@/pages/phone-login/utils'
 
 describe('validatePhone', () => {
@@ -359,5 +369,146 @@ describe('getProtocolText', () => {
   it('未知类型应返回空字符串', () => {
     expect(getProtocolText('unknown')).toBe('')
     expect(getProtocolText('')).toBe('')
+  })
+})
+
+describe('countdown constants', () => {
+  it('SMS_COUNTDOWN_SECONDS 应为 60', () => {
+    expect(SMS_COUNTDOWN_SECONDS).toBe(60)
+  })
+
+  it('ERROR_LOCK_SECONDS 应为 30', () => {
+    expect(ERROR_LOCK_SECONDS).toBe(30)
+  })
+})
+
+describe('getCountdownButtonText', () => {
+  it('倒计时大于 0 时应显示倒计时文案', () => {
+    expect(getCountdownButtonText(60, false)).toBe('60 秒后重新发送')
+    expect(getCountdownButtonText(30, false)).toBe('30 秒后重新发送')
+    expect(getCountdownButtonText(1, true)).toBe('1 秒后重新发送')
+  })
+
+  it('倒计时为 0 且从未请求过应显示获取验证码', () => {
+    expect(getCountdownButtonText(0, false)).toBe('获取验证码')
+  })
+
+  it('倒计时为 0 且之前请求过应显示重新获取验证码', () => {
+    expect(getCountdownButtonText(0, true)).toBe('重新获取验证码')
+  })
+
+  it('倒计时优先于历史状态显示', () => {
+    expect(getCountdownButtonText(10, true)).toBe('10 秒后重新发送')
+    expect(getCountdownButtonText(10, false)).toBe('10 秒后重新发送')
+  })
+})
+
+describe('getNextCountdownValue', () => {
+  it('大于 1 时应减 1', () => {
+    expect(getNextCountdownValue(60)).toBe(59)
+    expect(getNextCountdownValue(2)).toBe(1)
+    expect(getNextCountdownValue(100)).toBe(99)
+  })
+
+  it('等于 1 时应归零', () => {
+    expect(getNextCountdownValue(1)).toBe(0)
+  })
+
+  it('小于等于 0 时应归零', () => {
+    expect(getNextCountdownValue(0)).toBe(0)
+    expect(getNextCountdownValue(-1)).toBe(0)
+  })
+})
+
+describe('isCountdownActive', () => {
+  it('大于 0 应返回 true', () => {
+    expect(isCountdownActive(1)).toBe(true)
+    expect(isCountdownActive(60)).toBe(true)
+    expect(isCountdownActive(100)).toBe(true)
+  })
+
+  it('等于 0 应返回 false', () => {
+    expect(isCountdownActive(0)).toBe(false)
+  })
+
+  it('小于 0 应返回 false', () => {
+    expect(isCountdownActive(-1)).toBe(false)
+  })
+})
+
+describe('canRequestCode', () => {
+  it('手机号有效且不在倒计时中应返回 true', () => {
+    expect(canRequestCode(true, 0)).toBe(true)
+  })
+
+  it('手机号无效即使不在倒计时也应返回 false', () => {
+    expect(canRequestCode(false, 0)).toBe(false)
+  })
+
+  it('倒计时中即使手机号有效也应返回 false', () => {
+    expect(canRequestCode(true, 60)).toBe(false)
+    expect(canRequestCode(true, 1)).toBe(false)
+  })
+
+  it('两者都不满足应返回 false', () => {
+    expect(canRequestCode(false, 30)).toBe(false)
+  })
+})
+
+describe('getLockButtonText', () => {
+  it('锁定中应显示锁定倒计时文案', () => {
+    expect(getLockButtonText(30)).toBe('30 秒后重试')
+    expect(getLockButtonText(1)).toBe('1 秒后重试')
+    expect(getLockButtonText(10)).toBe('10 秒后重试')
+  })
+
+  it('未锁定应显示登录', () => {
+    expect(getLockButtonText(0)).toBe('登录')
+  })
+})
+
+describe('getNextLockValue', () => {
+  it('大于 1 时应减 1', () => {
+    expect(getNextLockValue(30)).toBe(29)
+    expect(getNextLockValue(2)).toBe(1)
+    expect(getNextLockValue(10)).toBe(9)
+  })
+
+  it('等于 1 时应归零', () => {
+    expect(getNextLockValue(1)).toBe(0)
+  })
+
+  it('小于等于 0 时应归零', () => {
+    expect(getNextLockValue(0)).toBe(0)
+    expect(getNextLockValue(-5)).toBe(0)
+  })
+})
+
+describe('isLocked', () => {
+  it('大于 0 应返回 true', () => {
+    expect(isLocked(1)).toBe(true)
+    expect(isLocked(30)).toBe(true)
+  })
+
+  it('等于 0 应返回 false', () => {
+    expect(isLocked(0)).toBe(false)
+  })
+
+  it('小于 0 应返回 false', () => {
+    expect(isLocked(-1)).toBe(false)
+  })
+})
+
+describe('shouldTriggerLock', () => {
+  it('错误次数大于等于 3 应返回 true', () => {
+    expect(shouldTriggerLock(3)).toBe(true)
+    expect(shouldTriggerLock(4)).toBe(true)
+    expect(shouldTriggerLock(100)).toBe(true)
+  })
+
+  it('错误次数小于 3 应返回 false', () => {
+    expect(shouldTriggerLock(0)).toBe(false)
+    expect(shouldTriggerLock(1)).toBe(false)
+    expect(shouldTriggerLock(2)).toBe(false)
   })
 })

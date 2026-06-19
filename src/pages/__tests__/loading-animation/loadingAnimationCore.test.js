@@ -113,11 +113,41 @@ describe('Keyframe builders', () => {
   })
 
   describe('buildCircleProgressKeyframes', () => {
-    it('should generate valid circle progress keyframes', () => {
+    it('should generate valid circle progress keyframes with default config', () => {
       const result = buildCircleProgressKeyframes(defaultTestConfig)
       expect(result).toContain('@keyframes circle-progress')
-      expect(result).toContain('stroke-dashoffset: 188.5')
+      expect(result).toContain('stroke-dashoffset:')
       expect(result).toContain('stroke-dashoffset: 0')
+    })
+
+    it('should dynamically calculate stroke-dashoffset based on config', () => {
+      const config = { size: 60, thickness: 6 }
+      const result = buildCircleProgressKeyframes(config)
+      const radius = (60 - 6) / 2
+      const circumference = 2 * Math.PI * radius
+      expect(result).toContain(`stroke-dashoffset: ${circumference.toFixed(1)}`)
+    })
+
+    it('should match CSS dasharray when using same config', () => {
+      const config = { size: 80, thickness: 8, primaryColor: '#3b82f6', secondaryColor: '#e5e7eb', speed: 1 }
+      const kfResult = buildCircleProgressKeyframes(config)
+      const cssResult = buildCircleProgressCSS(config)
+      const radius = (80 - 8) / 2
+      const circumference = 2 * Math.PI * radius
+      expect(kfResult).toContain(`stroke-dashoffset: ${circumference.toFixed(1)}`)
+      expect(cssResult).toContain(`stroke-dasharray: ${circumference.toFixed(1)}`)
+    })
+
+    it('should produce different offsets for different sizes', () => {
+      const config1 = { size: 40, thickness: 4 }
+      const config2 = { size: 100, thickness: 10 }
+      const result1 = buildCircleProgressKeyframes(config1)
+      const result2 = buildCircleProgressKeyframes(config2)
+      const offset1 = (2 * Math.PI * (40 - 4) / 2).toFixed(1)
+      const offset2 = (2 * Math.PI * (100 - 10) / 2).toFixed(1)
+      expect(result1).toContain(`stroke-dashoffset: ${offset1}`)
+      expect(result2).toContain(`stroke-dashoffset: ${offset2}`)
+      expect(offset1).not.toBe(offset2)
     })
   })
 
@@ -280,12 +310,52 @@ describe('HTML builders', () => {
       expect(result).toContain('cx="30"')
       expect(result).toContain('cy="30"')
     })
+
+    it('should reflect custom size and thickness in SVG viewBox and radius', () => {
+      const result = buildCircleProgressHTML({ size: 100, thickness: 8 })
+      expect(result).toContain('viewBox="0 0 100 100"')
+      expect(result).toContain('cx="50"')
+      expect(result).toContain('cy="50"')
+      const radius = (100 - 8) / 2
+      expect(result).toContain(`r="${radius.toFixed(1)}"`)
+    })
   })
 
   describe('buildHTML', () => {
     it('should return empty string for unknown type', () => {
       const result = buildHTML('unknown', defaultTestConfig)
       expect(result).toBe('')
+    })
+
+    it('should pass config to circleProgress HTML builder', () => {
+      const config = { ...defaultTestConfig, size: 100, thickness: 8 }
+      const result = buildHTML('circleProgress', config)
+      expect(result).toContain('viewBox="0 0 100 100"')
+      expect(result).toContain('cx="50"')
+      const radius = (100 - 8) / 2
+      expect(result).toContain(`r="${radius.toFixed(1)}"`)
+    })
+
+    it('should pass config to wave HTML builder', () => {
+      const config = { ...defaultTestConfig, count: 3 }
+      const result = buildHTML('wave', config)
+      expect(result).toContain('class="wave-bar-0"')
+      expect(result).toContain('class="wave-bar-2"')
+      expect(result).not.toContain('class="wave-bar-3"')
+    })
+
+    it('should pass config to skeleton HTML builder', () => {
+      const config = { ...defaultTestConfig, count: 2 }
+      const result = buildHTML('skeleton', config)
+      const matches = result.match(/class="skeleton-block"/g)
+      expect(matches).toHaveLength(2)
+    })
+
+    it('should pass config to dots HTML builder', () => {
+      const config = { ...defaultTestConfig, count: 4 }
+      const result = buildHTML('dots', config)
+      const matches = result.match(/class="bounce-dot-\d"/g)
+      expect(matches).toHaveLength(4)
     })
   })
 })
@@ -452,6 +522,41 @@ describe('Composition', () => {
       expect(result).toContain('left: 25%')
       expect(result).toContain('left: 75%')
       expect(result).toContain('@keyframes spin')
+    })
+
+    it('should generate differentiated keyframes for same animation type with different configs', () => {
+      const slowConfig = { ...defaultTestConfig, speed: 2 }
+      const fastConfig = { ...defaultTestConfig, speed: 0.5 }
+      const elements = [
+        createCompositionElement('spinner', slowConfig, { x: 25, y: 50 }),
+        createCompositionElement('spinner', fastConfig, { x: 75, y: 50 }),
+      ]
+      const result = generateCompositionCSS(elements)
+      expect(result).toContain('@keyframes spin')
+      const spinCount = (result.match(/@keyframes\s+spin/g) || []).length
+      expect(spinCount).toBe(2)
+    })
+
+    it('should reuse keyframe for same animation type with same config', () => {
+      const elements = [
+        createCompositionElement('spinner', defaultTestConfig, { x: 25, y: 50 }),
+        createCompositionElement('spinner', defaultTestConfig, { x: 75, y: 50 }),
+      ]
+      const result = generateCompositionCSS(elements)
+      const spinCount = (result.match(/@keyframes\s+spin/g) || []).length
+      expect(spinCount).toBe(1)
+    })
+
+    it('should preserve speed difference in CSS animation property for different configs', () => {
+      const slowConfig = { ...defaultTestConfig, speed: 3 }
+      const fastConfig = { ...defaultTestConfig, speed: 0.5 }
+      const elements = [
+        createCompositionElement('spinner', slowConfig, { x: 25, y: 50 }),
+        createCompositionElement('spinner', fastConfig, { x: 75, y: 50 }),
+      ]
+      const result = generateCompositionCSS(elements)
+      expect(result).toContain('3s')
+      expect(result).toContain('0.5s')
     })
   })
 

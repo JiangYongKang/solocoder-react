@@ -33,11 +33,10 @@ function AnimationThumbnail({ type, config }) {
           {[0, 1, 2, 3, 4].map(i => (
             <div
               key={i}
-              className="thumb-wave-bar"
+              className={`thumb-wave-bar thumb-wave-bar-${i}`}
               style={{
                 width: Math.max(2, 4 / 2),
                 backgroundColor: primaryColor,
-                animationDelay: `${i * 0.1}s`,
               }}
             />
           ))}

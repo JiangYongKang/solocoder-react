@@ -296,21 +296,10 @@ function TemplateThumbnail({ template }) {
 }
 
 function ColorPicker({ value, onChange, showPresets = true }) {
-  const [hexValue, setHexValue] = useState(() =>
-    /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(value) ? value : value
-  )
-  const [lastValue, setLastValue] = useState(value)
-
-  if (value !== lastValue) {
-    setLastValue(value)
-    if (/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(value)) {
-      setHexValue(value)
-    }
-  }
+  const hexValue = /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(value) ? value : value
 
   const handleHexChange = (e) => {
     const v = e.target.value
-    setHexValue(v)
     if (/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(v)) {
       onChange(v)
     }
@@ -325,7 +314,6 @@ function ColorPicker({ value, onChange, showPresets = true }) {
             value={/^#([0-9A-Fa-f]{6})$/.test(hexValue) ? hexValue : '#ffffff'}
             onChange={(e) => {
               onChange(e.target.value)
-              setHexValue(e.target.value)
             }}
           />
           <div className="color-picker-display" style={{ backgroundColor: value }} />
@@ -347,7 +335,6 @@ function ColorPicker({ value, onChange, showPresets = true }) {
               style={{ backgroundColor: c }}
               onClick={() => {
                 onChange(c)
-                setHexValue(c)
               }}
               title={c}
             />
@@ -582,16 +569,6 @@ export default function SplashConfigPage() {
   }, [showToast])
 
   const [previewCountdown, setPreviewCountdown] = useState(config.interaction.countdown.seconds)
-  const [resetCounter, setResetCounter] = useState(0)
-  const [lastTemplateId, setLastTemplateId] = useState(config.templateId)
-  const [lastFullscreen, setLastFullscreen] = useState(isFullscreen)
-
-  if (config.templateId !== lastTemplateId || isFullscreen !== lastFullscreen) {
-    setLastTemplateId(config.templateId)
-    setLastFullscreen(isFullscreen)
-    setPreviewCountdown(config.interaction.countdown.seconds)
-    setResetCounter((c) => c + 1)
-  }
 
   useEffect(() => {
     if (!config.interaction.countdown.enabled) return
@@ -602,7 +579,7 @@ export default function SplashConfigPage() {
       })
     }, 1000)
     return () => clearInterval(timer)
-  }, [config.interaction.countdown.enabled, config.interaction.countdown.seconds, resetCounter])
+  }, [config.interaction.countdown.enabled, config.interaction.countdown.seconds])
 
   const handleCancelModal = useCallback(() => {
     setConfirmModal(null)
@@ -1406,7 +1383,7 @@ export default function SplashConfigPage() {
             </div>
           </div>
           <SplashScreenPreview
-            key={resetCounter}
+            key={`${config.templateId}-${isFullscreen}-${config.interaction.countdown.seconds}`}
             config={config}
             countdownValue={previewCountdown}
             onSkip={() => showToast('已跳过启动页', 'info')}

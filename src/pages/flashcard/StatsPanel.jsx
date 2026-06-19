@@ -10,7 +10,7 @@ import {
 export default function StatsPanel({ cards, stats, settings, onSettingsChange }) {
   const studyDates = getStudyDatesFromStats(stats)
   const streak = calculateStreakDays(studyDates)
-  const heatmap = buildHeatmapData(studyDates, 30)
+  const heatmap = buildHeatmapData(stats, 30)
   const totalStats = calculateTotalStats(cards)
   const dailyProgress = calculateDailyProgress(cards, stats, settings.dailyGoal)
 
@@ -91,9 +91,9 @@ export default function StatsPanel({ cards, stats, settings, onSettingsChange })
               <div
                 key={idx}
                 className="fc-heatmap-cell"
-                title={`${cell.date}${cell.studied ? ' (已学习)' : ''}`}
+                title={`${cell.date}${cell.studied ? ` (${cell.count}张)` : ''}`}
                 style={{
-                  background: getHeatmapCellColor(cell.studied),
+                  background: getHeatmapCellColor(cell.studied, cell.count),
                 }}
               />
             ))}

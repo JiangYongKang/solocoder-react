@@ -78,7 +78,7 @@ export default function SettlementPanel({ participants, expenses }) {
                     </div>
                   ) : null}
                   <span className="settlement-from">{fromP?.name || s.from}</span>
-                  <span className="settlement-arrow">→</span>
+                  <span className="settlement-arrow">需支付</span>
                   {toP ? (
                     <div
                       style={{

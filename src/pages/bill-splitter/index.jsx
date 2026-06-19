@@ -13,6 +13,7 @@ import {
   deleteFromHistory,
   createBillRecord,
   formatDateTime,
+  validateAllExpenses,
 } from './utils'
 
 export default function BillSplitterPage() {
@@ -25,6 +26,7 @@ export default function BillSplitterPage() {
   const [saveModalOpen, setSaveModalOpen] = useState(false)
   const [saveModalKey, setSaveModalKey] = useState(0)
   const [saveInitialName, setSaveInitialName] = useState('')
+  const [saveError, setSaveError] = useState('')
 
   useEffect(() => {
     saveHistory(history)
@@ -37,6 +39,12 @@ export default function BillSplitterPage() {
   }
 
   const openSaveModal = () => {
+    const validation = validateAllExpenses(expenses, participants)
+    if (!validation.valid) {
+      setSaveError(validation.message)
+      return
+    }
+    setSaveError('')
     setSaveInitialName(`账单 ${formatDateTime(Date.now()).slice(0, 10)}`)
     setSaveModalKey((k) => k + 1)
     setSaveModalOpen(true)
@@ -62,10 +70,9 @@ export default function BillSplitterPage() {
     if (confirm('确认清空当前所有参与者和费用吗？')) {
       setParticipants([])
       setExpenses([])
+      setSaveError('')
     }
   }
-
-  const canSave = participants.length >= 2 && expenses.length > 0
 
   return (
     <div className="bill-splitter-page">
@@ -98,11 +105,16 @@ export default function BillSplitterPage() {
             type="button"
             className="btn btn-sm btn-primary"
             onClick={openSaveModal}
-            disabled={!canSave}
+            disabled={participants.length < 2 || expenses.length === 0}
           >
             保存账单
           </button>
         </div>
+        {saveError && (
+          <div className="error-text" style={{ width: '100%', marginTop: 8 }}>
+            {saveError}
+          </div>
+        )}
       </div>
 
       <div className="bill-splitter-main">

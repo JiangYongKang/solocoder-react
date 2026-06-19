@@ -31,14 +31,16 @@ function ExpenseItem({ expense, participants, onChange, onDelete, index }) {
     for (const id of Object.keys(nextRatios)) {
       if (!next.includes(id)) delete nextRatios[id]
     }
-    if (next.length > 0) {
-      const each = round2(100 / next.length)
-      let sum = 0
-      for (let i = 0; i < next.length - 1; i++) {
-        nextRatios[next[i]] = each
-        sum += each
+    if (expense.splitMode === SPLIT_MODE.EQUAL) {
+      if (next.length > 0) {
+        const each = round2(100 / next.length)
+        let sum = 0
+        for (let i = 0; i < next.length - 1; i++) {
+          nextRatios[next[i]] = each
+          sum += each
+        }
+        nextRatios[next[next.length - 1]] = round2(100 - sum)
       }
-      nextRatios[next[next.length - 1]] = round2(100 - sum)
     }
     onChange(expense.id, { ...expense, sharedWith: next, ratios: nextRatios })
   }

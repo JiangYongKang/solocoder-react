@@ -49,9 +49,13 @@ export function buildProgressKeyframes() {
 }`
 }
 
-export function buildCircleProgressKeyframes() {
+export function buildCircleProgressKeyframes(config) {
+  const size = config?.size || 60
+  const thickness = config?.thickness || 6
+  const radius = (size - thickness) / 2
+  const circumference = 2 * Math.PI * radius
   return `@keyframes circle-progress {
-  0% { stroke-dashoffset: 188.5; }
+  0% { stroke-dashoffset: ${circumference.toFixed(1)}; }
   100% { stroke-dashoffset: 0; }
 }`
 }
@@ -328,7 +332,7 @@ export function buildHTML(animationType, config, className) {
   if (!builder) return ''
   const animType = ANIMATION_TYPES[animationType]
   const finalClassName = className || animType?.className || 'loading-animation'
-  if (animationType === 'wave' || animationType === 'skeleton' || animationType === 'dots') {
+  if (animationType === 'wave' || animationType === 'skeleton' || animationType === 'dots' || animationType === 'circleProgress') {
     return builder(config, finalClassName)
   }
   return builder(finalClassName)
@@ -444,7 +448,8 @@ export function createCompositionElement(animationType, config, position = { x: 
 export function generateCompositionCSS(elements) {
   if (!Array.isArray(elements) || elements.length === 0) return ''
 
-  const keyframesSet = new Set()
+  const keyframeEntries = []
+  const elementKeyframeRefs = []
   let styleCSS = ''
 
   elements.forEach((element, index) => {
@@ -452,17 +457,13 @@ export function generateCompositionCSS(elements) {
     const className = `anim-${index}`
 
     const keyframes = buildKeyframes(animationType, config)
-    keyframes.split('@keyframes').forEach(kf => {
-      if (kf.trim()) {
-        const match = kf.match(/^([^{]+)/)
-        if (match) {
-          const name = match[1].trim()
-          if (!keyframesSet.has(name)) {
-            keyframesSet.add(name)
-          }
-        }
-      }
+    const kfNames = parseKeyframeNames(keyframes)
+    const refs = []
+    kfNames.forEach(name => {
+      keyframeEntries.push({ name, animationType, config, elementIndex: index })
+      refs.push(name)
     })
+    elementKeyframeRefs.push({ index, refs })
 
     const animCSS = buildAnimationCSS(animationType, config, className)
     styleCSS += `\n/* 元素 ${index + 1} */
@@ -477,16 +478,90 @@ ${animCSS.replace(new RegExp(`\\.${className}`, 'g'), `.composition-container .$
 `
   })
 
-  let keyframesCSS = ''
-  keyframesSet.forEach(name => {
-    const builder = KEYFRAME_BUILDERS[findAnimationTypeForKeyframe(name)]
-    if (builder) {
-      const sampleConfig = elements[0]?.config || {}
-      keyframesCSS += builder(sampleConfig) + '\n\n'
+  const { keyframesCSS: kfCSS, elementRenameMap } = deduplicateKeyframes(keyframeEntries)
+
+  elementKeyframeRefs.forEach(({ index, refs }) => {
+    const renameMap = elementRenameMap[index] || {}
+    refs.forEach(originalName => {
+      const renamed = renameMap[originalName]
+      if (renamed && renamed !== originalName) {
+        const sectionMarker = `/* 元素 ${index + 1} */`
+        const sectionStart = styleCSS.indexOf(sectionMarker)
+        if (sectionStart !== -1) {
+          const nextSection = styleCSS.indexOf('/* 元素 ', sectionStart + sectionMarker.length)
+          const sectionEnd = nextSection === -1 ? styleCSS.length : nextSection
+          const before = styleCSS.slice(0, sectionStart)
+          const section = styleCSS.slice(sectionStart, sectionEnd)
+          const after = styleCSS.slice(sectionEnd)
+          const updated = section.replace(
+            new RegExp(`(animation:\\s*)${escapeRegex(originalName)}`, 'g'),
+            `$1${renamed}`
+          )
+          styleCSS = before + updated + after
+        }
+      }
+    })
+  })
+
+  return `${kfCSS}${styleCSS}`.trim()
+}
+
+function parseKeyframeNames(keyframesStr) {
+  const names = []
+  const regex = /@keyframes\s+([^{]+)/g
+  let match
+  while ((match = regex.exec(keyframesStr)) !== null) {
+    names.push(match[1].trim())
+  }
+  return names
+}
+
+function configSignature(config) {
+  const keys = ['speed', 'size', 'thickness', 'count']
+  return keys.map(k => String(config[k] ?? '')).join('|')
+}
+
+function deduplicateKeyframes(entries) {
+  const seen = new Map()
+  let cssOutput = ''
+  const elementRenameMap = {}
+
+  entries.forEach(({ name, config, elementIndex }) => {
+    const sig = `${name}::${configSignature(config)}`
+    if (!seen.has(sig)) {
+      const renamedName = seen.size === 0
+        ? name
+        : `${name}-${seen.size}`
+      seen.set(sig, renamedName)
+
+      const builder = KEYFRAME_BUILDERS[findAnimationTypeForKeyframe(name)]
+      if (builder) {
+        const raw = builder(config)
+        let replaced = raw
+        if (renamedName !== name) {
+          replaced = raw.replace(
+            new RegExp(`@keyframes\\s+${escapeRegex(name)}\\s*\\{`),
+            `@keyframes ${renamedName} {`
+          )
+        }
+        cssOutput += replaced + '\n\n'
+      }
+    }
+
+    const renamedName = seen.get(sig)
+    if (renamedName !== name) {
+      if (!elementRenameMap[elementIndex]) {
+        elementRenameMap[elementIndex] = {}
+      }
+      elementRenameMap[elementIndex][name] = renamedName
     }
   })
 
-  return `${keyframesCSS}${styleCSS}`.trim()
+  return { keyframesCSS: cssOutput, elementRenameMap }
+}
+
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 function findAnimationTypeForKeyframe(keyframeName) {

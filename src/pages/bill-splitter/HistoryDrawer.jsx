@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { formatDateTime, formatCurrency } from './utils'
+import { formatDateTime } from './utils'
+import { formatCurrency } from './constants'
 
 export function SaveModal({ open, onClose, onSave, initialName }) {
   const [name, setName] = useState(initialName)

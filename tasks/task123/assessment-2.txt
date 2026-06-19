@@ -1,0 +1,8 @@
+产物不满意：
+1. flashcardUtils.js 的 getUniqueTags 函数在处理缺少 color 属性的标签对象时，表达式 `typeof tag === 'object' && tag ? tag.color : '#6b7280'` 在 tag 为对象但缺少 color 字段时，`tag.color` 求值为 `undefined` 而非 fallback 值 `#6b7280`，导致返回值中存入了 `color: undefined`。虽然下游 getTagColor 在 CardList.jsx 中有兜底处理，但函数契约声明为 `{ text, color }` 却存储了 `color: undefined`，维护者会困惑。应在条件表达式中对 tag.color 做显式的存在性检查。
+2. flashcardUtils.js 的 getHeatmapCellColor 函数分级阈值过于粗糙，count>=3 全部返回最深绿色 `#216e39`。无论用户当日学了 3 张还是 50 张卡片，热力图格子颜色完全一致，提示词要求的"按每日学习量分级展示不同深浅颜色"在常规使用场景下因阈值封顶过早而失去区分度。应该基于实际数据范围使用对数尺度或百分位数映射来设置阈值。
+3. buildHeatmapData 函数通过运行时类型检测判断参数是日期数组还是 stats 对象，将两种独立功能通过参数多态耦合在同一个函数中。这种"一个函数做两件事"的设计增加了理解成本和误用风险，应拆分为两个独立函数。
+
+过程不满意：
+1. 模型在修改 buildHeatmapData 时先做了一次最小修复解决 ESLint 报错，仅隔几步后就推翻重写用完全不同方案重构了同一段代码。这种"修完再推翻"的模式说明初始分析不够充分，应该先梳理清楚该函数的两种输入模式差异，直接设计正确方案一次性实现。
+2. 模型对同一个 flashcardUtils.test.js 文件连续执行了 4 次全量读取，但读取之间代码未发生任何变化。这种对同一文件的无意义重复读取浪费了工具调用轮次和 token。正确做法是读取一次后记住关键内容，仅在需要查看特定区域时分批读取。

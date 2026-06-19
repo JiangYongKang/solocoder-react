@@ -17,8 +17,9 @@ import {
   round2,
   loadHistory,
   saveHistory,
+  validateAllExpenses,
 } from '../../bill-splitter/utils'
-import { SPLIT_MODE, MAX_HISTORY_ITEMS } from '../../bill-splitter/constants'
+import { SPLIT_MODE, MAX_HISTORY_ITEMS, getAvatarColor, formatCurrency } from '../../bill-splitter/constants'
 
 const createMockLocalStorage = () => {
   let store = {}
@@ -563,5 +564,148 @@ describe('历史记录', () => {
     saveHistory(history)
     const loaded = loadHistory()
     expect(loaded).toEqual(history)
+  })
+})
+
+describe('validateAllExpenses', () => {
+  const participants = [{ id: 'p1' }, { id: 'p2' }]
+
+  it('所有费用完整时校验通过', () => {
+    const expenses = [
+      {
+        id: 'e1',
+        description: '午餐',
+        amount: 100,
+        payerId: 'p1',
+        sharedWith: ['p1', 'p2'],
+        splitMode: SPLIT_MODE.EQUAL,
+        ratios: { p1: 50, p2: 50 },
+      },
+    ]
+    const result = validateAllExpenses(expenses, participants)
+    expect(result.valid).toBe(true)
+    expect(result.message).toBe('')
+  })
+
+  it('空费用列表校验不通过', () => {
+    const result = validateAllExpenses([], participants)
+    expect(result.valid).toBe(false)
+    expect(result.message).toBeTruthy()
+  })
+
+  it('null费用列表校验不通过', () => {
+    const result = validateAllExpenses(null, participants)
+    expect(result.valid).toBe(false)
+  })
+
+  it('费用描述为空时校验不通过', () => {
+    const expenses = [
+      {
+        id: 'e1',
+        description: '',
+        amount: 100,
+        payerId: 'p1',
+        sharedWith: ['p1', 'p2'],
+        splitMode: SPLIT_MODE.EQUAL,
+      },
+    ]
+    const result = validateAllExpenses(expenses, participants)
+    expect(result.valid).toBe(false)
+    expect(result.message).toContain('费用 #1')
+  })
+
+  it('金额为0时校验不通过', () => {
+    const expenses = [
+      {
+        id: 'e1',
+        description: '午餐',
+        amount: 0,
+        payerId: 'p1',
+        sharedWith: ['p1', 'p2'],
+        splitMode: SPLIT_MODE.EQUAL,
+      },
+    ]
+    const result = validateAllExpenses(expenses, participants)
+    expect(result.valid).toBe(false)
+  })
+
+  it('未选择支付人时校验不通过', () => {
+    const expenses = [
+      {
+        id: 'e1',
+        description: '午餐',
+        amount: 100,
+        payerId: '',
+        sharedWith: ['p1', 'p2'],
+        splitMode: SPLIT_MODE.EQUAL,
+      },
+    ]
+    const result = validateAllExpenses(expenses, participants)
+    expect(result.valid).toBe(false)
+  })
+
+  it('多条费用中第二条有问题时提示正确序号', () => {
+    const expenses = [
+      {
+        id: 'e1',
+        description: '早餐',
+        amount: 50,
+        payerId: 'p1',
+        sharedWith: ['p1', 'p2'],
+        splitMode: SPLIT_MODE.EQUAL,
+      },
+      {
+        id: 'e2',
+        description: '',
+        amount: 100,
+        payerId: 'p1',
+        sharedWith: ['p1', 'p2'],
+        splitMode: SPLIT_MODE.EQUAL,
+      },
+    ]
+    const result = validateAllExpenses(expenses, participants)
+    expect(result.valid).toBe(false)
+    expect(result.message).toContain('费用 #2')
+  })
+})
+
+describe('getAvatarColor - 确定性哈希', () => {
+  it('同一姓名始终返回相同颜色', () => {
+    const c1 = getAvatarColor('张三')
+    const c2 = getAvatarColor('张三')
+    expect(c1).toBe(c2)
+  })
+
+  it('不同姓名返回不同颜色（大概率）', () => {
+    const c1 = getAvatarColor('张三')
+    const c2 = getAvatarColor('李四')
+    expect(typeof c1).toBe('string')
+    expect(typeof c2).toBe('string')
+  })
+
+  it('不依赖调用时机，颜色不会漂移', () => {
+    const first = getAvatarColor('王五')
+    for (let i = 0; i < 10; i++) {
+      expect(getAvatarColor('王五')).toBe(first)
+    }
+  })
+
+  it('空字符串也返回有效颜色', () => {
+    const c = getAvatarColor('')
+    expect(c).toBeTruthy()
+  })
+})
+
+describe('formatCurrency', () => {
+  it('正确格式化金额', () => {
+    expect(formatCurrency(100)).toBe('¥100.00')
+    expect(formatCurrency(0)).toBe('¥0.00')
+    expect(formatCurrency(3.5)).toBe('¥3.50')
+  })
+
+  it('无效值显示0', () => {
+    expect(formatCurrency(null)).toBe('¥0.00')
+    expect(formatCurrency(undefined)).toBe('¥0.00')
+    expect(formatCurrency('abc')).toBe('¥0.00')
   })
 })

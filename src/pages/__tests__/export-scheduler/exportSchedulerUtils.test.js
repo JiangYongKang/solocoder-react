@@ -3,6 +3,7 @@ import {
   taskStatusTransition,
   retryStateMachine,
   shouldTriggerExecution,
+  isOverdueTask,
   shouldSimulateFailure,
   generateExportData,
   formatToCSV,
@@ -22,7 +23,12 @@ import {
   sortRecordsByTime,
   generateId,
   selectRandomFailureReason,
+  showBrowserNotification,
 } from '@/pages/export-scheduler/utils.js'
+import {
+  findOverdueTasks,
+  recalculateNextExecutionForOverdueTasks,
+} from '@/pages/export-scheduler/storage.js'
 import {
   TASK_STATUS_RUNNING,
   TASK_STATUS_PAUSED,
@@ -39,7 +45,7 @@ import {
   FAILURE_REASONS,
   DATA_SOURCE_FIELDS,
 } from '@/pages/export-scheduler/constants.js'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 
 describe('exportScheduler utils', () => {
   describe('generateId', () => {
@@ -188,10 +194,19 @@ describe('exportScheduler utils', () => {
     })
 
     it('should handle retry_fail correctly at boundary', () => {
-      const state = { retryCount: MAX_RETRY_COUNT - 1, isRetrying: true, failed: false }
+      const state = { retryCount: MAX_RETRY_COUNT, isRetrying: true, failed: false }
       const result = retryStateMachine(state, 'retry_fail')
       expect(result.retryCount).toBe(MAX_RETRY_COUNT)
       expect(result.failed).toBe(true)
+      expect(result.isRetrying).toBe(false)
+    })
+
+    it('should allow 3rd retry before exhaustion (retry_count=2)', () => {
+      const state = { retryCount: MAX_RETRY_COUNT - 1, isRetrying: true, failed: false }
+      const result = retryStateMachine(state, 'retry_fail')
+      expect(result.retryCount).toBe(3)
+      expect(result.failed).toBe(false)
+      expect(result.isRetrying).toBe(true)
     })
 
     it('should continue retrying before max', () => {
@@ -214,12 +229,13 @@ describe('exportScheduler utils', () => {
       expect(result).toEqual({ retryCount: 0, isRetrying: false, failed: false })
     })
 
-    it('should handle full retry lifecycle', () => {
+    it('should handle full retry lifecycle with exactly 3 retries', () => {
       let state = retryStateMachine(null, 'execute')
       expect(state).toEqual({ retryCount: 0, isRetrying: false, failed: false })
 
       state = retryStateMachine(state, 'fail')
       expect(state.isRetrying).toBe(true)
+      expect(state.retryCount).toBe(0)
 
       state = retryStateMachine(state, 'retry')
       expect(state.retryCount).toBe(1)
@@ -227,6 +243,12 @@ describe('exportScheduler utils', () => {
       state = retryStateMachine(state, 'retry_fail')
       expect(state.retryCount).toBe(2)
       expect(state.isRetrying).toBe(true)
+      expect(state.failed).toBe(false)
+
+      state = retryStateMachine(state, 'retry_fail')
+      expect(state.retryCount).toBe(3)
+      expect(state.isRetrying).toBe(true)
+      expect(state.failed).toBe(false)
 
       state = retryStateMachine(state, 'retry_fail')
       expect(state.retryCount).toBe(3)
@@ -628,6 +650,168 @@ describe('exportScheduler utils', () => {
       const content = 'hello world'
       const size = estimateFileSize(content)
       expect(size).toBe(11)
+    })
+  })
+
+  describe('isOverdueTask', () => {
+    const baseTask = (overrides = {}) => ({
+      status: TASK_STATUS_RUNNING,
+      nextExecutionTime: Date.now() - 120000,
+      retryState: { retryCount: 0, isRetrying: false, failed: false },
+      ...overrides,
+    })
+
+    it('should return true for running task 60s+ past nextExecutionTime', () => {
+      const task = baseTask({ nextExecutionTime: Date.now() - 61000 })
+      expect(isOverdueTask(task, Date.now())).toBe(true)
+    })
+
+    it('should return false for running task less than 60s past nextExecutionTime', () => {
+      const task = baseTask({ nextExecutionTime: Date.now() - 30000 })
+      expect(isOverdueTask(task, Date.now())).toBe(false)
+    })
+
+    it('should return false for paused task even if overdue', () => {
+      const task = baseTask({ status: TASK_STATUS_PAUSED })
+      expect(isOverdueTask(task, Date.now())).toBe(false)
+    })
+
+    it('should return false for task with no nextExecutionTime', () => {
+      const task = baseTask({ nextExecutionTime: null })
+      expect(isOverdueTask(task, Date.now())).toBe(false)
+    })
+
+    it('should return false for task currently retrying', () => {
+      const task = baseTask({ retryState: { retryCount: 1, isRetrying: true, failed: false } })
+      expect(isOverdueTask(task, Date.now())).toBe(false)
+    })
+
+    it('should return false for future execution time', () => {
+      const task = baseTask({ nextExecutionTime: Date.now() + 120000 })
+      expect(isOverdueTask(task, Date.now())).toBe(false)
+    })
+  })
+
+  describe('findOverdueTasks', () => {
+    it('should return only overdue tasks from list', () => {
+      const now = Date.now()
+      const tasks = [
+        { id: 1, status: TASK_STATUS_RUNNING, nextExecutionTime: now - 120000, retryState: { retryCount: 0, isRetrying: false, failed: false } },
+        { id: 2, status: TASK_STATUS_RUNNING, nextExecutionTime: now + 60000, retryState: { retryCount: 0, isRetrying: false, failed: false } },
+        { id: 3, status: TASK_STATUS_RUNNING, nextExecutionTime: now - 30000, retryState: { retryCount: 0, isRetrying: false, failed: false } },
+        { id: 4, status: TASK_STATUS_PAUSED, nextExecutionTime: now - 120000, retryState: { retryCount: 0, isRetrying: false, failed: false } },
+      ]
+      const overdue = findOverdueTasks(tasks, now)
+      expect(overdue.length).toBe(1)
+      expect(overdue[0].id).toBe(1)
+    })
+
+    it('should return empty array when no tasks are overdue', () => {
+      const now = Date.now()
+      const tasks = [
+        { id: 1, status: TASK_STATUS_RUNNING, nextExecutionTime: now + 60000, retryState: { retryCount: 0, isRetrying: false, failed: false } },
+      ]
+      expect(findOverdueTasks(tasks, now).length).toBe(0)
+    })
+  })
+
+  describe('recalculateNextExecutionForOverdueTasks', () => {
+    it('should recalculate nextExecutionTime for overdue tasks', () => {
+      const now = Date.now()
+      const originalNext = now - 120000
+      const tasks = [
+        {
+          id: 1,
+          status: TASK_STATUS_RUNNING,
+          nextExecutionTime: originalNext,
+          retryState: { retryCount: 0, isRetrying: false, failed: false },
+          frequency: FREQUENCY_DAILY,
+          executionTime: '08:00',
+          weekDays: [],
+          monthDay: 1,
+          updatedAt: 0,
+        },
+      ]
+      const result = recalculateNextExecutionForOverdueTasks(tasks, now)
+      expect(result[0].nextExecutionTime).not.toBe(originalNext)
+      expect(result[0].nextExecutionTime).toBeGreaterThan(now)
+      expect(result[0].updatedAt).toBe(now)
+    })
+
+    it('should leave non-overdue tasks unchanged', () => {
+      const now = Date.now()
+      const futureNext = now + 600000
+      const tasks = [
+        {
+          id: 1,
+          status: TASK_STATUS_RUNNING,
+          nextExecutionTime: futureNext,
+          retryState: { retryCount: 0, isRetrying: false, failed: false },
+          frequency: FREQUENCY_DAILY,
+          executionTime: '08:00',
+          weekDays: [],
+          monthDay: 1,
+          updatedAt: 0,
+        },
+      ]
+      const result = recalculateNextExecutionForOverdueTasks(tasks, now)
+      expect(result[0].nextExecutionTime).toBe(futureNext)
+      expect(result[0].updatedAt).toBe(0)
+    })
+  })
+
+  describe('showBrowserNotification', () => {
+    const originalNotification = global.Notification
+
+    beforeEach(() => {
+      delete global.Notification
+    })
+
+    afterEach(() => {
+      global.Notification = originalNotification
+    })
+
+    it('should return false when Notification API is undefined', () => {
+      const result = showBrowserNotification('title', 'body')
+      expect(result).toBe(false)
+    })
+
+    it('should return false when permission not granted', () => {
+      global.Notification = class {
+        static get permission() { return 'default' }
+        constructor() {}
+      }
+      const result = showBrowserNotification('title', 'body')
+      expect(result).toBe(false)
+    })
+
+    it('should return false when permission denied', () => {
+      global.Notification = class {
+        static get permission() { return 'denied' }
+        constructor() {}
+      }
+      const result = showBrowserNotification('title', 'body')
+      expect(result).toBe(false)
+    })
+
+    it('should return true when permission granted and constructor works', () => {
+      const mockConstruct = vi.fn()
+      global.Notification = class {
+        static get permission() { return 'granted' }
+        constructor(t, b) { mockConstruct(t, b) }
+      }
+      const result = showBrowserNotification('Test Title', 'Test Body')
+      expect(result).toBe(true)
+      expect(mockConstruct).toHaveBeenCalledWith('Test Title', { body: 'Test Body' })
+    })
+
+    it('should return false when Notification constructor throws', () => {
+      global.Notification = class {
+        static get permission() { return 'granted' }
+        constructor() { throw new Error('fail') }
+      }
+      const result = showBrowserNotification('title', 'body')
+      expect(result).toBe(false)
     })
   })
 })

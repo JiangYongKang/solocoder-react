@@ -21,6 +21,12 @@ import {
 } from './utils.js';
 
 import {
+  LIFECYCLE_STAGES,
+  MESSAGE_TYPE,
+  BROADCAST_TARGET,
+} from './constants.js';
+
+import {
   createLifecycleManager,
   bootstrapApp,
   finishBootstrapApp,
@@ -61,7 +67,7 @@ export default function MicroFrontendSandbox() {
   const iframeRefs = useRef({});
   const loadTimersRef = useRef({});
 
-  if (!eventBusRef.current) {
+  if (eventBusRef.current == null) {
     eventBusRef.current = createEventBus();
   }
 
@@ -127,9 +133,11 @@ export default function MicroFrontendSandbox() {
   }, [appIds]);
 
   useEffect(() => {
+    const timers = loadTimersRef.current;
+    const bus = eventBusRef.current;
     return () => {
-      Object.values(loadTimersRef.current).forEach(clearTimeout);
-      eventBusRef.current?.clear();
+      Object.values(timers).forEach(clearTimeout);
+      bus?.clear();
     };
   }, []);
 
@@ -139,31 +147,57 @@ export default function MicroFrontendSandbox() {
     setApps((prev) => [...prev, newApp]);
   }, []);
 
+  const publishLifecycleEvent = useCallback((appId, stage, durationMs, timestamp = Date.now()) => {
+    eventBusRef.current.publish({
+      from: appId,
+      to: BROADCAST_TARGET,
+      type: MESSAGE_TYPE.LIFECYCLE,
+      body: {
+        stage,
+        duration: durationMs,
+        timestamp,
+      },
+    });
+  }, []);
+
   const handleStartApp = useCallback(async (appId) => {
-    const app = apps.find((a) => a.id === appId);
-    if (!app) return;
+    let startingApp = null;
 
-    if (app.status === APP_STATUS.LOAD_FAILED) {
-      const resetResult = resetFailedApp(app);
-      if (resetResult.error) return;
-      setApps((prev) => prev.map((a) => (a.id === appId ? resetResult.app : a)));
-      await handleStartApp(appId);
-      return;
-    }
+    setApps((prev) => {
+      const current = prev.find((a) => a.id === appId);
+      if (!current) return prev;
 
-    if (app.status !== APP_STATUS.STOPPED) return;
+      if (current.status === APP_STATUS.LOAD_FAILED) {
+        const resetResult = resetFailedApp(current);
+        if (resetResult.error) return prev;
+        startingApp = resetResult.app;
+        return prev.map((a) => (a.id === appId ? resetResult.app : a));
+      }
+
+      if (current.status === APP_STATUS.STOPPED) {
+        startingApp = current;
+        return prev;
+      }
+
+      return prev;
+    });
+
+    await Promise.resolve();
+
+    if (!startingApp) return;
 
     const startTs = Date.now();
-    const loadStart = startLoadingResources({ ...app, status: APP_STATUS.STOPPED }, startTs);
+    const loadStart = startLoadingResources(startingApp, startTs);
     if (loadStart.error) return;
+
     setApps((prev) => prev.map((a) => (a.id === appId ? loadStart.app : a)));
 
     setLoadProgress((prev) => ({
       ...prev,
-      [appId]: { loaded: 0, total: app.resources.length, current: '', percent: 0 },
+      [appId]: { loaded: 0, total: startingApp.resources.length, current: '', percent: 0 },
     }));
 
-    const loadResult = simulateResourceLoad(app.resources);
+    const loadResult = simulateResourceLoad(startingApp.resources);
 
     for (let i = 0; i < loadResult.results.length; i++) {
       const r = loadResult.results[i];
@@ -183,25 +217,42 @@ export default function MicroFrontendSandbox() {
       });
     }
 
-    const latestApp = apps.find((a) => a.id === appId);
-    const currentApp = latestApp || app;
+    const loadFinishTs = Date.now();
+    let loadFailed = false;
 
     setApps((prev) => {
       const prevApp = prev.find((a) => a.id === appId);
       if (!prevApp) return prev;
-      const finishLoad = finishLoadingResources(prevApp, loadResult);
+      const finishLoad = finishLoadingResources(prevApp, loadResult, loadFinishTs);
       if (finishLoad.error) return prev;
+      if (finishLoad.app.status === APP_STATUS.LOAD_FAILED) {
+        loadFailed = true;
+      }
       return prev.map((a) => (a.id === appId ? finishLoad.app : a));
     });
 
+    await Promise.resolve();
+
+    if (loadFailed) {
+      setLoadProgress((prev) => {
+        const next = { ...prev };
+        delete next[appId];
+        return next;
+      });
+      return;
+    }
+
     await sleep(50);
+
+    let bootstrapDuration = 0;
+    const bootTs = Date.now();
 
     setApps((prev) => {
       const prevApp = prev.find((a) => a.id === appId);
       if (!prevApp) return prev;
       if (prevApp.status === APP_STATUS.LOAD_FAILED) return prev;
       const resetApp = resetAppForRestart(prevApp);
-      const bootResult = bootstrapApp(resetApp, lifecycleManagerRef.current, Date.now());
+      const bootResult = bootstrapApp(resetApp, lifecycleManagerRef.current, bootTs);
       if (bootResult.error) return prev;
       lifecycleManagerRef.current = bootResult.manager;
       return prev.map((a) => (a.id === appId ? bootResult.app : a));
@@ -209,51 +260,92 @@ export default function MicroFrontendSandbox() {
 
     await sleep(300 + Math.random() * 200);
 
+    let mountDuration = 0;
+    const bootFinishTs = Date.now();
+
     setApps((prev) => {
       const prevApp = prev.find((a) => a.id === appId);
       if (!prevApp) return prev;
-      const finishBoot = finishBootstrapApp(prevApp, lifecycleManagerRef.current, Date.now());
+      const finishBoot = finishBootstrapApp(prevApp, lifecycleManagerRef.current, bootFinishTs);
       lifecycleManagerRef.current = finishBoot.manager;
+      bootstrapDuration = finishBoot.duration;
       return prev.map((a) => (a.id === appId ? finishBoot.app : a));
     });
 
+    if (bootstrapDuration > 0) {
+      publishLifecycleEvent(appId, LIFECYCLE_STAGES.BOOTSTRAP, bootstrapDuration, bootFinishTs);
+    }
+
     await sleep(200 + Math.random() * 200);
+
+    const mountFinishTs = Date.now();
 
     setApps((prev) => {
       const prevApp = prev.find((a) => a.id === appId);
       if (!prevApp) return prev;
-      const finishMount = finishMountApp(prevApp, lifecycleManagerRef.current, Date.now());
+      const finishMount = finishMountApp(prevApp, lifecycleManagerRef.current, mountFinishTs);
       lifecycleManagerRef.current = finishMount.manager;
-      const updatedApp = finishMount.app;
-      return prev.map((a) => (a.id === appId ? updatedApp : a));
+      mountDuration = finishMount.duration;
+      return prev.map((a) => (a.id === appId ? finishMount.app : a));
     });
+
+    if (mountDuration > 0) {
+      publishLifecycleEvent(appId, LIFECYCLE_STAGES.MOUNT, mountDuration, mountFinishTs);
+      publishLifecycleEvent(appId, LIFECYCLE_STAGES.READY, 0, mountFinishTs);
+    }
 
     setLoadProgress((prev) => {
       const next = { ...prev };
       delete next[appId];
       return next;
     });
-  }, [apps]);
+  }, [publishLifecycleEvent]);
 
   const handleStopApp = useCallback(async (appId) => {
-    const app = apps.find((a) => a.id === appId);
-    if (!app || app.status !== APP_STATUS.RUNNING) return;
+    let canProceed = false;
 
-    const unmountResult = unmountApp(app, lifecycleManagerRef.current, Date.now());
-    if (unmountResult.error) return;
-    lifecycleManagerRef.current = unmountResult.manager;
-    setApps((prev) => prev.map((a) => (a.id === appId ? unmountResult.app : a)));
+    setApps((prev) => {
+      const current = prev.find((a) => a.id === appId);
+      if (!current || current.status !== APP_STATUS.RUNNING) return prev;
+      canProceed = true;
+      return prev;
+    });
 
-    await sleep(200 + Math.random() * 200);
+    await Promise.resolve();
+
+    if (!canProceed) return;
+
+    const unmountTs = Date.now();
 
     setApps((prev) => {
       const prevApp = prev.find((a) => a.id === appId);
       if (!prevApp) return prev;
-      const finish = finishUnmountApp(prevApp, lifecycleManagerRef.current, Date.now());
+      const unmountResult = unmountApp(prevApp, lifecycleManagerRef.current, unmountTs);
+      if (unmountResult.error) return prev;
+      lifecycleManagerRef.current = unmountResult.manager;
+      return prev.map((a) => (a.id === appId ? unmountResult.app : a));
+    });
+
+    await sleep(200 + Math.random() * 200);
+
+    let unmountDuration = 0;
+    const unmountFinishTs = Date.now();
+
+    setApps((prev) => {
+      const prevApp = prev.find((a) => a.id === appId);
+      if (!prevApp) return prev;
+      const finish = finishUnmountApp(prevApp, lifecycleManagerRef.current, unmountFinishTs);
       lifecycleManagerRef.current = finish.manager;
+      unmountDuration = finish.duration;
       return prev.map((a) => (a.id === appId ? finish.app : a));
     });
-  }, [apps]);
+
+    eventBusRef.current.unregisterApp(appId);
+
+    if (unmountDuration > 0) {
+      publishLifecycleEvent(appId, LIFECYCLE_STAGES.UNMOUNT, unmountDuration, unmountFinishTs);
+    }
+  }, [publishLifecycleEvent]);
 
   const handleUninstallApp = useCallback((appId) => {
     if (!confirm('确定要卸载该微应用吗？卸载后所有版本记录将被清除。')) return;
@@ -300,7 +392,6 @@ export default function MicroFrontendSandbox() {
   }, []);
 
   const activeApp = useMemo(() => apps.find((a) => a.id === activeAppId) || null, [apps, activeAppId]);
-  const selectedDetailApp = useMemo(() => apps.find((a) => a.id === selectedDetailId) || null, [apps, selectedDetailId]);
   const upgradeTargetApp = useMemo(() => apps.find((a) => a.id === upgradeTargetId) || null, [apps, upgradeTargetId]);
 
   const stats = useMemo(() => {

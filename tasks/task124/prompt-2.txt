@@ -1,0 +1,9 @@
+你实现的微前端沙箱演示页面还存在一些问题，需要进行修复：
+
+1. 应用的生命周期事件（bootstrap、mount、ready、unmount）没有同步记录到操作日志面板。handleStartApp 和 handleStopApp 中完成了生命周期阶段的状态更新，但没有通过事件总线将生命周期事件（包含时间戳、阶段名称和耗时）发布到消息日志流中，右侧消息日志面板看不到任何生命周期时间线。需要在每次生命周期阶段完成后通过 eventBus 发送对应的消息。
+
+2. handleStartApp 在处理 LOAD_FAILED 状态应用的重试时存在无限递归 BUG：函数通过 setApps 重置状态后递归调用自身 await handleStartApp(appId)，但由于 useCallback 闭包中捕获的 apps 在 setApps 后未更新，递归调用中 apps.find 仍然命中 LOAD_FAILED 分支形成无限循环导致页面卡死。应避免 await 递归，改用 setApps 回调中直接重置状态后继续执行加载流程。
+
+3. handleStopApp 停止应用时没有调用 eventBus.unregisterApp 清理事件总线中已注册的 iframe contentWindow 引用。启动时调用了 registerApp 但停止时缺少对应的注销，导致已卸载 iframe 的过期引用残留在事件总线的 _apps Map 中，其他应用发送消息时会尝试调用无效引用。注册与注销应保持对称。
+
+4. 修复后为该页面补充对应纯 JS 函数的单元测试，覆盖以上修复逻辑。确保 pnpm run test 中所有测试通过。

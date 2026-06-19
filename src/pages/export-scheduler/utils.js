@@ -127,7 +127,7 @@ export function retryStateMachine(state, action) {
       }
       return s
     case 'retry_fail':
-      if (s.retryCount + 1 >= MAX_RETRY_COUNT) {
+      if (s.retryCount >= MAX_RETRY_COUNT) {
         return { retryCount: MAX_RETRY_COUNT, isRetrying: false, failed: true }
       }
       return { retryCount: s.retryCount + 1, isRetrying: true, failed: false }

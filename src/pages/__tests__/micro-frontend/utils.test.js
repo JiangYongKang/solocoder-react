@@ -715,4 +715,326 @@ describe('micro-frontend/eventBus', () => {
     bus.clear();
     expect(bus.getAppIds()).toEqual([]);
   });
+
+  describe('register/unregister symmetry', () => {
+    it('should remove app from registry on unregister', () => {
+      bus.registerApp('app1', { postMessage: () => {} });
+      bus.registerApp('app2', { postMessage: () => {} });
+      expect(bus.getAppIds()).toEqual(['app1', 'app2']);
+      expect(bus.hasApp('app1')).toBe(true);
+
+      const unregistered = bus.unregisterApp('app1');
+      expect(unregistered).toBe(true);
+      expect(bus.hasApp('app1')).toBe(false);
+      expect(bus.getAppIds()).toEqual(['app2']);
+    });
+
+    it('should return false when unregistering non-existent app', () => {
+      expect(bus.unregisterApp('nonexistent')).toBe(false);
+    });
+
+    it('should not attempt message delivery after unregister', () => {
+      const received = [];
+      const mockWindow = { postMessage: (msg) => received.push(msg) };
+      bus.registerApp('app1', mockWindow);
+      bus.registerApp('app2', { postMessage: () => {} });
+
+      bus.unregisterApp('app1');
+      bus.sendTo('app2', 'app1', 'hello');
+      expect(received).toHaveLength(0);
+    });
+
+    it('should register apps in idempotent way (latest wins)', () => {
+      const firstWindow = { postMessage: () => {} };
+      const secondWindow = { postMessage: () => {} };
+      bus.registerApp('app1', firstWindow);
+      bus.registerApp('app1', secondWindow);
+      expect(bus.getAppIds()).toEqual(['app1']);
+    });
+
+    it('should unregister app even if multiple events registered', () => {
+      const msgs1 = [];
+      const msgs2 = [];
+      const mockWindow = { postMessage: (m) => msgs1.push(m) };
+      bus.registerApp('app1', mockWindow);
+      bus.registerApp('app2', { postMessage: (m) => msgs2.push(m) });
+
+      const unsub1 = bus.onMessage('app1', () => {});
+      const unsub2 = bus.onMessage('app1', () => {});
+
+      bus.unregisterApp('app1');
+      expect(bus.getAppIds()).toEqual(['app2']);
+
+      bus.sendTo('app2', 'app1', 'test');
+      expect(msgs1).toHaveLength(0);
+
+      unsub1();
+      unsub2();
+    });
+  });
+
+  describe('lifecycle event message routing', () => {
+    it('should broadcast lifecycle event messages to all other apps', () => {
+      const r1 = [];
+      const r2 = [];
+      const r3 = [];
+      bus.registerApp('app1', { postMessage: (m) => r1.push(m) });
+      bus.registerApp('app2', { postMessage: (m) => r2.push(m) });
+      bus.registerApp('app3', { postMessage: (m) => r3.push(m) });
+
+      const result = bus.publish({
+        from: 'app1',
+        to: BROADCAST_TARGET,
+        type: 'lifecycle',
+        body: { stage: 'bootstrap', duration: 200, timestamp: 1000 },
+      });
+
+      expect(result.targets.sort()).toEqual(['app2', 'app3']);
+      expect(r1).toHaveLength(0);
+      expect(r2).toHaveLength(1);
+      expect(r3).toHaveLength(1);
+      expect(r2[0].body.stage).toBe('bootstrap');
+      expect(r2[0].body.duration).toBe(200);
+    });
+
+    it('should record lifecycle messages in log', () => {
+      const logs = [];
+      bus.onLog((entry) => logs.push(entry));
+      bus.registerApp('app1', { postMessage: () => {} });
+      bus.registerApp('app2', { postMessage: () => {} });
+
+      bus.publish({
+        from: 'app1',
+        to: BROADCAST_TARGET,
+        type: 'lifecycle',
+        body: { stage: 'ready', duration: 0, timestamp: 1000 },
+      });
+
+      expect(logs).toHaveLength(1);
+      expect(logs[0].type).toBe('lifecycle');
+      expect(logs[0].from).toBe('app1');
+      expect(logs[0].to).toBe(BROADCAST_TARGET);
+      expect(logs[0].summary).toContain('ready');
+    });
+
+    it('should handle multiple lifecycle events in sequence', () => {
+      const logs = [];
+      bus.onLog((entry) => logs.push(entry));
+      bus.registerApp('app1', { postMessage: () => {} });
+      bus.registerApp('app2', { postMessage: () => {} });
+
+      const stages = [
+        { stage: 'bootstrap', duration: 250 },
+        { stage: 'mount', duration: 180 },
+        { stage: 'ready', duration: 0 },
+      ];
+
+      stages.forEach((s) => {
+        bus.publish({
+          from: 'app1',
+          to: BROADCAST_TARGET,
+          type: 'lifecycle',
+          body: { ...s, timestamp: Date.now() },
+        });
+      });
+
+      expect(logs).toHaveLength(3);
+      expect(logs.map((l) => l.type).every((t) => t === 'lifecycle')).toBe(true);
+      expect(logs[0].summary).toContain('bootstrap');
+      expect(logs[1].summary).toContain('mount');
+      expect(logs[2].summary).toContain('ready');
+    });
+
+    it('should route unmount lifecycle events', () => {
+      const received = [];
+      bus.registerApp('app1', { postMessage: () => {} });
+      bus.registerApp('app2', { postMessage: (m) => received.push(m) });
+
+      bus.publish({
+        from: 'app1',
+        to: BROADCAST_TARGET,
+        type: 'lifecycle',
+        body: { stage: 'unmount', duration: 80, timestamp: 2000 },
+      });
+
+      expect(received).toHaveLength(1);
+      expect(received[0].body.stage).toBe('unmount');
+      expect(received[0].body.duration).toBe(80);
+    });
+  });
+});
+
+describe('micro-frontend/lifecycle - full flow with stage duration capture', () => {
+  const baseApp = createMicroApp({ name: 'App', appId: 'app', entryPath: '/app' });
+
+  it('should capture correct bootstrap stage duration', () => {
+    let mgr = createLifecycleManager();
+    let app = { ...baseApp };
+    const t0 = 1000;
+
+    const boot = bootstrapApp(app, mgr, t0);
+    expect(boot.error).toBeNull();
+    app = boot.app;
+    mgr = boot.manager;
+
+    const bootFinish = finishBootstrapApp(app, mgr, t0 + 350);
+    expect(bootFinish.duration).toBe(350);
+    const bootStages = bootFinish.app.lifecycle.stages.filter((s) => s.stage === LIFECYCLE_STAGES.BOOTSTRAP);
+    expect(bootStages).toHaveLength(1);
+    expect(bootStages[0].duration).toBe(350);
+  });
+
+  it('should capture correct mount stage duration', () => {
+    let mgr = createLifecycleManager();
+    let app = { ...baseApp };
+    const t0 = 1000;
+
+    const boot = bootstrapApp(app, mgr, t0);
+    app = boot.app;
+    mgr = boot.manager;
+
+    const bootFinish = finishBootstrapApp(app, mgr, t0 + 100);
+    app = bootFinish.app;
+    mgr = bootFinish.manager;
+
+    const mountFinish = finishMountApp(app, mgr, t0 + 100 + 220);
+    expect(mountFinish.duration).toBe(220);
+    const mountStages = mountFinish.app.lifecycle.stages.filter((s) => s.stage === LIFECYCLE_STAGES.MOUNT);
+    expect(mountStages[0].duration).toBe(220);
+    const readyStages = mountFinish.app.lifecycle.stages.filter((s) => s.stage === LIFECYCLE_STAGES.READY);
+    expect(readyStages).toHaveLength(1);
+  });
+
+  it('should capture correct unmount stage duration', () => {
+    let mgr = createLifecycleManager();
+    let app = { ...baseApp, status: APP_STATUS.RUNNING, lifecycle: { stages: [], currentStage: null } };
+    const t0 = 5000;
+
+    const unmountResult = unmountApp(app, mgr, t0);
+    app = unmountResult.app;
+    mgr = unmountResult.manager;
+
+    const finish = finishUnmountApp(app, mgr, t0 + 95);
+    expect(finish.duration).toBe(95);
+    const unmountStages = finish.app.lifecycle.stages.filter((s) => s.stage === LIFECYCLE_STAGES.UNMOUNT);
+    expect(unmountStages).toHaveLength(1);
+    expect(unmountStages[0].duration).toBe(95);
+    expect(finish.app.status).toBe(APP_STATUS.STOPPED);
+  });
+
+  it('should correctly order all stages in a full start-stop cycle', () => {
+    let mgr = createLifecycleManager();
+    let app = { ...baseApp };
+    let t = 1000;
+
+    const boot = bootstrapApp(app, mgr, t);
+    app = boot.app; mgr = boot.manager;
+    t += 150;
+
+    const bootFinish = finishBootstrapApp(app, mgr, t);
+    app = bootFinish.app; mgr = bootFinish.manager;
+    t += 200;
+
+    const mountFinish = finishMountApp(app, mgr, t);
+    app = mountFinish.app; mgr = mountFinish.manager;
+    t += 300;
+
+    const unmountResult = unmountApp(app, mgr, t);
+    app = unmountResult.app; mgr = unmountResult.manager;
+    t += 100;
+
+    const unmountFinish = finishUnmountApp(app, mgr, t);
+    app = unmountFinish.app;
+
+    const stageNames = app.lifecycle.stages.map((s) => s.stage);
+    expect(stageNames).toEqual([
+      LIFECYCLE_STAGES.BOOTSTRAP,
+      LIFECYCLE_STAGES.MOUNT,
+      LIFECYCLE_STAGES.READY,
+      LIFECYCLE_STAGES.UNMOUNT,
+    ]);
+
+    const durations = app.lifecycle.stages.map((s) => s.duration);
+    expect(durations).toEqual([150, 200, 0, 100]);
+  });
+
+  it('should not have active stages left after full lifecycle completion', () => {
+    let mgr = createLifecycleManager();
+    let app = { ...baseApp };
+
+    const boot = bootstrapApp(app, mgr, 1000);
+    mgr = boot.manager;
+    expect(mgr.activeStages.has('app')).toBe(true);
+
+    const bootFinish = finishBootstrapApp(boot.app, mgr, 1100);
+    mgr = bootFinish.manager;
+    expect(mgr.activeStages.has('app')).toBe(true);
+
+    const mountFinish = finishMountApp(bootFinish.app, mgr, 1200);
+    mgr = mountFinish.manager;
+    expect(mgr.activeStages.has('app')).toBe(false);
+
+    const unmountResult = unmountApp(mountFinish.app, mgr, 1300);
+    mgr = unmountResult.manager;
+    expect(mgr.activeStages.has('app')).toBe(true);
+
+    const unmountFinish = finishUnmountApp(unmountResult.app, mgr, 1400);
+    mgr = unmountFinish.manager;
+    expect(mgr.activeStages.has('app')).toBe(false);
+  });
+});
+
+describe('micro-frontend/load-failed reset flow (non-recursive)', () => {
+  it('resetFailedApp should produce app that can be started normally', () => {
+    const failedApp = createMicroApp({ name: 'App', appId: 'app', entryPath: '/app' });
+    failedApp.status = APP_STATUS.LOAD_FAILED;
+    failedApp.failedResources = ['a.js', 'b.css'];
+
+    const reset = resetFailedApp(failedApp);
+    expect(reset.error).toBeNull();
+    expect(reset.app.status).toBe(APP_STATUS.STOPPED);
+    expect(reset.app.failedResources).toEqual([]);
+
+    const loadStart = startLoadingResources(reset.app, Date.now());
+    expect(loadStart.error).toBeNull();
+    expect(loadStart.app.status).toBe(APP_STATUS.LOADING);
+  });
+
+  it('transition from LOAD_FAILED through STOPPED to LOADING is valid', () => {
+    let app = createMicroApp({ name: 'App', appId: 'app', entryPath: '/app' });
+
+    const toFailed = transitionStatus(app, APP_STATUS.LOADING);
+    app = toFailed.app;
+    const failResult = transitionStatus(app, APP_STATUS.LOAD_FAILED);
+    app = failResult.app;
+    expect(app.status).toBe(APP_STATUS.LOAD_FAILED);
+
+    const toStopped = transitionStatus(app, APP_STATUS.STOPPED);
+    expect(toStopped.error).toBeNull();
+    app = toStopped.app;
+
+    const toLoading = transitionStatus(app, APP_STATUS.LOADING);
+    expect(toLoading.error).toBeNull();
+    expect(toLoading.app.status).toBe(APP_STATUS.LOADING);
+  });
+
+  it('resetAppForRestart clears failedResources while preserving identity', () => {
+    let app = createMicroApp({ name: 'Test', appId: 'test-app', entryPath: '/test', resources: ['x.js'] });
+    app.status = APP_STATUS.LOAD_FAILED;
+    app.failedResources = ['x.js'];
+    app.lifecycle = {
+      stages: [{ stage: 'bootstrap', duration: 50, timestamp: 1000 }],
+      currentStage: 'bootstrap',
+    };
+    const originalId = app.id;
+    const originalName = app.name;
+
+    const reset = resetAppForRestart(app);
+    expect(reset.id).toBe(originalId);
+    expect(reset.name).toBe(originalName);
+    expect(reset.status).toBe(APP_STATUS.STOPPED);
+    expect(reset.failedResources).toEqual([]);
+    expect(reset.lifecycle.stages).toEqual([]);
+    expect(reset.lifecycle.currentStage).toBeNull();
+  });
 });

@@ -438,7 +438,7 @@ describe('新卡片与到期卡片优先级排序', () => {
   })
 
   describe('filterCardsByTags', () => {
-    it('按标签筛选', () => {
+    it('按字符串标签筛选', () => {
       const cards = [
         { id: '1', tags: ['易错', '重点'] },
         { id: '2', tags: ['重点'] },
@@ -452,6 +452,28 @@ describe('新卡片与到期卡片优先级排序', () => {
       expect(filtered2.map(c => c.id)).toEqual(['1', '2'])
     })
 
+    it('按对象格式标签筛选', () => {
+      const cards = [
+        { id: '1', tags: [{ text: '易错', color: '#ef4444' }, { text: '重点', color: '#f97316' }] },
+        { id: '2', tags: [{ text: '重点', color: '#f97316' }] },
+        { id: '3', tags: [] },
+      ]
+      const filtered = filterCardsByTags(cards, ['易错'])
+      expect(filtered.map(c => c.id)).toEqual(['1'])
+
+      const filtered2 = filterCardsByTags(cards, [{ text: '重点', color: '#f97316' }])
+      expect(filtered2.map(c => c.id)).toEqual(['1', '2'])
+    })
+
+    it('混合格式标签也能筛选', () => {
+      const cards = [
+        { id: '1', tags: [{ text: '易错', color: '#ef4444' }] },
+        { id: '2', tags: ['重点'] },
+      ]
+      const filtered = filterCardsByTags(cards, ['易错', '重点'])
+      expect(filtered.map(c => c.id)).toEqual(['1', '2'])
+    })
+
     it('空筛选条件返回全部', () => {
       const cards = [{ id: '1' }, { id: '2' }]
       expect(filterCardsByTags(cards, [])).toEqual(cards)
@@ -459,7 +481,7 @@ describe('新卡片与到期卡片优先级排序', () => {
   })
 
   describe('getUniqueTags', () => {
-    it('获取所有不重复标签', () => {
+    it('获取所有不重复字符串标签', () => {
       const cards = [
         { tags: ['易错', '重点'] },
         { tags: ['重点', '生词'] },
@@ -468,9 +490,41 @@ describe('新卡片与到期卡片优先级排序', () => {
       ]
       const tags = getUniqueTags(cards)
       expect(tags).toHaveLength(3)
-      expect(tags).toContain('易错')
-      expect(tags).toContain('重点')
-      expect(tags).toContain('生词')
+      const texts = tags.map(t => (typeof t === 'object' ? t.text : t))
+      expect(texts).toContain('易错')
+      expect(texts).toContain('重点')
+      expect(texts).toContain('生词')
+    })
+
+    it('对象格式标签返回带 color 的对象', () => {
+      const cards = [
+        { tags: [{ text: '易错', color: '#ef4444' }, { text: '重点', color: '#f97316' }] },
+        { tags: [{ text: '重点', color: '#f97316' }, { text: '生词', color: '#3b82f6' }] },
+      ]
+      const tags = getUniqueTags(cards)
+      expect(tags).toHaveLength(3)
+      expect(tags).toContainEqual({ text: '易错', color: '#ef4444' })
+      expect(tags).toContainEqual({ text: '重点', color: '#f97316' })
+      expect(tags).toContainEqual({ text: '生词', color: '#3b82f6' })
+    })
+
+    it('同 text 的标签去重，保留首次出现的 color', () => {
+      const cards = [
+        { tags: [{ text: '重点', color: '#ef4444' }] },
+        { tags: [{ text: '重点', color: '#3b82f6' }] },
+      ]
+      const tags = getUniqueTags(cards)
+      expect(tags).toHaveLength(1)
+      expect(tags[0]).toEqual({ text: '重点', color: '#ef4444' })
+    })
+
+    it('字符串标签转换为带默认 color 的对象', () => {
+      const cards = [
+        { tags: ['易错'] },
+      ]
+      const tags = getUniqueTags(cards)
+      expect(tags).toHaveLength(1)
+      expect(tags[0]).toEqual({ text: '易错', color: '#6b7280' })
     })
   })
 })
@@ -556,37 +610,68 @@ describe('统计和进度计算', () => {
   })
 
   describe('buildHeatmapData', () => {
-    it('生成30天数据', () => {
+    it('传入日期数组生成30天数据', () => {
       const result = buildHeatmapData([], 30)
       expect(result.length).toBe(30)
       result.forEach(item => {
         expect(item).toHaveProperty('date')
         expect(item).toHaveProperty('studied')
+        expect(item).toHaveProperty('count')
         expect(item).toHaveProperty('dayOfWeek')
       })
     })
 
-    it('正确标记学习日', () => {
+    it('传入日期数组时正确标记学习日，count 为 1', () => {
       const today = getTodayKey()
       const yesterday = addDays(today, -1)
       const result = buildHeatmapData([today, yesterday], 30)
       const todayItem = result.find(r => r.date === today)
       const yesterdayItem = result.find(r => r.date === yesterday)
       expect(todayItem.studied).toBe(true)
+      expect(todayItem.count).toBe(1)
       expect(yesterdayItem.studied).toBe(true)
+      expect(yesterdayItem.count).toBe(1)
+    })
+
+    it('传入 stats 对象时 count 为每日学习总数', () => {
+      const today = getTodayKey()
+      const yesterday = addDays(today, -1)
+      const stats = {
+        [today]: { total: 25, studied: 10, reviewed: 15 },
+        [yesterday]: { total: 5, studied: 3, reviewed: 2 },
+      }
+      const result = buildHeatmapData(stats, 30)
+      const todayItem = result.find(r => r.date === today)
+      const yesterdayItem = result.find(r => r.date === yesterday)
+      expect(todayItem.studied).toBe(true)
+      expect(todayItem.count).toBe(25)
+      expect(yesterdayItem.studied).toBe(true)
+      expect(yesterdayItem.count).toBe(5)
+    })
+
+    it('传入 stats 对象时无学习记录的日期 count 为 0', () => {
+      const stats = {}
+      const result = buildHeatmapData(stats, 30)
+      result.forEach(item => {
+        expect(item.studied).toBe(false)
+        expect(item.count).toBe(0)
+      })
     })
   })
 
   describe('getHeatmapCellColor', () => {
     it('未学习返回浅灰', () => {
       expect(getHeatmapCellColor(false)).toBe('#ebedf0')
+      expect(getHeatmapCellColor(false, 10)).toBe('#ebedf0')
     })
 
-    it('学习后根据数量返回不同绿色', () => {
+    it('学习后根据数量返回不同绿色（四级）', () => {
       expect(getHeatmapCellColor(true, 0)).toBe('#9be9a8')
       expect(getHeatmapCellColor(true, 1)).toBe('#40c463')
       expect(getHeatmapCellColor(true, 2)).toBe('#30a14e')
+      expect(getHeatmapCellColor(true, 3)).toBe('#216e39')
       expect(getHeatmapCellColor(true, 5)).toBe('#216e39')
+      expect(getHeatmapCellColor(true, 100)).toBe('#216e39')
     })
   })
 })

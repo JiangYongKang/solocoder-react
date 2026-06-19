@@ -1,0 +1,9 @@
+你实现的记忆卡片学习系统页面还存在一些问题，需要进行修复：
+
+1. 卡片标签数据格式在 CardEditModal.jsx 和工具函数之间不一致：CardEditModal 中将标签存储为 `{ text, color }` 对象格式，但 flashcardUtils.js 中 getUniqueTags 和 filterCardsByTags 按纯字符串处理标签。导致卡片列表和筛选 chip 中标签显示为 `[object Object]`，标签筛选功能完全失效，卡片列表中的标签颜色也被硬编码而非使用用户选择的颜色。需统一标签存储格式使筛选逻辑正确工作。
+
+2. StudyMode.jsx 的 handleAnswer 函数在学习最后一张卡片时存在 recordStudySession 被重复调用的问题：用户答完最后一张卡片时，setResults 是异步更新的但 onFinish 立即被调用捕获了旧 results 值，之后用户点击返回时 onFinish 再次被调用又用完整数据更新一次，导致最后一张卡片被重复累加到今日统计中。应在学习最后一张卡片时将新结果拼入 results 后再调用 onFinish。
+
+3. StatsPanel.jsx 中热力图调用 getHeatmapCellColor 时始终传入 count=0，所有学习过的日期都显示同一种浅绿色，无法按每日学习量分级展示不同深浅的颜色。getHeatmapCellColor 本身已经实现了四级颜色分级但从未被利用。应从 stats 中提取每日学习数量作为 count 参数传入，使热力图反映每日学习量差异。
+
+4. 修复后为该页面补充对应纯 JS 函数的单元测试，覆盖以上修复逻辑。确保 pnpm run test 中所有测试通过。

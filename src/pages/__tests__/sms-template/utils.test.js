@@ -329,6 +329,13 @@ describe('变量替换与预览相关函数', () => {
       const preview = buildPreviewContent(template)
       expect(preview.startsWith(DEFAULT_SIGNATURE)).toBe(true)
     })
+
+    it('空字符串签名不应回退到默认签名', () => {
+      const template = { signature: '', content: '测试内容' }
+      const preview = buildPreviewContent(template)
+      expect(preview.startsWith(DEFAULT_SIGNATURE)).toBe(false)
+      expect(preview).toBe('测试内容')
+    })
   })
 })
 

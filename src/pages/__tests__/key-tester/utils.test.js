@@ -366,7 +366,7 @@ describe('键盘布局数据结构', () => {
     })
 
     it('每种布局应该有6行', () => {
-      for (const [name, layout] of Object.entries(KEYBOARD_LAYOUTS)) {
+      for (const [, layout] of Object.entries(KEYBOARD_LAYOUTS)) {
         expect(layout.rows).toHaveLength(6)
       }
     })

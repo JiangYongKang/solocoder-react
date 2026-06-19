@@ -126,14 +126,15 @@ export function BackupProvider({ children }) {
   }, []);
 
   const handleStartRestore = useCallback(() => {
-    return new Promise((resolve) => {
+    const duration = 2000 + Math.random() * 1000;
+    const promise = new Promise((resolve) => {
       setRestoring(true);
-      const duration = 2000 + Math.random() * 1000;
       setTimeout(() => {
         setRestoring(false);
         resolve({ success: true });
       }, duration);
     });
+    return { duration, promise };
   }, []);
 
   const value = {

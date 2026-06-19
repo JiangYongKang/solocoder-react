@@ -37,6 +37,7 @@ export const PAGE_SIZE = 10
 
 export const DEFAULT_GOALS = {
   weightTarget: null,
+  weightStart: null,
   weightDeadline: '',
   weeklyExercise: 3,
   weeklyExerciseDone: 0,

@@ -11,6 +11,7 @@ import {
   updateNode,
   deleteNode,
   moveNode,
+  reorderSiblings,
   isDescendant,
   calculateLayout,
   getLayoutBounds,
@@ -150,7 +151,7 @@ const ContextMenu = ({ x, y, node, onClose, onEdit, onDelete, onAddChild, onAddS
   )
 }
 
-const PropertyPanel = ({ node, onUpdate, onClose, onDelete, rootId }) => {
+const PropertyPanel = ({ node, onUpdate, onTypeChange, onClose, onDelete, rootId }) => {
   if (!node) return null
 
   const handleChange = (field, value) => {
@@ -158,7 +159,7 @@ const PropertyPanel = ({ node, onUpdate, onClose, onDelete, rootId }) => {
   }
 
   const handleTypeChange = (newType) => {
-    onUpdate(node.id, { type: newType })
+    onTypeChange(node.id, newType)
   }
 
   return (
@@ -374,11 +375,12 @@ function OrgChartPage() {
 
     const node = findNodeById(tree, nodeId)
     const descendantCount = countDescendants(node)
+    const nodeTypeLabel = NODE_TYPE_LABELS[node.type] || '节点'
 
     if (descendantCount > 0) {
       setConfirmDialog({
         title: '确认删除',
-        message: `该部门下包含 ${descendantCount} 个子节点，确认删除？`,
+        message: `该${nodeTypeLabel}下包含 ${descendantCount} 个子节点，确认删除？`,
         onConfirm: () => {
           setTree((prev) => deleteNode(prev, nodeId))
           setSelectedId(tree?.id || null)
@@ -458,26 +460,18 @@ function OrgChartPage() {
     if (!svg || !containerRef.current) return
 
     const containerRect = containerRef.current.getBoundingClientRect()
+    const viewWidth = containerRect.width
+    const viewHeight = containerRect.height
 
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-    positions.forEach((pos) => {
-      minX = Math.min(minX, pos.x - 40)
-      minY = Math.min(minY, pos.y - 40)
-      maxX = Math.max(maxX, pos.x + pos.width + 40)
-      maxY = Math.max(maxY, pos.y + pos.height + 40)
-    })
-
-    const width = maxX - minX
-    const height = maxY - minY
+    const viewBoxX = -pan.x / zoom
+    const viewBoxY = -pan.y / zoom
+    const viewBoxWidth = viewWidth / zoom
+    const viewBoxHeight = viewHeight / zoom
 
     const clonedSvg = svg.cloneNode(true)
-    const mainGroup = clonedSvg.querySelector('.org-canvas-g')
-    if (mainGroup) {
-      mainGroup.setAttribute('transform', `translate(${-minX}, ${-minY})`)
-    }
-    clonedSvg.setAttribute('width', width)
-    clonedSvg.setAttribute('height', height)
-    clonedSvg.setAttribute('viewBox', `0 0 ${width} ${height}`)
+    clonedSvg.setAttribute('width', viewWidth)
+    clonedSvg.setAttribute('height', viewHeight)
+    clonedSvg.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxWidth} ${viewBoxHeight}`)
     clonedSvg.style.background = '#ffffff'
 
     const svgData = new XMLSerializer().serializeToString(clonedSvg)
@@ -488,13 +482,13 @@ function OrgChartPage() {
     img.onload = () => {
       const canvas = document.createElement('canvas')
       const scale = 2
-      canvas.width = width * scale
-      canvas.height = height * scale
+      canvas.width = viewWidth * scale
+      canvas.height = viewHeight * scale
       const ctx = canvas.getContext('2d')
       ctx.fillStyle = '#ffffff'
       ctx.fillRect(0, 0, canvas.width, canvas.height)
       ctx.scale(scale, scale)
-      ctx.drawImage(img, 0, 0)
+      ctx.drawImage(img, 0, 0, viewWidth, viewHeight)
       URL.revokeObjectURL(url)
 
       canvas.toBlob((blob) => {
@@ -514,7 +508,7 @@ function OrgChartPage() {
       alert('导出 PNG 失败')
     }
     img.src = url
-  }, [positions])
+  }, [pan, zoom])
 
   const handleTemplateDragStart = useCallback((e, nodeType) => {
     e.dataTransfer.setData('nodeType', nodeType)
@@ -555,7 +549,18 @@ function OrgChartPage() {
       if (isDescendant(tree, draggedNodeId, targetNodeId)) {
         return
       }
-      setTree((prev) => moveNode(prev, draggedNodeId, targetNodeId, 'child'))
+      const targetParent = findParentNode(tree, targetNodeId)
+      const draggedParent = findParentNode(tree, draggedNodeId)
+      const isSameParent = targetParent && draggedParent && targetParent.id === draggedParent.id
+      const isRootLevel = !targetParent && !draggedParent
+
+      if (isSameParent || isRootLevel) {
+        const parent = targetParent ? targetParent.children : tree.children
+        const targetIndex = parent.findIndex((c) => c.id === targetNodeId)
+        setTree((prev) => reorderSiblings(prev, draggedNodeId, targetIndex))
+      } else {
+        setTree((prev) => moveNode(prev, draggedNodeId, targetNodeId, 'child'))
+      }
     }
   }, [tree])
 
@@ -851,6 +856,7 @@ function OrgChartPage() {
             <PropertyPanel
               node={propertyPanelNode}
               onUpdate={handleUpdateNode}
+              onTypeChange={handleChangeNodeType}
               onClose={() => setPropertyPanelNode(null)}
               onDelete={handleDeleteNode}
               rootId={tree?.id}

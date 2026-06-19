@@ -400,6 +400,34 @@
   position: relative;
 }
 
+.sms-template-highlight-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 12px;
+  font-size: 14px;
+  font-family: inherit;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-y: auto;
+  overflow-x: hidden;
+  pointer-events: none;
+  color: transparent;
+  border: 1px solid transparent;
+  border-radius: 0 0 6px 6px;
+  z-index: 1;
+}
+
+.sms-template-highlight-overlay .sms-var-highlight {
+  background: #ecf5ff;
+  color: transparent;
+  border-radius: 3px;
+  padding: 1px 0;
+}
+
 .sms-template-textarea {
   width: 100%;
   min-height: 200px;
@@ -412,7 +440,11 @@
   font-family: inherit;
   line-height: 1.7;
   box-sizing: border-box;
-  background: #fff;
+  background: transparent;
+  color: #303133;
+  caret-color: #303133;
+  position: relative;
+  z-index: 2;
 }
 
 .sms-template-textarea:focus {

@@ -566,7 +566,7 @@ export function buildVariableSamplesMap(variableNames, customValues = {}) {
 
 export function buildPreviewContent(template, customSamples = {}) {
   if (!template) return ''
-  const signature = template.signature || DEFAULT_SIGNATURE
+  const signature = template.signature ?? DEFAULT_SIGNATURE
   const content = template.content || ''
   const samples = buildVariableSamplesMap(extractVariables(content), customSamples)
   return signature + replaceVariables(content, samples)

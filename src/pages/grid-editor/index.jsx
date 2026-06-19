@@ -166,11 +166,11 @@ function CodeModal({ grid, onClose }) {
   )
 }
 
-function MergeDialog({ startCol, startRow, endCol, onMerge, onCancel }) {
+function MergeDialog({ startCol, startRow, endCol, endRow, onMerge, onCancel }) {
   const minCol = Math.min(startCol, endCol)
   const maxCol = Math.max(startCol, endCol)
-  const minRow = Math.min(startRow, endCol ? endCol : startRow)
-  const maxRow = Math.max(startRow, endCol ? endCol : startRow)
+  const minRow = Math.min(startRow, endRow)
+  const maxRow = Math.max(startRow, endRow)
   const colSpan = maxCol - minCol + 1
   const rowSpan = maxRow - minRow + 1
 
@@ -251,6 +251,8 @@ function GridEditorPage() {
   const [contextMenu, setContextMenu] = useState(null)
   const [mergeDialog, setMergeDialog] = useState(null)
   const [codeModal, setCodeModal] = useState(false)
+  const [codeMode, setCodeMode] = useState('css')
+  const [copySuccess, setCopySuccess] = useState(false)
   const [colsInput, setColsInput] = useState(String(grid.cols))
   const [rowsInput, setRowsInput] = useState(String(grid.rows))
 
@@ -459,6 +461,17 @@ function GridEditorPage() {
       setColsInput(String(newGrid.cols))
       setRowsInput(String(newGrid.rows))
       setSelectedCellIds([])
+    }
+  }
+
+  const handleCopyCode = async () => {
+    const code = codeMode === 'html' ? generateHTML(grid) : generateCSS(grid)
+    try {
+      await navigator.clipboard.writeText(code)
+      setCopySuccess(true)
+      setTimeout(() => setCopySuccess(false), 2000)
+    } catch (err) {
+      alert('复制失败: ' + (err?.message || '请手动复制'))
     }
   }
 
@@ -724,6 +737,47 @@ function GridEditorPage() {
               </div>
             </>
           )}
+
+          <div className="ge-sidebar-section" style={{ marginTop: 'auto', borderTop: '1px solid #e0e0e0', paddingTop: '16px' }}>
+            <h3 className="ge-sidebar-title">代码预览</h3>
+            <div className="ge-code-tabs">
+              <button
+                className={`ge-code-tab ${codeMode === 'html' ? 'active' : ''}`}
+                onClick={() => setCodeMode('html')}
+              >
+                HTML
+              </button>
+              <button
+                className={`ge-code-tab ${codeMode === 'css' ? 'active' : ''}`}
+                onClick={() => setCodeMode('css')}
+              >
+                CSS
+              </button>
+            </div>
+            <pre className="ge-code-preview" style={{
+              maxHeight: '200px',
+              fontSize: '11px',
+              padding: '10px',
+            }}>
+              {codeMode === 'html' ? generateHTML(grid) : generateCSS(grid)}
+            </pre>
+            <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+              <button
+                className="ge-btn"
+                style={{ flex: 1, fontSize: '12px', padding: '6px 10px' }}
+                onClick={handleCopyCode}
+              >
+                {copySuccess ? '✓ 已复制' : '📋 复制代码'}
+              </button>
+              <button
+                className="ge-btn ge-btn-primary"
+                style={{ flex: 1, fontSize: '12px', padding: '6px 10px' }}
+                onClick={() => setCodeModal(true)}
+              >
+                展开
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -748,6 +802,7 @@ function GridEditorPage() {
                 startCol={mergeDialog.startCol}
                 startRow={mergeDialog.startRow}
                 endCol={mergeDialog.endCol}
+                endRow={mergeDialog.endRow}
                 onMerge={handleMerge}
                 onCancel={() => setMergeDialog(null)}
               />

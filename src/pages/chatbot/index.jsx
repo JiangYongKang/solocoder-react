@@ -180,9 +180,8 @@ export default function ChatbotPage() {
 
       const humanMatch = matchFAQ(text)
       if (humanMatch && humanMatch.category === 'human') {
-        setSessions((prev) => updateSessionMessages(prev, currentSessionId, newUserMessages))
         setInputValue('')
-        handleTransferToHuman()
+        handleTransferToHuman(newUserMessages)
         return
       }
 
@@ -219,25 +218,32 @@ export default function ChatbotPage() {
     setTimeout(() => handleSend(option.question), 50)
   }
 
-  const handleTransferToHuman = useCallback(() => {
-    if (!currentSessionId || currentSession?.isHuman || isTransferring) return
-    setIsTransferring(true)
+  const handleTransferToHuman = useCallback((startingMessages) => {
+    if (!currentSessionId || isTransferring) return
 
+    setIsTransferring(true)
     const waitingMsg = createMessage('正在为您转接人工客服...', 'bot')
-    const currentMsgs = currentSession?.messages || []
-    const withWaiting = [...currentMsgs, waitingMsg]
-    setSessions((prev) => updateSessionMessages(prev, currentSessionId, withWaiting))
+
+    setSessions((prev) => {
+      const session = getSessionById(prev, currentSessionId)
+      if (!session || session.isHuman) return prev
+      const baseMsgs = startingMessages && Array.isArray(startingMessages)
+        ? startingMessages
+        : session.messages
+      return updateSessionMessages(prev, currentSessionId, [...baseMsgs, waitingMsg])
+    })
 
     setTimeout(() => {
       const connectedMsg = createMessage('已为您转接人工客服，请稍候', 'bot')
-      const finalMsgs = [...withWaiting, connectedMsg]
       setSessions((prev) => {
-        const updated = updateSessionMessages(prev, currentSessionId, finalMsgs)
+        const session = getSessionById(prev, currentSessionId)
+        if (!session) return prev
+        const updated = updateSessionMessages(prev, currentSessionId, [...session.messages, connectedMsg])
         return updateSessionHumanFlag(updated, currentSessionId, true)
       })
       setIsTransferring(false)
     }, 2500)
-  }, [currentSessionId, currentSession, isTransferring])
+  }, [currentSessionId, isTransferring])
 
   const handleEndHuman = () => {
     if (!currentSessionId) return

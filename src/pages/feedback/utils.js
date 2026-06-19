@@ -227,10 +227,7 @@ export const searchByKeyword = (feedbacks, keyword) => {
   if (!keyword || typeof keyword !== 'string' || keyword.trim() === '') return feedbacks
   const kw = keyword.trim().toLowerCase()
   return feedbacks.filter((f) => {
-    return (
-      (f.title && f.title.toLowerCase().includes(kw)) ||
-      (f.description && f.description.toLowerCase().includes(kw))
-    )
+    return (f.title && f.title.toLowerCase().includes(kw))
   })
 }
 

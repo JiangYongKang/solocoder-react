@@ -83,11 +83,11 @@ const HealthTrackerPage = () => {
   const latestValues = useMemo(() => getLatestValues(records), [records])
 
   const weightProgress = useMemo(() => {
-    if (goals.weightTarget && latestValues.weight) {
-      return calculateWeightProgress(latestValues.weight, goals.weightTarget)
+    if (goals.weightStart && latestValues.weight && goals.weightTarget) {
+      return calculateWeightProgress(goals.weightStart, latestValues.weight, goals.weightTarget)
     }
     return null
-  }, [goals.weightTarget, latestValues.weight])
+  }, [goals.weightStart, goals.weightTarget, latestValues.weight])
 
   const exerciseProgress = useMemo(
     () => calculateExerciseProgress(goals.weeklyExerciseDone, goals.weeklyExercise),
@@ -157,7 +157,11 @@ const HealthTrackerPage = () => {
   }
 
   const handleSaveGoals = () => {
-    const result = setGoals(goals, goalFormData)
+    const payload = { ...goalFormData }
+    if (payload.weightTarget && !payload.weightStart) {
+      payload.weightStart = latestValues.weight || payload.weightTarget
+    }
+    const result = setGoals(goals, payload)
     if (result.success) {
       setGoalsState(result.goals)
       setGoalModalOpen(false)
@@ -288,6 +292,46 @@ const HealthTrackerPage = () => {
       return { pathD, points }
     }
 
+    const buildBmiSegmentedLines = (values) => {
+      const points = []
+      for (let i = 0; i < values.length; i++) {
+        if (values[i] !== null && values[i] !== undefined) {
+          points.push({ x: paddingLeft + i * xStep, y: yScale(values[i]), index: i, value: values[i] })
+        }
+      }
+      const thresholds = [18.5, 24, 28]
+      const segments = []
+      for (let i = 0; i < points.length - 1; i++) {
+        const p1 = points[i]
+        const p2 = points[i + 1]
+        const crossings = []
+        for (const t of thresholds) {
+          if ((p1.value - t) * (p2.value - t) < 0) {
+            const ratio = (t - p1.value) / (p2.value - p1.value)
+            const cx = p1.x + (p2.x - p1.x) * ratio
+            const cy = yScale(t)
+            crossings.push({ x: cx, y: cy, value: t, ratio })
+          }
+        }
+        crossings.sort((a, b) => a.ratio - b.ratio)
+        const subPoints = [p1, ...crossings, p2]
+        for (let j = 0; j < subPoints.length - 1; j++) {
+          const sp1 = subPoints[j]
+          const sp2 = subPoints[j + 1]
+          const midVal = (sp1.value + sp2.value) / 2
+          const color = getBMIColor(midVal)
+          segments.push({
+            x1: sp1.x.toFixed(2),
+            y1: sp1.y.toFixed(2),
+            x2: sp2.x.toFixed(2),
+            y2: sp2.y.toFixed(2),
+            color,
+          })
+        }
+      }
+      return { lines: segments, points }
+    }
+
     const bmiBandY = (val) => yScale(val)
 
     const bmiBands = selectedIndicators.bmi ? [
@@ -331,15 +375,46 @@ const HealthTrackerPage = () => {
           })}
 
           {activeKeys.map((key) => {
+            const isBmiKey = key === 'bmi'
+            if (isBmiKey) {
+              const { lines, points } = buildBmiSegmentedLines(seriesData[key])
+              if (lines.length === 0 && points.length === 0) return null
+              return (
+                <g key={`series-${key}`}>
+                  {lines.map((seg, i) => (
+                    <line
+                      key={`bmi-seg-${i}`}
+                      x1={seg.x1} y1={seg.y1} x2={seg.x2} y2={seg.y2}
+                      stroke={seg.color}
+                      strokeWidth={2.5}
+                      strokeLinecap="round"
+                    />
+                  ))}
+                  {points.map((p) => (
+                    <circle
+                      key={`dot-${key}-${p.index}`}
+                      cx={p.x}
+                      cy={p.y}
+                      r={hoveredIndex === p.index ? 5 : 3}
+                      fill={getBMIColor(p.value)}
+                      stroke={getBMIColor(p.value)}
+                      strokeWidth={1}
+                      onMouseEnter={() => setHoveredIndex(p.index)}
+                      onMouseLeave={() => setHoveredIndex(null)}
+                      style={{ cursor: 'pointer' }}
+                    />
+                  ))}
+                </g>
+              )
+            }
             const { pathD, points } = buildPath(seriesData[key])
             if (!pathD) return null
             const color = INDICATOR_COLORS[key]
-            const isBmiKey = key === 'bmi'
             return (
               <g key={`series-${key}`}>
-                <path d={pathD} fill="none" stroke={color} strokeWidth={isBmiKey ? 2.5 : 2} strokeLinejoin="round" strokeLinecap="round" />
+                <path d={pathD} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
                 {points.map((p) => {
-                  const isAbn = key !== 'height' && key !== 'weight' && key !== 'bmi' && NORMAL_RANGES[key] && isAbnormal(key, p.value)
+                  const isAbn = NORMAL_RANGES[key] && isAbnormal(key, p.value)
                   return (
                     <circle
                       key={`dot-${key}-${p.index}`}
@@ -382,12 +457,25 @@ const HealthTrackerPage = () => {
         })()}
 
         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 8 }}>
-          {activeKeys.map((key) => (
-            <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--text)' }}>
-              <span style={{ width: 12, height: 3, background: INDICATOR_COLORS[key], borderRadius: 2, display: 'inline-block' }} />
-              {FIELD_CONFIG[key]?.label || 'BMI'}
-            </div>
-          ))}
+          {activeKeys.map((key) => {
+            if (key === 'bmi') {
+              return (
+                <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--text)' }}>
+                  <span style={{
+                    width: 24, height: 8, borderRadius: 2, display: 'inline-block',
+                    background: `linear-gradient(to right, ${BMI_RANGES.underweight.color} 0%, ${BMI_RANGES.underweight.color} 25%, ${BMI_RANGES.normal.color} 25%, ${BMI_RANGES.normal.color} 50%, ${BMI_RANGES.overweight.color} 50%, ${BMI_RANGES.overweight.color} 75%, ${BMI_RANGES.obese.color} 75%, ${BMI_RANGES.obese.color} 100%)`,
+                  }} />
+                  BMI
+                </div>
+              )
+            }
+            return (
+              <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--text)' }}>
+                <span style={{ width: 12, height: 3, background: INDICATOR_COLORS[key], borderRadius: 2, display: 'inline-block' }} />
+                {FIELD_CONFIG[key]?.label || 'BMI'}
+              </div>
+            )
+          })}
         </div>
       </div>
     )

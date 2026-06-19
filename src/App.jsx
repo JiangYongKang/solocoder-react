@@ -202,6 +202,7 @@ const TASKS = [
     { id: 90, title: '数据导出调度器', route: 'export-scheduler', description: '数据导出定时调度管理工具，创建导出任务配置数据源/字段/格式/调度频率，执行时间线与历史下载，失败自动重试与完成通知，基于 localStorage 持久化。' },
     { id: 91, title: '账单分摊计算器', route: 'bill-splitter', description: '多人账单分摊计算工具，支持参与者增删与拖拽排序、费用录入（平分/自定义比例）、最简结算方案生成，历史记录 localStorage 持久化。' },
     { id: 92, title: '颜色工具集', route: 'color-toolkit', description: '前端开发者颜色工具箱，调色板生成、HEX/RGB/HSL互转、色盲模拟、渐变色CSS、品牌色提取，收藏与导出功能，基于 localStorage 持久化。' },
+    { id: 93, title: '短信模板编辑器', route: 'sms-template', description: '短信模板可视化编辑管理工具，变量占位符插入与蓝色高亮、实时字数统计与计费、分组管理、手机预览、审核状态流转、JSON导入导出，基于 localStorage 持久化。' },
     { id: 93, title: '个人健康档案', route: 'health-tracker', description: '个人健康数据记录和追踪工具，支持身高/体重/血压/血糖录入、趋势折线图、BMI计算与标准范围对比、异常值标记、健康报告生成、目标设定追踪，基于 localStorage 持久化。' },
     { id: 93, title: '组织架构图编辑器', route: 'org-chart', description: '可视化组织架构图编辑工具，支持部门/职位/人员三种节点，拖拽增删改、横向纵向布局切换、缩放平移、属性编辑、JSON/PNG导入导出，数据 localStorage 持久化。' },
     { id: 94, title: '图片压缩工具', route: 'image-compressor', description: '纯前端图片压缩工具，支持质量/尺寸/格式参数调节、并排对比预览、批量处理、压缩级别预设、localStorage 历史记录持久化。' },

@@ -401,10 +401,13 @@ describe('树形结构增删改操作', () => {
     })
 
     it('不应该修改不允许的字段', () => {
-      const updated = updateNode(testTree, 'person1', { id: 'hacked', children: [] })
-      const node = findNodeById(updated, 'person1')
+      const updated = updateNode(testTree, 'pos1', { id: 'hacked-pos1', children: [] })
+      const node = findNodeById(updated, 'pos1')
       expect(node).not.toBeNull()
-      expect(node.children).toHaveLength(0)
+      expect(node.id).toBe('pos1')
+      expect(node.children).toHaveLength(2)
+      const hackedNode = findNodeById(updated, 'hacked-pos1')
+      expect(hackedNode).toBeNull()
     })
 
     it('不存在的节点应该返回原树', () => {

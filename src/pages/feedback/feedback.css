@@ -472,7 +472,7 @@
 
 .fb-chart-section {
   display: grid;
-  grid-template-columns: 1fr 320px;
+  grid-template-columns: 1fr 380px;
   gap: 24px;
   align-items: start;
 }
@@ -639,6 +639,37 @@
 
 .fb-card-attachments img:hover {
   transform: scale(1.05);
+}
+
+.fb-overview-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.fb-overview-stat {
+  background: #f9fafb;
+  border-radius: 8px;
+  padding: 12px;
+  text-align: center;
+  border: 1px solid #f3f4f6;
+}
+
+.fb-overview-stat-value {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.2;
+  margin-bottom: 4px;
+}
+
+.fb-overview-stat-value.total { color: #6366f1; }
+.fb-overview-stat-value.pending { color: #f59e0b; }
+.fb-overview-stat-value.resolved { color: #22c55e; }
+.fb-overview-stat-value.rating { color: #ec4899; }
+
+.fb-overview-stat-label {
+  font-size: 11px;
+  color: #6b7280;
 }
 
 @media (max-width: 768px) {

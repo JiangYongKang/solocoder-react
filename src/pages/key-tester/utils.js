@@ -86,7 +86,6 @@ export function detectCombination(activeKeys) {
     return null
   }
 
-  const activeSet = new Set(activeKeys)
   const normalizedActiveSet = new Set(activeKeys.map(normalizeModifierKey))
 
   for (const preset of PRESET_COMBINATIONS) {
@@ -209,14 +208,27 @@ export function filterLogsByKeyword(logs, keyword) {
   if (!keyword || !keyword.trim()) return logs
 
   const kw = keyword.trim().toLowerCase()
+  const isSingleChar = kw.length === 1
 
   return logs.filter((log) => {
-    const searchText = [log.keyName, log.keyCode, log.eventType, formatTimestamp(log.timestamp)]
-      .filter(Boolean)
-      .join(' ')
-      .toLowerCase()
+    const keyName = (log.keyName || '').toLowerCase()
+    const keyCode = (log.keyCode || '').toLowerCase()
+    const eventType = (log.eventType || '').toLowerCase()
+    const timestamp = formatTimestamp(log.timestamp).toLowerCase()
 
-    return searchText.includes(kw)
+    if (isSingleChar) {
+      if (keyName === kw) return true
+      if (keyCode === `key${kw}`) return true
+      if (/^[a-z]$/.test(kw) && keyCode === `digit${kw}`) return true
+      return false
+    }
+
+    return (
+      keyName.includes(kw) ||
+      keyCode.includes(kw) ||
+      eventType.includes(kw) ||
+      timestamp.includes(kw)
+    )
   })
 }
 

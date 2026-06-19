@@ -43,6 +43,21 @@ function readFileAsDataURL(file) {
   })
 }
 
+const drawRoundedRect = (ctx, x, y, width, height, radius) => {
+  const r = Math.min(radius, width / 2, height / 2)
+  ctx.beginPath()
+  ctx.moveTo(x + r, y)
+  ctx.lineTo(x + width - r, y)
+  ctx.quadraticCurveTo(x + width, y, x + width, y + r)
+  ctx.lineTo(x + width, y + height - r)
+  ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height)
+  ctx.lineTo(x + r, y + height)
+  ctx.quadraticCurveTo(x, y + height, x, y + height - r)
+  ctx.lineTo(x, y + r)
+  ctx.quadraticCurveTo(x, y, x + r, y)
+  ctx.closePath()
+}
+
 function FeedbackForm({ onSubmit }) {
   const [category, setCategory] = useState('')
   const [title, setTitle] = useState('')
@@ -557,8 +572,7 @@ function TrendChart({ trendData, categories, colors }) {
         const y = padding.top + chartHeight - barHeight
 
         ctx.fillStyle = colors[cat] + 'cc'
-        ctx.beginPath()
-        ctx.roundRect(x, y, barWidth, barHeight, 2)
+        drawRoundedRect(ctx, x, y, barWidth, barHeight, 2)
         ctx.fill()
 
         if (value > 0) {
@@ -689,7 +703,7 @@ export default function FeedbackPage() {
             <input
               type="text"
               className="fb-input"
-              placeholder="搜索标题或描述..."
+              placeholder="搜索标题..."
               value={keyword}
               onChange={(e) => {
                 setKeyword(e.target.value)
@@ -771,24 +785,6 @@ export default function FeedbackPage() {
 
       <section className="fb-section">
         <h2 className="fb-section-title">数据统计与趋势</h2>
-        <div className="fb-stats-grid">
-          <div className="fb-stat-card">
-            <div className="fb-stat-value total">{overview.total}</div>
-            <div className="fb-stat-label">总反馈数</div>
-          </div>
-          <div className="fb-stat-card">
-            <div className="fb-stat-value pending">{overview.pending}</div>
-            <div className="fb-stat-label">待处理数</div>
-          </div>
-          <div className="fb-stat-card">
-            <div className="fb-stat-value resolved">{overview.resolved}</div>
-            <div className="fb-stat-label">已解决数</div>
-          </div>
-          <div className="fb-stat-card">
-            <div className="fb-stat-value rating">{overview.averageRating > 0 ? overview.averageRating.toFixed(1) : '-'}</div>
-            <div className="fb-stat-label">平均满意度</div>
-          </div>
-        </div>
 
         <div className="fb-chart-section">
           <div>
@@ -831,7 +827,29 @@ export default function FeedbackPage() {
             />
           </div>
           <div className="fb-overview-panel">
-            <h3 className="fb-overview-title">分类分布</h3>
+            <h3 className="fb-overview-title">总览数字</h3>
+            <div className="fb-overview-stats-grid">
+              <div className="fb-overview-stat">
+                <div className="fb-overview-stat-value total">{overview.total}</div>
+                <div className="fb-overview-stat-label">总反馈</div>
+              </div>
+              <div className="fb-overview-stat">
+                <div className="fb-overview-stat-value pending">{overview.pending}</div>
+                <div className="fb-overview-stat-label">待处理</div>
+              </div>
+              <div className="fb-overview-stat">
+                <div className="fb-overview-stat-value resolved">{overview.resolved}</div>
+                <div className="fb-overview-stat-label">已解决</div>
+              </div>
+              <div className="fb-overview-stat">
+                <div className="fb-overview-stat-value rating">
+                  {overview.averageRating > 0 ? overview.averageRating.toFixed(1) : '-'}
+                </div>
+                <div className="fb-overview-stat-label">平均分</div>
+              </div>
+            </div>
+            <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #f3f4f6' }}>
+              <h3 className="fb-overview-title">分类分布</h3>
             {Object.values(FEEDBACK_CATEGORIES).map((cat) => {
               const count = feedbacks.filter((f) => f.category === cat).length
               return (
@@ -852,6 +870,7 @@ export default function FeedbackPage() {
                 </div>
               )
             })}
+            </div>
             <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #f3f4f6' }}>
               <h3 className="fb-overview-title">处理率</h3>
               <div className="fb-overview-item">

@@ -1,0 +1,11 @@
+你实现的键盘键位测试器还存在一些问题，需要进行修复：
+
+1. ESLint 检查存在 3 个未使用变量错误：index.jsx 导入了 buildCombinationLabel 但全文件未使用；utils.js 的 detectCombination 函数中声明了 activeSet 变量但从未读取；utils.test.js 中声明了 name 变量但未使用。
+
+2. 热力图图例的渐变色与实际键位上的热力图颜色不一致：CSS 中 .heatmap-legend-bar 定义的渐变色与 utils.js 中 getHeatmapColor 函数实际使用的色值不统一，用户看到的图例配色与键位实际颜色存在色差。
+
+3. 按键日志搜索过滤存在误匹配：filterLogsByKeyword 函数使用简单的子串匹配，当用户搜索字母 "A" 时，键码为 "Space" 的日志条目也被匹配出来（因为字符串 "Space" 包含子串 "a"），产生了与搜索意图无关的误匹配结果。
+
+4. AZERTY 键盘布局的底部行缺少 KeyM 键位定义，当用户在 AZERTY 模式下按下该键位时，无法显示正确的字符映射。
+
+5. 修复完成后重新运行 pnpm run test，需要让所有测试通过。

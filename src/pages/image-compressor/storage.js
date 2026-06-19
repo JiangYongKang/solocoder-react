@@ -1,4 +1,5 @@
 import { HISTORY_KEY, MAX_HISTORY_ITEMS, FORMAT_NAMES } from './constants.js'
+import { calculateSavingsPercent } from './compressorUtils.js'
 
 const isLocalStorageAvailable = () => {
   try {
@@ -44,9 +45,10 @@ export const addToHistory = (item, maxItems = MAX_HISTORY_ITEMS) => {
   if (!item) return []
 
   const history = getHistory()
+  const now = Date.now()
 
   const newItem = {
-    id: item.id || `history_${Date.now()}`,
+    id: item.id || `history_${now}`,
     name: item.name || 'unknown',
     quality: item.quality,
     scale: item.scale,
@@ -58,17 +60,15 @@ export const addToHistory = (item, maxItems = MAX_HISTORY_ITEMS) => {
     compressedWidth: item.compressedWidth,
     compressedHeight: item.compressedHeight,
     compressedAt: item.compressedAt || new Date().toISOString(),
+    lastAccessed: now,
   }
 
   const filtered = history.filter((h) => h.id !== newItem.id)
   const updated = [newItem, ...filtered]
 
-  if (updated.length > maxItems) {
-    updated.splice(maxItems)
-  }
-
-  safeLocalStorage.setItem(HISTORY_KEY, JSON.stringify(updated))
-  return updated
+  const evicted = lruEvict(updated, maxItems)
+  safeLocalStorage.setItem(HISTORY_KEY, JSON.stringify(evicted))
+  return evicted
 }
 
 export const addBatchToHistory = (items, maxItems = MAX_HISTORY_ITEMS) => {
@@ -78,11 +78,12 @@ export const addBatchToHistory = (items, maxItems = MAX_HISTORY_ITEMS) => {
 
   const history = getHistory()
   const existingIds = new Set(history.map((h) => h.id))
+  const now = Date.now()
 
   const newItems = items
     .filter((item) => item && !existingIds.has(item.id))
     .map((item) => ({
-      id: item.id || `history_${Date.now()}_${Math.random()}`,
+      id: item.id || `history_${now}_${Math.random()}`,
       name: item.name || 'unknown',
       quality: item.quality,
       scale: item.scale,
@@ -94,16 +95,14 @@ export const addBatchToHistory = (items, maxItems = MAX_HISTORY_ITEMS) => {
       compressedWidth: item.compressedWidth,
       compressedHeight: item.compressedHeight,
       compressedAt: item.compressedAt || new Date().toISOString(),
+      lastAccessed: now,
     }))
 
   const updated = [...newItems, ...history]
+  const evicted = lruEvict(updated, maxItems)
 
-  if (updated.length > maxItems) {
-    updated.splice(maxItems)
-  }
-
-  safeLocalStorage.setItem(HISTORY_KEY, JSON.stringify(updated))
-  return updated
+  safeLocalStorage.setItem(HISTORY_KEY, JSON.stringify(evicted))
+  return evicted
 }
 
 export const getHistory = () => {
@@ -134,7 +133,13 @@ export const lruEvict = (history, maxItems = MAX_HISTORY_ITEMS) => {
   if (!Array.isArray(history)) return []
   if (history.length <= maxItems) return history
 
-  return history.slice(0, maxItems)
+  const sorted = [...history].sort((a, b) => {
+    const aTime = a.lastAccessed || 0
+    const bTime = b.lastAccessed || 0
+    return bTime - aTime
+  })
+
+  return sorted.slice(0, maxItems)
 }
 
 export const accessHistoryItem = (id) => {
@@ -143,7 +148,11 @@ export const accessHistoryItem = (id) => {
   if (index === -1) return history
 
   const [item] = history.splice(index, 1)
-  const updated = [item, ...history]
+  const accessedItem = {
+    ...item,
+    lastAccessed: Date.now(),
+  }
+  const updated = [accessedItem, ...history]
 
   safeLocalStorage.setItem(HISTORY_KEY, JSON.stringify(updated))
   return updated
@@ -153,13 +162,11 @@ export const formatHistoryItemDisplay = (item) => {
   if (!item) return null
 
   const formatName = FORMAT_NAMES[item.format] || 'UNKNOWN'
-  const savingsPercent = item.originalSize > 0
-    ? Math.max(0, ((item.originalSize - item.compressedSize) / item.originalSize) * 100).toFixed(1)
-    : 0
+  const savingsPercent = calculateSavingsPercent(item.originalSize, item.compressedSize)
 
   return {
     ...item,
     formatName,
-    savingsPercent: Number(savingsPercent),
+    savingsPercent,
   }
 }

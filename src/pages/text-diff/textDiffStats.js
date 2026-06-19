@@ -1,3 +1,11 @@
+import {
+  splitLines,
+  computeLCSMatrix,
+  computeLineDiff,
+  computeCharDiff as computeCharDiffUtil,
+  mergeModifiedLines,
+  DIFF_TYPE,
+} from './diffUtils'
 
 export const normalizeText = (text) => {
   if (typeof text !== 'string') return ''
@@ -16,40 +24,23 @@ export const splitIntoChars = (text) => {
   return text.split('')
 }
 
-export const splitIntoLines = (text) => {
-  if (typeof text !== 'string') return []
-  if (text === '') return []
-  return text.split('\n')
-}
+export const splitIntoLines = splitLines
 
 export const computeDiffCount = (arrA, arrB) => {
   if (!Array.isArray(arrA) || !Array.isArray(arrB)) {
-    return { diff: 0, totalA: 0, totalB: 0 }
+    return { diff: 0, totalA: 0, totalB: 0, lcsLength: 0 }
   }
 
   const m = arrA.length
   const n = arrB.length
 
   if (m === 0 && n === 0) {
-    return { diff: 0, totalA: 0, totalB: 0 }
+    return { diff: 0, totalA: 0, totalB: 0, lcsLength: 0 }
   }
 
-  const dp = Array(m + 1)
-    .fill(null)
-    .map(() => Array(n + 1).fill(0))
-
-  for (let i = 1; i <= m; i++) {
-    for (let j = 1; j <= n; j++) {
-      if (arrA[i - 1] === arrB[j - 1]) {
-        dp[i][j] = dp[i - 1][j - 1] + 1
-      } else {
-        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1])
-      }
-    }
-  }
-
+  const dp = computeLCSMatrix(arrA, arrB)
   const lcsLength = dp[m][n]
-  const diffCount = m + n - 2 * lcsLength
+  const diffCount = Math.max(m, n) - lcsLength
 
   return {
     diff: diffCount,
@@ -81,11 +72,10 @@ export const computeSimilarity = (diffResult) => {
   if (!diffResult || typeof diffResult !== 'object') {
     return 0
   }
-  const { totalA, totalB } = diffResult
+  const { diff, totalA, totalB } = diffResult
   const maxTotal = Math.max(totalA, totalB)
   if (maxTotal === 0) return 100
-  const lcsLength = diffResult.lcsLength ?? 0
-  return parseFloat(((lcsLength / maxTotal) * 100).toFixed(2))
+  return parseFloat(((1 - diff / maxTotal) * 100).toFixed(2))
 }
 
 export const computeCharSimilarity = (textA, textB) => {
@@ -198,58 +188,53 @@ export const getSimilarityColor = (similarity) => {
 export const buildLineDiffPairs = (textA, textB) => {
   const linesA = splitIntoLines(textA)
   const linesB = splitIntoLines(textB)
+  const rawDiff = computeLineDiff(linesA, linesB)
+  const lineDiff = mergeModifiedLines(rawDiff)
 
-  const m = linesA.length
-  const n = linesB.length
-  const dp = Array(m + 1)
-    .fill(null)
-    .map(() => Array(n + 1).fill(0))
-
-  for (let i = 1; i <= m; i++) {
-    for (let j = 1; j <= n; j++) {
-      if (linesA[i - 1] === linesB[j - 1]) {
-        dp[i][j] = dp[i - 1][j - 1] + 1
-      } else {
-        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1])
-      }
+  const pairs = lineDiff.map((row) => {
+    switch (row.type) {
+      case DIFF_TYPE.EQUAL:
+        return {
+          type: 'equal',
+          leftIndex: row.oldIndex,
+          rightIndex: row.newIndex,
+          leftContent: row.oldLine || '',
+          rightContent: row.newLine || '',
+        }
+      case DIFF_TYPE.ADDED:
+        return {
+          type: 'added',
+          leftIndex: null,
+          rightIndex: row.newIndex,
+          leftContent: '',
+          rightContent: row.newLine || '',
+        }
+      case DIFF_TYPE.REMOVED:
+        return {
+          type: 'removed',
+          leftIndex: row.oldIndex,
+          rightIndex: null,
+          leftContent: row.oldLine || '',
+          rightContent: '',
+        }
+      case DIFF_TYPE.MODIFIED:
+        return {
+          type: 'modified',
+          leftIndex: row.oldIndex,
+          rightIndex: row.newIndex,
+          leftContent: row.oldLine || '',
+          rightContent: row.newLine || '',
+        }
+      default:
+        return {
+          type: 'equal',
+          leftIndex: row.oldIndex ?? null,
+          rightIndex: row.newIndex ?? null,
+          leftContent: row.oldLine || '',
+          rightContent: row.newLine || '',
+        }
     }
-  }
-
-  const pairs = []
-  let i = m
-  let j = n
-
-  while (i > 0 || j > 0) {
-    if (i > 0 && j > 0 && linesA[i - 1] === linesB[j - 1]) {
-      pairs.unshift({
-        type: 'equal',
-        leftIndex: i - 1,
-        rightIndex: j - 1,
-        leftContent: linesA[i - 1],
-        rightContent: linesB[j - 1],
-      })
-      i--
-      j--
-    } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
-      pairs.unshift({
-        type: 'added',
-        leftIndex: null,
-        rightIndex: j - 1,
-        leftContent: '',
-        rightContent: linesB[j - 1],
-      })
-      j--
-    } else {
-      pairs.unshift({
-        type: 'removed',
-        leftIndex: i - 1,
-        rightIndex: null,
-        leftContent: linesA[i - 1],
-        rightContent: '',
-      })
-      i--
-    }
-  }
+  })
 
   return {
     pairs,
@@ -259,59 +244,17 @@ export const buildLineDiffPairs = (textA, textB) => {
 }
 
 export const computeCharDiffForLine = (lineA, lineB) => {
-  if (typeof lineA !== 'string') lineA = ''
-  if (typeof lineB !== 'string') lineB = ''
-
-  if (lineA === lineB) {
-    return [{ type: 'equal', value: lineA }]
-  }
-
-  const charsA = lineA.split('')
-  const charsB = lineB.split('')
-  const m = charsA.length
-  const n = charsB.length
-
-  const dp = Array(m + 1)
-    .fill(null)
-    .map(() => Array(n + 1).fill(0))
-
-  for (let i = 1; i <= m; i++) {
-    for (let j = 1; j <= n; j++) {
-      if (charsA[i - 1] === charsB[j - 1]) {
-        dp[i][j] = dp[i - 1][j - 1] + 1
-      } else {
-        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1])
-      }
+  const charDiff = computeCharDiffUtil(lineA, lineB)
+  return charDiff.map((item) => {
+    switch (item.type) {
+      case DIFF_TYPE.EQUAL:
+        return { type: 'equal', value: item.value }
+      case DIFF_TYPE.ADDED:
+        return { type: 'added', value: item.value }
+      case DIFF_TYPE.REMOVED:
+        return { type: 'removed', value: item.value }
+      default:
+        return { type: 'equal', value: item.value }
     }
-  }
-
-  const result = []
-  let i = m
-  let j = n
-
-  while (i > 0 || j > 0) {
-    if (i > 0 && j > 0 && charsA[i - 1] === charsB[j - 1]) {
-      result.unshift({ type: 'equal', value: charsA[i - 1] })
-      i--
-      j--
-    } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
-      result.unshift({ type: 'added', value: charsB[j - 1] })
-      j--
-    } else {
-      result.unshift({ type: 'removed', value: charsA[i - 1] })
-      i--
-    }
-  }
-
-  const merged = []
-  for (let k = 0; k < result.length; k++) {
-    const item = result[k]
-    if (merged.length > 0 && merged[merged.length - 1].type === item.type) {
-      merged[merged.length - 1].value += item.value
-    } else {
-      merged.push({ ...item })
-    }
-  }
-
-  return merged
+  })
 }

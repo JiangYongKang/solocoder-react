@@ -212,17 +212,25 @@ function getFieldLabel(key) {
   return labels[key] || key
 }
 
-export function calculateWeightProgress(currentWeight, targetWeight) {
-  if (!currentWeight || !targetWeight) return null
-  if (targetWeight <= 0 || currentWeight <= 0) return null
-  const startWeight = currentWeight
-  const totalNeeded = Math.abs(startWeight - targetWeight)
-  if (totalNeeded === 0) return { percent: 100, isCompleted: true, currentWeight, targetWeight }
-  const currentDiff = Math.abs(startWeight - targetWeight)
-  const lost = Math.abs(startWeight - currentWeight)
-  const percent = Math.min((lost / totalNeeded) * 100, 100)
-  const isCompleted = currentDiff <= 0.1
-  return { percent: Math.round(percent * 10) / 10, isCompleted, currentWeight, targetWeight }
+export function calculateWeightProgress(startWeight, currentWeight, targetWeight) {
+  if (!startWeight || !currentWeight || !targetWeight) return null
+  if (startWeight <= 0 || currentWeight <= 0 || targetWeight <= 0) return null
+  const totalNeeded = Math.abs(targetWeight - startWeight)
+  if (totalNeeded === 0) {
+    const isCompleted = true
+    return { percent: 100, isCompleted, startWeight, currentWeight, targetWeight }
+  }
+  const isLosing = targetWeight < startWeight
+  const moved = isLosing ? (startWeight - currentWeight) : (currentWeight - startWeight)
+  const percent = (moved / totalNeeded) * 100
+  const isCompleted = isLosing ? currentWeight <= targetWeight : currentWeight >= targetWeight
+  return {
+    percent: Math.round(percent * 10) / 10,
+    isCompleted,
+    startWeight,
+    currentWeight,
+    targetWeight,
+  }
 }
 
 export function calculateExerciseProgress(weeklyDone, weeklyGoal) {
@@ -261,6 +269,7 @@ export function loadGoals() {
     if (typeof parsed !== 'object' || parsed === null) return { ...DEFAULT_GOALS }
     return {
       weightTarget: typeof parsed.weightTarget === 'number' ? parsed.weightTarget : null,
+      weightStart: typeof parsed.weightStart === 'number' ? parsed.weightStart : null,
       weightDeadline: typeof parsed.weightDeadline === 'string' ? parsed.weightDeadline : '',
       weeklyExercise: typeof parsed.weeklyExercise === 'number' ? parsed.weeklyExercise : DEFAULT_GOALS.weeklyExercise,
       weeklyExerciseDone: typeof parsed.weeklyExerciseDone === 'number' ? parsed.weeklyExerciseDone : 0,
@@ -307,12 +316,26 @@ export function setGoals(currentGoals, newGoals) {
   if (Object.keys(errors).length > 0) {
     return { success: false, errors }
   }
+  const hasNewWeightTarget = newGoals.weightTarget !== ''
+    && newGoals.weightTarget !== null
+    && newGoals.weightTarget !== undefined
+  const updatedTarget = hasNewWeightTarget ? Number(newGoals.weightTarget) : null
   const updated = {
-    weightTarget: newGoals.weightTarget !== '' && newGoals.weightTarget !== null && newGoals.weightTarget !== undefined
-      ? Number(newGoals.weightTarget) : null,
+    weightTarget: updatedTarget,
+    weightStart: currentGoals.weightStart,
     weightDeadline: newGoals.weightDeadline || '',
     weeklyExercise: Number(newGoals.weeklyExercise),
     weeklyExerciseDone: currentGoals.weeklyExerciseDone || 0,
+  }
+  if (hasNewWeightTarget) {
+    const ws = newGoals.weightStart !== ''
+      && newGoals.weightStart !== null
+      && newGoals.weightStart !== undefined
+      ? Number(newGoals.weightStart) : null
+    if (ws) updated.weightStart = ws
+    if (!updated.weightStart) updated.weightStart = updatedTarget
+  } else {
+    updated.weightStart = null
   }
   return { success: true, goals: updated }
 }

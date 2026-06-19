@@ -134,13 +134,13 @@ describe('computeDiffCount', () => {
 
   it('完全不同的数组应该返回最大差异', () => {
     const result = computeDiffCount(['a', 'b'], ['c', 'd'])
-    expect(result.diff).toBe(4)
+    expect(result.diff).toBe(2)
     expect(result.lcsLength).toBe(0)
   })
 
   it('部分相同的数组应该计算正确的差异数', () => {
     const result = computeDiffCount(['a', 'b', 'c'], ['a', 'c', 'd'])
-    expect(result.diff).toBe(2)
+    expect(result.diff).toBe(1)
     expect(result.lcsLength).toBe(2)
   })
 
@@ -169,7 +169,7 @@ describe('computeDiffCount', () => {
 describe('computeCharDiffCount', () => {
   it('应该正确计算字符级差异', () => {
     const result = computeCharDiffCount('abc', 'abd')
-    expect(result.diff).toBe(2)
+    expect(result.diff).toBe(1)
     expect(result.totalA).toBe(3)
     expect(result.totalB).toBe(3)
   })
@@ -188,7 +188,7 @@ describe('computeCharDiffCount', () => {
 describe('computeWordDiffCount', () => {
   it('应该正确计算单词级差异', () => {
     const result = computeWordDiffCount('hello world', 'hello there')
-    expect(result.diff).toBe(2)
+    expect(result.diff).toBe(1)
   })
 
   it('忽略大小写和标点', () => {
@@ -205,7 +205,7 @@ describe('computeWordDiffCount', () => {
 describe('computeLineDiffCount', () => {
   it('应该正确计算行级差异', () => {
     const result = computeLineDiffCount('a\nb\nc', 'a\nd\nc')
-    expect(result.diff).toBe(2)
+    expect(result.diff).toBe(1)
   })
 
   it('完全相同的文本应该返回 0 差异', () => {
@@ -216,27 +216,27 @@ describe('computeLineDiffCount', () => {
 
 describe('computeSimilarity', () => {
   it('完全相同应该返回 100% 相似度', () => {
-    const result = computeSimilarity({ totalA: 5, totalB: 5, lcsLength: 5 })
+    const result = computeSimilarity({ diff: 0, totalA: 5, totalB: 5 })
     expect(result).toBe(100)
   })
 
   it('完全不同应该返回 0% 相似度', () => {
-    const result = computeSimilarity({ totalA: 5, totalB: 5, lcsLength: 0 })
+    const result = computeSimilarity({ diff: 5, totalA: 5, totalB: 5 })
     expect(result).toBe(0)
   })
 
   it('一半相同应该返回 50% 相似度', () => {
-    const result = computeSimilarity({ totalA: 4, totalB: 4, lcsLength: 2 })
+    const result = computeSimilarity({ diff: 2, totalA: 4, totalB: 4 })
     expect(result).toBe(50)
   })
 
   it('两端数量不同时以较大值为基准', () => {
-    const result = computeSimilarity({ totalA: 2, totalB: 4, lcsLength: 2 })
+    const result = computeSimilarity({ diff: 2, totalA: 2, totalB: 4 })
     expect(result).toBe(50)
   })
 
   it('两侧都为空应该返回 100% 相似度', () => {
-    const result = computeSimilarity({ totalA: 0, totalB: 0, lcsLength: 0 })
+    const result = computeSimilarity({ diff: 0, totalA: 0, totalB: 0 })
     expect(result).toBe(100)
   })
 

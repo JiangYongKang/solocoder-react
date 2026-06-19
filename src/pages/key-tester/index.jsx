@@ -4,7 +4,6 @@ import { KEYBOARD_LAYOUTS, PRESET_COMBINATIONS, MAX_LOG_ENTRIES } from './consta
 import {
   getHeatmapColor,
   detectCombination,
-  buildCombinationLabel,
   formatTimestamp,
   addLogEntry,
   filterLogsByKeyword,

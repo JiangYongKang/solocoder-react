@@ -607,6 +607,7 @@ describe('searchByKeyword', () => {
     { title: '登录问题', description: '无法登录系统' },
     { title: '支付功能', description: '支付宝支付失败' },
     { title: '界面建议', description: '登录界面颜色调整' },
+    { title: '首页优化', description: '推荐算法改进' },
   ]
 
   it('非数组返回空数组', () => {
@@ -618,17 +619,23 @@ describe('searchByKeyword', () => {
     expect(searchByKeyword(list, '   ')).toEqual(list)
   })
 
-  it('按标题搜索', () => {
+  it('只搜索标题字段，不搜索描述', () => {
     const result = searchByKeyword(list, '登录')
-    expect(result.length).toBe(2)
-    expect(result.some((r) => r.title === '登录问题')).toBe(true)
-    expect(result.some((r) => r.title === '界面建议')).toBe(true)
+    expect(result.length).toBe(1)
+    expect(result[0].title).toBe('登录问题')
   })
 
-  it('按描述搜索', () => {
+  it('按标题搜索', () => {
     const result = searchByKeyword(list, '支付')
     expect(result.length).toBe(1)
     expect(result[0].title).toBe('支付功能')
+  })
+
+  it('仅描述中包含的关键词不会被匹配', () => {
+    const result = searchByKeyword(list, '推荐')
+    expect(result.length).toBe(0)
+    const result2 = searchByKeyword(list, '算法')
+    expect(result2.length).toBe(0)
   })
 
   it('搜索不区分大小写', () => {

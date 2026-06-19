@@ -1,0 +1,13 @@
+你实现的文本差异统计工具还存在一些问题，需要进行修复：
+
+1. 相似度计算公式与要求不符：computeSimilarity 函数使用的公式与提示词指定的 `1 - (差异数 / 两端较大总数) × 100%` 不一致，当两端文本长度不等时计算结果存在偏差。
+
+2. 差异高亮颜色不符合提示词规范：提示词要求差异标记统一使用红色背景高亮，但代码中分别为新增内容使用了绿色、删除内容使用红色、修改内容使用黄色，共计三种颜色标记，与提示词要求的纯红色标记不一致。
+
+3. 差异视图的同步滚动存在死代码：index.jsx 中声明了 rightDiffRef 但从未将其绑定到任何 DOM 元素，handleScrollSync 中对应的同步逻辑永远无法执行。
+
+4. 缺少 storage.js 中 localStorage 持久化函数的单元测试，loadHistory、saveHistory、addHistoryItem 等纯 JS 函数没有被测试覆盖。
+
+5. textDiffStats.js 与项目中已有的 diffUtils.js 存在大量功能重复代码，且 index.jsx 的 renderLineDiff 中判断了 `pair.type === 'modified'` 分支，但 buildLineDiffPairs 的返回值中 type 永远不会是 'modified'，该分支是永远无法执行的死代码。
+
+6. 修复完成后重新运行 pnpm run test，需要让所有测试通过。

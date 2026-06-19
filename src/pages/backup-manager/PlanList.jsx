@@ -3,6 +3,7 @@ import {
   BACKUP_TYPE_LABELS,
   PLAN_STATUS_LABELS,
   PLAN_STATUS,
+  DATA_SOURCE_LABELS,
 } from './constants.js';
 import {
   formatDateTime,
@@ -77,7 +78,7 @@ export default function PlanList({ onEdit, onDelete, onManualRun, onCreate }) {
                   <div className="plan-info-row">
                     <span className="info-label">备份目标：</span>
                     <span className="info-value">
-                      {plan.dataSources?.map((s) => s).join(', ')}
+                      {plan.dataSources?.map((s) => DATA_SOURCE_LABELS[s] || s).join(', ')}
                     </span>
                   </div>
                   <div className="plan-info-row">

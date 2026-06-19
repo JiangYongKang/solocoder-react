@@ -50,13 +50,76 @@ function ImageCompressorPage() {
   const [dividerPosition, setDividerPosition] = useState(50)
   const [isDraggingDivider, setIsDraggingDivider] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [isRealTimeCompressing, setIsRealTimeCompressing] = useState(false)
+  const oldBlobUrlsRef = useRef(new Set())
+  const debounceTimerRef = useRef(null)
+  const compressFnRef = useRef(null)
 
   const selectedImage = images.find((img) => img.id === selectedImageId)
+
+  const releaseOldBlobUrl = (url) => {
+    if (url && url.startsWith('blob:')) {
+      oldBlobUrlsRef.current.add(url)
+      setTimeout(() => {
+        URL.revokeObjectURL(url)
+        oldBlobUrlsRef.current.delete(url)
+      }, 1000)
+    }
+  }
   const isBatchMode = images.length > 1
 
   useEffect(() => {
     setHistory(getHistory())
   }, [])
+
+  const performCompress = useCallback(async (imageItem, currentParams) => {
+    if (!imageItem || isBatchMode) return
+
+    try {
+      setIsRealTimeCompressing(true)
+      const img = await loadImage(imageItem.dataUrl)
+      const result = await compressImage(img, currentParams)
+
+      releaseOldBlobUrl(imageItem.compressedDataUrl)
+
+      setImages((prev) =>
+        prev.map((img) =>
+          img.id === imageItem.id
+            ? {
+                ...img,
+                ...result,
+                status: PROCESSING_STATUS.COMPLETED,
+                progress: 100,
+              }
+            : img
+        )
+      )
+    } catch (err) {
+      console.error('实时压缩失败:', err)
+    } finally {
+      setIsRealTimeCompressing(false)
+    }
+  }, [isBatchMode])
+
+  useEffect(() => {
+    compressFnRef.current = performCompress
+  }, [performCompress])
+
+  useEffect(() => {
+    if (selectedImage && !isBatchMode && selectedImage.dataUrl) {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current)
+      }
+      debounceTimerRef.current = setTimeout(() => {
+        compressFnRef.current?.(selectedImage, params)
+      }, 300)
+    }
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current)
+      }
+    }
+  }, [selectedImage, params, isBatchMode])
 
   const handleFiles = useCallback(async (files) => {
     const validFiles = Array.from(files).filter(validateImageType)
@@ -169,6 +232,8 @@ function ImageCompressorPage() {
       const img = await loadImage(selectedImage.dataUrl)
       const result = await compressImage(img, params)
 
+      releaseOldBlobUrl(selectedImage.compressedDataUrl)
+
       const updatedImage = {
         ...selectedImage,
         ...result,
@@ -232,6 +297,8 @@ function ImageCompressorPage() {
 
         const img = await loadImage(imageItem.dataUrl)
         const result = await compressImage(img, params)
+
+        releaseOldBlobUrl(imageItem.compressedDataUrl)
 
         const updatedImage = {
           ...imageItem,
@@ -560,18 +627,22 @@ function ImageCompressorPage() {
               </div>
 
               <div className="ic-preview-panel">
-                <div className="ic-preview-title">压缩后</div>
+                <div className="ic-preview-title">
+                  压缩后
+                  {isRealTimeCompressing && <span className="ic-loading"> (处理中...)</span>}
+                </div>
                 <div className="ic-preview-image-wrapper">
                   {selectedImage.compressedDataUrl ? (
                     <img
                       src={selectedImage.compressedDataUrl}
                       alt="压缩后"
                       className="ic-preview-image"
+                      style={{ opacity: isRealTimeCompressing ? 0.5 : 1 }}
                     />
                   ) : (
                     <div className="ic-empty">
                       <div className="ic-empty-icon">🖼️</div>
-                      <div>压缩后预览</div>
+                      <div>{isRealTimeCompressing ? '处理中...' : '压缩后预览'}</div>
                     </div>
                   )}
                 </div>
@@ -674,6 +745,10 @@ function ImageCompressorPage() {
                 <div className="ic-compare-info-grid">
                   <div className="ic-compare-info">
                     <div className="ic-info-row">
+                      <span className="ic-info-label">文件名</span>
+                      <span className="ic-info-value">{selectedImage.name}</span>
+                    </div>
+                    <div className="ic-info-row">
                       <span className="ic-info-label">格式</span>
                       <span className="ic-info-value">
                         {selectedImage.file?.type?.split('/')[1]?.toUpperCase() || 'UNKNOWN'}
@@ -693,6 +768,12 @@ function ImageCompressorPage() {
                     </div>
                   </div>
                   <div className="ic-compare-info">
+                    <div className="ic-info-row">
+                      <span className="ic-info-label">文件名</span>
+                      <span className="ic-info-value">
+                        {generateCompressedFileName(selectedImage.name, params.format)}
+                      </span>
+                    </div>
                     <div className="ic-info-row">
                       <span className="ic-info-label">格式</span>
                       <span className="ic-info-value">{FORMAT_NAMES[params.format]}</span>

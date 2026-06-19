@@ -465,14 +465,15 @@ const SmsTemplatePage = () => {
         if (preset) samples[name] = preset.sampleValue
       }
     })
-    return (editingSignature || '') + (selectedTemplate ? buildPreviewContent({ content: editingContent, signature: '' }, samples) : '')
+    const sig = editingSignature ?? DEFAULT_SIGNATURE
+    return sig + (selectedTemplate ? buildPreviewContent({ content: editingContent, signature: '' }, samples) : '')
   }, [editingContent, editingSignature, selectedTemplate, editingSamples, editingVariables])
 
   const loadTemplateToEditor = useCallback((template) => {
     setSelectedTemplateId(template.id)
     setEditingTitle(template.title)
     setEditingContent(template.content)
-    setEditingSignature(template.signature || DEFAULT_SIGNATURE)
+    setEditingSignature(template.signature ?? DEFAULT_SIGNATURE)
     setEditingGroupId(template.groupId || currentGroupId)
     setEditingSamples(template.variableSamples || {})
     setSaveError('')
@@ -717,6 +718,32 @@ const SmsTemplatePage = () => {
     return parts
   }
 
+  const renderEditorHighlight = (content) => {
+    if (!content) return '\n'
+    const parts = []
+    let lastIndex = 0
+    const regex = /\{([^{}]+)\}/g
+    let match
+    while ((match = regex.exec(content)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push(<span key={`et-${lastIndex}`}>{content.slice(lastIndex, match.index)}</span>)
+      }
+      parts.push(
+        <span key={`ev-${match.index}`} className="sms-var-highlight">
+          {match[0]}
+        </span>
+      )
+      lastIndex = match.index + match[0].length
+    }
+    if (lastIndex < content.length) {
+      parts.push(<span key={`et-${lastIndex}`}>{content.slice(lastIndex)}</span>)
+    }
+    if (content.endsWith('\n')) {
+      parts.push(<span key="newline">{'\n'}</span>)
+    }
+    return parts
+  }
+
   return (
     <div className="sms-template-page">
       <div className="sms-template-topbar">
@@ -892,6 +919,9 @@ const SmsTemplatePage = () => {
                         )}
                       </div>
                       <div className="sms-template-textarea-wrapper">
+                        <div className="sms-template-highlight-overlay" aria-hidden="true">
+                          {renderEditorHighlight(editingContent)}
+                        </div>
                         <textarea
                           ref={textareaRef}
                           className="sms-template-textarea"
@@ -981,7 +1011,6 @@ const SmsTemplatePage = () => {
                       <h3>📱 实时预览</h3>
                       <button
                         className="sms-template-btn"
-                        size="small"
                         onClick={() => setShowSamplesModal(true)}
                         disabled={editingVariables.length === 0}
                       >
@@ -1001,7 +1030,7 @@ const SmsTemplatePage = () => {
                         <div className="sms-template-sms-bubble">
                           {previewContent ? (
                             renderHighlightedContent(
-                              (editingSignature || '') +
+                              (editingSignature ?? DEFAULT_SIGNATURE) +
                               (selectedTemplate
                                 ? buildPreviewContent(
                                     { content: editingContent, signature: '' },

@@ -17,10 +17,23 @@ export function loadPlans(storage = globalThis.localStorage) {
     if (!data) return getDefaultPlans();
     const plans = safeParse(data, null);
     if (!Array.isArray(plans)) return getDefaultPlans();
-    return plans;
+    return normalizePlansNextBackupTime(plans);
   } catch (e) {
     return getDefaultPlans();
   }
+}
+
+function normalizePlansNextBackupTime(plans) {
+  const now = Date.now();
+  return plans.map((plan, index) => {
+    if (!plan.nextBackupTime || plan.nextBackupTime <= now) {
+      const baseNextTime = calculateNextBackupTime(plan, now);
+      const offsetMinutes = (index * 15) % 120;
+      const nextBackupTime = baseNextTime + offsetMinutes * 60 * 1000;
+      return { ...plan, nextBackupTime };
+    }
+    return plan;
+  });
 }
 
 export function savePlans(plans, storage = globalThis.localStorage) {
@@ -185,7 +198,7 @@ export function clearBackupData(storage = globalThis.localStorage) {
 
 function getDefaultPlans() {
   const now = Date.now();
-  return [
+  const plans = [
     {
       id: 'plan_default_1',
       name: '生产数据库每日备份',
@@ -231,6 +244,7 @@ function getDefaultPlans() {
       updatedAt: now,
     },
   ];
+  return normalizePlansNextBackupTime(plans);
 }
 
 function getDefaultRecords() {

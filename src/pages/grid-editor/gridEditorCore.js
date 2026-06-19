@@ -301,8 +301,15 @@ export function generateHTML(grid) {
   })
 
   sortedCells.forEach((cell, index) => {
+    const hasCustomStyle = cell.colSpan > 1 || cell.rowSpan > 1 ||
+      cell.horizontalAlign !== DEFAULT_HORIZONTAL_ALIGN ||
+      cell.verticalAlign !== DEFAULT_VERTICAL_ALIGN ||
+      cell.borderColor !== DEFAULT_BORDER_COLOR ||
+      cell.borderWidth !== DEFAULT_BORDER_WIDTH ||
+      cell.borderStyle !== DEFAULT_BORDER_STYLE
+
     const classNames = ['grid-item']
-    if (cell.colSpan > 1 || cell.rowSpan > 1) {
+    if (hasCustomStyle) {
       classNames.push(`grid-item-${index + 1}`)
     }
 
@@ -343,18 +350,14 @@ export function generateCSS(grid) {
   })
 
   sortedCells.forEach((cell, index) => {
-    const needsCustomSelector = cell.colSpan > 1 || cell.rowSpan > 1 ||
+    const hasCustomStyle = cell.colSpan > 1 || cell.rowSpan > 1 ||
       cell.horizontalAlign !== DEFAULT_HORIZONTAL_ALIGN ||
       cell.verticalAlign !== DEFAULT_VERTICAL_ALIGN ||
       cell.borderColor !== DEFAULT_BORDER_COLOR ||
       cell.borderWidth !== DEFAULT_BORDER_WIDTH ||
       cell.borderStyle !== DEFAULT_BORDER_STYLE
 
-    const selector = cell.colSpan > 1 || cell.rowSpan > 1
-      ? `.grid-item-${index + 1}`
-      : '.grid-item'
-
-    if (needsCustomSelector || index === 0) {
+    if (hasCustomStyle || index === 0) {
       const cellLines = []
 
       if (cell.colSpan > 1 || cell.rowSpan > 1) {
@@ -372,6 +375,9 @@ export function generateCSS(grid) {
       cellLines.push(`  border: ${cell.borderWidth}px ${cell.borderStyle} ${cell.borderColor};`)
 
       if (cellLines.length > 0) {
+        const selector = hasCustomStyle
+          ? `.grid-item-${index + 1}`
+          : '.grid-item'
         lines.push(`${selector} {`)
         lines.push(...cellLines)
         lines.push('}')

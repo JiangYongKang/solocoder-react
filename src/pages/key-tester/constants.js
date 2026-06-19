@@ -243,6 +243,7 @@ export const KEYBOARD_LAYOUTS = {
         createKey('KeyV', 'V'),
         createKey('KeyB', 'B'),
         createKey('KeyN', 'N'),
+        createKey('KeyM', 'M'),
         createKey('Comma', ','),
         createKey('Period', ';'),
         createKey('Slash', ':'),

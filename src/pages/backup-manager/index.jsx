@@ -23,16 +23,14 @@ function BackupManagerContent() {
     setFormOpen(true);
   };
 
-  const handleEditPlan = (plan) => {
-    if (typeof plan === 'string') {
-      return;
+  const handleEditPlan = (planOrId, updates) => {
+    if (typeof planOrId === 'string' && updates) {
+      return updatePlan(planOrId, updates);
     }
-    setEditingPlan(plan);
-    setFormOpen(true);
-  };
-
-  const handleUpdatePlan = (planId, updates) => {
-    return updatePlan(planId, updates);
+    if (planOrId && typeof planOrId === 'object') {
+      setEditingPlan(planOrId);
+      setFormOpen(true);
+    }
   };
 
   const handleAskDelete = (plan) => {

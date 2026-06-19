@@ -686,6 +686,38 @@ describe('code generation', () => {
       expect(css).toContain('align-items: flex-end')
       expect(css).toContain('border: 3px dashed #ff0000')
     })
+
+    it('should use unique selectors for non-merged cells with different styles', () => {
+      const grid = createInitialGrid(2, 1)
+      grid.cells[0] = {
+        ...grid.cells[0],
+        borderColor: '#ff0000',
+      }
+      grid.cells[1] = {
+        ...grid.cells[1],
+        borderColor: '#00ff00',
+      }
+
+      const html = generateHTML(grid)
+      const css = generateCSS(grid)
+
+      expect(html).toContain('grid-item-1')
+      expect(html).toContain('grid-item-2')
+      expect(css).toContain('.grid-item-1 {')
+      expect(css).toContain('.grid-item-2 {')
+      expect(css).toContain('border: 1px solid #ff0000')
+      expect(css).toContain('border: 1px solid #00ff00')
+
+      const cssLines = css.split('\n')
+      let borderRedCount = 0
+      let borderGreenCount = 0
+      cssLines.forEach((line) => {
+        if (line.includes('#ff0000')) borderRedCount += 1
+        if (line.includes('#00ff00')) borderGreenCount += 1
+      })
+      expect(borderRedCount).toBe(1)
+      expect(borderGreenCount).toBe(1)
+    })
   })
 
   describe('generateFullCode', () => {

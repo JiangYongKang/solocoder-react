@@ -478,21 +478,80 @@ describe('generateTrendSummary', () => {
 })
 
 describe('calculateWeightProgress', () => {
-  it('计算体重进度', () => {
-    const progress = calculateWeightProgress(70, 65)
+  it('减重场景：进度百分比正确计算（50%）', () => {
+    const progress = calculateWeightProgress(80, 75, 70)
     expect(progress).toBeTruthy()
-    expect(progress.targetWeight).toBe(65)
+    expect(progress.startWeight).toBe(80)
+    expect(progress.currentWeight).toBe(75)
+    expect(progress.targetWeight).toBe(70)
+    expect(progress.percent).toBe(50)
+    expect(progress.isCompleted).toBe(false)
   })
 
-  it('当前等于目标时完成', () => {
-    const progress = calculateWeightProgress(65, 65)
-    expect(progress.isCompleted).toBe(true)
+  it('减重场景：到达目标时 100%', () => {
+    const progress = calculateWeightProgress(80, 70, 70)
     expect(progress.percent).toBe(100)
+    expect(progress.isCompleted).toBe(true)
+  })
+
+  it('减重场景：超额达成超过100%', () => {
+    const progress = calculateWeightProgress(80, 65, 70)
+    expect(progress.percent).toBe(150)
+    expect(progress.isCompleted).toBe(true)
+  })
+
+  it('减重场景：刚起步 0%', () => {
+    const progress = calculateWeightProgress(80, 80, 70)
+    expect(progress.percent).toBe(0)
+    expect(progress.isCompleted).toBe(false)
+  })
+
+  it('增重场景：进度百分比正确计算', () => {
+    const progress = calculateWeightProgress(50, 55, 60)
+    expect(progress.percent).toBe(50)
+    expect(progress.isCompleted).toBe(false)
+  })
+
+  it('增重场景：到达目标时 100%', () => {
+    const progress = calculateWeightProgress(50, 60, 60)
+    expect(progress.percent).toBe(100)
+    expect(progress.isCompleted).toBe(true)
+  })
+
+  it('增重场景：超额达成超过100%', () => {
+    const progress = calculateWeightProgress(50, 65, 60)
+    expect(progress.percent).toBe(150)
+    expect(progress.isCompleted).toBe(true)
+  })
+
+  it('起点=目标时直接 100% 完成', () => {
+    const progress = calculateWeightProgress(70, 70, 70)
+    expect(progress.percent).toBe(100)
+    expect(progress.isCompleted).toBe(true)
+  })
+
+  it('减重方向走错时进度为负', () => {
+    const progress = calculateWeightProgress(80, 85, 70)
+    expect(progress.percent).toBe(-50)
+    expect(progress.isCompleted).toBe(false)
+  })
+
+  it('增重方向走错时进度为负', () => {
+    const progress = calculateWeightProgress(50, 45, 60)
+    expect(progress.percent).toBe(-50)
+    expect(progress.isCompleted).toBe(false)
+  })
+
+  it('精确到一位小数', () => {
+    const progress = calculateWeightProgress(100, 93, 70)
+    expect(progress.percent).toBe(23.3)
   })
 
   it('参数缺失返回null', () => {
-    expect(calculateWeightProgress(null, 65)).toBe(null)
-    expect(calculateWeightProgress(70, null)).toBe(null)
+    expect(calculateWeightProgress(null, 70, 65)).toBe(null)
+    expect(calculateWeightProgress(80, null, 65)).toBe(null)
+    expect(calculateWeightProgress(80, 70, null)).toBe(null)
+    expect(calculateWeightProgress(0, 70, 65)).toBe(null)
   })
 })
 
@@ -547,22 +606,24 @@ describe('localStorage operations', () => {
   })
 
   it('saveGoals 保存到 localStorage', () => {
-    const goals = { weightTarget: 65, weightDeadline: '2025-12-31', weeklyExercise: 3, weeklyExerciseDone: 1 }
+    const goals = { weightTarget: 65, weightStart: 80, weightDeadline: '2025-12-31', weeklyExercise: 3, weeklyExerciseDone: 1 }
     expect(saveGoals(goals)).toBe(true)
     expect(localStorage.getItem(STORAGE_KEY_GOALS)).toBe(JSON.stringify(goals))
   })
 
   it('loadGoals 从 localStorage 读取', () => {
-    const goals = { weightTarget: 65, weightDeadline: '2025-12-31', weeklyExercise: 3, weeklyExerciseDone: 1 }
+    const goals = { weightTarget: 65, weightStart: 80, weightDeadline: '2025-12-31', weeklyExercise: 3, weeklyExerciseDone: 1 }
     localStorage.setItem(STORAGE_KEY_GOALS, JSON.stringify(goals))
     const loaded = loadGoals()
     expect(loaded.weightTarget).toBe(65)
+    expect(loaded.weightStart).toBe(80)
     expect(loaded.weeklyExercise).toBe(3)
   })
 
   it('loadGoals 为空时返回默认值', () => {
     const loaded = loadGoals()
     expect(loaded.weightTarget).toBe(null)
+    expect(loaded.weightStart).toBe(null)
     expect(loaded.weeklyExercise).toBe(3)
   })
 })
@@ -600,11 +661,34 @@ describe('setGoals', () => {
     expect(result.success).toBe(false)
   })
 
-  it('有效数据返回成功', () => {
-    const result = setGoals({ weeklyExerciseDone: 0 }, { weightTarget: '65', weightDeadline: '2025-12-31', weeklyExercise: '3' })
+  it('设置体重目标时自动记录初始体重', () => {
+    const result = setGoals(
+      { weeklyExerciseDone: 0, weightStart: null },
+      { weightTarget: '65', weightStart: '80', weightDeadline: '2025-12-31', weeklyExercise: '3' }
+    )
     expect(result.success).toBe(true)
     expect(result.goals.weightTarget).toBe(65)
+    expect(result.goals.weightStart).toBe(80)
     expect(result.goals.weeklyExercise).toBe(3)
+  })
+
+  it('无初始体重时以目标体重为初始值', () => {
+    const result = setGoals(
+      { weeklyExerciseDone: 0, weightStart: null },
+      { weightTarget: '65', weightDeadline: '', weeklyExercise: '3' }
+    )
+    expect(result.success).toBe(true)
+    expect(result.goals.weightStart).toBe(65)
+  })
+
+  it('取消体重目标时清除初始体重', () => {
+    const result = setGoals(
+      { weeklyExerciseDone: 0, weightStart: 80, weightTarget: 65 },
+      { weightTarget: '', weightDeadline: '', weeklyExercise: '3' }
+    )
+    expect(result.success).toBe(true)
+    expect(result.goals.weightTarget).toBe(null)
+    expect(result.goals.weightStart).toBe(null)
   })
 })
 

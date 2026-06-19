@@ -25,7 +25,7 @@ export default function RestoreModal({ isOpen, onClose, record }) {
     setProgress(0);
     setRestoreComplete(false);
 
-    const duration = 2000 + Math.random() * 1000;
+    const { duration, promise } = startRestore();
     const startTime = Date.now();
 
     const progressInterval = setInterval(() => {
@@ -37,7 +37,7 @@ export default function RestoreModal({ isOpen, onClose, record }) {
       }
     }, 50);
 
-    await startRestore();
+    await promise;
 
     clearInterval(progressInterval);
     setProgress(100);

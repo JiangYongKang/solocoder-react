@@ -1,0 +1,17 @@
+产物不满意：
+用户启动或停止微应用时，handleStartApp 和 handleStopApp 中 finishBootstrapApp、finishMountApp、finishUnmountApp 完成生命周期阶段后，只更新了 app 对象的 lifecycle.stages 数组，没有通过 eventBus 将 bootstrap、mount、ready、unmount 事件（包含时间戳、阶段名称和耗时）作为 lifecycle 类型消息发布到日志流中。提示词第 6 条要求的"生命周期事件同步记录到操作日志面板"完全缺失，右侧消息日志面板看不到任何生命周期时间线。根本原因是生命周期管理函数与事件总线之间缺少桥接，开发者只关注了状态转换而忽略了日志采集需求。正确做法是在每次生命周期阶段完成后调用 eventBusRef.current.publish 发送包含阶段名和耗时的消息。
+
+用户点击处于 LOAD_FAILED 状态应用的"重试"按钮时，handleStartApp 检测到 LOAD_FAILED 状态后通过 setApps 重置为 STOPPED，然后 await handleStartApp(appId) 递归调用自身。由于 handleStartApp 通过 useCallback 创建并依赖 apps 数组，在 await 递归调用时闭包中的 apps 仍然保持旧状态（包含 LOAD_FAILED 的应用），第二次调用中 apps.find 再次命中 LOAD_FAILED 分支，形成无限递归，浏览器主线程被完全阻塞导致页面卡死。根本原因是 useCallback 闭包陷阱与 await 异步递归组合时，setApps 的状态更新是异步批处理的，递归调用中的函数引用不会自动切换到新闭包。正确做法是避免 await 递归，改用 setApps 回调中直接重置状态后继续执行加载流程。
+
+用户点击停止按钮后，handleStopApp 完成了 unmount 生命周期记录和应用状态变更为 STOPPED，但整个过程没有调用 eventBusRef.current.unregisterApp(appId) 清理事件总线中已注册的 iframe contentWindow 引用。启动应用时 setIframeRef 中调用了 eventBus.registerApp，但停止时缺少对应的 unregisterApp，事件总线的 _apps Map 中保留着已卸载 iframe 的过期引用。当其他应用向已停止应用发送消息时，eventBus.publish 会尝试调用过时的 contentWindow.postMessage，造成无效的消息投递尝试和潜在的内存泄漏。根本原因是状态管理只关注了应用层的状态转换，忽略了事件总线资源的生命周期对称性——注册与注销应成对出现。
+
+handleStartApp 中存在 LOAD_FAILED 状态下的 await 递归重试逻辑，但测试文件 utils.test.js 的 74 个测试用例全部集中在 utils.js、eventBus.js、lifecycle.js 的纯函数上，完全没有覆盖 index.jsx 中 React 组件层的重试路径。测试中的 resetFailedApp 和 resetAppForRestart 仅验证了状态重置的纯函数逻辑，未模拟完整的 handleStartApp 重试调用链，导致无限递归这个严重的运行时 bug 在单元测试阶段未被发现，只有用户实际浏览器操作时才会暴露。根本原因是测试设计仅覆盖了提示词列举的纯函数范围，未识别出 React 组件中异步闭包与递归组合场景需要集成测试覆盖。
+
+过程不满意：
+模型收到任务后在第一步就直接创建了包含 7 个 TODO 项的列表，而此时只查看了项目根目录和 src 目录，尚未完整阅读提示词的 7 条需求。标注规范明确要求"不能在刚收到任务时就直接创建 TodoList，应先分析问题再规划"，这种先规划后理解的做法导致第 6 条"生命周期事件同步记录到操作日志面板"的需求从未进入 TODO 列表，最终该项功能完全缺失。正确做法是先通读全部需求、逐条理解清楚后，再制定包含所有需求点的开发计划。
+
+模型在探索项目结构时通过 file_search 找到页面示例后，选择 message-queue 任务作为参考，连续查看了其下 5 个文件（index.jsx、utils.js、测试文件、css、constants.js）。micro-frontend 与 message-queue 在功能上没有任何关联，跨任务参考浪费了工具调用资源，且可能引入不相关的代码模式。正确做法是选择一个与本任务最接近的参考页面或直接根据项目骨架开始开发。
+
+模型在完成任务后的总结中声称完成了全部 6 条需求，将每条逐一标记为已实现并描述具体功能点，但第 6 条的"生命周期事件同步记录到操作日志面板"实际并未实现——handleStartApp 和 handleStopApp 中没有任何向事件总线发送生命周期事件记录的代码。模型的总结描述与实际文件内容严重不符，存在幻觉与虚假完成问题。正确做法是在总结前逐文件确认每条需求对应的代码实现是否真实存在。
+
+模型首次运行测试时使用了命令 `npm run test -- src/pages/__tests__/micro-frontend/utils.test.js undefined`，命令末尾多了一个 `undefined` 字符串。虽然实际执行中 test runner 可能忽略了多余参数，但表明模型在构造终端命令时存在粗心问题，没有仔细检查命令字符串的格式正确性。正确做法是执行命令前确认路径参数准确无误。

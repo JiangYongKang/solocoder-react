@@ -16,6 +16,7 @@ import DanmakuPlayerPage from '@/pages/danmaku-player/index.jsx'
 import Dashboard from '@/pages/dashboard/Dashboard.jsx'
 import DataImporterPage from '@/pages/data-importer/index.jsx'
 import DataMaskPage from '@/pages/data-mask/index.jsx'
+import ExportSchedulerPage from '@/pages/export-scheduler/index.jsx'
 import DBDesignerPage from '@/pages/db-designer/index.jsx'
 import EventTimelinePage from '@/pages/event-timeline/index.jsx'
 import ExamPage from '@/pages/exam/index.jsx'
@@ -94,6 +95,13 @@ import ModalGenerator from '@/pages/modal-generator/index.jsx'
 import PuzzleGamePage from '@/pages/puzzle-game/index.jsx'
 import MessageQueuePage from '@/pages/message-queue/index.jsx'
 import StickyNotesPage from '@/pages/sticky-notes/index.jsx'
+import LoadingAnimationPage from '@/pages/loading-animation/index.jsx'
+import MicroFrontendPage from '@/pages/micro-frontend/index.jsx'
+import PhoneLoginPage from '@/pages/phone-login/index.jsx'
+import LogAnalyzerPage from '@/pages/log-analyzer/index.jsx'
+import SplashConfigPage from '@/pages/splash-config/index.jsx'
+import BillSplitterPage from '@/pages/bill-splitter/index.jsx'
+import ColorToolkitPage from '@/pages/color-toolkit/index.jsx'
 
 const TASKS = [
     { id: 1, title: '用户认证系统', route: 'auth', description: '登录、注册、找回密码、修改密码完整的认证流程，基于 localStorage 存储。' },
@@ -180,6 +188,13 @@ const TASKS = [
     { id: 84, title: '拼图游戏', route: 'puzzle-game', description: '完整拼图益智游戏，上传图片切分网格拼块、拖拽交换完成拼图、计时计步、多难度选择、完成庆祝动画、排行榜 localStorage 持久化。' },
     { id: 85, title: '消息队列模拟', route: 'message-queue', description: '消息队列系统管理界面，主题管理、消息发布与延迟送达、消费者组订阅与消费位点、积压监控折线图、死信队列与重试配置，基于 localStorage 持久化。' },
     { id: 86, title: '便签提醒应用', route: 'sticky-notes', description: '带定时提醒功能的便签管理工具，支持多彩便签、设置提醒闹钟、分类标签管理、网格/列表视图切换、拖拽排序、归档回收站、过期自动清理，所有数据基于 localStorage 持久化。' },
+    { id: 87, title: '加载动画生成器', route: 'loading-animation', description: '加载动画可视化配置和代码生成工具，支持多种动画类型、颜色大小速度调节、实时预览、组合动画编辑、CSS代码导出与 localStorage 配置持久化。' },
+    { id: 88, title: '日志分析器', route: 'log-analyzer', description: '前端日志分析工具，支持日志粘贴解析、正则过滤高亮、时间范围筛选、级别统计柱状图、关键词趋势折线图、折叠展开与虚拟滚动。' },
+    { id: 88, title: '手机验证码登录', route: 'phone-login', description: '手机号 + 短信验证码登录，支持滑块拼图验证、60秒倒计时、协议勾选、验证码错误锁定、登录态 localStorage 持久化与 24 小时自动过期。' },
+    { id: 89, title: '应用启动页配置器', route: 'splash-config', description: '应用启动页（Splash Screen）可视化配置工具，编辑Logo、标题、背景，套用模板，全屏预览手机比例效果，配置JSON导入导出，基于localStorage持久化。' },
+    { id: 90, title: '数据导出调度器', route: 'export-scheduler', description: '数据导出定时调度管理工具，创建导出任务配置数据源/字段/格式/调度频率，执行时间线与历史下载，失败自动重试与完成通知，基于 localStorage 持久化。' },
+    { id: 91, title: '账单分摊计算器', route: 'bill-splitter', description: '多人账单分摊计算工具，支持参与者增删与拖拽排序、费用录入（平分/自定义比例）、最简结算方案生成，历史记录 localStorage 持久化。' },
+    { id: 92, title: '颜色工具集', route: 'color-toolkit', description: '前端开发者颜色工具箱，调色板生成、HEX/RGB/HSL互转、色盲模拟、渐变色CSS、品牌色提取，收藏与导出功能，基于 localStorage 持久化。' },
 ]
 
 function HomePage() {
@@ -279,6 +294,7 @@ function App() {
             <Route path="/event-timeline" element={<EventTimelinePage />} />
             <Route path="/data-importer" element={<DataImporterPage />} />
             <Route path="/data-mask" element={<DataMaskPage />} />
+            <Route path="/export-scheduler" element={<ExportSchedulerPage />} />
             <Route path="/json-to-ts" element={<JsonToTsPage />} />
             <Route path="/url-tool" element={<UrlToolPage />} />
             <Route path="/release-manager" element={<ReleaseManagerPage />} />
@@ -303,6 +319,9 @@ function App() {
             <Route path="/stock-dashboard" element={<StockDashboardPage />} />
             <Route path="/package-manager" element={<PackageManagerPage />} />
             <Route path="/sticky-notes" element={<StickyNotesPage />} />
+            <Route path="/loading-animation" element={<LoadingAnimationPage />} />
+            <Route path="/bill-splitter" element={<BillSplitterPage />} />
+            <Route path="/color-toolkit" element={<ColorToolkitPage />} />
         </Routes>
     )
 }

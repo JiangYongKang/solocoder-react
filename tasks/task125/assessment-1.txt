@@ -1,0 +1,17 @@
+产物不满意：
+用户在首页点击"手机验证码登录"任务卡片后，App.jsx 中只添加了 PhoneLoginPage 的 import 语句和 TASKS 数组条目，Routes 中完全缺少 `<Route path="/phone-login" element={<PhoneLoginPage />} />` 这一行路由配置。触发后页面无法正确渲染 phone-login 组件，整个功能入口阻断。根本原因是模型在修改 App.jsx 时完成了 import 和任务卡片的两步编辑，但遗漏了第三步添加 Route 的操作，事后总结时未验证文件最终状态。正确做法是在 Routes 数组内的合适位置插入 phone-login 对应的 Route 条目。
+
+用户完成滑块验证通过且 60 秒倒计时结束后，验证码按钮的文本是 `{countdown > 0 ? `XX 秒后重新发送` : '获取验证码'}`，始终显示"获取验证码"而非提示词第 2 条明确要求的"重新获取验证码"。触发后用户无法区分是首次请求还是重试阶段，两个状态语义完全丢失。根本原因是三元表达式只有两个分支，缺少一个 hasRequested 标识来区分"从未发送过"和"已完成一轮倒计时"两种场景。正确做法是引入布尔状态，倒计时结束后若 hasRequested 为 true 则显示"重新获取验证码"。
+
+用户在滑块验证通过后"验证通过"提示出现 500ms 延迟期间点击弹窗关闭按钮，handleEnd 函数中验证通过分支的 setTimeout 回调没有被关闭弹窗的逻辑清理。定时器到期后仍会静默执行 `generateSmsCode()` 生成新验证码并设置 `setCountdown(60)`，用户此时弹窗已关闭看不到任何验证码发送提示，但"获取验证码"按钮已进入 60 秒倒计时态。后果是用户被无故锁定 60 秒无法获取验证码，且生成的验证码未感知到导致登录阻塞。根本原因是 setTimeout 的返回值未存入 ref，关闭弹窗时未调用 clearTimeout。正确做法是将定时器 ID 存入 ref，在关闭按钮和 modal overlay 点击关闭逻辑中统一清理。
+
+TASKS 数组中"日志分析器"和"手机验证码登录"两个条目均使用了 `id: 88`，导致 React 在 `[...TASKS].reverse().map(task => <a key={task.id}>...)` 遍历时产生两个相同 key 的 DOM 节点。触发后浏览器控制台输出 React key 重复警告，可能引发卡片列表渲染错位。根本原因是模型添加新任务卡片时未检查已有最大 id，直接复用了与上一个任务相同的 id 值。正确做法是查询数组中最大 id 后取 max+1 作为新任务 id。
+
+utils.test.js 覆盖了手机号格式校验、格式化与解析、掩码、验证码生成与比对、滑块容差判定、登录态存取与过期判断、协议文本提取等纯函数，但提示词第 7 条明确列举要求测试的"倒计时逻辑"完全没有对应的单元测试用例。倒计时逻辑完全内嵌在 index.jsx 组件的 useState 和 useEffect 中，未被抽象为纯函数，触发后如果组件中计数状态更新或 setInterval 清除逻辑被改动，没有任何测试能拦截至倒计时行为回归。根本原因是模型未将倒计时核心判定提炼为纯工具函数。正确做法是从组件中提取 getCountdownButtonText 和 computeNextCountdown 等纯函数，在 utils.test.js 中补充对应的测试。
+
+过程不满意：
+模型在最终总结中写道"已添加 id=88 的任务卡片和 /phone-login 路由"，声称完成了 App.jsx 的路由配置。实际打开 App.jsx 文件检查 Routes 段内容，从 `<Route path="/loading-animation" ...>` 到 `<Route path="/color-toolkit" ...>` 之间完全没有 phone-login 对应的 Route 条目，只有 import 和 TASKS 数组被正确添加。模型在未逐条核实 App.jsx Routes 段真实内容的情况下做出了虚假的完成声明，属于典型的幻觉与虚假完成问题。正确做法是在输出任何"已完成"声明前，必须完整读取被修改文件的相关代码段并逐行确认改动确实落地。
+
+模型在初次编写 localStorage 相关测试时直接使用全局 localStorage API 而未做 mock，导致测试失败后才去查看 auth 测试文件学习 `vi.stubGlobal` 方案。之后遇到 useEffect 依赖数组触发的 ESLint exhaustive-deps 警告，模型没有系统分析哪些依赖可通过 useCallback 或 useRef 合理管理，而是采用了有损规避方案——将登录态初始化检查从 `useEffect(() => { ... }, [])` 改为模块作用域级的 `const initialState = getInitialLoginState()` 调用，以此消除 lint 警告。这个改动虽然平息了 ESLint，但牺牲了功能正确性：当组件通过 React Router SPA 导航重挂载时，模块不会重新执行，initialState 仍是首次加载时的旧值，无法反映会话中 localStorage 的状态变更。正确做法是通过 useRef 缓存初始化标记或正确管理 useEffect 依赖数组，在不损害功能的前提下满足 lint 规则。
+
+模型在 TASKS 数组中添加"手机验证码登录"任务卡片时直接使用了 `id: 88`，但数组中紧随前一个条目"日志分析器"已经占用了 `id: 88`。模型在整个开发过程中两次读取了 App.jsx 文件，却从未搜索或关注过已有的最大 id 值，导致重复 id 一路未被察觉。这属于对全局数据一致性的边界意识缺失——修改共享数据结构时应先确认约束条件（id 唯一性），再执行写入，而非只关注目标条目的插入位置。

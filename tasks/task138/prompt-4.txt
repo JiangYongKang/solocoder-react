@@ -1,0 +1,5 @@
+你实现的备份恢复管理中心还存在一些问题，需要进行修复：
+
+1. storage.js 的 normalizePlansNextBackupTime 函数中定义了 MAX_SPREAD_MINUTES 常量，但该常量在函数体内的所有逻辑分支中均未被引用。当前实现中计划的 nextBackupTime 碰撞偏移按固定步长持续递增，没有任何上限限制。当同一时间槽上存在较多计划冲突时，排在后面的计划会被偏移到越来越远的时间点。
+
+2. 修复完成后重新运行 pnpm run test，需要让所有测试通过。

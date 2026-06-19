@@ -59,8 +59,9 @@ function normalizePlansNextBackupTime(plans) {
       return { ...plan, _originalIndex: originalIndex };
     }
     const offsetSoFar = perKeyOffset.get(key) || 0;
-    const addMinutes = offsetSoFar;
-    perKeyOffset.set(key, offsetSoFar + OFFSET_MINUTES);
+    perKeyOffset.set(key, offsetSoFar + 1);
+    const dynamicStep = Math.max(OFFSET_MINUTES, Math.floor(MAX_SPREAD_MINUTES / Math.max(1, count - 1)));
+    const addMinutes = Math.min(offsetSoFar * dynamicStep, MAX_SPREAD_MINUTES);
     const nextBackupTime = key + addMinutes * 60 * 1000;
     return { ...plan, nextBackupTime, _originalIndex: originalIndex };
   });

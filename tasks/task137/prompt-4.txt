@@ -1,0 +1,7 @@
+你实现的短信模板编辑器还存在一些问题，需要进行修复：
+
+1. 模板编辑区在 disabled 状态下的变量占位符显示异常。textarea 被禁用后文字颜色设为透明，渲染交给了 overlay 层承担，但 overlay 层中 `.sms-var-highlight` 内的变量名称文字同样被设为透明色。用户在 disabled 状态下只能看到蓝色背景方块，无法辨认 `{用户名}`、`{验证码}` 这类变量占位符的名称。
+
+2. sms-template.css 中新增的 `.is-disabled .sms-var-highlight` 规则内声明的 `color: transparent` 与 `.sms-var-highlight` 本身的默认文字颜色完全一致，属于无实际效果的冗余样式声明。
+
+3. 修复完成后重新运行 pnpm run test，需要让所有测试通过。

@@ -463,7 +463,7 @@
 }
 
 .sms-template-textarea-wrapper.is-disabled .sms-template-highlight-overlay .sms-var-highlight {
-  color: transparent;
+  color: #409eff;
 }
 
 .sms-template-stats-bar {

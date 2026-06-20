@@ -1,0 +1,13 @@
+产物不满意：
+1. App.jsx中完全未注册seat-selection页面的路由和任务卡片。组件SeatSelectionPage既未在App.jsx顶部导入，Routes中也无对应的Route条目，TASKS数组内没有该任务的卡片定义。这导致从首页完全无法导航到座位选座系统页面，整个页面在应用中不可访问。正确做法是在App.jsx中添加import语句和Route配置，并在TASKS数组中补上任务卡片条目。
+2. seat-selection.css第3行的linear-gradient函数缺少右括号，当前写为`linear-gradient(135deg, #f5f7fa 0%, #e4e7eb 100%;`，`100%`后面丢失了闭合的`)`。CSS语法错误会导致.seat-selection-page的背景渐变属性完全失效，浏览器会将该行视为无效样式直接丢弃。正确做法是在`100%`后补上`)`闭合括号。
+3. index.jsx中handleTimeout的useCallback定义在第128行，但在第94行的useEffect setInterval回调中就被引用了，React ESLint规则`react-hooks/immutability`明确报出`handleTimeout is accessed before it is declared`错误。这会导致setInterval闭包中捕获的handleTimeout永远是最初渲染时的版本，后续因selectedIds变化而重新创建的handleTimeout不会被定时器使用。当用户在倒计时期间新增选中座位后超时，releaseSelectedSeats释放的仍是旧的selectedIds，新选中的座位不会被释放。正确做法是将handleTimeout的定义移到useEffect之前，或使用ref存储最新值。
+4. seatSelectionCore.js的updatePriceZoneConfig函数直接对导入的PRICE_ZONE_CONFIG常量对象执行赋值`PRICE_ZONE_CONFIG[zoneKey] = mergedConfig`，这是对模块级导入常量的副作用修改。同一个模块中的createSeatGrid等函数在读取PRICE_ZONE_CONFIG时，其行为会因updatePriceZoneConfig的调用而不可预测地改变，破坏了纯函数的可测试性和代码的可维护性。正确做法是返回新的配置对象而非修改导入的常量，由调用方管理配置状态。
+5. index.jsx的handleSeatClick函数在双人或三人模式下，当findAdjacentSeats返回空数组时仅调用showToast弹出提示后直接return，完全没有提供手动逐个选座的降级路径。提示词要求"相邻座位无法满足时允许用户手动逐个选择不连续的座位作为备用方案"，当前实现彻底阻断了该备用方案的入口。正确做法是在提示后允许用户切回单人模式或以逐个点击的方式累加座位，而非完全阻断选择操作。
+6. index.jsx的useEffect在第112行依赖数组中仅写了`[selectedIds.length > 0, isConfirmed, grid]`，但effect内部使用了handleTimeout函数，ESLint报出`react-hooks/exhaustive-deps`警告提示缺少`handleTimeout`和`selectedIds.length`依赖。同时该effect依赖使用了布尔表达式`selectedIds.length > 0`导致React无法静态检查依赖完整性，也产生了一个`complex expression`警告。正确做法是将`selectedIds.length > 0`提取为独立变量，并将handleTimeout加入依赖数组。
+
+过程不满意：
+1. 模型在整个开发流程中完全没有查看或修改App.jsx文件。思考过程中列出了大量文件操作记录——创建constants.js、创建seatSelectionCore.js、创建CSS、创建index.jsx、创建测试文件，但自始至终没有打开过App.jsx，没有检查现有页面的路由注册模式，也没有添加seat-selection页面的路由和任务卡片。这让整个页面在应用中完全孤立不可达，属于严重的交付遗漏。正确做法是在创建页面组件后，参照其他页面的注册方式在App.jsx中补上import、Route和TASKS条目。
+2. 模型在修改findAdjacentSeats排序逻辑时经历了至少五轮试错式调试。思考过程显示模型先后尝试了多种排序方案：先按offset排序、再按是否包含点击座位的布尔值排序、再按与preferredOffset的距离排序，每次都是运行测试→看到失败→重新修改，没有在动手前系统分析出"优先选择点击座位尽量居中的连续区间"这一核心约束。同一函数的排序逻辑被反复推翻重写的次数过多，反映出缺乏先设计再编码的习惯。
+3. 模型在运行lint检查后声称"没有任何lint错误"，但实际lint输出中seat-selection包下存在4个error和2个warning：index.jsx的TOTAL_ROWS未使用、useEffect中同步setState、handleTimeout声明前引用、缺少依赖项；seatSelectionCore.js的newPersonCount参数未使用；测试文件的updatePriceZoneConfig导入未使用。模型对lint输出质量关注不足，仅凭exit code或粗略扫视就下了错误结论，遗漏了多个应修复的问题。
+4. 模型从未运行`pnpm run dev`启动开发服务器进行页面级验证。整个验证过程仅依赖单元测试通过（86个all pass）和错误的lint结果，缺少对页面能否渲染、交互是否正常、CSS是否生效等端到端的人工或自动验证步骤。CSS语法错误（缺少右括号）和路由未注册这两个问题如果启动dev server打开页面，都是可以直接发现的。

@@ -1,0 +1,8 @@
+产物不满意：
+1. GridCanvas.jsx中的行线编号显示存在缺陷：左侧边缘渲染的是行号（1到rows）而非网格线编号。提示词第9条要求"网格线编号（行线1-13、列线1-13）在画布边缘显示"，CSS Grid中N行产生N+1条网格线，3行网格应显示行线1到4而非仅1到3。模型混淆了行序号与行线编号的概念，导致行线编号缺失最后一条线。正确做法是像列线编号一样用 `getGridLineNumbers(rows)` 获取rows+1个编号并在行侧展示。前一个rowLines渲染区块中div内容为空也佐证了模型中途放弃了行线编号渲染。
+2. gridGeneratorCore.js的generateChildrenCSS函数中，当单元格同时设置colSpan大于1且areaName非空时，会先后生成含span的grid-column和grid-area声明。grid-area在输出中位于grid-column之后，根据CSS层叠规则后声明覆盖先声明，导致用户配置的跨列跨行在复制CSS中丢失，合并单元格退化为普通单格。根因是未处理二者的互斥关系。正确做法是当同时存在areaName和span时，改用 `grid-area: rowStart / colStart / rowEnd / colEnd` 简写同时表达位置与跨度。
+3. ConfigPanel.jsx中 `step={modes === 'col' ? '' : ''}` 三元表达式两个分支值完全相同均为空字符串，属于无意义的冗余代码。该SizeList组件被实例化两次分别处理列宽和行高，modes属性分别被硬编码为"col"和"row"，三元判断始终得出同一结果未产生区分效果。这暴露了模型编写可复用组件props时对调用方场景差异考虑不充分。
+
+过程不满意：
+1. 模型在session-cot-1.md收到任务后立即创建了9项TodoList，随后才探索项目结构。规范要求应先完整阅读需求分析项目后再制定计划。模型在未充分了解测试规范和技术栈的情况下急于列清单，导致首次编写的getMaxColSpanForCell、getMaxRowSpanForCell和validateSpanChange三个函数将普通单格cells也错误视为跨列障碍物，首次运行测试即失败6个用例，之后需额外读取代码定位根因才完成修复。
+2. 模型在storage.test.js编写阶段发现语法问题后采取全量重写整个测试文件的策略，而非定位到具体语法错误做最小修正。这种试错式调试有两个隐患：全量重写可能遗漏已正确的测试逻辑或引入新错误，对无问题部分做不必要的覆盖增加验证成本。正确做法是先运行测试查看具体报错信息，只对报错区域精确修正。

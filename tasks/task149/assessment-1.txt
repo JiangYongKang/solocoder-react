@@ -1,0 +1,8 @@
+产物不满意：
+1. index.jsx 中存在 7 个 ESLint `no-unused-vars` 错误，包括 `DEFAULT_RETENTION_HOURS`、`generateCellCode`、`isOverdue`、`getOverduePackages`、`validatePhone`、`formatDate` 六个未使用的导入和 `rowIdx` 一个未使用的 map 参数。其中 `getOverduePackages` 被重复导入了两次（第41行直接导入和第62行以别名 `getOverduePkgs` 导入），直接导入的那个从未被引用。原因是模型完成开发后未运行 lint 检查来清理代码，导致产物中存在大量冗余导入，增加了包的噪音和维护负担。正确做法是在提交前运行 `pnpm run lint` 并修复所有报错。
+2. 在 `handleRegenerateCode` 函数中，重新生成取件码成功后使用原生 `alert()` 弹窗展示新取件码，而页面其他所有通知（投递成功、取件成功、错误提示等）均通过自定义的 `showAlert()` 函数统一管理。导致用户重新生成取件码时看到的是浏览器原生弹窗而非页面内提示条，交互体验不一致。原因是模型在写这个函数时未遵循页面已有的通知模式。正确做法是将 `alert()` 替换为 `showAlert('取件码已重新生成：' + result.newCode, 'success')`。
+3. `handleConfigChange` 函数在应用新格口配置时调用 `setPackages([])` 清空了所有包裹数据，但 `deliveryRecords` 和 `pickupRecords` 这两个状态数组未同步清理。导致历史投递和取件记录中仍保留着已删除包裹的引用，统计图表中会出现引用失效包裹 ID 的孤立记录。原因是模型只考虑了格口数据重置需要清空包裹，没有同步考虑关联记录表的一致性维护。正确做法是在清空 packages 的同时也重置 deliveryRecords 和 pickupRecords 为空数组，或至少将配置变更前后的数据关联关系保持一致。
+
+过程不满意：
+1. 模型在完成所有开发任务、测试全部通过（56个测试）后直接声称"所有功能均已实现并通过测试"，完全没有执行 `pnpm run lint` 命令来检查代码质量。运行 ESLint 后 index.jsx 报出 7 个 `no-unused-vars` 错误，这些错误在模型总结完成时已经存在于代码中，但模型既没有运行 lint 发现它们，也没有在总结中提到任何代码质量问题。原因是对产物质量验证的维度过于单一，只关注测试通过而忽略了代码规范检查。正确做法是在测试通过后追加一轮 lint 检查，通读 lint 输出并修复所有报错后再做完成总结。
+2. 模型在向 App.jsx 的 TASKS 数组添加快递柜任务条目时，第一次 `edit_file_search_replace` 操作执行失败（status: failed），原因是匹配文本不精确导致替换无法定位。模型随后重新读取文件内容、确认目标位置的精确文本后再次操作才成功。这反映出模型在大文件中做精确替换时未事先确认匹配文本的唯一性，凭经验推定后直接执行，造成了无效操作。正确做法是在对大型配置文件做文本替换前，先通过读取目标区域代码确认上下文文本的唯一性和精确格式，再执行替换操作，避免试错式的编辑。

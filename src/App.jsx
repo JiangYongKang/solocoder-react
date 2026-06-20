@@ -109,6 +109,13 @@ import OrgChartPage from '@/pages/org-chart/index.jsx'
 import ChatbotPage from '@/pages/chatbot/index.jsx'
 import KeyTesterPage from '@/pages/key-tester/index.jsx'
 import ImageCompressorPage from '@/pages/image-compressor/index.jsx'
+import GridGeneratorPage from '@/pages/grid-generator/index.jsx'
+import TtsConfigPage from '@/pages/tts-config/index.jsx'
+import PasswordManagerPage from '@/pages/password-manager/index.jsx'
+import GroupBuyingPage from '@/pages/group-buying/index.jsx'
+import SerialDebuggerPage from '@/pages/serial-debugger/index.jsx'
+import CloudMonitorPage from '@/pages/cloud-monitor/index.jsx'
+import LockerManagementPage from '@/pages/locker-management/index.jsx'
 
 const TASKS = [
     { id: 1, title: '用户认证系统', route: 'auth', description: '登录、注册、找回密码、修改密码完整的认证流程，基于 localStorage 存储。' },
@@ -206,6 +213,9 @@ const TASKS = [
     { id: 93, title: '个人健康档案', route: 'health-tracker', description: '个人健康数据记录和追踪工具，支持身高/体重/血压/血糖录入、趋势折线图、BMI计算与标准范围对比、异常值标记、健康报告生成、目标设定追踪，基于 localStorage 持久化。' },
     { id: 93, title: '组织架构图编辑器', route: 'org-chart', description: '可视化组织架构图编辑工具，支持部门/职位/人员三种节点，拖拽增删改、横向纵向布局切换、缩放平移、属性编辑、JSON/PNG导入导出，数据 localStorage 持久化。' },
     { id: 94, title: '图片压缩工具', route: 'image-compressor', description: '纯前端图片压缩工具，支持质量/尺寸/格式参数调节、并排对比预览、批量处理、压缩级别预设、localStorage 历史记录持久化。' },
+    { id: 95, title: '团购活动页面', route: 'group-buying', description: '电商拼团活动页面，商品原价拼团价对比、成团进度条、倒计时、团列表实时刷新、发起与参与拼团、拼团记录与状态展示，基于 localStorage 持久化。' },
+    { id: 96, title: '密码管理器', route: 'password-manager', description: '本地密码管理工具，分组管理密码条目、密码生成器、主密码解锁、掩码显示与复制、Base64模拟加密、数据导入导出，基于 localStorage 持久化。' },
+    { id: 97, title: '快递柜管理模拟', route: 'locker-management', description: '快递柜模拟管理系统，支持格口配置、包裹投递、自动取件码生成、格口状态可视化、滞留超时提醒、投递取件统计，基于 localStorage 持久化。' },
 ]
 
 function HomePage() {
@@ -338,6 +348,13 @@ function App() {
             <Route path="/health-tracker" element={<HealthTrackerPage />} />
             <Route path="/org-chart" element={<OrgChartPage />} />
             <Route path="/image-compressor" element={<ImageCompressorPage />} />
+            <Route path="/grid-generator" element={<GridGeneratorPage />} />
+            <Route path="/group-buying" element={<GroupBuyingPage />} />
+            <Route path="/serial-debugger" element={<SerialDebuggerPage />} />
+            <Route path="/cloud-monitor" element={<CloudMonitorPage />} />
+            <Route path="/password-manager" element={<PasswordManagerPage />} />
+            <Route path="/tts-config" element={<TtsConfigPage />} />
+            <Route path="/locker-management" element={<LockerManagementPage />} />
         </Routes>
     )
 }

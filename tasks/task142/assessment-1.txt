@@ -1,0 +1,10 @@
+产物不满意：
+1. index.jsx 中商品概览区域的进度条数据完全写死为随机数。progressPercentage 的计算使用了 `Math.floor(currentProduct.groupSize * 0.4) + Math.floor(Math.random() * 2)` 作为已拼人数，JSX 中又硬编码了 `Math.floor(currentProduct.groupSize * 0.6)` 作为展示的已拼人数。两个数字来源不同，进度条填充比例和文字描述显示的人数不一致，且都与下方团列表中的真实拼团数据毫无关联。违反了提示词第2条"按已拼人数比例计算"的要求，用户看到的是虚假进度数据。正确做法是从当前商品对应的进行中团列表中聚合 real currentPeople 数据来计算总体的已拼人数和进度百分比。
+2. index.jsx 底部操作栏中"参与现有团"按钮和"发起新团"按钮的 onClick 都绑定到了同一个 `handleCreateGroup` 函数。提示词第5条明确要求"参与现有团"按钮与"发起新团"按钮功能不同——前者应引导用户参与已有的团，后者才创建新团。当前实现导致无论用户点击哪个按钮都会触发创建新团的流程，在用户已有进行中的团时两个按钮会弹出相同的"您已有进行中的拼团"提示，无法实现参与已有团的功能。正确做法是"参与现有团"按钮应滚动到团列表区域或切换排序让用户快速找到可参与的团。
+3. index.jsx 中团列表渲染使用了 `sortedOngoingGroups.slice(0, 10)` 限制最多显示 10 个团。提示词第4条要求展示"当前进行中的团列表"，并未限制展示数量。当商品热门、进行中的拼团超过 10 个时，排名靠后的团用户将完全看不到，限制了用户的参团选择。正确做法是移除 slice 限制或设置合理的上限（如 50 或 100）并提供"加载更多"机制。
+4. calculateProgressPercentage 函数在 currentPeople 小于等于 0 时返回值固定为 0，但 getRemainingSpots 函数中计算 `total - current` 时，当 current 为合法值 0 时能正确处理，两个函数对零值输入的处理逻辑语义一致但实现路径不同，说明函数间缺乏统一的防御编程约定。此外 formatPrice 函数对 null/undefined/NaN 的兜底使用了三段式判断，而其他函数则分别采用 `Number(val)` 加 `Number.isNaN` 的模式，同一文件中存在两种不同的无效值检测风格，降低了代码一致性。
+
+过程不满意：
+1. 模型在 utils.js 中编写 `formatPrice`、`calculateSavings`、`calculateProgressPercentage`、`getRemainingSpots` 四个函数时，都使用了 `Number(val)` 转换后未单独处理 null 的情况——因为 `Number(null)` 返回 0 而非 NaN，导致无效输入无法被 `Number.isNaN` 捕获。模型在运行测试后发现 3 个失败用例，第一轮修复只改了 `calculateSavings`，第二轮又发现 `calculateProgressPercentage` 同样失败，第三轮再改 `getRemainingSpots`。同一个 root cause 的错误模式被散布在 4 个函数中，模型用了 3 轮修复才全部处理完，且每次都只修当前报错的函数，没有主动用 grep 搜索所有使用相同模式的函数一次性批量修复。正确做法是定位到 `Number(null)` 的根因后立即搜索所有相关的转换逻辑，一次性修复避免多轮返工。
+2. 模型在编写完所有代码后才运行 lint 检查，发现了 index.jsx 中未使用的 `formatCountdownString` 导入、storage.js 中 4 个 catch 块未使用的 e 变量、utils.test.js 中未使用的常量导入等共计 8 处 lint 警告。这些清理工作在 5 轮 edit_file_search_replace 中才逐步完成。说明模型在开发过程中没有利用 IDE 的实时 lint 反馈或在每写完一个文件后及时检查，将质量清理全部堆积到了最后，增加了无谓的修改轮次。正确做法是完成每个文件后立即运行 lint 检查该文件，确保问题不累积。
+3. 模型在整个开发过程中从未运行 `pnpm run dev` 启动项目来肉眼验证页面渲染效果。如果启动后打开团购页面，就会立即发现底部"参与现有团"和"发起新团"两个按钮点击后行为完全一致、商品概览进度条的人数和百分比与实际团数据无关等视觉层面的问题。模型在最终总结中声称 6 项功能全部实现完成且描述了所有功能点的具体展示效果，但实际页面存在明显的数据造假和按钮逻辑错误，存在"幻觉与虚假完成"问题。正确做法是完成前端页面开发后必须启动开发服务器至少验证关键交互路径的可视化效果。

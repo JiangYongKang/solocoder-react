@@ -1,0 +1,9 @@
+产物不满意：
+1. index.jsx 中 useEffect 每秒执行 `setFormData((prev) => ({ ...prev, registerTime: formatDateTime(Date.now()) }))` 导致表单上的"登记时间"字段每秒跳动更新。提示词要求"自动获取当前时间并显示，不可修改"，语义应为表单初始化时自动填充当前时间并保持静态显示，而非呈现为一个实时跳动的时钟。此外 handleSubmit 中实际使用的登记时间是 `Date.now()`，与表单上跳动显示的时间值不同步：用户在某一秒看到显示时间是 23:12:33，但提交一瞬间实际记录的时间可能已是 23:12:34。这造成显示时间与记录时间不一致的业务歧义。正确做法是去掉每秒更新的 useEffect，只在 formData 初始化和表单重置时设置一次 registerTime，保持显示值稳定不变。
+2. index.jsx 中 `setRecords((prev) => [...prev])` 的 60 秒定时器有其本意（通过创建新数组引用触发组件重渲染来刷新超时状态判定），但该方式副作用大：每次创建新引用都会触发 useEffect 执行 saveRecords 向 localStorage 做全量写入，每分钟产生一次不必要的持久化 I/O。应采用更轻量的方式实现状态刷新，例如使用独立的计数器 state（如 `const [refreshTick, setRefreshTick] = useState(0)`）并通过它触发 useMemo 的重新计算，避免直接修改 records 状态引发连锁的持久化写入。
+
+过程不满意：
+1. 模型首次编写完 index.jsx 后运行 ESLint，终端输出大量语法错误（syntax errors），模型没有读取 lint 输出中的具体错误行号和错误类型，也没有逐处排查修复，而是直接选择重写整个约 890 行的 index.jsx 文件。这种"推倒重来"的试错式修复方式浪费了一轮开发时间，且重写过程仍可能引入新的语法问题。正确做法是先通读 lint 报告的每个错误，定位到具体行号，做最小范围的字符串修复，再重新运行 lint 确认修复成功后再继续。
+2. 模型首次创建 validators.js 时使用了 CommonJS 的 `require('./constants')` 语法引入依赖，而项目中所有已有文件均使用 ES Module 的 `import/export` 规范。模型在写完文件后才意识到规范不符并修改为 import 语法，暴露出模型在创建新文件前未充分核实项目已有模块导入规范的问题。应先用 Grep 搜索项目中的 import 模式确认规范，再按照统一风格编写新文件。
+3. maskIdCard 函数首次实现的掩码逻辑中切片起始位置计算错误，对 18 位身份证号做掩码时使用了错误的 slice 参数导致掩码长度和位置不符合提示词要求的"中间 8 位掩码"规则。提示词已明确说明掩码规则但模型首次编写时未仔细核对就提交了错误逻辑，直到运行测试失败后才被动修复。说明编写工具函数时对需求的逐字核对意识不够，应在编写时即对照提示词验证函数行为而非依赖测试兜底。
+4. 模型在运行测试命令时反复出现参数格式错误，如 `pnpm test -- --run src/pages/__tests__/visitor-registration/` 和 `pnpm test --run src/pages/__tests__/visitor-registration/`，均因多余或错误的参数导致执行失败，正确命令应为 `pnpm test src/pages/__tests__/visitor-registration/`。模型经过两次失败后才找到正确参数格式，反映出对 vitest CLI 参数约定不熟悉，应在首次遇到命令执行失败时先用 `pnpm test --help` 查阅文档核验参数格式再重新执行。

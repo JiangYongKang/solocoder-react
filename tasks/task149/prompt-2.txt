@@ -1,0 +1,7 @@
+你实现的快递柜管理模拟页面还存在一些问题，需要进行修复：
+
+1. index.jsx 中存在多个未使用的导入和变量，包括 DEFAULT_RETENTION_HOURS、generateCellCode、isOverdue、getOverduePackages、validatePhone、formatDate 以及一个未使用的 map 参数 rowIdx。其中 getOverduePackages 被重复导入了两次。
+2. handleRegenerateCode 函数中重新生成取件码成功后使用浏览器原生 alert() 弹窗展示，但页面其他所有通知（投递成功、取件成功、错误提示等）均通过自定义的 showAlert 统一管理，视觉体验不一致。
+3. handleConfigChange 函数在应用新格口配置时调用了 setPackages([]) 清空所有包裹数据，但 deliveryRecords 和 pickupRecords 这两个状态数组未同步清理，导致历史记录中仍保留着已删除包裹的引用。
+
+修复后需要为该页面补充纯 JS 函数的单元测试，只测和页面渲染无关的逻辑。测试代码放在 src/pages/__tests__/locker-management/ 下。确保所有测试通过。

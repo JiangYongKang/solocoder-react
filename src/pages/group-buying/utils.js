@@ -393,3 +393,86 @@ export function getProgressColor(percentage) {
   }
   return '#1890ff'
 }
+
+export function getProductGroupStats(groups, productId, productGroupSize, now = Date.now()) {
+  if (!Array.isArray(groups) || !productId || !productGroupSize) {
+    return {
+      totalGroups: 0,
+      ongoingGroups: 0,
+      successGroups: 0,
+      failedGroups: 0,
+      totalJoinedPeople: 0,
+      aggregateCurrentPeople: 0,
+      aggregateTotalPeople: 0,
+      averageProgress: 0,
+      bestProgress: 0,
+      bestGroup: null,
+    }
+  }
+
+  const productGroups = groups.filter((g) => g.productId === productId)
+  const totalGroups = productGroups.length
+  const ongoingGroups = productGroups.filter((g) => isGroupOngoing(g, now)).length
+  const successGroups = productGroups.filter((g) => isGroupSuccess(g, now)).length
+  const failedGroups = productGroups.filter((g) => isGroupFailed(g, now)).length
+
+  const totalJoinedPeople = productGroups.reduce(
+    (sum, g) => sum + (g.currentPeople || 0),
+    0
+  )
+
+  const aggregateCurrentPeople = productGroups.reduce((sum, g) => {
+    const status = getGroupStatus(g, now)
+    if (status === GROUP_BUYING_STATUS.FAILED) return sum
+    return sum + Math.min(g.currentPeople || 0, g.totalPeople || productGroupSize)
+  }, 0)
+
+  const aggregateTotalPeople = productGroups.reduce((sum, g) => {
+    const status = getGroupStatus(g, now)
+    if (status === GROUP_BUYING_STATUS.FAILED) return sum
+    return sum + (g.totalPeople || productGroupSize)
+  }, 0)
+
+  let bestProgress = 0
+  let bestGroup = null
+  productGroups.forEach((g) => {
+    const progress = calculateProgressPercentage(g.currentPeople, g.totalPeople)
+    if (progress > bestProgress) {
+      bestProgress = progress
+      bestGroup = g
+    }
+  })
+
+  const averageProgress =
+    aggregateTotalPeople > 0
+      ? Math.round((aggregateCurrentPeople / aggregateTotalPeople) * 10000) / 100
+      : 0
+
+  return {
+    totalGroups,
+    ongoingGroups,
+    successGroups,
+    failedGroups,
+    totalJoinedPeople,
+    aggregateCurrentPeople,
+    aggregateTotalPeople,
+    averageProgress,
+    bestProgress,
+    bestGroup,
+  }
+}
+
+export function findJoinableGroup(groups, productId, userId, now = Date.now()) {
+  if (!Array.isArray(groups) || !productId || !userId) return null
+
+  const joinableGroups = groups
+    .filter((g) => g.productId === productId && canJoinGroup(g, userId, now))
+    .sort((a, b) => {
+      const remainingA = getRemainingSpots(a.currentPeople, a.totalPeople)
+      const remainingB = getRemainingSpots(b.currentPeople, b.totalPeople)
+      return remainingA - remainingB
+    })
+
+  return joinableGroups.length > 0 ? joinableGroups[0] : null
+}
+

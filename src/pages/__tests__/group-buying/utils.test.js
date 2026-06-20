@@ -41,6 +41,8 @@ import {
   getJoinedGroups,
   formatDateTime,
   getProgressColor,
+  getProductGroupStats,
+  findJoinableGroup,
 } from '@/pages/group-buying/utils.js';
 
 function createMockStorage() {
@@ -916,5 +918,214 @@ describe('group-buying/storage', () => {
     const { saveGroups, loadGroups } = await import('@/pages/group-buying/storage.js');
     expect(() => saveGroups([], null)).not.toThrow();
     expect(() => loadGroups(null)).not.toThrow();
+  });
+});
+
+describe('group-buying/utils - product stats and joinable group', () => {
+  const now = Date.now();
+
+  describe('getProductGroupStats', () => {
+    it('returns zero stats for empty/invalid inputs', () => {
+      const emptyResult = getProductGroupStats([], 'p1', 5, now);
+      expect(emptyResult.totalGroups).toBe(0);
+      expect(emptyResult.ongoingGroups).toBe(0);
+      expect(emptyResult.successGroups).toBe(0);
+      expect(emptyResult.totalJoinedPeople).toBe(0);
+      expect(emptyResult.averageProgress).toBe(0);
+      expect(emptyResult.bestProgress).toBe(0);
+      expect(emptyResult.bestGroup).toBeNull();
+
+      const nullResult = getProductGroupStats(null, 'p1', 5, now);
+      expect(nullResult.totalGroups).toBe(0);
+
+      const noIdResult = getProductGroupStats([], '', 5, now);
+      expect(noIdResult.totalGroups).toBe(0);
+
+      const noSizeResult = getProductGroupStats([], 'p1', 0, now);
+      expect(noSizeResult.totalGroups).toBe(0);
+    });
+
+    it('aggregates stats for ongoing groups correctly', () => {
+      const groups = [
+        createMockGroup({
+          id: 'g1', productId: 'p1', totalPeople: 5, currentPeople: 2,
+          status: GROUP_BUYING_STATUS.ONGOING, endTime: now + 3600000,
+        }),
+        createMockGroup({
+          id: 'g2', productId: 'p1', totalPeople: 5, currentPeople: 4,
+          status: GROUP_BUYING_STATUS.ONGOING, endTime: now + 3600000,
+        }),
+        createMockGroup({
+          id: 'g3', productId: 'p1', totalPeople: 5, currentPeople: 1,
+          status: GROUP_BUYING_STATUS.ONGOING, endTime: now + 3600000,
+        }),
+      ];
+      const stats = getProductGroupStats(groups, 'p1', 5, now);
+
+      expect(stats.totalGroups).toBe(3);
+      expect(stats.ongoingGroups).toBe(3);
+      expect(stats.successGroups).toBe(0);
+      expect(stats.failedGroups).toBe(0);
+      expect(stats.totalJoinedPeople).toBe(2 + 4 + 1);
+      expect(stats.aggregateCurrentPeople).toBe(7);
+      expect(stats.aggregateTotalPeople).toBe(15);
+      expect(stats.averageProgress).toBeCloseTo(46.67);
+      expect(stats.bestProgress).toBe(80);
+      expect(stats.bestGroup.id).toBe('g2');
+    });
+
+    it('counts success groups correctly', () => {
+      const groups = [
+        createMockGroup({
+          id: 'g1', productId: 'p1', totalPeople: 5, currentPeople: 5,
+          status: GROUP_BUYING_STATUS.SUCCESS, successTime: now,
+          endTime: now + 3600000,
+        }),
+        createMockGroup({
+          id: 'g2', productId: 'p1', totalPeople: 5, currentPeople: 3,
+          status: GROUP_BUYING_STATUS.ONGOING, endTime: now + 3600000,
+        }),
+      ];
+      const stats = getProductGroupStats(groups, 'p1', 5, now);
+
+      expect(stats.totalGroups).toBe(2);
+      expect(stats.successGroups).toBe(1);
+      expect(stats.ongoingGroups).toBe(1);
+      expect(stats.bestProgress).toBe(100);
+    });
+
+    it('excludes failed groups from aggregate counts', () => {
+      const groups = [
+        createMockGroup({
+          id: 'g1', productId: 'p1', totalPeople: 5, currentPeople: 2,
+          status: GROUP_BUYING_STATUS.FAILED, failedReason: FAILED_REASON.TIMEOUT,
+          failedTime: now, endTime: now - 1000,
+        }),
+        createMockGroup({
+          id: 'g2', productId: 'p1', totalPeople: 5, currentPeople: 3,
+          status: GROUP_BUYING_STATUS.ONGOING, endTime: now + 3600000,
+        }),
+      ];
+      const stats = getProductGroupStats(groups, 'p1', 5, now);
+
+      expect(stats.totalGroups).toBe(2);
+      expect(stats.failedGroups).toBe(1);
+      expect(stats.ongoingGroups).toBe(1);
+      expect(stats.aggregateCurrentPeople).toBe(3);
+      expect(stats.aggregateTotalPeople).toBe(5);
+    });
+
+    it('filters by productId', () => {
+      const groups = [
+        createMockGroup({
+          id: 'g1', productId: 'p1', totalPeople: 5, currentPeople: 2,
+          status: GROUP_BUYING_STATUS.ONGOING, endTime: now + 3600000,
+        }),
+        createMockGroup({
+          id: 'g2', productId: 'p2', totalPeople: 10, currentPeople: 5,
+          status: GROUP_BUYING_STATUS.ONGOING, endTime: now + 3600000,
+        }),
+      ];
+
+      const statsP1 = getProductGroupStats(groups, 'p1', 5, now);
+      expect(statsP1.totalGroups).toBe(1);
+      expect(statsP1.totalJoinedPeople).toBe(2);
+
+      const statsP2 = getProductGroupStats(groups, 'p2', 10, now);
+      expect(statsP2.totalGroups).toBe(1);
+      expect(statsP2.totalJoinedPeople).toBe(5);
+    });
+  });
+
+  describe('findJoinableGroup', () => {
+    it('returns null for invalid inputs', () => {
+      expect(findJoinableGroup(null, 'p1', 'u1', now)).toBeNull();
+      expect(findJoinableGroup([], '', 'u1', now)).toBeNull();
+      expect(findJoinableGroup([], 'p1', '', now)).toBeNull();
+    });
+
+    it('returns null when no joinable group exists', () => {
+      const groups = [
+        createMockGroup({
+          id: 'g1', productId: 'p1', totalPeople: 5, currentPeople: 5,
+          status: GROUP_BUYING_STATUS.ONGOING,
+          members: ['u2', 'u3', 'u4', 'u5', 'u6'],
+          endTime: now + 3600000,
+        }),
+        createMockGroup({
+          id: 'g2', productId: 'p2', totalPeople: 5, currentPeople: 2,
+          status: GROUP_BUYING_STATUS.ONGOING,
+          members: ['u2', 'u3'],
+          endTime: now + 3600000,
+        }),
+      ];
+      expect(findJoinableGroup(groups, 'p1', 'u1', now)).toBeNull();
+    });
+
+    it('returns the group with fewest remaining spots (nearest to complete)', () => {
+      const groups = [
+        createMockGroup({
+          id: 'g1', productId: 'p1', totalPeople: 5, currentPeople: 2,
+          status: GROUP_BUYING_STATUS.ONGOING,
+          members: ['u10', 'u11'],
+          endTime: now + 3600000,
+        }),
+        createMockGroup({
+          id: 'g2', productId: 'p1', totalPeople: 5, currentPeople: 4,
+          status: GROUP_BUYING_STATUS.ONGOING,
+          members: ['u20', 'u21', 'u22', 'u23'],
+          endTime: now + 3600000,
+        }),
+        createMockGroup({
+          id: 'g3', productId: 'p1', totalPeople: 5, currentPeople: 3,
+          status: GROUP_BUYING_STATUS.ONGOING,
+          members: ['u30', 'u31', 'u32'],
+          endTime: now + 3600000,
+        }),
+      ];
+      const found = findJoinableGroup(groups, 'p1', 'u1', now);
+      expect(found).not.toBeNull();
+      expect(found.id).toBe('g2');
+    });
+
+    it('excludes groups that user already joined', () => {
+      const groups = [
+        createMockGroup({
+          id: 'g1', productId: 'p1', totalPeople: 5, currentPeople: 4,
+          status: GROUP_BUYING_STATUS.ONGOING,
+          members: ['u1', 'u11', 'u12', 'u13'],
+          leaderId: 'u1',
+          endTime: now + 3600000,
+        }),
+        createMockGroup({
+          id: 'g2', productId: 'p1', totalPeople: 5, currentPeople: 2,
+          status: GROUP_BUYING_STATUS.ONGOING,
+          members: ['u20', 'u21'],
+          endTime: now + 3600000,
+        }),
+      ];
+      const found = findJoinableGroup(groups, 'p1', 'u1', now);
+      expect(found).not.toBeNull();
+      expect(found.id).toBe('g2');
+    });
+
+    it('excludes groups from different products', () => {
+      const groups = [
+        createMockGroup({
+          id: 'g1', productId: 'p2', totalPeople: 5, currentPeople: 4,
+          status: GROUP_BUYING_STATUS.ONGOING,
+          members: ['u20', 'u21', 'u22', 'u23'],
+          endTime: now + 3600000,
+        }),
+        createMockGroup({
+          id: 'g2', productId: 'p1', totalPeople: 5, currentPeople: 2,
+          status: GROUP_BUYING_STATUS.ONGOING,
+          members: ['u10', 'u11'],
+          endTime: now + 3600000,
+        }),
+      ];
+      const found = findJoinableGroup(groups, 'p1', 'u1', now);
+      expect(found.id).toBe('g2');
+    });
   });
 });

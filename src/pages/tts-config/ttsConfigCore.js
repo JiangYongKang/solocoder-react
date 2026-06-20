@@ -112,7 +112,7 @@ export function addToHistory(history, record, maxItems) {
   return updated
 }
 
-export function createHistoryRecord(text, voiceId, speed) {
+export function createHistoryRecord(text, voiceId, speed, pitch, volume) {
   const cleaned = removePauseMarkers(text || '')
   const title = (cleaned || '').slice(0, 30)
   return {
@@ -121,6 +121,8 @@ export function createHistoryRecord(text, voiceId, speed) {
     title,
     voiceId,
     speed,
+    pitch: pitch ?? DEFAULT_PITCH,
+    volume: volume ?? DEFAULT_VOLUME,
     text: text || '',
   }
 }
@@ -173,11 +175,54 @@ export function getVoiceName(voiceId) {
 export function formatPauseDuration(ms) {
   if (ms >= 1000) {
     const sec = ms / 1000
-    return Number.isInteger(sec) ? `${sec}s` : `${sec}s`
+    return Number.isInteger(sec) ? `${sec}s` : `${sec.toFixed(1).replace(/\.0$/, '')}s`
   }
   return `${ms}ms`
 }
 
 export function getTextWithoutPauseMarkersForParagraph(paragraph) {
   return removePauseMarkers(paragraph)
+}
+
+export function buildAuditionText(voiceName) {
+  return `你好，这是语音助手，当前音色为${voiceName || '标准女声'}。`
+}
+
+export function parseSegmentsWithPauses(text) {
+  if (!text || typeof text !== 'string') return []
+  const segments = []
+  let lastIdx = 0
+  let match
+  PAUSE_MARKER_REGEX.lastIndex = 0
+  while ((match = PAUSE_MARKER_REGEX.exec(text)) !== null) {
+    if (match.index > lastIdx) {
+      segments.push({
+        type: 'text',
+        content: text.slice(lastIdx, match.index),
+        duration: 0,
+      })
+    }
+    segments.push({
+      type: 'pause',
+      content: match[0],
+      duration: parseInt(match[1], 10),
+    })
+    lastIdx = match.index + match[0].length
+  }
+  if (lastIdx < text.length) {
+    segments.push({
+      type: 'text',
+      content: text.slice(lastIdx),
+      duration: 0,
+    })
+  }
+  return segments
+}
+
+export function flattenTextSegments(segments) {
+  if (!Array.isArray(segments)) return ''
+  return segments
+    .filter((s) => s && s.type === 'text')
+    .map((s) => s.content)
+    .join('')
 }

@@ -31,6 +31,9 @@ import {
   getVoiceById,
   getVoiceName,
   formatPauseDuration,
+  buildAuditionText,
+  parseSegmentsWithPauses,
+  flattenTextSegments,
 } from '../../tts-config/ttsConfigCore'
 
 describe('countChars', () => {
@@ -294,7 +297,29 @@ describe('createHistoryRecord', () => {
     expect(record.title).toBe('你好世界')
     expect(record.voiceId).toBe('standard-female')
     expect(record.speed).toBe(1.0)
+    expect(record.pitch).toBe(DEFAULT_PITCH)
+    expect(record.volume).toBe(DEFAULT_VOLUME)
     expect(record.text).toBe('你好世界')
+  })
+
+  it('should store explicit pitch and volume values', () => {
+    const record = createHistoryRecord('测试文本', 'standard-male', 1.5, 3, 60)
+    expect(record.pitch).toBe(3)
+    expect(record.volume).toBe(60)
+    expect(record.speed).toBe(1.5)
+    expect(record.voiceId).toBe('standard-male')
+  })
+
+  it('should store negative pitch and zero volume', () => {
+    const record = createHistoryRecord('测试', 'child', 2.0, -5, 0)
+    expect(record.pitch).toBe(-5)
+    expect(record.volume).toBe(0)
+  })
+
+  it('should default pitch and volume when not provided', () => {
+    const record = createHistoryRecord('测试', 'news-anchor', 1.2)
+    expect(record.pitch).toBe(DEFAULT_PITCH)
+    expect(record.volume).toBe(DEFAULT_VOLUME)
   })
 
   it('should truncate title to 30 chars', () => {
@@ -434,10 +459,132 @@ describe('formatPauseDuration', () => {
   it('should format whole seconds', () => {
     expect(formatPauseDuration(1000)).toBe('1s')
     expect(formatPauseDuration(2000)).toBe('2s')
+    expect(formatPauseDuration(3000)).toBe('3s')
   })
 
-  it('should format fractional seconds', () => {
+  it('should format fractional seconds correctly', () => {
     expect(formatPauseDuration(1500)).toBe('1.5s')
+    expect(formatPauseDuration(1200)).toBe('1.2s')
+    expect(formatPauseDuration(2500)).toBe('2.5s')
+    expect(formatPauseDuration(800)).toBe('800ms')
+  })
+})
+
+describe('buildAuditionText', () => {
+  it('should build audition text with provided voice name', () => {
+    expect(buildAuditionText('标准女声')).toBe('你好，这是语音助手，当前音色为标准女声。')
+    expect(buildAuditionText('童声')).toBe('你好，这是语音助手，当前音色为童声。')
+  })
+
+  it('should default to 标准女声 when voice name is missing', () => {
+    expect(buildAuditionText('')).toBe('你好，这是语音助手，当前音色为标准女声。')
+    expect(buildAuditionText(null)).toBe('你好，这是语音助手，当前音色为标准女声。')
+    expect(buildAuditionText(undefined)).toBe('你好，这是语音助手，当前音色为标准女声。')
+  })
+})
+
+describe('parseSegmentsWithPauses', () => {
+  it('should return empty array for null or empty', () => {
+    expect(parseSegmentsWithPauses(null)).toEqual([])
+    expect(parseSegmentsWithPauses(undefined)).toEqual([])
+    expect(parseSegmentsWithPauses('')).toEqual([])
+  })
+
+  it('should return single text segment for text without pauses', () => {
+    const result = parseSegmentsWithPauses('你好世界')
+    expect(result).toHaveLength(1)
+    expect(result[0]).toEqual({ type: 'text', content: '你好世界', duration: 0 })
+  })
+
+  it('should parse a single pause marker at beginning', () => {
+    const result = parseSegmentsWithPauses('<pause=500>你好')
+    expect(result).toHaveLength(2)
+    expect(result[0]).toEqual({ type: 'pause', content: '<pause=500>', duration: 500 })
+    expect(result[1]).toEqual({ type: 'text', content: '你好', duration: 0 })
+  })
+
+  it('should parse a single pause marker at end', () => {
+    const result = parseSegmentsWithPauses('你好<pause=500>')
+    expect(result).toHaveLength(2)
+    expect(result[0]).toEqual({ type: 'text', content: '你好', duration: 0 })
+    expect(result[1]).toEqual({ type: 'pause', content: '<pause=500>', duration: 500 })
+  })
+
+  it('should parse text with pause in the middle', () => {
+    const result = parseSegmentsWithPauses('你好<pause=500>世界')
+    expect(result).toHaveLength(3)
+    expect(result[0]).toEqual({ type: 'text', content: '你好', duration: 0 })
+    expect(result[1]).toEqual({ type: 'pause', content: '<pause=500>', duration: 500 })
+    expect(result[2]).toEqual({ type: 'text', content: '世界', duration: 0 })
+  })
+
+  it('should parse multiple pause markers', () => {
+    const result = parseSegmentsWithPauses('A<pause=200>B<pause=800>C')
+    expect(result).toHaveLength(5)
+    expect(result[0].type).toBe('text')
+    expect(result[0].content).toBe('A')
+    expect(result[1].type).toBe('pause')
+    expect(result[1].duration).toBe(200)
+    expect(result[2].type).toBe('text')
+    expect(result[2].content).toBe('B')
+    expect(result[3].type).toBe('pause')
+    expect(result[3].duration).toBe(800)
+    expect(result[4].type).toBe('text')
+    expect(result[4].content).toBe('C')
+  })
+
+  it('should parse consecutive pause markers', () => {
+    const result = parseSegmentsWithPauses('A<pause=500><pause=1000>B')
+    expect(result).toHaveLength(4)
+    expect(result[0]).toEqual({ type: 'text', content: 'A', duration: 0 })
+    expect(result[1]).toEqual({ type: 'pause', content: '<pause=500>', duration: 500 })
+    expect(result[2]).toEqual({ type: 'pause', content: '<pause=1000>', duration: 1000 })
+    expect(result[3]).toEqual({ type: 'text', content: 'B', duration: 0 })
+  })
+
+  it('should parse 2 second pause correctly', () => {
+    const result = parseSegmentsWithPauses('开始<pause=2000>结束')
+    expect(result).toHaveLength(3)
+    expect(result[1].type).toBe('pause')
+    expect(result[1].duration).toBe(2000)
+  })
+})
+
+describe('flattenTextSegments', () => {
+  it('should return empty string for null or non-array', () => {
+    expect(flattenTextSegments(null)).toBe('')
+    expect(flattenTextSegments(undefined)).toBe('')
+    expect(flattenTextSegments('not-array')).toBe('')
+    expect(flattenTextSegments([])).toBe('')
+  })
+
+  it('should join all text segments', () => {
+    const segments = [
+      { type: 'text', content: '你好', duration: 0 },
+      { type: 'pause', content: '<pause=500>', duration: 500 },
+      { type: 'text', content: '世界', duration: 0 },
+    ]
+    expect(flattenTextSegments(segments)).toBe('你好世界')
+  })
+
+  it('should skip pause segments and non-object entries', () => {
+    const segments = [
+      { type: 'pause', content: '<pause=200>', duration: 200 },
+      null,
+      undefined,
+      { type: 'text', content: 'A', duration: 0 },
+      { type: 'text', content: 'BC', duration: 0 },
+      { type: 'pause', content: '<pause=800>', duration: 800 },
+    ]
+    expect(flattenTextSegments(segments)).toBe('ABC')
+  })
+
+  it('should return original text equivalent from parseSegmentsWithPauses result', () => {
+    const original = '你好<pause=500>世界<pause=1000>结束'
+    const segs = parseSegmentsWithPauses(original)
+    const flattened = flattenTextSegments(segs)
+    const cleaned = original.replace(/<pause=\d+>/g, '')
+    expect(flattened).toBe(cleaned)
   })
 })
 

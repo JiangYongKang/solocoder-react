@@ -1,0 +1,7 @@
+你实现的网格布局生成器页面还存在一些问题，需要进行修复：
+
+1. 网格画布左侧边缘显示的是行序号（1 到 rows），实际上需要展示的是网格线编号（1 到 rows+1）。当前渲染中 rowLines 对应的 div 内容为空也说明这部分逻辑未完成。
+2. 代码输出面板中，当某个单元格同时设置了跨列跨行和 grid-area 名称时，generateChildrenCSS 生成的 CSS 中 grid-area 声明会覆盖 grid-column 的 span 设置，导致跨列效果在复制出的 CSS 中丢失。
+3. ConfigPanel 中 SizeList 组件渲染时传入了 `step={modes === 'col' ? '' : ''}`，三元表达式的两个分支返回值完全相同，属于无效代码。
+
+修复后需要为该页面补充纯 JS 函数的单元测试，只测和页面渲染无关的逻辑。测试代码放在 src/pages/__tests__/grid-generator/ 下。确保所有测试通过。

@@ -225,6 +225,7 @@ describe('配置参数校验', () => {
   describe('validatePort', () => {
     it('应该通过有效的串口号', () => {
       expect(validatePort('COM1').valid).toBe(true)
+      expect(validatePort('COM3').valid).toBe(true)
       expect(validatePort('COM8').valid).toBe(true)
     })
 
@@ -232,6 +233,27 @@ describe('配置参数校验', () => {
       expect(validatePort('').valid).toBe(false)
       expect(validatePort(null).valid).toBe(false)
       expect(validatePort(undefined).valid).toBe(false)
+    })
+
+    it('应该拒绝不在 COM1-COM8 范围内的串口号', () => {
+      expect(validatePort('COM0').valid).toBe(false)
+      expect(validatePort('COM9').valid).toBe(false)
+      expect(validatePort('COM10').valid).toBe(false)
+      expect(validatePort('COM99').valid).toBe(false)
+    })
+
+    it('应该拒绝格式不正确的串口号', () => {
+      expect(validatePort('com1').valid).toBe(false)
+      expect(validatePort('COM').valid).toBe(false)
+      expect(validatePort('abc').valid).toBe(false)
+      expect(validatePort('SERIAL1').valid).toBe(false)
+    })
+
+    it('拒绝时应包含有意义的错误信息', () => {
+      const result = validatePort('COM9')
+      expect(result.valid).toBe(false)
+      expect(result.error).toContain('COM1')
+      expect(result.error).toContain('COM8')
     })
   })
 
@@ -270,6 +292,29 @@ describe('配置参数校验', () => {
         port: 'COM3',
         baudRate: 9600,
         dataBits: 9,
+        stopBits: 1,
+        parity: 'none',
+      }
+      expect(validateConfig(config).valid).toBe(false)
+    })
+
+    it('应该检测非法串口号 COM9', () => {
+      const config = {
+        port: 'COM9',
+        baudRate: 9600,
+        dataBits: 8,
+        stopBits: 1,
+        parity: 'none',
+      }
+      expect(validateConfig(config).valid).toBe(false)
+      expect(validateConfig(config).error).toContain('COM1')
+    })
+
+    it('应该检测空串口号', () => {
+      const config = {
+        port: '',
+        baudRate: 9600,
+        dataBits: 8,
         stopBits: 1,
         parity: 'none',
       }
@@ -623,6 +668,50 @@ describe('日志导出文本拼接格式化', () => {
     it('默认格式应该是纯文本', () => {
       const result = buildExportContent(receiveLog, history, config)
       expect(result).not.toContain('串口调试日志')
+    })
+
+    it('isHex=true 时接收区日志应保留 Hex 格式而非转换为 ASCII', () => {
+      const hexReceiveLog = [
+        { content: '48 65 6C 6C 6F', format: 'hex', direction: DIRECTIONS.SEND, timestamp: Date.now() },
+      ]
+      const result = buildExportContent(hexReceiveLog, [], config, EXPORT_FORMATS.PLAIN_TEXT, true)
+      expect(result).toContain('48 65 6C 6C 6F')
+      expect(result).not.toContain('Hello')
+    })
+
+    it('isHex=false 时 Hex 格式内容应转换为 ASCII', () => {
+      const hexReceiveLog = [
+        { content: '48 65 6C 6C 6F', format: 'hex', direction: DIRECTIONS.SEND, timestamp: Date.now() },
+      ]
+      const result = buildExportContent(hexReceiveLog, [], config, EXPORT_FORMATS.PLAIN_TEXT, false)
+      expect(result).toContain('Hello')
+    })
+
+    it('isHex=true 时 ASCII 格式内容应转换为 Hex 显示', () => {
+      const asciiReceiveLog = [
+        { content: 'Hello', format: 'ascii', direction: DIRECTIONS.SEND, timestamp: Date.now() },
+      ]
+      const result = buildExportContent(asciiReceiveLog, [], config, EXPORT_FORMATS.PLAIN_TEXT, true)
+      expect(result).toContain('48 65 6C 6C 6F')
+    })
+
+    it('isHex 默认为 false，与用户不传参时的行为一致', () => {
+      const hexReceiveLog = [
+        { content: '48 65 6C 6C 6F', format: 'hex', direction: DIRECTIONS.SEND, timestamp: Date.now() },
+      ]
+      const resultDefault = buildExportContent(hexReceiveLog, [], config, EXPORT_FORMATS.PLAIN_TEXT)
+      const resultExplicit = buildExportContent(hexReceiveLog, [], config, EXPORT_FORMATS.PLAIN_TEXT, false)
+      expect(resultDefault).toBe(resultExplicit)
+    })
+
+    it('isHex=true 且带配置头格式时应同时包含配置头和 Hex 内容', () => {
+      const hexReceiveLog = [
+        { content: '48 65 6C 6C 6F', format: 'hex', direction: DIRECTIONS.RECEIVE, timestamp: Date.now() },
+      ]
+      const result = buildExportContent(hexReceiveLog, [], config, EXPORT_FORMATS.WITH_HEADER, true)
+      expect(result).toContain('串口调试日志')
+      expect(result).toContain('48 65 6C 6C 6F')
+      expect(result).not.toContain('Hello')
     })
   })
 })

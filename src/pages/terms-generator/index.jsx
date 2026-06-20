@@ -24,6 +24,7 @@ import {
   formatTimestamp,
   copyToClipboard,
   downloadHtmlFile,
+  createCustomTemplate,
 } from './utils.js'
 
 const Toast = ({ message, type }) => {
@@ -335,12 +336,7 @@ const TermsGeneratorPage = () => {
       showToast('请输入模板名称', 'error')
       return
     }
-    const newTemplate = {
-      name,
-      description: newTemplateDesc.trim(),
-      content: '# 自定义模板\n\n请在此处编辑您的条款内容...\n\n## 章节一\n\n内容...\n',
-      variables: [],
-    }
+    const newTemplate = createCustomTemplate(name, newTemplateDesc.trim())
     const validation = validateTemplate(newTemplate)
     if (!validation.valid) {
       showToast(validation.errors[0] || '模板校验失败', 'error')

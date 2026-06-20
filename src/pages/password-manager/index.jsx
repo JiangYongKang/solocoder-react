@@ -399,14 +399,19 @@ function EntryForm({ entry, groups, onSave, onCancel }) {
   )
 }
 
-function ConfirmDialog({ message, onConfirm, onCancel }) {
+function ConfirmDialog({ message, onConfirm, onCancel, confirmLabel = '确认', confirmDanger = true }) {
   return (
     <div className="pm-confirm-overlay">
       <div className="pm-confirm-dialog">
         <p className="pm-confirm-message">{message}</p>
         <div className="pm-confirm-actions">
           <button className="pm-btn" onClick={onCancel}>取消</button>
-          <button className="pm-btn pm-btn-danger" onClick={onConfirm}>确认</button>
+          <button
+            className={`pm-btn ${confirmDanger ? 'pm-btn-danger' : 'pm-btn-primary'}`}
+            onClick={onConfirm}
+          >
+            {confirmLabel}
+          </button>
         </div>
       </div>
     </div>
@@ -417,28 +422,30 @@ function EntryCard({ entry, group, onEdit, onDelete }) {
   const [showPassword, setShowPassword] = useState(false)
   const [copiedPwd, setCopiedPwd] = useState(false)
   const [copiedAcct, setCopiedAcct] = useState(false)
-  const timerRef = useRef(null)
+  const showPwdTimerRef = useRef(null)
+  const copyPwdTimerRef = useRef(null)
   const acctTimerRef = useRef(null)
 
   useEffect(() => {
     return () => {
-      if (timerRef.current) clearTimeout(timerRef.current)
+      if (showPwdTimerRef.current) clearTimeout(showPwdTimerRef.current)
+      if (copyPwdTimerRef.current) clearTimeout(copyPwdTimerRef.current)
       if (acctTimerRef.current) clearTimeout(acctTimerRef.current)
     }
   }, [])
 
   const handleShowPassword = useCallback(() => {
     setShowPassword(true)
-    if (timerRef.current) clearTimeout(timerRef.current)
-    timerRef.current = setTimeout(() => setShowPassword(false), SHOW_PASSWORD_DURATION_MS)
+    if (showPwdTimerRef.current) clearTimeout(showPwdTimerRef.current)
+    showPwdTimerRef.current = setTimeout(() => setShowPassword(false), SHOW_PASSWORD_DURATION_MS)
   }, [])
 
   const handleCopyPassword = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(entry.password)
       setCopiedPwd(true)
-      if (timerRef.current) clearTimeout(timerRef.current)
-      timerRef.current = setTimeout(() => setCopiedPwd(false), COPIED_FEEDBACK_DURATION_MS)
+      if (copyPwdTimerRef.current) clearTimeout(copyPwdTimerRef.current)
+      copyPwdTimerRef.current = setTimeout(() => setCopiedPwd(false), COPIED_FEEDBACK_DURATION_MS)
     } catch { /* no-op */ }
   }, [entry.password])
 
@@ -463,7 +470,7 @@ function EntryCard({ entry, group, onEdit, onDelete }) {
             onClick={(e) => { e.stopPropagation(); handleCopyAccount() }}
             title="复制账号"
           >
-            {copiedAcct ? '✓' : '📋'}
+            {copiedAcct ? '已复制' : '📋'}
           </button>
         </div>
         <div className="pm-entry-row">
@@ -483,7 +490,7 @@ function EntryCard({ entry, group, onEdit, onDelete }) {
             onClick={(e) => { e.stopPropagation(); handleCopyPassword() }}
             title="复制密码"
           >
-            {copiedPwd ? '✓' : '📋'}
+            {copiedPwd ? '已复制' : '📋'}
           </button>
         </div>
         <div className="pm-entry-meta">
@@ -590,6 +597,8 @@ export default function PasswordManagerPage() {
       if (isDuplicateEntry(entry, entries)) {
         setConfirmDialog({
           message: '已存在相同标题和账号的条目',
+          confirmLabel: '确定',
+          confirmDanger: false,
           onConfirm: () => setConfirmDialog(null),
         })
         return
@@ -642,6 +651,8 @@ export default function PasswordManagerPage() {
     if (!isGroupEmpty(entries, group.id)) {
       setConfirmDialog({
         message: `分组「${group.name}」中仍有条目，请先迁移或删除条目后再删除分组。`,
+        confirmLabel: '确定',
+        confirmDanger: false,
         onConfirm: () => setConfirmDialog(null),
       })
       return
@@ -658,7 +669,7 @@ export default function PasswordManagerPage() {
     setDeleteGroupTarget(null)
   }, [deleteGroupTarget, groups, activeGroupId, persistGroups])
 
-  const handleExport = useCallback(() => {
+  const doExport = useCallback(() => {
     const data = exportData(entries, groups)
     const json = JSON.stringify(data, null, 2)
     const blob = new Blob([json], { type: 'application/json' })
@@ -669,6 +680,18 @@ export default function PasswordManagerPage() {
     a.click()
     URL.revokeObjectURL(url)
   }, [entries, groups])
+
+  const handleExport = useCallback(() => {
+    setConfirmDialog({
+      message: '⚠️ 数据仅经 Base64 编码，非真正加密。请妥善保管导出文件，避免泄露。确认导出？',
+      confirmLabel: '确认导出',
+      confirmDanger: false,
+      onConfirm: () => {
+        setConfirmDialog(null)
+        doExport()
+      },
+    })
+  }, [doExport])
 
   const handleImport = useCallback(() => {
     fileInputRef.current?.click()
@@ -686,11 +709,15 @@ export default function PasswordManagerPage() {
         persistGroups(result.groups)
         setConfirmDialog({
           message: `导入完成：新增 ${result.imported} 条，跳过 ${result.skipped} 条重复条目。`,
+          confirmLabel: '确定',
+          confirmDanger: false,
           onConfirm: () => setConfirmDialog(null),
         })
       } catch {
         setConfirmDialog({
           message: '导入失败：文件格式无效',
+          confirmLabel: '确定',
+          confirmDanger: false,
           onConfirm: () => setConfirmDialog(null),
         })
       }
@@ -865,6 +892,8 @@ export default function PasswordManagerPage() {
           message={confirmDialog.message}
           onConfirm={confirmDialog.onConfirm}
           onCancel={() => setConfirmDialog(null)}
+          confirmLabel={confirmDialog.confirmLabel}
+          confirmDanger={confirmDialog.confirmDanger}
         />
       )}
     </div>

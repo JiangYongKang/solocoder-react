@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useState } from 'react'
 import { METRIC_LABELS } from './constants'
 import { getGaugeColor } from './utils'
 
@@ -12,8 +12,46 @@ const GaugePanel = ({ metrics, serverName }) => {
   )
 }
 
+const ANIM_DURATION = 800
+
 const SingleGauge = ({ type, value, serverName }) => {
   const canvasRef = useRef(null)
+  const [displayValue, setDisplayValue] = useState(value)
+  const animRef = useRef(null)
+  const prevValueRef = useRef(value)
+  const startValueRef = useRef(value)
+  const startTimeRef = useRef(null)
+
+  useEffect(() => {
+    startValueRef.current = displayValue
+    prevValueRef.current = value
+    startTimeRef.current = null
+
+    const animate = (timestamp) => {
+      if (startTimeRef.current === null) {
+        startTimeRef.current = timestamp
+      }
+      const elapsed = timestamp - startTimeRef.current
+      const progress = Math.min(elapsed / ANIM_DURATION, 1)
+      const eased = 1 - Math.pow(1 - progress, 3)
+      const current = startValueRef.current + (value - startValueRef.current) * eased
+      setDisplayValue(current)
+
+      if (progress < 1) {
+        animRef.current = requestAnimationFrame(animate)
+      } else {
+        setDisplayValue(value)
+      }
+    }
+
+    animRef.current = requestAnimationFrame(animate)
+    return () => {
+      if (animRef.current) {
+        cancelAnimationFrame(animRef.current)
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -42,7 +80,7 @@ const SingleGauge = ({ type, value, serverName }) => {
     ctx.lineCap = 'round'
     ctx.stroke()
 
-    const clampedValue = Math.max(0, Math.min(100, value))
+    const clampedValue = Math.max(0, Math.min(100, displayValue))
     const valueAngle = startAngle + (clampedValue / 100) * Math.PI
 
     const gradient = ctx.createLinearGradient(cx - r, cy, cx + r, cy)
@@ -66,13 +104,13 @@ const SingleGauge = ({ type, value, serverName }) => {
     ctx.moveTo(cx, cy)
     ctx.lineTo(px, py)
     ctx.lineWidth = 2.5
-    ctx.strokeStyle = getGaugeColor(value)
+    ctx.strokeStyle = getGaugeColor(displayValue)
     ctx.lineCap = 'round'
     ctx.stroke()
 
     ctx.beginPath()
     ctx.arc(cx, cy, 4, 0, Math.PI * 2)
-    ctx.fillStyle = getGaugeColor(value)
+    ctx.fillStyle = getGaugeColor(displayValue)
     ctx.fill()
 
     for (let i = 0; i <= 10; i++) {
@@ -91,7 +129,7 @@ const SingleGauge = ({ type, value, serverName }) => {
       ctx.strokeStyle = isMajor ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.2)'
       ctx.stroke()
     }
-  }, [value])
+  }, [displayValue])
 
   const isAlerting = value >= 80
 
@@ -100,7 +138,7 @@ const SingleGauge = ({ type, value, serverName }) => {
       <div className="cm-gauge-label">{METRIC_LABELS[type]} · {serverName}</div>
       <div className="cm-gauge-canvas-wrap">
         <canvas ref={canvasRef} />
-        <div className="cm-gauge-value">{Math.round(value)}%</div>
+        <div className="cm-gauge-value">{Math.round(displayValue)}%</div>
       </div>
     </div>
   )

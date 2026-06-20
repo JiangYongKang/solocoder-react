@@ -36,6 +36,8 @@ import {
   simulateNewGroup,
   simulateGroupsUpdate,
   getProgressColor,
+  getProductGroupStats,
+  findJoinableGroup,
 } from './utils.js'
 import {
   loadGroups,
@@ -66,10 +68,11 @@ export default function GroupBuyingPage() {
     saveCurrentUser(user)
     return user
   })
-  const [now, setNow] = useState(Date.now())
+  const [now, setNow] = useState(() => Date.now())
   const [toast, setToast] = useState(null)
   const toastTimerRef = useRef(null)
   const refreshTimerRef = useRef(null)
+  const groupListSectionRef = useRef(null)
 
   const currentProduct = PRODUCTS[currentProductIndex]
 
@@ -99,7 +102,9 @@ export default function GroupBuyingPage() {
     const updatedGroups = groups.map((g) => updateGroupStatus(g, now))
     const hasChanges = updatedGroups.some((g, i) => g.status !== groups[i].status)
     if (hasChanges) {
-      handleGroupsChange(updatedGroups)
+      queueMicrotask(() => {
+        handleGroupsChange(updatedGroups)
+      })
     }
   }, [now, groups, handleGroupsChange])
 
@@ -132,6 +137,14 @@ export default function GroupBuyingPage() {
     showToast('刷新成功', 'success')
   }
 
+  const [activityEndTime] = useState(() =>
+    Date.now() + ACTIVITY_DURATION_HOURS * 60 * 60 * 1000
+  )
+  const activityRemaining = Math.max(0, activityEndTime - now)
+  const activityCountdown = formatCountdown(activityRemaining)
+  const isActivityWarning = isCountdownWarning(activityRemaining)
+  const isActivityEnded = activityRemaining <= 0
+
   const ongoingGroups = getOngoingGroups(groups, currentProduct.id, now)
   const sortedOngoingGroups = sortGroups(ongoingGroups, sortType, now)
 
@@ -142,14 +155,6 @@ export default function GroupBuyingPage() {
   )
 
   const hasOngoingGroup = hasUserOngoingGroup(groups, currentUser.id, currentProduct.id, now)
-
-  const activityEndTime = useRef(
-    Date.now() + ACTIVITY_DURATION_HOURS * 60 * 60 * 1000
-  )
-  const activityRemaining = Math.max(0, activityEndTime.current - now)
-  const activityCountdown = formatCountdown(activityRemaining)
-  const isActivityWarning = isCountdownWarning(activityRemaining)
-  const isActivityEnded = activityRemaining <= 0
 
   const handleCreateGroup = () => {
     if (isActivityEnded) {
@@ -223,15 +228,36 @@ export default function GroupBuyingPage() {
     }
   }
 
-  const progressPercentage = calculateProgressPercentage(
-    currentProduct.groupSize > 0
-      ? Math.min(
-          currentProduct.groupSize,
-          Math.floor(currentProduct.groupSize * 0.4) + Math.floor(Math.random() * 2)
-        )
-      : 0,
-    currentProduct.groupSize
+  const handleJoinExistingGroup = () => {
+    if (isActivityEnded) {
+      showToast('活动已结束', 'error')
+      return
+    }
+    if (hasOngoingGroup) {
+      showToast('您已有进行中的拼团，请先查看', 'warning')
+      setCurrentView(VIEW_TABS.MY_GROUPS)
+      return
+    }
+
+    const joinableGroup = findJoinableGroup(groups, currentProduct.id, currentUser.id, now)
+
+    if (joinableGroup) {
+      handleJoinGroup(joinableGroup)
+    } else {
+      showToast('暂无可参与的拼团，为您发起新团', 'info')
+      handleCreateGroup()
+    }
+  }
+
+  const productStats = getProductGroupStats(
+    groups,
+    currentProduct.id,
+    currentProduct.groupSize,
+    now
   )
+  const bestProgress = productStats.bestProgress > 0 ? productStats.bestProgress : productStats.averageProgress
+  const progressPercentage = bestProgress
+  const displayCurrentPeople = Math.round(bestProgress / 100 * currentProduct.groupSize)
 
   return (
     <div className="group-buying-page">
@@ -301,10 +327,13 @@ export default function GroupBuyingPage() {
             <div className="gb-progress-section">
               <div className="gb-progress-info">
                 <span className="gb-progress-text">
-                  已拼 <strong>{Math.floor(currentProduct.groupSize * 0.6)}</strong> 人 / 共需 {currentProduct.groupSize} 人成团
+                  已拼 <strong>{displayCurrentPeople}</strong> 人 / 共需 {currentProduct.groupSize} 人成团
+                  {productStats.totalGroups > 0 && (
+                    <span className="gb-group-count">（{productStats.totalGroups}个团进行中）</span>
+                  )}
                 </span>
                 <span className="gb-remaining-spots">
-                  剩余 {getRemainingSpots(Math.floor(currentProduct.groupSize * 0.6), currentProduct.groupSize)} 个名额
+                  剩余 {getRemainingSpots(displayCurrentPeople, currentProduct.groupSize)} 个名额
                 </span>
               </div>
               <div className="gb-progress-bar-container">
@@ -340,7 +369,7 @@ export default function GroupBuyingPage() {
             </div>
           </div>
 
-          <div className="gb-group-list-section">
+          <div className="gb-group-list-section" ref={groupListSectionRef}>
             <div className="gb-section-header">
               <h3 className="gb-section-title">进行中的拼团</h3>
               <button
@@ -369,7 +398,7 @@ export default function GroupBuyingPage() {
               </div>
             ) : (
               <div className="gb-group-list">
-                {sortedOngoingGroups.slice(0, 10).map((group) => {
+                {sortedOngoingGroups.map((group) => {
                   const groupPercentage = calculateProgressPercentage(
                     group.currentPeople,
                     group.totalPeople
@@ -503,7 +532,7 @@ export default function GroupBuyingPage() {
         <div className="gb-action-bar">
           <button
             className={`gb-secondary-btn ${isActivityEnded ? 'disabled' : ''}`}
-            onClick={handleCreateGroup}
+            onClick={handleJoinExistingGroup}
             disabled={isActivityEnded}
           >
             参与现有团

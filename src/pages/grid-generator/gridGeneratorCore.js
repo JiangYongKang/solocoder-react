@@ -377,18 +377,19 @@ export function generateChildrenCSS(config) {
   originCells.forEach(({ cell, idx }) => {
     const selector = `.grid-item-${idx + 1}`
     const rules = []
+    const trimmedAreaName = cell.areaName?.trim()
+    if (trimmedAreaName) {
+      rules.push(`  grid-area: ${trimmedAreaName};`)
+    }
     if (cell.colSpan > 1) {
       rules.push(`  grid-column: ${cell.col} / span ${cell.colSpan};`)
-    } else if (cell.areaName && cell.areaName.trim()) {
+    } else if (trimmedAreaName) {
       rules.push(`  grid-column: ${cell.col};`)
     }
     if (cell.rowSpan > 1) {
       rules.push(`  grid-row: ${cell.row} / span ${cell.rowSpan};`)
-    } else if (cell.areaName && cell.areaName.trim()) {
+    } else if (trimmedAreaName) {
       rules.push(`  grid-row: ${cell.row};`)
-    }
-    if (cell.areaName && cell.areaName.trim()) {
-      rules.push(`  grid-area: ${cell.areaName.trim()};`)
     }
     if (cell.backgroundColor) {
       rules.push(`  background-color: ${cell.backgroundColor};`)

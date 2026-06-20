@@ -8,7 +8,6 @@ import {
   CELL_SIZE_LABELS,
   CELL_STATUS,
   RETENTION_OPTIONS,
-  DEFAULT_RETENTION_HOURS,
   PACKAGE_STATUS,
   CELL_GRID_ROWS,
   MAX_PICKUP_ATTEMPTS,
@@ -35,17 +34,12 @@ import {
   allocateCell,
   releaseCell,
   generatePickupCode,
-  generateCellCode,
-  isOverdue,
   getOverdueHours,
-  getOverduePackages,
   updateCellStatuses,
-  validatePhone,
   validatePickupCode,
   maskPhone,
   getLastFourChars,
   formatDateTime,
-  formatDate,
   checkPickupAttempts,
   recordFailedPickupAttempt,
   resetPickupAttempts,
@@ -94,7 +88,7 @@ export default function LockerManagementPage() {
   const [showCellDetail, setShowCellDetail] = useState(null);
   const [showOverdueModal, setShowOverdueModal] = useState(false);
   const [alertMessage, setAlertMessage] = useState(null);
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     saveConfig(config);
@@ -191,6 +185,8 @@ export default function LockerManagementPage() {
     const newCells = createCells(newConfig);
     setCells(newCells);
     setPackages([]);
+    setDeliveryRecords([]);
+    setPickupRecords([]);
     
     showAlert('格口配置已更新', 'success');
   };
@@ -324,7 +320,7 @@ export default function LockerManagementPage() {
     const result = regeneratePickupCode(packages, pkg.id);
     if (result.success) {
       setPackages(result.updatedPackages);
-      alert(`取件码已重新生成：${result.newCode}`);
+      showAlert(`取件码已重新生成：${result.newCode}`, 'success');
     } else {
       showAlert(result.error, 'error');
     }
@@ -356,12 +352,12 @@ export default function LockerManagementPage() {
   function renderCell(cell) {
     const pkg = getCellPackage(cell);
     const isOccupied = cell.status === CELL_STATUS.OCCUPIED;
-    const isOverdue = cell.status === CELL_STATUS.OVERDUE;
+    const cellOverdue = cell.status === CELL_STATUS.OVERDUE;
 
     return (
       <div
         key={cell.id}
-        className={`locker-cell ${cell.size} ${isOccupied ? 'occupied' : ''} ${isOverdue ? 'overdue' : ''}`}
+        className={`locker-cell ${cell.size} ${isOccupied ? 'occupied' : ''} ${cellOverdue ? 'overdue' : ''}`}
         onClick={() => handleCellClick(cell)}
       >
         <div className={`cell-status ${cell.status}`} />
@@ -391,8 +387,8 @@ export default function LockerManagementPage() {
             </div>
             <div className="tooltip-row">
               <span className="tooltip-label">状态:</span>
-              <span className="tooltip-value" style={{ color: isOverdue ? '#fecaca' : '#86efac' }}>
-                {isOverdue ? '滞留超时' : '已投递'}
+              <span className="tooltip-value" style={{ color: cellOverdue ? '#fecaca' : '#86efac' }}>
+                {cellOverdue ? '滞留超时' : '已投递'}
               </span>
             </div>
           </div>
@@ -556,7 +552,7 @@ export default function LockerManagementPage() {
                   gridTemplateColumns: `repeat(${cellGrid[0]?.length || 10}, 1fr)`,
                 }}
               >
-                {cellGrid.map((row, rowIdx) =>
+                {cellGrid.map((row) =>
                   row.map((cell) => renderCell(cell))
                 )}
               </div>
@@ -789,7 +785,7 @@ export default function LockerManagementPage() {
               {(() => {
                 const pkg = getCellPackage(showCellDetail);
                 if (!pkg) return null;
-                const isOverdue = isOverdue(pkg.deliveredAt, now, retentionHours);
+                const overdueStatus = getOverdueHours(pkg.deliveredAt, now, retentionHours) > 0;
                 return (
                   <>
                     <div className="package-info">
@@ -817,9 +813,9 @@ export default function LockerManagementPage() {
                         <span className="info-label">状态</span>
                         <span
                           className="info-value"
-                          style={{ color: isOverdue ? '#ef4444' : '#22c55e', fontWeight: 600 }}
+                          style={{ color: overdueStatus ? '#ef4444' : '#22c55e', fontWeight: 600 }}
                         >
-                          {isOverdue ? `滞留超时 (${getOverdueHours(pkg.deliveredAt, now, retentionHours)}小时)` : '正常'}
+                          {overdueStatus ? `滞留超时 (${getOverdueHours(pkg.deliveredAt, now, retentionHours)}小时)` : '正常'}
                         </span>
                       </div>
                       <div className="package-info-row">

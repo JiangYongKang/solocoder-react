@@ -1,4 +1,5 @@
 import {
+  COM_PORTS,
   DATA_BITS,
   STOP_BITS,
   PARITY_OPTIONS,
@@ -99,8 +100,11 @@ export function validateParity(parity) {
 }
 
 export function validatePort(port) {
-  if (!port && port !== 0) {
+  if (!port) {
     return { valid: false, error: '串口号不能为空' }
+  }
+  if (!COM_PORTS.includes(port)) {
+    return { valid: false, error: `串口号必须是 ${COM_PORTS.join('/')} 之一` }
   }
   return { valid: true }
 }
@@ -243,7 +247,7 @@ export function formatLogEntry(entry, options = {}) {
   return autoWrap ? result + '\n' : result
 }
 
-export function buildExportContent(receiveLog, history, config, format = EXPORT_FORMATS.PLAIN_TEXT) {
+export function buildExportContent(receiveLog, history, config, format = EXPORT_FORMATS.PLAIN_TEXT, isHex = false) {
   let content = ''
 
   if (format === EXPORT_FORMATS.WITH_HEADER) {
@@ -272,6 +276,7 @@ export function buildExportContent(receiveLog, history, config, format = EXPORT_
         showTimestamp: true,
         showDirection: true,
         autoWrap: true,
+        isHex,
       })
     }
     content += '\n'

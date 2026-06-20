@@ -80,8 +80,11 @@ export default function SerialDebuggerPage() {
   const configSummary = useMemo(() => formatConfigSummary(config), [config])
 
   const filteredHistory = useMemo(() => {
-    return filterHistoryByKeyword(history, searchKeyword)
-  }, [history, searchKeyword])
+    const pinnedIds = new Set(pinned.map((p) => p.id))
+    return filterHistoryByKeyword(history, searchKeyword).filter(
+      (item) => !pinnedIds.has(item.id)
+    )
+  }, [history, searchKeyword, pinned])
 
   const displayReceiveContent = useMemo(() => {
     return receiveLog
@@ -207,10 +210,11 @@ export default function SerialDebuggerPage() {
   }, [])
 
   const handleExport = useCallback(() => {
-    const content = buildExportContent(receiveLog, history, config, exportFormat)
+    const isHexMode = receiveMode === DISPLAY_MODES.HEX
+    const content = buildExportContent(receiveLog, history, config, exportFormat, isHexMode)
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
     downloadTextFile(content, `serial-log-${timestamp}.txt`)
-  }, [receiveLog, history, config, exportFormat])
+  }, [receiveLog, history, config, exportFormat, receiveMode])
 
   const isPinned = useCallback(
     (item) => {

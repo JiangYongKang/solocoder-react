@@ -632,6 +632,17 @@ describe('Grid line helpers', () => {
       expect(getGridLineNumbers(3)).toEqual([1, 2, 3, 4])
       expect(getGridLineNumbers(0)).toEqual([1])
     })
+
+    it('should return correct count for max rows/cols', () => {
+      const lines = getGridLineNumbers(12)
+      expect(lines).toHaveLength(13)
+      expect(lines[0]).toBe(1)
+      expect(lines[12]).toBe(13)
+    })
+
+    it('should handle 1 row/col correctly', () => {
+      expect(getGridLineNumbers(1)).toEqual([1, 2])
+    })
   })
 
   describe('getCellGridLines', () => {
@@ -647,5 +658,90 @@ describe('Grid line helpers', () => {
     it('should return null for null cell', () => {
       expect(getCellGridLines(null)).toBeNull()
     })
+
+    it('should handle single cell (span=1)', () => {
+      const cell = { col: 1, row: 1, colSpan: 1, rowSpan: 1 }
+      const lines = getCellGridLines(cell)
+      expect(lines.rowStart).toBe(1)
+      expect(lines.rowEnd).toBe(2)
+      expect(lines.colStart).toBe(1)
+      expect(lines.colEnd).toBe(2)
+    })
+  })
+})
+
+describe('generateChildrenCSS - span and area name interaction', () => {
+  let config
+
+  beforeEach(() => {
+    config = createInitialConfig()
+    config = resizeGrid(config, 4, 4)
+  })
+
+  it('should output grid-area BEFORE grid-column when both span and area are set', () => {
+    config.cells[0].colSpan = 2
+    config.cells[0].rowSpan = 2
+    config.cells[0].areaName = 'header'
+    const css = generateChildrenCSS(config)
+    const areaIdx = css.indexOf('grid-area:')
+    const colIdx = css.indexOf('grid-column:')
+    expect(areaIdx).toBeGreaterThan(-1)
+    expect(colIdx).toBeGreaterThan(-1)
+    expect(areaIdx).toBeLessThan(colIdx)
+    expect(css).toContain('grid-column: 1 / span 2')
+    expect(css).toContain('grid-row: 1 / span 2')
+    expect(css).toContain('grid-area: header')
+  })
+
+  it('should preserve span values when area name is present', () => {
+    config.cells[5].colSpan = 3
+    config.cells[5].rowSpan = 2
+    config.cells[5].areaName = 'sidebar'
+    config.cells[5].backgroundColor = '#a0c4ff'
+    const css = generateChildrenCSS(config)
+    expect(css).toContain('grid-area: sidebar')
+    expect(css).toContain('grid-column: 2 / span 3')
+    expect(css).toContain('grid-row: 2 / span 2')
+    expect(css).toContain('background-color: #a0c4ff')
+  })
+
+  it('should output grid-column/row without span when only area name is set (no span)', () => {
+    config.cells[3].areaName = 'footer'
+    const css = generateChildrenCSS(config)
+    expect(css).toContain('grid-area: footer')
+    expect(css).toContain('grid-column: 4')
+    expect(css).toContain('grid-row: 1')
+    expect(css).not.toContain('/ span')
+  })
+
+  it('should not output grid-column/row when neither span nor area is set', () => {
+    config.cells[0].backgroundColor = '#ff0000'
+    const css = generateChildrenCSS(config)
+    expect(css).not.toContain('grid-area:')
+    expect(css).not.toContain('grid-column:')
+    expect(css).not.toContain('grid-row:')
+    expect(css).toContain('background-color: #ff0000')
+  })
+
+  it('should trim whitespace from area name', () => {
+    config.cells[0].colSpan = 2
+    config.cells[0].areaName = '  main  '
+    const css = generateChildrenCSS(config)
+    expect(css).toContain('grid-area: main')
+    expect(css).not.toContain('grid-area:   main  ')
+  })
+
+  it('should handle multiple cells with mixed span and area', () => {
+    config.cells[0].colSpan = 2
+    config.cells[0].areaName = 'header'
+    config.cells[5].rowSpan = 2
+    config.cells[5].areaName = 'nav'
+    config.cells[10].backgroundColor = '#eee'
+    const css = generateChildrenCSS(config)
+    expect(css).toContain('grid-area: header')
+    expect(css).toContain('grid-column: 1 / span 2')
+    expect(css).toContain('grid-area: nav')
+    expect(css).toContain('grid-row: 2 / span 2')
+    expect(css).toContain('background-color: #eee')
   })
 })

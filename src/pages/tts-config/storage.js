@@ -43,9 +43,9 @@ export function saveHistory(history) {
   return safeSetItem(STORAGE_KEY_HISTORY, history)
 }
 
-export function addRecordToHistory(text, voiceId, speed) {
+export function addRecordToHistory(text, voiceId, speed, pitch, volume) {
   const history = loadHistory()
-  const record = createHistoryRecord(text, voiceId, speed)
+  const record = createHistoryRecord(text, voiceId, speed, pitch, volume)
   const updated = addToHistory(history, record, MAX_HISTORY_ITEMS)
   saveHistory(updated)
   return updated

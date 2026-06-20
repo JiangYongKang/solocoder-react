@@ -106,6 +106,29 @@ export function generateMetrics() {
   }
 }
 
+export function generateAllRegionMetrics() {
+  const map = { all: generateMetrics() }
+  for (const r of REGIONS) {
+    map[r.id] = generateMetrics()
+  }
+  return map
+}
+
+export function fluctuateAllRegionMetrics(prevMap) {
+  if (!prevMap) return generateAllRegionMetrics()
+  const map = { all: fluctuateMetrics(prevMap.all) }
+  for (const r of REGIONS) {
+    map[r.id] = fluctuateMetrics(prevMap[r.id])
+  }
+  return map
+}
+
+export function selectRegionMetrics(metricsMap, regionId) {
+  if (!metricsMap) return generateMetrics()
+  if (!regionId || regionId === 'all') return metricsMap.all
+  return metricsMap[regionId] || metricsMap.all
+}
+
 export function fluctuateMetrics(prev) {
   if (!prev) return generateMetrics()
   return {
@@ -124,7 +147,7 @@ export function filterDataByRegion(data, regionId) {
 export function generateInitialTrendData() {
   const now = Date.now()
   const points = []
-  const count = Math.min(MAX_TREND_POINTS, 30)
+  const count = Math.min(MAX_TREND_POINTS, 360)
   for (let i = count; i >= 1; i--) {
     const ts = now - i * 5000
     points.push({
@@ -135,6 +158,33 @@ export function generateInitialTrendData() {
     })
   }
   return points
+}
+
+export function generateAllRegionTrendData() {
+  const map = { all: generateInitialTrendData() }
+  for (const r of REGIONS) {
+    map[r.id] = generateInitialTrendData()
+  }
+  return map
+}
+
+export function appendTrendPointToMap(trendMap, regionId, newPoint) {
+  if (!trendMap || !newPoint) return trendMap
+  const map = { ...trendMap }
+  const keys = regionId && regionId !== 'all' ? [regionId] : ['all', ...REGIONS.map((r) => r.id)]
+  for (const key of keys) {
+    if (map[key]) {
+      const appended = appendTrendPoint(map[key], newPoint)
+      map[key] = evictOldTrendPoints(appended, 30 * 60 * 1000)
+    }
+  }
+  return map
+}
+
+export function selectRegionTrendData(trendMap, regionId) {
+  if (!trendMap) return []
+  if (!regionId || regionId === 'all') return trendMap.all || []
+  return trendMap[regionId] || trendMap.all || []
 }
 
 export function appendTrendPoint(points, newPoint) {

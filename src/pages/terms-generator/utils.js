@@ -348,6 +348,22 @@ export const buildExportHtml = (htmlContent, title, companyName, generateDate) =
 </html>`
 }
 
+export const generateTemplateId = () => {
+  return `custom-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+}
+
+export const createCustomTemplate = (name, description = '', content = '', variables = []) => {
+  return {
+    id: generateTemplateId(),
+    name: name || '自定义模板',
+    description: description || '',
+    isDefault: false,
+    variables: Array.isArray(variables) ? variables : [],
+    content: content || '# 自定义模板\n\n请在此处编辑您的条款内容...\n\n## 章节一\n\n内容...\n',
+    createdAt: Date.now(),
+  }
+}
+
 export const mergeVariableDefinitions = (templateVars, contentExtractedVars) => {
   const commonKeys = new Set(COMMON_VARIABLES.map((v) => v.key))
   const templateKeySet = new Set((templateVars || []).map((v) => v.key))

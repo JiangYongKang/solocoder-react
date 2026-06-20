@@ -1,5 +1,5 @@
 import { PRESET_GROUPS } from './constants'
-import { encodeBase64 } from './utils'
+import { encodeBase64, decodeBase64 } from './utils'
 
 const STORAGE_KEY_ENTRIES = 'pm_entries_v1'
 const STORAGE_KEY_GROUPS = 'pm_groups_v1'
@@ -26,11 +26,14 @@ function safeSetItem(key, value) {
 }
 
 export function loadEntries() {
-  return safeGetItem(STORAGE_KEY_ENTRIES, [])
+  const raw = safeGetItem(STORAGE_KEY_ENTRIES, [])
+  if (!Array.isArray(raw)) return []
+  return raw.map((e) => ({ ...e, password: decodeBase64(e.password) }))
 }
 
 export function saveEntries(entries) {
-  return safeSetItem(STORAGE_KEY_ENTRIES, entries)
+  const encoded = entries.map((e) => ({ ...e, password: encodeBase64(e.password) }))
+  return safeSetItem(STORAGE_KEY_ENTRIES, encoded)
 }
 
 export function loadGroups() {

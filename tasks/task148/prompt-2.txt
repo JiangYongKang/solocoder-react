@@ -1,0 +1,5 @@
+你实现的协议条款生成器页面还存在一些问题，需要进行修复：
+
+1. 用户点击创建自定义模板并填写名称提交时，confirmAddCustomTemplate 函数构造的 newTemplate 对象缺少 id 字段，直接传入 validateTemplate 进行校验。由于该校验函数要求模板必须有字符串类型的 id，校验永远返回 false，弹窗提示失败，用户始终无法创建自定义模板。
+
+修复后需要为该页面补充纯 JS 函数的单元测试，只测和页面渲染无关的逻辑。测试代码放在 src/pages/__tests__/terms-generator/ 下。确保所有测试通过。

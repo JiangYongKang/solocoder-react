@@ -59,7 +59,7 @@ export function sortRecords(records, now = Date.now()) {
   return sorted
 }
 
-export function filterRecords(records, filters = {}) {
+export function filterRecords(records, filters = {}, now = Date.now()) {
   let result = [...records]
 
   if (filters.keyword && filters.keyword.trim()) {
@@ -73,7 +73,7 @@ export function filterRecords(records, filters = {}) {
   }
 
   if (filters.status && filters.status !== 'all') {
-    result = result.filter((r) => getVisitorStatus(r) === filters.status)
+    result = result.filter((r) => getVisitorStatus(r, now) === filters.status)
   }
 
   if (filters.startDate) {
@@ -180,4 +180,32 @@ export function batchCheckOutRecords(records, ids, checkOutTime = Date.now()) {
   return records.map((r) =>
     idSet.has(r.id) && !r.checkOutTime ? { ...r, checkOutTime } : r
   )
+}
+
+export function createFormInitialState(timestamp = Date.now()) {
+  return {
+    name: '',
+    phone: '',
+    idCard: '',
+    reason: '',
+    host: null,
+    photo: '',
+    registerTime: formatDateTime(timestamp),
+    _registerTimestamp: timestamp,
+  }
+}
+
+export function createRegistrationRecord(formData, idGenerator = generateId) {
+  const registerTimestamp = formData._registerTimestamp || Date.now()
+  return {
+    id: idGenerator(),
+    name: formData.name.trim(),
+    phone: formData.phone.trim(),
+    idCard: formData.idCard.trim(),
+    reason: formData.reason.trim(),
+    host: formData.host,
+    photo: formData.photo,
+    registerTime: registerTimestamp,
+    checkOutTime: null,
+  }
 }

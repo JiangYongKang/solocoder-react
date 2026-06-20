@@ -1,0 +1,9 @@
+你实现的座位选座系统页面还存在一些问题，需要进行修复：
+
+1. seat-selection.css 中 `.seat-selection-page` 的背景渐变声明 `linear-gradient(135deg, #f5f7fa 0%, #e4e7eb 100%` 末尾缺少右括号，导致该 CSS 规则被浏览器丢弃，背景效果不生效。
+2. handleTimeout 函数在 useEffect 的 setInterval 回调中被引用，但 handleTimeout 是用 useCallback 定义在该 useEffect 之后的，React 报出声明前引用的问题。这导致定时器闭包中捕获的 handleTimeout 始终是旧的版本，用户在倒计时期间新增选中座位后超时，新选中的座位不会被自动释放。
+3. updatePriceZoneConfig 函数直接对导入的 PRICE_ZONE_CONFIG 常量对象执行属性赋值修改，这改变了模块级别的共享常量，破坏了数据不可变性。
+4. 双人或三人模式下，当 findAdjacentSeats 找不到足够的相邻座位时只弹出一个提示就直接 return 了，没有提供手动逐个选座的降级路径。
+5. useEffect 的依赖数组使用了 `selectedIds.length > 0` 这样的布尔表达式，导致 React 无法静态检查依赖完整性，同时缺少 handleTimeout 和 selectedIds.length 的依赖声明。
+
+修复后需要为该页面补充纯 JS 函数的单元测试，只测和页面渲染无关的逻辑。测试代码放在 src/pages/__tests__/seat-selection/ 下。确保所有测试通过。

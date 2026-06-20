@@ -27,6 +27,7 @@ import {
   clearSavedSeatState,
   restoreLockedSeats,
   handlePersonCountChange,
+  handleMultiPersonSeatClick,
 } from '@/pages/seat-selection/seatSelectionCore.js';
 import {
   SEAT_STATUS,
@@ -621,7 +622,7 @@ describe('seatSelectionCore', () => {
     it('should clear selected seats and reset timer', () => {
       const grid = createSeatGrid();
       grid[0][0].status = SEAT_STATUS.SELECTED;
-      const result = handlePersonCountChange(grid, ['A1'], PERSON_COUNT.DOUBLE);
+      const result = handlePersonCountChange(grid, ['A1']);
       expect(result.grid[0][0].status).toBe(SEAT_STATUS.AVAILABLE);
       expect(result.selected).toEqual([]);
       expect(result.remainingTime).toBe(LOCK_DURATION_SECONDS);
@@ -702,6 +703,170 @@ describe('seatSelectionCore', () => {
       const loaded = loadSeatState(storage);
       expect(loaded.remainingTime).toBeLessThan(900);
       expect(loaded.remainingTime).toBeGreaterThan(0);
+    });
+  });
+
+  describe('updatePriceZoneConfig', () => {
+    it('should return updated config without mutating original', () => {
+      const grid = createSeatGrid();
+      const originalVipPrice = PRICE_ZONE_CONFIG[PRICE_ZONES.VIP].price;
+      const result = updatePriceZoneConfig(grid, PRICE_ZONES.VIP, { price: 200 });
+
+      expect(PRICE_ZONE_CONFIG[PRICE_ZONES.VIP].price).toBe(originalVipPrice);
+      expect(result.priceZoneConfig[PRICE_ZONES.VIP].price).toBe(200);
+    });
+
+    it('should return updated grid with new prices', () => {
+      const grid = createSeatGrid();
+      const result = updatePriceZoneConfig(grid, PRICE_ZONES.VIP, { price: 200 });
+
+      expect(result.grid[0][0].price).toBe(200);
+      expect(result.grid[1][0].price).toBe(200);
+      expect(result.grid[2][0].price).toBe(200);
+    });
+
+    it('should not change seats in other zones', () => {
+      const grid = createSeatGrid();
+      const result = updatePriceZoneConfig(grid, PRICE_ZONES.VIP, { price: 200 });
+
+      expect(result.grid[4][0].price).toBe(PRICE_ZONE_CONFIG[PRICE_ZONES.STANDARD].price);
+      expect(result.grid[8][0].price).toBe(PRICE_ZONE_CONFIG[PRICE_ZONES.ECONOMY].price);
+    });
+
+    it('should return original grid and config for invalid zone', () => {
+      const grid = createSeatGrid();
+      const result = updatePriceZoneConfig(grid, 'invalid', { price: 999 });
+
+      expect(result.grid).toBe(grid);
+      expect(result.priceZoneConfig).toEqual(PRICE_ZONE_CONFIG);
+    });
+
+    it('should merge config properties partially', () => {
+      const grid = createSeatGrid();
+      const result = updatePriceZoneConfig(grid, PRICE_ZONES.VIP, { price: 150 });
+
+      expect(result.priceZoneConfig[PRICE_ZONES.VIP].price).toBe(150);
+      expect(result.priceZoneConfig[PRICE_ZONES.VIP].name).toBe('VIP区');
+      expect(result.priceZoneConfig[PRICE_ZONES.VIP].color).toBe('#fee2e2');
+    });
+
+    it('should accept custom currentConfig', () => {
+      const grid = createSeatGrid();
+      const customConfig = {
+        ...PRICE_ZONE_CONFIG,
+        [PRICE_ZONES.VIP]: { ...PRICE_ZONE_CONFIG[PRICE_ZONES.VIP], price: 150 },
+      };
+      const result = updatePriceZoneConfig(grid, PRICE_ZONES.VIP, { price: 180 }, customConfig);
+
+      expect(result.priceZoneConfig[PRICE_ZONES.VIP].price).toBe(180);
+      expect(customConfig[PRICE_ZONES.VIP].price).toBe(150);
+    });
+
+    it('should not mutate the grid', () => {
+      const grid = createSeatGrid();
+      const originalPrice = grid[0][0].price;
+      updatePriceZoneConfig(grid, PRICE_ZONES.VIP, { price: 200 });
+      expect(grid[0][0].price).toBe(originalPrice);
+    });
+  });
+
+  describe('handleMultiPersonSeatClick', () => {
+    it('should select adjacent seats when available for double mode', () => {
+      const grid = createSeatGrid();
+      const result = handleMultiPersonSeatClick(grid, 0, 0, PERSON_COUNT.DOUBLE, []);
+
+      expect(result.changed).toBe(true);
+      expect(result.needsFallback).toBe(false);
+      expect(result.selected).toEqual(expect.arrayContaining(['A1', 'A2']));
+      expect(result.grid[0][0].status).toBe(SEAT_STATUS.SELECTED);
+      expect(result.grid[0][1].status).toBe(SEAT_STATUS.SELECTED);
+    });
+
+    it('should select adjacent seats when available for triple mode', () => {
+      const grid = createSeatGrid();
+      const result = handleMultiPersonSeatClick(grid, 0, 5, PERSON_COUNT.TRIPLE, []);
+
+      expect(result.changed).toBe(true);
+      expect(result.needsFallback).toBe(false);
+      expect(result.selected.length).toBe(3);
+    });
+
+    it('should return needsFallback=true when no adjacent seats available', () => {
+      const grid = createSeatGrid();
+      grid[0][1].status = SEAT_STATUS.LOCKED;
+      grid[0][2].status = SEAT_STATUS.LOCKED;
+      const result = handleMultiPersonSeatClick(grid, 0, 0, PERSON_COUNT.DOUBLE, []);
+
+      expect(result.changed).toBe(false);
+      expect(result.needsFallback).toBe(true);
+      expect(result.selected).toEqual([]);
+    });
+
+    it('should deselect a previously selected seat', () => {
+      const grid = createSeatGrid();
+      grid[0][0].status = SEAT_STATUS.SELECTED;
+      const result = handleMultiPersonSeatClick(grid, 0, 0, PERSON_COUNT.DOUBLE, ['A1']);
+
+      expect(result.changed).toBe(true);
+      expect(result.needsFallback).toBe(false);
+      expect(result.grid[0][0].status).toBe(SEAT_STATUS.AVAILABLE);
+      expect(result.selected).not.toContain('A1');
+    });
+
+    it('should not change locked seats', () => {
+      const grid = createSeatGrid();
+      grid[0][0].status = SEAT_STATUS.LOCKED;
+      const result = handleMultiPersonSeatClick(grid, 0, 0, PERSON_COUNT.DOUBLE, []);
+
+      expect(result.changed).toBe(false);
+      expect(result.needsFallback).toBe(false);
+    });
+
+    it('should not change unavailable seats', () => {
+      const grid = createSeatGrid();
+      grid[0][0].status = SEAT_STATUS.UNAVAILABLE;
+      const result = handleMultiPersonSeatClick(grid, 0, 0, PERSON_COUNT.DOUBLE, []);
+
+      expect(result.changed).toBe(false);
+      expect(result.needsFallback).toBe(false);
+    });
+
+    it('should handle null/undefined seat gracefully', () => {
+      const grid = createSeatGrid();
+      const result = handleMultiPersonSeatClick(grid, 99, 0, PERSON_COUNT.DOUBLE, []);
+
+      expect(result.changed).toBe(false);
+      expect(result.needsFallback).toBe(false);
+    });
+
+    it('should not mutate original grid', () => {
+      const grid = createSeatGrid();
+      const originalStatus = grid[0][0].status;
+      handleMultiPersonSeatClick(grid, 0, 0, PERSON_COUNT.DOUBLE, []);
+      expect(grid[0][0].status).toBe(originalStatus);
+    });
+
+    it('should return needsFallback when all adjacent seats are blocked', () => {
+      const grid = createSeatGrid();
+      for (let i = 0; i < TOTAL_COLS; i++) {
+        if (grid[4][i].status === SEAT_STATUS.AVAILABLE) {
+          grid[4][i].status = SEAT_STATUS.LOCKED;
+        }
+      }
+      grid[4][5].status = SEAT_STATUS.AVAILABLE;
+      const result = handleMultiPersonSeatClick(grid, 4, 5, PERSON_COUNT.TRIPLE, []);
+
+      expect(result.needsFallback).toBe(true);
+      expect(result.changed).toBe(false);
+    });
+
+    it('should append to existing selected IDs when adjacent found', () => {
+      const grid = createSeatGrid();
+      grid[4][0].status = SEAT_STATUS.SELECTED;
+      const result = handleMultiPersonSeatClick(grid, 0, 0, PERSON_COUNT.DOUBLE, ['E1']);
+
+      expect(result.changed).toBe(true);
+      expect(result.selected).toEqual(expect.arrayContaining(['E1', 'A1', 'A2']));
     });
   });
 });

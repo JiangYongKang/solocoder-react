@@ -6,7 +6,6 @@ import {
   PERSON_COUNT,
   PERSON_COUNT_LABELS,
   LOCK_DURATION_SECONDS,
-  TOTAL_ROWS,
   TOTAL_COLS,
   ZONE_ROWS,
 } from './constants.js';
@@ -14,10 +13,8 @@ import {
   createSeatGrid,
   getRowLabel,
   getSeatTooltip,
-  findAdjacentSeats,
   canSelectSeat,
   toggleSeatSelection,
-  selectMultipleSeats,
   clearSelectedSeats,
   lockSelectedSeats,
   releaseSelectedSeats,
@@ -32,23 +29,55 @@ import {
   clearSavedSeatState,
   restoreLockedSeats,
   handlePersonCountChange,
+  handleMultiPersonSeatClick,
 } from './seatSelectionCore.js';
 import './seat-selection.css';
+
+function loadInitialState() {
+  const saved = loadSeatState();
+  if (saved) {
+    let loadedGrid = saved.grid || createSeatGrid();
+    if (saved.lockedIds && saved.lockedIds.length > 0) {
+      loadedGrid = restoreLockedSeats(loadedGrid, saved.lockedIds);
+    }
+    return {
+      grid: loadedGrid,
+      selectedIds: saved.selectedIds || [],
+      lockedIds: saved.lockedIds || [],
+      personCount: saved.personCount || PERSON_COUNT.SINGLE,
+      remainingTime: saved.remainingTime || LOCK_DURATION_SECONDS,
+      isConfirmed: saved.isConfirmed || false,
+      lockStartTime: saved.lockStartTime || null,
+    };
+  }
+  return {
+    grid: createSeatGrid(),
+    selectedIds: [],
+    lockedIds: [],
+    personCount: PERSON_COUNT.SINGLE,
+    remainingTime: LOCK_DURATION_SECONDS,
+    isConfirmed: false,
+    lockStartTime: null,
+  };
+}
 
 function SeatSelectionPage() {
   const navigate = useNavigate();
 
-  const [grid, setGrid] = useState(null);
-  const [selectedIds, setSelectedIds] = useState([]);
-  const [lockedIds, setLockedIds] = useState([]);
-  const [personCount, setPersonCount] = useState(PERSON_COUNT.SINGLE);
-  const [remainingTime, setRemainingTime] = useState(LOCK_DURATION_SECONDS);
-  const [isConfirmed, setIsConfirmed] = useState(false);
+  const [initialState] = useState(loadInitialState);
+  const [grid, setGrid] = useState(initialState.grid);
+  const [selectedIds, setSelectedIds] = useState(initialState.selectedIds);
+  const [lockedIds, setLockedIds] = useState(initialState.lockedIds);
+  const [personCount, setPersonCount] = useState(initialState.personCount);
+  const [remainingTime, setRemainingTime] = useState(initialState.remainingTime);
+  const [isConfirmed, setIsConfirmed] = useState(initialState.isConfirmed);
   const [toast, setToast] = useState(null);
-  const [lockStartTime, setLockStartTime] = useState(null);
+  const [lockStartTime, setLockStartTime] = useState(initialState.lockStartTime);
+  const [manualFallback, setManualFallback] = useState(false);
 
   const timerRef = useRef(null);
   const toastTimerRef = useRef(null);
+  const handleTimeoutRef = useRef(null);
 
   const showToast = useCallback((message, type = 'info') => {
     if (toastTimerRef.current) {
@@ -58,27 +87,21 @@ function SeatSelectionPage() {
     toastTimerRef.current = setTimeout(() => setToast(null), 3000);
   }, []);
 
-  useEffect(() => {
-    const saved = loadSeatState();
-    if (saved) {
-      let loadedGrid = saved.grid || createSeatGrid();
-      if (saved.lockedIds && saved.lockedIds.length > 0) {
-        loadedGrid = restoreLockedSeats(loadedGrid, saved.lockedIds);
-      }
-      setGrid(loadedGrid);
-      setSelectedIds(saved.selectedIds || []);
-      setLockedIds(saved.lockedIds || []);
-      setPersonCount(saved.personCount || PERSON_COUNT.SINGLE);
-      setRemainingTime(saved.remainingTime || LOCK_DURATION_SECONDS);
-      setIsConfirmed(saved.isConfirmed || false);
-      if (saved.lockStartTime) {
-        setLockStartTime(saved.lockStartTime);
-      }
-    } else {
-      setGrid(createSeatGrid());
+  const handleTimeout = useCallback(() => {
+    if (grid) {
+      const result = releaseSelectedSeats(grid, selectedIds);
+      setGrid(result.grid);
+      setSelectedIds([]);
+      setRemainingTime(LOCK_DURATION_SECONDS);
+      setLockStartTime(null);
+      clearSavedSeatState();
+      showToast('选座超时，座位已释放，请重新选择', 'error');
     }
-    return () => clearSavedSeatState();
-  }, []);
+  }, [grid, selectedIds, showToast]);
+
+  useEffect(() => {
+    handleTimeoutRef.current = handleTimeout;
+  }, [handleTimeout]);
 
   useEffect(() => {
     if (!grid || isConfirmed) return;
@@ -91,7 +114,7 @@ function SeatSelectionPage() {
             if (newTime <= 0) {
               clearInterval(timerRef.current);
               timerRef.current = null;
-              handleTimeout();
+              handleTimeoutRef.current?.();
               return 0;
             }
             return newTime;
@@ -109,7 +132,7 @@ function SeatSelectionPage() {
         timerRef.current = null;
       }
     };
-  }, [selectedIds.length > 0, isConfirmed, grid]);
+  }, [selectedIds.length, isConfirmed, grid]);
 
   useEffect(() => {
     if (grid && selectedIds) {
@@ -124,18 +147,6 @@ function SeatSelectionPage() {
       });
     }
   }, [grid, selectedIds, lockedIds, personCount, remainingTime, lockStartTime, isConfirmed]);
-
-  const handleTimeout = useCallback(() => {
-    if (grid) {
-      const result = releaseSelectedSeats(grid, selectedIds);
-      setGrid(result.grid);
-      setSelectedIds([]);
-      setRemainingTime(LOCK_DURATION_SECONDS);
-      setLockStartTime(null);
-      clearSavedSeatState();
-      showToast('选座超时，座位已释放，请重新选择', 'error');
-    }
-  }, [grid, selectedIds, showToast]);
 
   const handleSeatClick = useCallback(
     (row, col) => {
@@ -154,31 +165,30 @@ function SeatSelectionPage() {
           if (result.selected.length === 0) {
             setRemainingTime(LOCK_DURATION_SECONDS);
             setLockStartTime(null);
+            setManualFallback(false);
           }
         }
         return;
       }
 
-      if (personCount === PERSON_COUNT.SINGLE) {
+      if (personCount === PERSON_COUNT.SINGLE || manualFallback) {
         const result = toggleSeatSelection(grid, row, col, selectedIds);
         if (result.changed) {
           setGrid(result.grid);
           setSelectedIds(result.selected);
         }
       } else {
-        const adjacent = findAdjacentSeats(grid, row, col, personCount);
-        if (adjacent.length === personCount) {
-          const result = selectMultipleSeats(grid, adjacent, selectedIds);
-          if (result.changed) {
-            setGrid(result.grid);
-            setSelectedIds(result.selected);
-          }
-        } else {
+        const result = handleMultiPersonSeatClick(grid, row, col, personCount, selectedIds);
+        if (result.needsFallback) {
           showToast('该位置周边没有足够的连续座位，请选择其他位置', 'error');
+          setManualFallback(true);
+        } else if (result.changed) {
+          setGrid(result.grid);
+          setSelectedIds(result.selected);
         }
       }
     },
-    [grid, selectedIds, personCount, isConfirmed, showToast]
+    [grid, selectedIds, personCount, isConfirmed, showToast, manualFallback]
   );
 
   const handlePersonCountChangeClick = useCallback(
@@ -187,7 +197,7 @@ function SeatSelectionPage() {
       if (!grid) return;
 
       if (selectedIds.length > 0) {
-        const result = handlePersonCountChange(grid, selectedIds, newCount);
+        const result = handlePersonCountChange(grid, selectedIds);
         setGrid(result.grid);
         setSelectedIds(result.selected);
         setRemainingTime(result.remainingTime);
@@ -199,6 +209,7 @@ function SeatSelectionPage() {
       }
 
       setPersonCount(newCount);
+      setManualFallback(false);
     },
     [grid, selectedIds, personCount]
   );
@@ -236,6 +247,7 @@ function SeatSelectionPage() {
       setSelectedIds([]);
       setRemainingTime(LOCK_DURATION_SECONDS);
       setLockStartTime(null);
+      setManualFallback(false);
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;

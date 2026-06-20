@@ -21,6 +21,8 @@ import {
   searchHosts,
   checkOutRecord,
   batchCheckOutRecords,
+  createFormInitialState,
+  createRegistrationRecord,
 } from '../../visitor-registration/utils'
 import {
   loadRecords,
@@ -615,5 +617,148 @@ describe('localStorage operations', () => {
   it('loadRecentHosts 数据非数组时返回空数组', () => {
     localStorage.setItem(STORAGE_KEY_RECENT, JSON.stringify({ not: 'array' }))
     expect(loadRecentHosts()).toEqual([])
+  })
+})
+
+describe('createFormInitialState', () => {
+  it('创建默认表单初始状态', () => {
+    const before = Date.now()
+    const state = createFormInitialState()
+    const after = Date.now()
+    expect(state.name).toBe('')
+    expect(state.phone).toBe('')
+    expect(state.idCard).toBe('')
+    expect(state.reason).toBe('')
+    expect(state.host).toBeNull()
+    expect(state.photo).toBe('')
+    expect(state._registerTimestamp).toBeGreaterThanOrEqual(before)
+    expect(state._registerTimestamp).toBeLessThanOrEqual(after)
+    expect(state.registerTime).toBe(formatDateTime(state._registerTimestamp))
+  })
+
+  it('使用指定时间戳创建初始状态', () => {
+    const ts = new Date(2025, 5, 15, 14, 30, 45).getTime()
+    const state = createFormInitialState(ts)
+    expect(state._registerTimestamp).toBe(ts)
+    expect(state.registerTime).toBe('2025-06-15 14:30:45')
+  })
+
+  it('格式化的显示时间与时间戳完全一致', () => {
+    const ts = new Date(2025, 0, 1, 0, 0, 0).getTime()
+    const state = createFormInitialState(ts)
+    expect(state.registerTime).toBe(formatDateTime(ts))
+    expect(new Date(state.registerTime.replace(' ', 'T')).getTime()).toBe(ts)
+  })
+
+  it('所有字符串字段初始化为空字符串', () => {
+    const state = createFormInitialState()
+    expect(typeof state.name).toBe('string')
+    expect(typeof state.phone).toBe('string')
+    expect(typeof state.idCard).toBe('string')
+    expect(typeof state.reason).toBe('string')
+    expect(typeof state.photo).toBe('string')
+  })
+})
+
+describe('createRegistrationRecord', () => {
+  const mockHost = { id: 'H001', name: '李经理', department: '市场部', position: '经理' }
+
+  it('使用表单中的时间戳创建记录（确保一致性）', () => {
+    const timestamp = new Date(2025, 5, 15, 10, 30, 0).getTime()
+    const formData = {
+      ...createFormInitialState(timestamp),
+      name: '  张三  ',
+      phone: ' 13812345678 ',
+      idCard: ' 110101199001011234 ',
+      reason: '  商务洽谈  ',
+      host: mockHost,
+      photo: 'data:image/png;base64,xxx',
+    }
+    const mockId = () => 'vr_mock_id_123'
+    const record = createRegistrationRecord(formData, mockId)
+    expect(record.id).toBe('vr_mock_id_123')
+    expect(record.name).toBe('张三')
+    expect(record.phone).toBe('13812345678')
+    expect(record.idCard).toBe('110101199001011234')
+    expect(record.reason).toBe('商务洽谈')
+    expect(record.host).toBe(mockHost)
+    expect(record.photo).toBe('data:image/png;base64,xxx')
+    expect(record.registerTime).toBe(timestamp)
+    expect(record.checkOutTime).toBeNull()
+  })
+
+  it('登记时间严格使用表单中保存的时间戳（不使用 Date.now()）', () => {
+    const formTimestamp = new Date(2020, 0, 1, 0, 0, 0).getTime()
+    const formData = {
+      ...createFormInitialState(formTimestamp),
+      name: '测试用户',
+      phone: '13900001111',
+      idCard: '440101199505056789',
+      reason: '测试',
+      host: mockHost,
+    }
+    const record = createRegistrationRecord(formData)
+    expect(record.registerTime).toBe(formTimestamp)
+    expect(record.registerTime).not.toBe(Date.now())
+  })
+
+  it('缺少 _registerTimestamp 时回退到 Date.now()', () => {
+    const formData = {
+      name: '李四',
+      phone: '13912345678',
+      idCard: '310101198801015678',
+      reason: '面试',
+      host: mockHost,
+      photo: '',
+    }
+    const before = Date.now()
+    const record = createRegistrationRecord(formData)
+    const after = Date.now()
+    expect(record.registerTime).toBeGreaterThanOrEqual(before)
+    expect(record.registerTime).toBeLessThanOrEqual(after)
+  })
+
+  it('默认使用 generateId 生成 id', () => {
+    const formData = {
+      ...createFormInitialState(),
+      name: '王五',
+      phone: '13700001234',
+      idCard: '510101199212123456',
+      reason: '拜访',
+      host: mockHost,
+    }
+    const record = createRegistrationRecord(formData)
+    expect(record.id).toMatch(/^vr_/)
+  })
+
+  it('被访人对象完整保存在记录中', () => {
+    const formData = {
+      ...createFormInitialState(),
+      name: '赵六',
+      phone: '13688889999',
+      idCard: '320101198510107890',
+      reason: '合作讨论',
+      host: mockHost,
+    }
+    const record = createRegistrationRecord(formData)
+    expect(record.host).toEqual(mockHost)
+    expect(record.host.name).toBe('李经理')
+    expect(record.host.department).toBe('市场部')
+  })
+
+  it('表单字段有前后空格时进行 trim 处理', () => {
+    const formData = {
+      ...createFormInitialState(),
+      name: '   钱七   ',
+      phone: '  13511112222  ',
+      idCard: '  110101199003034567  ',
+      reason: '  产品演示  ',
+      host: mockHost,
+    }
+    const record = createRegistrationRecord(formData)
+    expect(record.name).toBe('钱七')
+    expect(record.phone).toBe('13511112222')
+    expect(record.idCard).toBe('110101199003034567')
+    expect(record.reason).toBe('产品演示')
   })
 })

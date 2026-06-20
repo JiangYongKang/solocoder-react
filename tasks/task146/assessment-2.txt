@@ -1,0 +1,5 @@
+产物不满意：
+handleHistoryClick 函数在恢复朗读历史记录时为 speed pitch volume 分别使用了硬编码回退值 1.0 0 80，没有使用 ttsConfigCore.js 中已定义的标准常量 DEFAULT_SPEED DEFAULT_PITCH DEFAULT_VOLUME。但同一函数中 voiceId 的回退却正确地使用了 DEFAULT_VOICE_ID 常量，回退值来源不统一。如果未来默认参数发生变更，硬编码回退值将成为与标准常量不一致的隐藏缺陷点，导致从历史记录恢复出的参数和系统默认参数产生偏离。正确做法是统一从 ttsConfigCore.js 导入并使用全部四个默认常量。
+
+过程不满意：
+模型在首轮测试 98 个用例全部通过后运行 ESLint 检查，发现 index.jsx 中有 4 个 lint 错误。模型没有针对这 4 个错误做定向的 StrReplace 精确修复，而是直接使用 Write 工具全量重写了整个 index.jsx 文件约 679 行代码。全量重写一个已通过全部测试的组件文件风险极高，任何细微的逻辑偏差都可能引入回归缺陷。正确做法是逐条分析 ESLint 报错信息，针对每个问题做精准的最小化修改。虽然最终重写后测试仍全部通过，但这种操作在真实项目中极易将已验证的逻辑不小心改错。

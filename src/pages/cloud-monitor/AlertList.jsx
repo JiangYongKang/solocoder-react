@@ -42,6 +42,7 @@ const AlertList = ({ alerts, onSilenceChange }) => {
   }
 
   const displayAlerts = filterAlertsByLevel(alerts, filterLevel)
+  const newestId = alerts.length > 0 ? alerts[0].id : null
 
   return (
     <div>
@@ -85,7 +86,7 @@ const AlertList = ({ alerts, onSilenceChange }) => {
           return (
             <div
               key={alert.id}
-              className="cm-alert-item"
+              className={`cm-alert-item${alert.id === newestId ? ' cm-alert-item-new' : ''}`}
               style={{ borderLeftColor: cfg.color }}
             >
               <div className="cm-alert-item-title">

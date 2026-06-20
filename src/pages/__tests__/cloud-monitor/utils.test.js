@@ -5,6 +5,9 @@ import {
   MAX_ALERT_COUNT,
   MAX_TREND_POINTS,
   METRIC_TYPES,
+  REGIONS,
+  TREND_TIME_RANGE_MS,
+  TREND_DATA_POINT_INTERVAL,
 } from '../../cloud-monitor/constants'
 import {
   randomInRange,
@@ -21,9 +24,15 @@ import {
   fluctuateRegionData,
   generateMetrics,
   fluctuateMetrics,
+  generateAllRegionMetrics,
+  fluctuateAllRegionMetrics,
+  selectRegionMetrics,
   filterDataByRegion,
   generateInitialTrendData,
+  generateAllRegionTrendData,
   appendTrendPoint,
+  appendTrendPointToMap,
+  selectRegionTrendData,
   evictOldTrendPoints,
   computeTrendStats,
   formatTimeAgo,
@@ -299,6 +308,77 @@ describe('模拟数据生成器', () => {
   })
 })
 
+describe('多地域指标生成与筛选', () => {
+  it('generateAllRegionMetrics 包含 all 和所有地域', () => {
+    const map = generateAllRegionMetrics()
+    expect(map).toHaveProperty('all')
+    for (const r of REGIONS) {
+      expect(map).toHaveProperty(r.id)
+    }
+    expect(Object.keys(map)).toHaveLength(REGIONS.length + 1)
+  })
+
+  it('generateAllRegionMetrics 每个地域指标在有效范围内', () => {
+    const map = generateAllRegionMetrics()
+    for (const key of Object.keys(map)) {
+      const m = map[key]
+      expect(m.cpu).toBeGreaterThanOrEqual(0)
+      expect(m.cpu).toBeLessThanOrEqual(100)
+      expect(m.memory).toBeGreaterThanOrEqual(0)
+      expect(m.memory).toBeLessThanOrEqual(100)
+      expect(m.disk).toBeGreaterThanOrEqual(0)
+      expect(m.disk).toBeLessThanOrEqual(100)
+    }
+  })
+
+  it('fluctuateAllRegionMetrics 波动后所有地域数据有效', () => {
+    const prev = generateAllRegionMetrics()
+    const next = fluctuateAllRegionMetrics(prev)
+    expect(Object.keys(next)).toHaveLength(Object.keys(prev).length)
+    for (const key of Object.keys(next)) {
+      expect(next[key].cpu).toBeGreaterThanOrEqual(0)
+      expect(next[key].cpu).toBeLessThanOrEqual(100)
+    }
+  })
+
+  it('fluctuateAllRegionMetrics null 输入生成新数据', () => {
+    const map = fluctuateAllRegionMetrics(null)
+    expect(map).toHaveProperty('all')
+    expect(map).toHaveProperty('east')
+  })
+
+  it('selectRegionMetrics: all 返回全局指标', () => {
+    const map = generateAllRegionMetrics()
+    const result = selectRegionMetrics(map, 'all')
+    expect(result).toBe(map.all)
+  })
+
+  it('selectRegionMetrics: 指定地域返回该地域指标', () => {
+    const map = generateAllRegionMetrics()
+    const result = selectRegionMetrics(map, 'east')
+    expect(result).toBe(map.east)
+  })
+
+  it('selectRegionMetrics: 不存在的地域回退到全局', () => {
+    const map = generateAllRegionMetrics()
+    const result = selectRegionMetrics(map, 'nonexistent')
+    expect(result).toBe(map.all)
+  })
+
+  it('selectRegionMetrics: null map 生成默认指标', () => {
+    const result = selectRegionMetrics(null, 'east')
+    expect(result).toHaveProperty('cpu')
+    expect(result).toHaveProperty('memory')
+    expect(result).toHaveProperty('disk')
+  })
+
+  it('selectRegionMetrics: 空地域ID返回全局指标', () => {
+    const map = generateAllRegionMetrics()
+    expect(selectRegionMetrics(map, '')).toBe(map.all)
+    expect(selectRegionMetrics(map, null)).toBe(map.all)
+  })
+})
+
 describe('地域筛选数据过滤', () => {
   it('filterDataByRegion: all 返回原数据', () => {
     const data = { foo: 'bar', regionId: 'east' }
@@ -325,9 +405,30 @@ describe('地域筛选数据过滤', () => {
 })
 
 describe('时间序列数据追加与淘汰逻辑', () => {
-  it('generateInitialTrendData 生成指定数量的数据点', () => {
+  it('generateInitialTrendData 生成覆盖30分钟的数据点', () => {
     const data = generateInitialTrendData()
-    expect(data.length).toBe(30)
+    const expectedPoints = TREND_TIME_RANGE_MS / TREND_DATA_POINT_INTERVAL
+    expect(data.length).toBe(expectedPoints)
+  })
+
+  it('generateInitialTrendData 数据点覆盖过去30分钟', () => {
+    const data = generateInitialTrendData()
+    const now = Date.now()
+    const oldest = data[0].time
+    const newest = data[data.length - 1].time
+    expect(now - oldest).toBeGreaterThanOrEqual(TREND_TIME_RANGE_MS - 10000)
+    expect(now - newest).toBeLessThanOrEqual(10000)
+  })
+
+  it('generateInitialTrendData 时间戳递增', () => {
+    const data = generateInitialTrendData()
+    for (let i = 1; i < data.length; i++) {
+      expect(data[i].time).toBeGreaterThan(data[i - 1].time)
+    }
+  })
+
+  it('generateInitialTrendData 数据点值在有效范围内', () => {
+    const data = generateInitialTrendData()
     data.forEach((p) => {
       expect(p).toHaveProperty('time')
       expect(p).toHaveProperty('cpu')
@@ -338,10 +439,19 @@ describe('时间序列数据追加与淘汰逻辑', () => {
     })
   })
 
-  it('generateInitialTrendData 时间戳递增', () => {
-    const data = generateInitialTrendData()
-    for (let i = 1; i < data.length; i++) {
-      expect(data[i].time).toBeGreaterThan(data[i - 1].time)
+  it('generateAllRegionTrendData 包含所有地域', () => {
+    const map = generateAllRegionTrendData()
+    expect(map).toHaveProperty('all')
+    for (const r of REGIONS) {
+      expect(map).toHaveProperty(r.id)
+    }
+  })
+
+  it('generateAllRegionTrendData 每个地域数据覆盖30分钟', () => {
+    const map = generateAllRegionTrendData()
+    const expectedPoints = TREND_TIME_RANGE_MS / TREND_DATA_POINT_INTERVAL
+    for (const key of Object.keys(map)) {
+      expect(map[key].length).toBe(expectedPoints)
     }
   })
 
@@ -371,6 +481,60 @@ describe('时间序列数据追加与淘汰逻辑', () => {
     const result = appendTrendPoint(points, null)
     expect(result).toHaveLength(1)
     expect(result).not.toBe(points)
+  })
+
+  it('appendTrendPointToMap: 全局视图更新所有地域', () => {
+    const map = generateAllRegionTrendData()
+    const newPoint = { time: Date.now(), cpu: 50, memory: 50, disk: 50 }
+    const result = appendTrendPointToMap(map, 'all', newPoint)
+    for (const key of Object.keys(result)) {
+      expect(result[key].length).toBeGreaterThanOrEqual(map[key].length)
+      const lastPoint = result[key][result[key].length - 1]
+      expect(lastPoint.time).toBe(newPoint.time)
+    }
+  })
+
+  it('appendTrendPointToMap: 指定地域只更新该地域', () => {
+    const map = generateAllRegionTrendData()
+    const newPoint = { time: Date.now(), cpu: 50, memory: 50, disk: 50 }
+    const result = appendTrendPointToMap(map, 'east', newPoint)
+    expect(result.east.length).toBeGreaterThanOrEqual(map.east.length)
+    expect(result.north.length).toBe(map.north.length)
+    expect(result.all.length).toBe(map.all.length)
+  })
+
+  it('appendTrendPointToMap: null map 返回原值', () => {
+    const result = appendTrendPointToMap(null, 'all', { time: 1, cpu: 50, memory: 50, disk: 50 })
+    expect(result).toBeNull()
+  })
+
+  it('appendTrendPointToMap: null newPoint 返回原值', () => {
+    const map = generateAllRegionTrendData()
+    const result = appendTrendPointToMap(map, 'all', null)
+    expect(result).toBe(map)
+  })
+
+  it('selectRegionTrendData: all 返回全局趋势', () => {
+    const map = generateAllRegionTrendData()
+    const result = selectRegionTrendData(map, 'all')
+    expect(result).toBe(map.all)
+  })
+
+  it('selectRegionTrendData: 指定地域返回该地域趋势', () => {
+    const map = generateAllRegionTrendData()
+    const result = selectRegionTrendData(map, 'east')
+    expect(result).toBe(map.east)
+  })
+
+  it('selectRegionTrendData: 不存在的地域回退到全局', () => {
+    const map = generateAllRegionTrendData()
+    const result = selectRegionTrendData(map, 'nonexistent')
+    expect(result).toBe(map.all)
+  })
+
+  it('selectRegionTrendData: null map 返回空数组', () => {
+    const result = selectRegionTrendData(null, 'all')
+    expect(result).toEqual([])
   })
 
   it('evictOldTrendPoints 淘汰超时数据点', () => {
@@ -465,7 +629,7 @@ describe('时间格式化', () => {
 
   it('formatTimeAgo: 空值返回空字符串', () => {
     expect(formatTimeAgo(null)).toBe('')
-    expect(formatTimeAgo(0)).toBe('') 
+    expect(formatTimeAgo(0)).toBe('')
   })
 })
 

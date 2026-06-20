@@ -18,7 +18,6 @@ import {
   validateImageFile,
 } from './validators'
 import {
-  generateId,
   formatDateTime,
   maskPhone,
   maskIdCard,
@@ -32,6 +31,8 @@ import {
   searchHosts,
   checkOutRecord,
   batchCheckOutRecords,
+  createFormInitialState,
+  createRegistrationRecord,
 } from './utils'
 import {
   loadRecords,
@@ -58,15 +59,7 @@ const VisitorRegistrationPage = () => {
   const [showSuccess, setShowSuccess] = useState(false)
   const successTimerRef = useRef(null)
 
-  const [formData, setFormData] = useState(() => ({
-    name: '',
-    phone: '',
-    idCard: '',
-    reason: '',
-    host: null,
-    photo: '',
-    registerTime: formatDateTime(Date.now()),
-  }))
+  const [formData, setFormData] = useState(() => createFormInitialState())
 
   const [errors, setErrors] = useState({
     name: '',
@@ -104,12 +97,13 @@ const VisitorRegistrationPage = () => {
     startDate: '',
     endDate: '',
   })
+  const [now, setNow] = useState(() => Date.now())
 
   const debounceRef = useRef(null)
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setRecords((prev) => [...prev])
+      setNow(Date.now())
     }, 60 * 1000)
     return () => clearInterval(interval)
   }, [])
@@ -121,13 +115,6 @@ const VisitorRegistrationPage = () => {
   useEffect(() => {
     saveRecentHosts(recentHosts)
   }, [recentHosts])
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setFormData((prev) => ({ ...prev, registerTime: formatDateTime(Date.now()) }))
-    }, 1000)
-    return () => clearInterval(timer)
-  }, [])
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -150,11 +137,14 @@ const VisitorRegistrationPage = () => {
     [hostSearchKeyword]
   )
 
-  const sortedRecords = useMemo(() => sortRecords(records), [records])
+  const sortedRecords = useMemo(
+    () => sortRecords(records, now),
+    [records, now]
+  )
 
   const filteredRecords = useMemo(
-    () => filterRecords(sortedRecords, filters),
-    [sortedRecords, filters]
+    () => filterRecords(sortedRecords, filters, now),
+    [sortedRecords, filters, now]
   )
 
   const pagination = useMemo(
@@ -165,9 +155,9 @@ const VisitorRegistrationPage = () => {
   const overdueCount = useMemo(
     () =>
       sortedRecords.filter(
-        (r) => getVisitorStatus(r) === VISITOR_STATUS.OVERDUE
+        (r) => getVisitorStatus(r, now) === VISITOR_STATUS.OVERDUE
       ).length,
-    [sortedRecords]
+    [sortedRecords, now]
   )
 
   const handleBlur = useCallback((field, validator) => {
@@ -246,30 +236,12 @@ const VisitorRegistrationPage = () => {
     e.preventDefault()
     if (!validateForm()) return
 
-    const newRecord = {
-      id: generateId(),
-      name: formData.name.trim(),
-      phone: formData.phone.trim(),
-      idCard: formData.idCard.trim(),
-      reason: formData.reason.trim(),
-      host: formData.host,
-      photo: formData.photo,
-      registerTime: Date.now(),
-      checkOutTime: null,
-    }
+    const newRecord = createRegistrationRecord(formData)
 
     setRecords((prev) => [newRecord, ...prev])
     setRecentHosts((prev) => updateRecentHosts(prev, formData.host))
 
-    setFormData({
-      name: '',
-      phone: '',
-      idCard: '',
-      reason: '',
-      host: null,
-      photo: '',
-      registerTime: formatDateTime(Date.now()),
-    })
+    setFormData(createFormInitialState())
     setErrors({ name: '', phone: '', idCard: '', reason: '', host: '', photo: '' })
     setTouched({ name: false, phone: false, idCard: false, reason: false, host: false })
 
@@ -777,7 +749,7 @@ const VisitorRegistrationPage = () => {
                 </tr>
               ) : (
                 pagination.items.map((record) => {
-                  const status = getVisitorStatus(record)
+                  const status = getVisitorStatus(record, now)
                   const isOverdue = status === VISITOR_STATUS.OVERDUE
                   return (
                     <tr key={record.id} className={isOverdue ? 'overdue-row' : ''}>

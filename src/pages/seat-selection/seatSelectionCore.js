@@ -290,22 +290,25 @@ export function getSeatTooltip(seat) {
   return `${seat.id} · ${zoneConfig.name} · ¥${seat.price}`;
 }
 
-export function updatePriceZoneConfig(grid, zone, newConfig) {
-  if (!PRICE_ZONES[zone.toUpperCase?.()]) return grid;
-  const zoneKey = zone.toUpperCase?.() || zone;
+export function updatePriceZoneConfig(grid, zone, newConfig, currentConfig) {
+  const config = currentConfig || PRICE_ZONE_CONFIG;
+  const upperKey = zone.toUpperCase?.();
+  if (!PRICE_ZONES[upperKey]) return { grid, priceZoneConfig: config };
+  const zoneKey = PRICE_ZONES[upperKey];
 
-  const currentConfig = PRICE_ZONE_CONFIG[zoneKey];
-  const mergedConfig = { ...currentConfig, ...newConfig };
-  PRICE_ZONE_CONFIG[zoneKey] = mergedConfig;
+  const mergedConfig = { ...config[zoneKey], ...newConfig };
+  const updatedConfig = { ...config, [zoneKey]: mergedConfig };
 
   const rows = ZONE_ROWS[zoneKey] || [];
-  return grid.map((row, rowIdx) => {
+  const newGrid = grid.map((row, rowIdx) => {
     if (!rows.includes(rowIdx)) return row;
     return row.map((seat) => ({
       ...seat,
       price: mergedConfig.price,
     }));
   });
+
+  return { grid: newGrid, priceZoneConfig: updatedConfig };
 }
 
 export function saveSeatState(state, storage) {
@@ -384,11 +387,31 @@ export function restoreLockedSeats(grid, lockedIds) {
   );
 }
 
-export function handlePersonCountChange(grid, selectedIds, newPersonCount) {
+export function handlePersonCountChange(grid, selectedIds) {
   const result = clearSelectedSeats(grid, selectedIds);
   return {
     grid: result.grid,
     selected: [],
     remainingTime: LOCK_DURATION_SECONDS,
   };
+}
+
+export function handleMultiPersonSeatClick(grid, row, col, personCount, selectedIds) {
+  const seat = grid[row]?.[col];
+  if (!seat || !canSelectSeat(seat)) {
+    return { grid, selected: selectedIds, changed: false, needsFallback: false };
+  }
+
+  if (seat.status === SEAT_STATUS.SELECTED) {
+    const result = toggleSeatSelection(grid, row, col, selectedIds);
+    return { grid: result.grid, selected: result.selected, changed: result.changed, needsFallback: false };
+  }
+
+  const adjacent = findAdjacentSeats(grid, row, col, personCount);
+  if (adjacent.length === personCount) {
+    const result = selectMultipleSeats(grid, adjacent, selectedIds);
+    return { grid: result.grid, selected: result.selected, changed: result.changed, needsFallback: false };
+  }
+
+  return { grid, selected: selectedIds, changed: false, needsFallback: true };
 }

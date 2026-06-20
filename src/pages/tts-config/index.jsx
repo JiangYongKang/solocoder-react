@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import './tts-config.css'
 import {
@@ -25,7 +25,9 @@ import {
   getVoiceById,
   getVoiceName,
   formatPauseDuration,
-  getTextWithoutPauseMarkersForParagraph,
+  buildAuditionText,
+  parseSegmentsWithPauses,
+  flattenTextSegments,
 } from './ttsConfigCore.js'
 import {
   loadHistory,
@@ -97,9 +99,14 @@ export default function TtsConfigPage() {
   const [currentParaIndex, setCurrentParaIndex] = useState(0)
   const [currentCharIndex, setCurrentCharIndex] = useState(0)
   const [playStatus, setPlayStatus] = useState('')
+  const [inPause, setInPause] = useState(false)
 
   const [isAuditioning, setIsAuditioning] = useState(false)
   const auditionTimerRef = useRef(null)
+  const auditionText = useMemo(() => buildAuditionText(getVoiceById(voiceId).name), [voiceId])
+
+  const pauseTimeoutRef = useRef(null)
+  const playStepRef = useRef({ segmentIdx: 0, segmentCharIdx: 0 })
 
   const [showHistory, setShowHistory] = useState(false)
   const [history, setHistory] = useState(() => loadHistory())
@@ -112,10 +119,23 @@ export default function TtsConfigPage() {
   const charCount = useMemo(() => countChars(text), [text])
   const pauseMarkers = useMemo(() => parsePauseMarkers(text), [text])
 
+  const stopPlayback = () => {
+    setIsPlaying(false)
+    setIsPaused(false)
+    setInPause(false)
+    setCurrentParaIndex(0)
+    setCurrentCharIndex(0)
+    setPlayStatus('')
+    playStepRef.current = { segmentIdx: 0, segmentCharIdx: 0 }
+    if (playTimerRef.current) clearInterval(playTimerRef.current)
+    if (pauseTimeoutRef.current) clearTimeout(pauseTimeoutRef.current)
+  }
+
   useEffect(() => {
     return () => {
       if (playTimerRef.current) clearInterval(playTimerRef.current)
       if (auditionTimerRef.current) clearTimeout(auditionTimerRef.current)
+      if (pauseTimeoutRef.current) clearTimeout(pauseTimeoutRef.current)
     }
   }, [])
 
@@ -189,18 +209,23 @@ export default function TtsConfigPage() {
     }, 2000)
   }
 
-  const currentParaText = useMemo(() => {
-    if (paragraphs.length === 0) return ''
+  const currentParaSegments = useMemo(() => {
+    if (paragraphs.length === 0) return []
     const idx = Math.min(currentParaIndex, paragraphs.length - 1)
-    return getTextWithoutPauseMarkersForParagraph(paragraphs[idx] || '')
+    return parseSegmentsWithPauses(paragraphs[idx] || '')
   }, [paragraphs, currentParaIndex])
+
+  const currentParaText = useMemo(
+    () => flattenTextSegments(currentParaSegments),
+    [currentParaSegments]
+  )
 
   const progress = useMemo(
     () => calculateProgress(currentParaIndex, paragraphs.length, currentCharIndex, currentParaText.length || 1),
     [currentParaIndex, paragraphs.length, currentCharIndex, currentParaText.length]
   )
 
-  const startPlayback = useCallback(() => {
+  const startPlayback = () => {
     if (text.trim().length === 0) return
     if (paragraphs.length === 0) return
 
@@ -211,33 +236,28 @@ export default function TtsConfigPage() {
       return
     }
 
-    addRecordToHistory(text, voiceId, speed)
+    addRecordToHistory(text, voiceId, speed, pitch, volume)
     setHistory(loadHistory())
 
+    playStepRef.current = { segmentIdx: 0, segmentCharIdx: 0 }
     setIsPlaying(true)
     setIsPaused(false)
+    setInPause(false)
     setCurrentParaIndex(0)
     setCurrentCharIndex(0)
     setPlayStatus(`正在朗读第 1/${paragraphs.length} 段...`)
-  }, [text, paragraphs.length, isPaused, voiceId, speed, currentParaIndex])
+  }
 
-  const pausePlayback = useCallback(() => {
+  const pausePlayback = () => {
     setIsPlaying(false)
     setIsPaused(true)
     setPlayStatus('已暂停')
     if (playTimerRef.current) clearInterval(playTimerRef.current)
-  }, [])
+    if (pauseTimeoutRef.current) clearTimeout(pauseTimeoutRef.current)
+    setInPause(false)
+  }
 
-  const stopPlayback = useCallback(() => {
-    setIsPlaying(false)
-    setIsPaused(false)
-    setCurrentParaIndex(0)
-    setCurrentCharIndex(0)
-    setPlayStatus('')
-    if (playTimerRef.current) clearInterval(playTimerRef.current)
-  }, [])
-
-  const prevParagraph = useCallback(() => {
+  const prevParagraph = () => {
     if (currentParaIndex > 0) {
       setCurrentParaIndex((prev) => prev - 1)
       setCurrentCharIndex(0)
@@ -245,9 +265,9 @@ export default function TtsConfigPage() {
         setPlayStatus(`正在朗读第 ${currentParaIndex}/${paragraphs.length} 段...`)
       }
     }
-  }, [currentParaIndex, isPlaying, paragraphs.length])
+  }
 
-  const nextParagraph = useCallback(() => {
+  const nextParagraph = () => {
     if (currentParaIndex < paragraphs.length - 1) {
       setCurrentParaIndex((prev) => prev + 1)
       setCurrentCharIndex(0)
@@ -255,46 +275,109 @@ export default function TtsConfigPage() {
         setPlayStatus(`正在朗读第 ${currentParaIndex + 2}/${paragraphs.length} 段...`)
       }
     }
-  }, [currentParaIndex, isPlaying, paragraphs.length])
+  }
 
   useEffect(() => {
     if (!isPlaying) return
     if (paragraphs.length === 0) {
-      stopPlayback()
+      setTimeout(stopPlayback, 0)
+      return
+    }
+    if (inPause) return
+
+    const segs = currentParaSegments
+    if (!segs || segs.length === 0) {
+      setTimeout(() => {
+        if (currentParaIndex >= paragraphs.length - 1) {
+          setIsPlaying(false)
+          setIsPaused(false)
+          setPlayStatus('播放完成')
+        } else {
+          setCurrentParaIndex((pi) => pi + 1)
+          playStepRef.current = { segmentIdx: 0, segmentCharIdx: 0 }
+          setCurrentCharIndex(0)
+          setPlayStatus(`正在朗读第 ${currentParaIndex + 2}/${paragraphs.length} 段...`)
+        }
+      }, 0)
+      return
+    }
+
+    const step = playStepRef.current
+    if (step.segmentIdx >= segs.length) {
+      setTimeout(() => {
+        if (currentParaIndex >= paragraphs.length - 1) {
+          setIsPlaying(false)
+          setIsPaused(false)
+          setPlayStatus('播放完成')
+        } else {
+          setCurrentParaIndex((pi) => pi + 1)
+          playStepRef.current = { segmentIdx: 0, segmentCharIdx: 0 }
+          setCurrentCharIndex(0)
+          setPlayStatus(`正在朗读第 ${currentParaIndex + 2}/${paragraphs.length} 段...`)
+        }
+      }, 0)
+      return
+    }
+
+    const currentSegment = segs[step.segmentIdx]
+    if (currentSegment.type === 'pause') {
+      setInPause(true)
+      const actualDuration = Math.max(10, Math.round(currentSegment.duration / speed))
+      setPlayStatus(`停顿中（${formatPauseDuration(currentSegment.duration)}）...`)
+      pauseTimeoutRef.current = setTimeout(() => {
+        step.segmentIdx += 1
+        step.segmentCharIdx = 0
+        setInPause(false)
+        setPlayStatus(`正在朗读第 ${currentParaIndex + 1}/${paragraphs.length} 段...`)
+      }, actualDuration)
+      return
+    }
+
+    const textContent = currentSegment.content
+    if (step.segmentCharIdx >= textContent.length) {
+      step.segmentIdx += 1
+      step.segmentCharIdx = 0
+      if (playTimerRef.current) clearInterval(playTimerRef.current)
       return
     }
 
     if (playTimerRef.current) clearInterval(playTimerRef.current)
 
-    const interval = Math.max(30, Math.round(100 / speed))
+    const interval = Math.max(20, Math.round(100 / speed))
     playTimerRef.current = setInterval(() => {
-      setCurrentCharIndex((prev) => {
-        const paraLen = currentParaText.length || 1
-        if (prev >= paraLen) {
-          if (currentParaIndex >= paragraphs.length - 1) {
-            setIsPlaying(false)
-            setIsPaused(false)
-            setPlayStatus('播放完成')
-            if (playTimerRef.current) clearInterval(playTimerRef.current)
-            return prev
-          }
-          setCurrentParaIndex((pi) => pi + 1)
-          setPlayStatus(`正在朗读第 ${currentParaIndex + 2}/${paragraphs.length} 段...`)
-          return 0
-        }
-        return prev + 1
-      })
+      const curStep = playStepRef.current
+      const curSegs = currentParaSegments
+      if (!curSegs || curSegs.length === 0) return
+      if (curStep.segmentIdx >= curSegs.length) {
+        if (playTimerRef.current) clearInterval(playTimerRef.current)
+        return
+      }
+      const seg = curSegs[curStep.segmentIdx]
+      if (seg.type !== 'text') {
+        if (playTimerRef.current) clearInterval(playTimerRef.current)
+        return
+      }
+      if (curStep.segmentCharIdx >= seg.content.length) {
+        curStep.segmentIdx += 1
+        curStep.segmentCharIdx = 0
+        if (playTimerRef.current) clearInterval(playTimerRef.current)
+        return
+      }
+      curStep.segmentCharIdx += 1
+      setCurrentCharIndex((prev) => prev + 1)
     }, interval)
 
     return () => {
       if (playTimerRef.current) clearInterval(playTimerRef.current)
     }
-  }, [isPlaying, currentParaIndex, speed, paragraphs.length, currentParaText.length, stopPlayback])
+  }, [isPlaying, inPause, currentParaIndex, currentParaSegments, speed, paragraphs.length])
 
   const handleHistoryClick = (record) => {
     setText(record.text || '')
     setVoiceId(record.voiceId || DEFAULT_VOICE_ID)
-    setSpeed(record.speed || 1.0)
+    setSpeed(typeof record.speed === 'number' ? record.speed : 1.0)
+    setPitch(typeof record.pitch === 'number' ? record.pitch : 0)
+    setVolume(typeof record.volume === 'number' ? record.volume : 80)
     stopPlayback()
   }
 
@@ -534,6 +617,10 @@ export default function TtsConfigPage() {
                 >
                   {isAuditioning ? '停止试听' : `试听 · ${getVoiceById(voiceId).name}`}
                 </button>
+              </div>
+              <div style={{ marginTop: 10, padding: '8px 10px', background: isAuditioning ? '#eff6ff' : '#f3f4f6', borderRadius: 6, border: '1px solid #e5e7eb', fontSize: 13, color: isAuditioning ? '#1d4ed8' : '#4b5563', transition: 'background 0.2s' }}>
+                <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>试听文本：</div>
+                <div style={{ lineHeight: 1.5 }}>{auditionText}</div>
               </div>
             </div>
           </div>

@@ -12,6 +12,8 @@ import {
   buildExportHtml,
   mergeVariableDefinitions,
   formatTimestamp,
+  generateTemplateId,
+  createCustomTemplate,
 } from '../../terms-generator/utils.js'
 import { COMMON_VARIABLES } from '../../terms-generator/constants.js'
 
@@ -429,5 +431,102 @@ describe('formatTimestamp', () => {
     const formatted = formatTimestamp(0)
     expect(typeof formatted).toBe('string')
     expect(formatted.length).toBeGreaterThan(0)
+  })
+})
+
+describe('generateTemplateId', () => {
+  it('应该返回字符串类型的 id', () => {
+    const id = generateTemplateId()
+    expect(typeof id).toBe('string')
+    expect(id.length).toBeGreaterThan(0)
+  })
+
+  it('id 应该以 custom- 开头', () => {
+    const id = generateTemplateId()
+    expect(id.startsWith('custom-')).toBe(true)
+  })
+
+  it('两次调用应该返回不同的 id', () => {
+    const id1 = generateTemplateId()
+    const id2 = generateTemplateId()
+    expect(id1).not.toBe(id2)
+  })
+})
+
+describe('createCustomTemplate', () => {
+  it('应该创建一个完整的自定义模板对象', () => {
+    const template = createCustomTemplate('测试模板', '这是描述')
+    expect(template).toHaveProperty('id')
+    expect(template).toHaveProperty('name')
+    expect(template).toHaveProperty('description')
+    expect(template).toHaveProperty('isDefault')
+    expect(template).toHaveProperty('variables')
+    expect(template).toHaveProperty('content')
+    expect(template).toHaveProperty('createdAt')
+  })
+
+  it('isDefault 应该为 false', () => {
+    const template = createCustomTemplate('测试')
+    expect(template.isDefault).toBe(false)
+  })
+
+  it('name 应该正确设置', () => {
+    const template = createCustomTemplate('隐私政策模板')
+    expect(template.name).toBe('隐私政策模板')
+  })
+
+  it('description 应该正确设置', () => {
+    const template = createCustomTemplate('测试', '我的描述')
+    expect(template.description).toBe('我的描述')
+  })
+
+  it('空名称应该使用默认值', () => {
+    const template = createCustomTemplate('')
+    expect(template.name).toBe('自定义模板')
+  })
+
+  it('variables 应该是一个数组', () => {
+    const template = createCustomTemplate('测试')
+    expect(Array.isArray(template.variables)).toBe(true)
+    expect(template.variables.length).toBe(0)
+  })
+
+  it('content 应该有默认值', () => {
+    const template = createCustomTemplate('测试')
+    expect(template.content).toContain('自定义模板')
+    expect(template.content).toContain('# 自定义模板')
+  })
+
+  it('自定义 content 应该正确设置', () => {
+    const customContent = '# 我的模板\n\n自定义内容'
+    const template = createCustomTemplate('测试', '', customContent)
+    expect(template.content).toBe(customContent)
+  })
+
+  it('自定义 variables 应该正确设置', () => {
+    const vars = [{ key: 'a', label: 'A', type: 'text' }]
+    const template = createCustomTemplate('测试', '', '', vars)
+    expect(template.variables).toEqual(vars)
+  })
+
+  it('createdAt 应该是有效的时间戳', () => {
+    const before = Date.now()
+    const template = createCustomTemplate('测试')
+    const after = Date.now()
+    expect(template.createdAt).toBeGreaterThanOrEqual(before)
+    expect(template.createdAt).toBeLessThanOrEqual(after)
+  })
+
+  it('创建的模板应该通过 validateTemplate 校验', () => {
+    const template = createCustomTemplate('有效模板', '描述内容')
+    const result = validateTemplate(template)
+    expect(result.valid).toBe(true)
+    expect(result.errors).toEqual([])
+  })
+
+  it('id 应该满足模板校验的字符串类型要求', () => {
+    const template = createCustomTemplate('测试')
+    expect(typeof template.id).toBe('string')
+    expect(template.id.length).toBeGreaterThan(0)
   })
 })

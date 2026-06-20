@@ -15,8 +15,6 @@ import {
   validatePickupCode,
   maskPhone,
   getLastFourChars,
-  formatDateTime,
-  formatDate,
   checkPickupAttempts,
   recordFailedPickupAttempt,
   resetPickupAttempts,

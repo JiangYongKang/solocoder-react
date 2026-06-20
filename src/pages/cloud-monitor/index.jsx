@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import './cloud-monitor.css'
 
@@ -19,14 +19,15 @@ import {
 import {
   generateRegionData,
   fluctuateRegionData,
-  generateMetrics,
-  fluctuateMetrics,
-  generateInitialTrendData,
+  generateAllRegionMetrics,
+  fluctuateAllRegionMetrics,
+  selectRegionMetrics,
+  generateAllRegionTrendData,
+  appendTrendPointToMap,
+  selectRegionTrendData,
   generateAlert,
   addAlertToList,
   calculateHealthScore,
-  appendTrendPoint,
-  evictOldTrendPoints,
   loadAutoRefreshState,
   saveAutoRefreshState,
   clamp,
@@ -39,10 +40,10 @@ const CloudMonitorPage = () => {
   const [autoRefresh, setAutoRefresh] = useState(() => loadAutoRefreshState())
   const [selectedRegion, setSelectedRegion] = useState('all')
   const [regionData, setRegionData] = useState(() => generateRegionData())
-  const [metrics, setMetrics] = useState(() => generateMetrics())
+  const [allMetrics, setAllMetrics] = useState(() => generateAllRegionMetrics())
   const [alerts, setAlerts] = useState([])
-  const [trendData, setTrendData] = useState(() => generateInitialTrendData())
-  const [healthScore, setHealthScore] = useState(() => calculateHealthScore(generateMetrics()))
+  const [allTrendData, setAllTrendData] = useState(() => generateAllRegionTrendData())
+  const [healthScore, setHealthScore] = useState(() => calculateHealthScore(selectRegionMetrics(generateAllRegionMetrics(), 'all')))
   const [prevHealthScore, setPrevHealthScore] = useState(null)
   const [silenced, setSilenced] = useState(false)
   const [visibleMetrics, setVisibleMetrics] = useState({
@@ -51,8 +52,14 @@ const CloudMonitorPage = () => {
     disk: true,
   })
 
-  const metricsRef = useRef(metrics)
-  useEffect(() => { metricsRef.current = metrics }, [metrics])
+  const allMetricsRef = useRef(allMetrics)
+  useEffect(() => { allMetricsRef.current = allMetrics }, [allMetrics])
+
+  const selectedRegionRef = useRef(selectedRegion)
+  useEffect(() => { selectedRegionRef.current = selectedRegion }, [selectedRegion])
+
+  const currentMetrics = useMemo(() => selectRegionMetrics(allMetrics, selectedRegion), [allMetrics, selectedRegion])
+  const currentTrendData = useMemo(() => selectRegionTrendData(allTrendData, selectedRegion), [allTrendData, selectedRegion])
 
   const serverName = selectedRegion === 'all'
     ? '全部地域'
@@ -63,12 +70,13 @@ const CloudMonitorPage = () => {
   }, [autoRefresh])
 
   const refreshAll = useCallback(() => {
-    const newMetrics = fluctuateMetrics(metricsRef.current)
-    setMetrics(newMetrics)
-    metricsRef.current = newMetrics
+    const newAllMetrics = fluctuateAllRegionMetrics(allMetricsRef.current)
+    setAllMetrics(newAllMetrics)
+    allMetricsRef.current = newAllMetrics
 
-    const newScore = calculateHealthScore(newMetrics)
-    setPrevHealthScore(healthScore)
+    const regionId = selectedRegionRef.current
+    const currentMetrics = selectRegionMetrics(newAllMetrics, regionId)
+    const newScore = calculateHealthScore(currentMetrics)
     setHealthScore(newScore)
 
     if (!silenced) {
@@ -81,15 +89,12 @@ const CloudMonitorPage = () => {
     const now = Date.now()
     const newPoint = {
       time: now,
-      cpu: clamp(newMetrics.cpu + randomInRange(-3, 3), 0, 100),
-      memory: clamp(newMetrics.memory + randomInRange(-2, 2), 0, 100),
-      disk: clamp(newMetrics.disk + randomInRange(-1, 1), 0, 100),
+      cpu: clamp(currentMetrics.cpu + randomInRange(-3, 3), 0, 100),
+      memory: clamp(currentMetrics.memory + randomInRange(-2, 2), 0, 100),
+      disk: clamp(currentMetrics.disk + randomInRange(-1, 1), 0, 100),
     }
-    setTrendData((prev) => {
-      const appended = appendTrendPoint(prev, newPoint)
-      return evictOldTrendPoints(appended, 30 * 60 * 1000)
-    })
-  }, [healthScore, silenced])
+    setAllTrendData((prev) => appendTrendPointToMap(prev, regionId, newPoint))
+  }, [silenced])
 
   useEffect(() => {
     if (!autoRefresh) return
@@ -120,6 +125,14 @@ const CloudMonitorPage = () => {
 
   const handleToggleMetric = (metric) => {
     setVisibleMetrics((prev) => ({ ...prev, [metric]: !prev[metric] }))
+  }
+
+  const handleSelectRegion = (regionId) => {
+    setSelectedRegion(regionId)
+    const metrics = selectRegionMetrics(allMetrics, regionId)
+    const score = calculateHealthScore(metrics)
+    setPrevHealthScore(healthScore)
+    setHealthScore(score)
   }
 
   return (
@@ -154,13 +167,13 @@ const CloudMonitorPage = () => {
             <RegionCards
               regionData={regionData}
               selectedRegion={selectedRegion}
-              onSelectRegion={setSelectedRegion}
+              onSelectRegion={handleSelectRegion}
             />
           </div>
 
           <div className="cm-section">
             <h3 className="cm-section-title">资源使用率仪表盘</h3>
-            <GaugePanel metrics={metrics} serverName={serverName} />
+            <GaugePanel metrics={currentMetrics} serverName={serverName} />
           </div>
 
           <div className="cm-section">
@@ -179,7 +192,7 @@ const CloudMonitorPage = () => {
                 ))}
               </div>
             </div>
-            <TrendChart trendData={trendData} visibleMetrics={visibleMetrics} />
+            <TrendChart trendData={currentTrendData} visibleMetrics={visibleMetrics} />
           </div>
         </div>
 

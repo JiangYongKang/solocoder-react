@@ -115,13 +115,13 @@ export const saveCustomTemplates = (templates, storage = safeGetStorage()) => {
 export const addCustomTemplate = (template, storage = safeGetStorage()) => {
   const templates = loadCustomTemplates(storage)
   const newTemplate = {
-    id: `custom-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    id: template?.id || `custom-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     name: template?.name || '自定义模板',
     description: template?.description || '',
     isDefault: false,
     variables: template?.variables || [],
     content: template?.content || '',
-    createdAt: Date.now(),
+    createdAt: template?.createdAt || Date.now(),
   }
   const updated = [...templates, newTemplate]
   saveCustomTemplates(updated, storage)

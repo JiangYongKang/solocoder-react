@@ -198,42 +198,23 @@ export default function GridCanvas({
           })}
         </div>
 
-        {rowLines.map((n, i) => (
-          <div
-            key={`row-${n}`}
-            className="gg-line-number"
-            style={{
-              position: 'absolute',
-              left: 0,
-              top: i === 0 ? 24 : undefined,
-              ...(i > 0 ? { marginTop: `${(i - 1) * 0}px` } : {}),
-              width: 24,
-              height: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              pointerEvents: 'none',
-              gridRow: i + 1,
-            }}
-          >
-          </div>
-        ))}
-
         <div
+          className="gg-row-line-numbers"
           style={{
             position: 'absolute',
             left: 0,
             top: 24,
             display: 'grid',
-            gridTemplateRows: buildTemplateRows(rowSizes),
+            gridTemplateRows: `0 ${buildTemplateRows(rowSizes)}`,
             gap: `${rowGap}px 0`,
             width: 24,
             pointerEvents: 'none',
           }}
         >
-          {Array.from({ length: rows }, (_, i) => (
-            <div key={i} className="gg-line-number" style={{ alignSelf: 'center' }}>
-              {i + 1}
+          <div />
+          {rowLines.map((n, i) => (
+            <div key={`row-line-${n}`} className="gg-line-number" style={{ gridRow: i + 2 }}>
+              {n}
             </div>
           ))}
         </div>

@@ -52,7 +52,7 @@ function SizeList({ title, sizes, modes, onModeChange, onValueChange, uniformVal
           className="gg-size-input"
           style={{ width: 90 }}
           value={uniformValue}
-          step={modes === 'col' ? '' : ''}
+          step={sizes[0]?.mode === SIZE_MODES.FR ? 0.1 : 1}
           onChange={(e) => onUniformValueChange(Number(e.target.value))}
         />
         <span style={{ fontSize: 11, color: '#64748b', alignSelf: 'center' }}>统一设置</span>

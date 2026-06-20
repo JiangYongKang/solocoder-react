@@ -437,10 +437,21 @@ describe('getGroupEntryCount', () => {
 })
 
 describe('formatTimestamp', () => {
-  it('should return empty string for falsy', () => {
-    expect(formatTimestamp(0)).toBe('')
+  it('should treat timestamp 0 as a valid value (not empty)', () => {
+    const result = formatTimestamp(0)
+    expect(result).toBeTruthy()
+    expect(result).toContain('1970')
+  })
+
+  it('should return empty string for null/undefined/NaN', () => {
     expect(formatTimestamp(null)).toBe('')
     expect(formatTimestamp(undefined)).toBe('')
+    expect(formatTimestamp(NaN)).toBe('')
+  })
+
+  it('should return empty string for non-number types', () => {
+    expect(formatTimestamp('2024-01-01')).toBe('')
+    expect(formatTimestamp({})).toBe('')
   })
 
   it('should format valid timestamp', () => {

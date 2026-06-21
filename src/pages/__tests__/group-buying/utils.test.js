@@ -931,18 +931,22 @@ describe('group-buying/utils - product stats and joinable group', () => {
       expect(emptyResult.ongoingGroups).toBe(0);
       expect(emptyResult.successGroups).toBe(0);
       expect(emptyResult.totalJoinedPeople).toBe(0);
+      expect(emptyResult.activeJoinedPeople).toBe(0);
       expect(emptyResult.averageProgress).toBe(0);
       expect(emptyResult.bestProgress).toBe(0);
       expect(emptyResult.bestGroup).toBeNull();
 
       const nullResult = getProductGroupStats(null, 'p1', 5, now);
       expect(nullResult.totalGroups).toBe(0);
+      expect(nullResult.activeJoinedPeople).toBe(0);
 
       const noIdResult = getProductGroupStats([], '', 5, now);
       expect(noIdResult.totalGroups).toBe(0);
+      expect(noIdResult.activeJoinedPeople).toBe(0);
 
       const noSizeResult = getProductGroupStats([], 'p1', 0, now);
       expect(noSizeResult.totalGroups).toBe(0);
+      expect(noSizeResult.activeJoinedPeople).toBe(0);
     });
 
     it('aggregates stats for ongoing groups correctly', () => {
@@ -967,6 +971,7 @@ describe('group-buying/utils - product stats and joinable group', () => {
       expect(stats.successGroups).toBe(0);
       expect(stats.failedGroups).toBe(0);
       expect(stats.totalJoinedPeople).toBe(2 + 4 + 1);
+      expect(stats.activeJoinedPeople).toBe(2 + 4 + 1);
       expect(stats.aggregateCurrentPeople).toBe(7);
       expect(stats.aggregateTotalPeople).toBe(15);
       expect(stats.averageProgress).toBeCloseTo(46.67);
@@ -1015,6 +1020,104 @@ describe('group-buying/utils - product stats and joinable group', () => {
       expect(stats.aggregateTotalPeople).toBe(5);
     });
 
+    it('activeJoinedPeople only sums ongoing groups and excludes success/failed', () => {
+      const groups = [
+        createMockGroup({
+          id: 'g1', productId: 'p1', totalPeople: 5, currentPeople: 2,
+          status: GROUP_BUYING_STATUS.FAILED, failedReason: FAILED_REASON.TIMEOUT,
+          failedTime: now, endTime: now - 1000,
+        }),
+        createMockGroup({
+          id: 'g2', productId: 'p1', totalPeople: 5, currentPeople: 3,
+          status: GROUP_BUYING_STATUS.ONGOING, endTime: now + 3600000,
+        }),
+        createMockGroup({
+          id: 'g3', productId: 'p1', totalPeople: 5, currentPeople: 5,
+          status: GROUP_BUYING_STATUS.SUCCESS, successTime: now,
+          endTime: now + 3600000,
+        }),
+        createMockGroup({
+          id: 'g4', productId: 'p1', totalPeople: 5, currentPeople: 4,
+          status: GROUP_BUYING_STATUS.ONGOING, endTime: now + 3600000,
+        }),
+      ];
+      const stats = getProductGroupStats(groups, 'p1', 5, now);
+
+      expect(stats.activeJoinedPeople).toBe(3 + 4);
+      expect(stats.totalJoinedPeople).toBe(2 + 3 + 5 + 4);
+      expect(stats.ongoingGroups).toBe(2);
+      expect(stats.totalGroups).toBe(4);
+    });
+
+    it('ongoingGroups count only includes ongoing groups, not success or failed', () => {
+      const groups = [
+        createMockGroup({
+          id: 'g1', productId: 'p1', totalPeople: 5, currentPeople: 2,
+          status: GROUP_BUYING_STATUS.FAILED, endTime: now - 1000,
+        }),
+        createMockGroup({
+          id: 'g2', productId: 'p1', totalPeople: 5, currentPeople: 3,
+          status: GROUP_BUYING_STATUS.ONGOING, endTime: now + 3600000,
+        }),
+        createMockGroup({
+          id: 'g3', productId: 'p1', totalPeople: 5, currentPeople: 5,
+          status: GROUP_BUYING_STATUS.SUCCESS, successTime: now,
+          endTime: now + 3600000,
+        }),
+        createMockGroup({
+          id: 'g4', productId: 'p1', totalPeople: 5, currentPeople: 4,
+          status: GROUP_BUYING_STATUS.ONGOING, endTime: now + 3600000,
+        }),
+      ];
+      const stats = getProductGroupStats(groups, 'p1', 5, now);
+
+      expect(stats.ongoingGroups).toBe(2);
+      expect(stats.successGroups).toBe(1);
+      expect(stats.failedGroups).toBe(1);
+      expect(stats.totalGroups).toBe(4);
+    });
+
+    it('bestProgress and bestGroup exclude failed groups even if they had higher percentage', () => {
+      const groups = [
+        createMockGroup({
+          id: 'g1', productId: 'p1', totalPeople: 5, currentPeople: 4,
+          status: GROUP_BUYING_STATUS.FAILED, failedReason: FAILED_REASON.TIMEOUT,
+          failedTime: now, endTime: now - 1000,
+        }),
+        createMockGroup({
+          id: 'g2', productId: 'p1', totalPeople: 5, currentPeople: 3,
+          status: GROUP_BUYING_STATUS.ONGOING, endTime: now + 3600000,
+        }),
+      ];
+      const stats = getProductGroupStats(groups, 'p1', 5, now);
+
+      expect(stats.bestProgress).toBe(60);
+      expect(stats.bestGroup.id).toBe('g2');
+    });
+
+    it('bestProgress considers both ongoing and success groups, but not failed', () => {
+      const groups = [
+        createMockGroup({
+          id: 'g1', productId: 'p1', totalPeople: 5, currentPeople: 4,
+          status: GROUP_BUYING_STATUS.FAILED, failedReason: FAILED_REASON.TIMEOUT,
+          failedTime: now, endTime: now - 1000,
+        }),
+        createMockGroup({
+          id: 'g2', productId: 'p1', totalPeople: 5, currentPeople: 5,
+          status: GROUP_BUYING_STATUS.SUCCESS, successTime: now,
+          endTime: now + 3600000,
+        }),
+        createMockGroup({
+          id: 'g3', productId: 'p1', totalPeople: 5, currentPeople: 3,
+          status: GROUP_BUYING_STATUS.ONGOING, endTime: now + 3600000,
+        }),
+      ];
+      const stats = getProductGroupStats(groups, 'p1', 5, now);
+
+      expect(stats.bestProgress).toBe(100);
+      expect(stats.bestGroup.id).toBe('g2');
+    });
+
     it('filters by productId', () => {
       const groups = [
         createMockGroup({
@@ -1030,10 +1133,12 @@ describe('group-buying/utils - product stats and joinable group', () => {
       const statsP1 = getProductGroupStats(groups, 'p1', 5, now);
       expect(statsP1.totalGroups).toBe(1);
       expect(statsP1.totalJoinedPeople).toBe(2);
+      expect(statsP1.activeJoinedPeople).toBe(2);
 
       const statsP2 = getProductGroupStats(groups, 'p2', 10, now);
       expect(statsP2.totalGroups).toBe(1);
       expect(statsP2.totalJoinedPeople).toBe(5);
+      expect(statsP2.activeJoinedPeople).toBe(5);
     });
   });
 

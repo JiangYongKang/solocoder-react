@@ -226,3 +226,22 @@ export function flattenTextSegments(segments) {
     .map((s) => s.content)
     .join('')
 }
+
+export function normalizeHistoryRecord(record) {
+  if (!record || typeof record !== 'object') {
+    return {
+      text: '',
+      voiceId: DEFAULT_VOICE_ID,
+      speed: DEFAULT_SPEED,
+      pitch: DEFAULT_PITCH,
+      volume: DEFAULT_VOLUME,
+    }
+  }
+  return {
+    text: typeof record.text === 'string' ? record.text : '',
+    voiceId: typeof record.voiceId === 'string' ? record.voiceId : DEFAULT_VOICE_ID,
+    speed: typeof record.speed === 'number' ? record.speed : DEFAULT_SPEED,
+    pitch: typeof record.pitch === 'number' ? record.pitch : DEFAULT_PITCH,
+    volume: typeof record.volume === 'number' ? record.volume : DEFAULT_VOLUME,
+  }
+}

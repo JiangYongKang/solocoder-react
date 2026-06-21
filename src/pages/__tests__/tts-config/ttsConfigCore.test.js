@@ -34,6 +34,7 @@ import {
   buildAuditionText,
   parseSegmentsWithPauses,
   flattenTextSegments,
+  normalizeHistoryRecord,
 } from '../../tts-config/ttsConfigCore'
 
 describe('countChars', () => {
@@ -621,5 +622,98 @@ describe('SAMPLE_TEXT', () => {
 
   it('should be around 100 characters', () => {
     expect(SAMPLE_TEXT.length).toBeLessThanOrEqual(150)
+  })
+})
+
+describe('normalizeHistoryRecord', () => {
+  it('should return defaults for null input', () => {
+    const result = normalizeHistoryRecord(null)
+    expect(result.text).toBe('')
+    expect(result.voiceId).toBe(DEFAULT_VOICE_ID)
+    expect(result.speed).toBe(DEFAULT_SPEED)
+    expect(result.pitch).toBe(DEFAULT_PITCH)
+    expect(result.volume).toBe(DEFAULT_VOLUME)
+  })
+
+  it('should return defaults for undefined input', () => {
+    const result = normalizeHistoryRecord(undefined)
+    expect(result.voiceId).toBe(DEFAULT_VOICE_ID)
+    expect(result.speed).toBe(DEFAULT_SPEED)
+    expect(result.pitch).toBe(DEFAULT_PITCH)
+    expect(result.volume).toBe(DEFAULT_VOLUME)
+  })
+
+  it('should return defaults for non-object input', () => {
+    expect(normalizeHistoryRecord('string').speed).toBe(DEFAULT_SPEED)
+    expect(normalizeHistoryRecord(42).pitch).toBe(DEFAULT_PITCH)
+    expect(normalizeHistoryRecord([]).volume).toBe(DEFAULT_VOLUME)
+  })
+
+  it('should preserve valid values from record', () => {
+    const record = {
+      text: '测试文本',
+      voiceId: 'child',
+      speed: 1.5,
+      pitch: 3,
+      volume: 60,
+    }
+    const result = normalizeHistoryRecord(record)
+    expect(result.text).toBe('测试文本')
+    expect(result.voiceId).toBe('child')
+    expect(result.speed).toBe(1.5)
+    expect(result.pitch).toBe(3)
+    expect(result.volume).toBe(60)
+  })
+
+  it('should default missing fields', () => {
+    const result = normalizeHistoryRecord({})
+    expect(result.text).toBe('')
+    expect(result.voiceId).toBe(DEFAULT_VOICE_ID)
+    expect(result.speed).toBe(DEFAULT_SPEED)
+    expect(result.pitch).toBe(DEFAULT_PITCH)
+    expect(result.volume).toBe(DEFAULT_VOLUME)
+  })
+
+  it('should default wrong-type fields individually', () => {
+    const record = {
+      text: 123,
+      voiceId: 999,
+      speed: 'fast',
+      pitch: 'high',
+      volume: 'loud',
+    }
+    const result = normalizeHistoryRecord(record)
+    expect(result.text).toBe('')
+    expect(result.voiceId).toBe(DEFAULT_VOICE_ID)
+    expect(result.speed).toBe(DEFAULT_SPEED)
+    expect(result.pitch).toBe(DEFAULT_PITCH)
+    expect(result.volume).toBe(DEFAULT_VOLUME)
+  })
+
+  it('should handle partial valid fields mixed with invalid ones', () => {
+    const record = {
+      text: '部分有效',
+      speed: 2.0,
+      volume: 'wrong',
+    }
+    const result = normalizeHistoryRecord(record)
+    expect(result.text).toBe('部分有效')
+    expect(result.speed).toBe(2.0)
+    expect(result.pitch).toBe(DEFAULT_PITCH)
+    expect(result.volume).toBe(DEFAULT_VOLUME)
+    expect(result.voiceId).toBe(DEFAULT_VOICE_ID)
+  })
+
+  it('should accept 0 as valid numeric value for pitch and volume', () => {
+    const record = { pitch: 0, volume: 0, speed: 0.5 }
+    const result = normalizeHistoryRecord(record)
+    expect(result.pitch).toBe(0)
+    expect(result.volume).toBe(0)
+    expect(result.speed).toBe(0.5)
+  })
+
+  it('should accept negative pitch', () => {
+    const result = normalizeHistoryRecord({ pitch: -5 })
+    expect(result.pitch).toBe(-5)
   })
 })

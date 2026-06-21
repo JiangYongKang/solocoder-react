@@ -14,7 +14,6 @@ import {
   VOLUME_STEP,
   PAUSE_DURATION_OPTIONS,
   VOICE_PRESETS,
-  DEFAULT_VOICE_ID,
   SAMPLE_TEXT,
   countChars,
   splitParagraphs,
@@ -28,6 +27,7 @@ import {
   buildAuditionText,
   parseSegmentsWithPauses,
   flattenTextSegments,
+  normalizeHistoryRecord,
 } from './ttsConfigCore.js'
 import {
   loadHistory,
@@ -373,11 +373,12 @@ export default function TtsConfigPage() {
   }, [isPlaying, inPause, currentParaIndex, currentParaSegments, speed, paragraphs.length])
 
   const handleHistoryClick = (record) => {
-    setText(record.text || '')
-    setVoiceId(record.voiceId || DEFAULT_VOICE_ID)
-    setSpeed(typeof record.speed === 'number' ? record.speed : 1.0)
-    setPitch(typeof record.pitch === 'number' ? record.pitch : 0)
-    setVolume(typeof record.volume === 'number' ? record.volume : 80)
+    const safe = normalizeHistoryRecord(record)
+    setText(safe.text)
+    setVoiceId(safe.voiceId)
+    setSpeed(safe.speed)
+    setPitch(safe.pitch)
+    setVolume(safe.volume)
     stopPlayback()
   }
 

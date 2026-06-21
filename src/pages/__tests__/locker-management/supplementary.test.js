@@ -106,8 +106,16 @@ describe('locker-management/utils supplementary', () => {
       expect(findAvailableCell([], CELL_SIZE.LARGE, [])).toBe(null);
     });
 
-    it('throws for null cells input', () => {
-      expect(() => findAvailableCell(null, CELL_SIZE.LARGE, null)).toThrow();
+    it('returns null for null cells input', () => {
+      expect(findAvailableCell(null, CELL_SIZE.LARGE, null)).toBe(null);
+    });
+
+    it('returns null for undefined cells input', () => {
+      expect(findAvailableCell(undefined, CELL_SIZE.LARGE, [])).toBe(null);
+    });
+
+    it('returns null for non-array cells input (object)', () => {
+      expect(findAvailableCell({}, CELL_SIZE.LARGE, [])).toBe(null);
     });
 
     it('returns first available cell when multiple are free', () => {
@@ -446,19 +454,49 @@ describe('locker-management/utils supplementary', () => {
   });
 
   describe('regeneratePickupCode edge cases', () => {
-    it('generates new code even when package not found (no validation of existence)', () => {
+    it('returns error when package not found', () => {
       const packages = [
         { id: 'p1', pickupCode: '123456', status: PACKAGE_STATUS.PENDING },
       ];
       const result = regeneratePickupCode(packages, 'nonexistent');
-      expect(result.success).toBe(true);
-      expect(result.newCode).not.toBe('123456');
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('包裹不存在');
     });
 
-    it('generates code for null packages (treated as empty)', () => {
+    it('returns error when packages is null', () => {
       const result = regeneratePickupCode(null, 'p1');
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('包裹不存在');
+    });
+
+    it('returns error when packages is undefined', () => {
+      const result = regeneratePickupCode(undefined, 'p1');
+      expect(result.success).toBe(false);
+    });
+
+    it('returns error when packages is empty array', () => {
+      const result = regeneratePickupCode([], 'p1');
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('包裹不存在');
+    });
+
+    it('returns error when packages is a non-array object', () => {
+      const result = regeneratePickupCode({}, 'p1');
+      expect(result.success).toBe(false);
+    });
+
+    it('successfully regenerates code for existing package', () => {
+      vi.useFakeTimers().setSystemTime(new Date('2024-06-15'));
+      const packages = [
+        { id: 'p1', pickupCode: '123456', status: PACKAGE_STATUS.PENDING },
+      ];
+      const result = regeneratePickupCode(packages, 'p1');
       expect(result.success).toBe(true);
-      expect(result.newCode).toMatch(/^\d{6}$/);
+      expect(result.newCode).toBeTruthy();
+      expect(result.newCode).not.toBe('123456');
+      expect(result.updatedPackages[0].pickupCode).toBe(result.newCode);
+      expect(result.updatedPackages[0].codeRegeneratedAt).toBeTruthy();
+      vi.useRealTimers();
     });
 
     it('does not duplicate existing pending codes', () => {

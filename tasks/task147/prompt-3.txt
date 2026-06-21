@@ -1,0 +1,4 @@
+你实现的访客登记系统页面还存在一些问题，需要进行修复：
+
+1. 在统一给 getVisitorStatus、sortRecords、filterRecords 函数增加 now 参数后，exportRecordsToCsv 函数中的 getVisitorStatus 调用遗漏了 now 参数，仍然使用实时时间而非组件统一的时间基准。当访客登记时长恰好跨越超时边界时，CSV 导出的状态标签可能与页面显示的筛选状态不一致。
+2. 修复后需要为该页面补充对应的纯 JS 函数单元测试，只测和页面渲染无关的逻辑。测试代码放在 src/pages/__tests__/visitor-registration/ 下。确保所有测试通过。

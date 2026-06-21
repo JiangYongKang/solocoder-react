@@ -78,6 +78,8 @@ export function createCells(config) {
 }
 
 export function findAvailableCell(cells, size, packages) {
+  if (!Array.isArray(cells) || cells.length === 0) return null;
+
   const pendingPackageIds = new Set(
     (packages || [])
       .filter((p) => p.status === PACKAGE_STATUS.PENDING)
@@ -323,14 +325,20 @@ export function findPackageByPickupCode(packages, code) {
 }
 
 export function regeneratePickupCode(packages, packageId) {
-  const existingCodes = (packages || [])
+  const safePackages = Array.isArray(packages) ? packages : [];
+  const targetPackage = safePackages.find((p) => p.id === packageId);
+  if (!targetPackage) {
+    return { success: false, error: '包裹不存在' };
+  }
+
+  const existingCodes = safePackages
     .filter((p) => p.status === PACKAGE_STATUS.PENDING && p.id !== packageId)
     .map((p) => p.pickupCode);
 
   const newCode = generatePickupCode(existingCodes);
   if (!newCode) return { success: false, error: '无法生成新的取件码' };
 
-  const updatedPackages = (packages || []).map((p) => {
+  const updatedPackages = safePackages.map((p) => {
     if (p.id === packageId) {
       return { ...p, pickupCode: newCode, codeRegeneratedAt: Date.now() };
     }

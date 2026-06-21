@@ -28,6 +28,9 @@ import {
   restoreLockedSeats,
   handlePersonCountChange,
   handleMultiPersonSeatClick,
+  canAddSeat,
+  handleManualSeatClick,
+  mergeLockedIds,
 } from '@/pages/seat-selection/seatSelectionCore.js';
 import {
   SEAT_STATUS,
@@ -867,6 +870,153 @@ describe('seatSelectionCore', () => {
 
       expect(result.changed).toBe(true);
       expect(result.selected).toEqual(expect.arrayContaining(['E1', 'A1', 'A2']));
+    });
+  });
+
+  describe('canAddSeat', () => {
+    it('should always allow adding for SINGLE mode', () => {
+      expect(canAddSeat([], PERSON_COUNT.SINGLE)).toBe(true);
+      expect(canAddSeat(['A1'], PERSON_COUNT.SINGLE)).toBe(true);
+      expect(canAddSeat(['A1', 'A2', 'A3'], PERSON_COUNT.SINGLE)).toBe(true);
+    });
+
+    it('should allow adding when under limit for DOUBLE mode', () => {
+      expect(canAddSeat([], PERSON_COUNT.DOUBLE)).toBe(true);
+      expect(canAddSeat(['A1'], PERSON_COUNT.DOUBLE)).toBe(true);
+    });
+
+    it('should disallow adding when at limit for DOUBLE mode', () => {
+      expect(canAddSeat(['A1', 'A2'], PERSON_COUNT.DOUBLE)).toBe(false);
+    });
+
+    it('should allow adding when under limit for TRIPLE mode', () => {
+      expect(canAddSeat([], PERSON_COUNT.TRIPLE)).toBe(true);
+      expect(canAddSeat(['A1'], PERSON_COUNT.TRIPLE)).toBe(true);
+      expect(canAddSeat(['A1', 'A2'], PERSON_COUNT.TRIPLE)).toBe(true);
+    });
+
+    it('should disallow adding when at limit for TRIPLE mode', () => {
+      expect(canAddSeat(['A1', 'A2', 'A3'], PERSON_COUNT.TRIPLE)).toBe(false);
+    });
+
+    it('should return true for non-array selectedIds', () => {
+      expect(canAddSeat(null, PERSON_COUNT.DOUBLE)).toBe(true);
+      expect(canAddSeat(undefined, PERSON_COUNT.DOUBLE)).toBe(true);
+    });
+  });
+
+  describe('handleManualSeatClick', () => {
+    it('should select a seat when under person limit', () => {
+      const grid = createSeatGrid();
+      const result = handleManualSeatClick(grid, 0, 0, PERSON_COUNT.DOUBLE, []);
+
+      expect(result.changed).toBe(true);
+      expect(result.isOverLimit).toBe(false);
+      expect(result.selected).toContain('A1');
+      expect(result.grid[0][0].status).toBe(SEAT_STATUS.SELECTED);
+    });
+
+    it('should return isOverLimit=true when at person limit', () => {
+      const grid = createSeatGrid();
+      grid[0][0].status = SEAT_STATUS.SELECTED;
+      grid[0][1].status = SEAT_STATUS.SELECTED;
+      const result = handleManualSeatClick(grid, 0, 2, PERSON_COUNT.DOUBLE, ['A1', 'A2']);
+
+      expect(result.changed).toBe(false);
+      expect(result.isOverLimit).toBe(true);
+      expect(result.grid[0][2].status).toBe(SEAT_STATUS.AVAILABLE);
+    });
+
+    it('should allow deselecting a seat even at person limit', () => {
+      const grid = createSeatGrid();
+      grid[0][0].status = SEAT_STATUS.SELECTED;
+      grid[0][1].status = SEAT_STATUS.SELECTED;
+      const result = handleManualSeatClick(grid, 0, 0, PERSON_COUNT.DOUBLE, ['A1', 'A2']);
+
+      expect(result.changed).toBe(true);
+      expect(result.isOverLimit).toBe(false);
+      expect(result.selected).not.toContain('A1');
+      expect(result.grid[0][0].status).toBe(SEAT_STATUS.AVAILABLE);
+    });
+
+    it('should not change locked or unavailable seats', () => {
+      const grid = createSeatGrid();
+      grid[0][0].status = SEAT_STATUS.LOCKED;
+      const lockedResult = handleManualSeatClick(grid, 0, 0, PERSON_COUNT.DOUBLE, []);
+      expect(lockedResult.changed).toBe(false);
+      expect(lockedResult.isOverLimit).toBe(false);
+
+      grid[0][1].status = SEAT_STATUS.UNAVAILABLE;
+      const unavailableResult = handleManualSeatClick(grid, 0, 1, PERSON_COUNT.DOUBLE, []);
+      expect(unavailableResult.changed).toBe(false);
+    });
+
+    it('should handle non-existent seat gracefully', () => {
+      const grid = createSeatGrid();
+      const result = handleManualSeatClick(grid, 99, 0, PERSON_COUNT.DOUBLE, []);
+      expect(result.changed).toBe(false);
+      expect(result.isOverLimit).toBe(false);
+    });
+
+    it('should not mutate original grid', () => {
+      const grid = createSeatGrid();
+      const originalStatus = grid[0][0].status;
+      handleManualSeatClick(grid, 0, 0, PERSON_COUNT.DOUBLE, []);
+      expect(grid[0][0].status).toBe(originalStatus);
+    });
+
+    it('should allow selecting up to exactly personCount for TRIPLE', () => {
+      const grid = createSeatGrid();
+      let result1 = handleManualSeatClick(grid, 0, 0, PERSON_COUNT.TRIPLE, []);
+      expect(result1.isOverLimit).toBe(false);
+
+      let result2 = handleManualSeatClick(result1.grid, 0, 1, PERSON_COUNT.TRIPLE, result1.selected);
+      expect(result2.isOverLimit).toBe(false);
+
+      let result3 = handleManualSeatClick(result2.grid, 0, 2, PERSON_COUNT.TRIPLE, result2.selected);
+      expect(result3.isOverLimit).toBe(false);
+
+      const result4 = handleManualSeatClick(result3.grid, 0, 3, PERSON_COUNT.TRIPLE, result3.selected);
+      expect(result4.isOverLimit).toBe(true);
+    });
+  });
+
+  describe('mergeLockedIds', () => {
+    it('should merge two arrays with deduplication', () => {
+      const result = mergeLockedIds(['A1', 'B5'], ['A1', 'C3']);
+      expect(result.sort()).toEqual(['A1', 'B5', 'C3'].sort());
+      expect(new Set(result).size).toBe(3);
+    });
+
+    it('should return newLockedIds when prev is not array', () => {
+      expect(mergeLockedIds(null, ['A1'])).toEqual(['A1']);
+      expect(mergeLockedIds(undefined, ['A1'])).toEqual(['A1']);
+      expect(mergeLockedIds('invalid', ['A1'])).toEqual(['A1']);
+    });
+
+    it('should return prevLockedIds when new is not array', () => {
+      expect(mergeLockedIds(['A1'], null)).toEqual(['A1']);
+      expect(mergeLockedIds(['A1'], undefined)).toEqual(['A1']);
+      expect(mergeLockedIds(['A1'], 123)).toEqual(['A1']);
+    });
+
+    it('should return empty array when both are not arrays', () => {
+      expect(mergeLockedIds(null, null)).toEqual([]);
+      expect(mergeLockedIds(undefined, undefined)).toEqual([]);
+    });
+
+    it('should return new array (not reference)', () => {
+      const prev = ['A1'];
+      const newIds = ['B5'];
+      const result = mergeLockedIds(prev, newIds);
+      expect(result).not.toBe(prev);
+      expect(result).not.toBe(newIds);
+    });
+
+    it('should handle empty arrays correctly', () => {
+      expect(mergeLockedIds([], [])).toEqual([]);
+      expect(mergeLockedIds([], ['A1'])).toEqual(['A1']);
+      expect(mergeLockedIds(['A1'], [])).toEqual(['A1']);
     });
   });
 });

@@ -257,7 +257,9 @@ export default function GroupBuyingPage() {
   )
   const bestProgress = productStats.bestProgress > 0 ? productStats.bestProgress : productStats.averageProgress
   const progressPercentage = bestProgress
-  const displayCurrentPeople = Math.round(bestProgress / 100 * currentProduct.groupSize)
+  const displayCurrentPeople = productStats.activeJoinedPeople
+  const displayTotalSpots = productStats.ongoingGroups * currentProduct.groupSize
+  const displayRemainingSpots = getRemainingSpots(displayCurrentPeople, displayTotalSpots || currentProduct.groupSize)
 
   return (
     <div className="group-buying-page">
@@ -328,12 +330,12 @@ export default function GroupBuyingPage() {
               <div className="gb-progress-info">
                 <span className="gb-progress-text">
                   已拼 <strong>{displayCurrentPeople}</strong> 人 / 共需 {currentProduct.groupSize} 人成团
-                  {productStats.totalGroups > 0 && (
-                    <span className="gb-group-count">（{productStats.totalGroups}个团进行中）</span>
+                  {productStats.ongoingGroups > 0 && (
+                    <span className="gb-group-count">（{productStats.ongoingGroups}个团进行中）</span>
                   )}
                 </span>
                 <span className="gb-remaining-spots">
-                  剩余 {getRemainingSpots(displayCurrentPeople, currentProduct.groupSize)} 个名额
+                  剩余 {displayRemainingSpots} 个名额
                 </span>
               </div>
               <div className="gb-progress-bar-container">

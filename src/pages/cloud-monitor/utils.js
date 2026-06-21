@@ -168,14 +168,74 @@ export function generateAllRegionTrendData() {
   return map
 }
 
+export function buildTrendPoint(metrics, timestamp) {
+  return {
+    time: timestamp || Date.now(),
+    cpu: clamp(metrics.cpu + randomInRange(-3, 3), 0, 100),
+    memory: clamp(metrics.memory + randomInRange(-2, 2), 0, 100),
+    disk: clamp(metrics.disk + randomInRange(-1, 1), 0, 100),
+  }
+}
+
+export function fluctuateAllRegionTrendData(trendMap, allMetrics) {
+  if (!trendMap) return trendMap
+  if (!allMetrics) return trendMap
+
+  const now = Date.now()
+  const regionPoints = {}
+  let totalCpu = 0
+  let totalMem = 0
+  let totalDisk = 0
+  let count = 0
+
+  for (const r of REGIONS) {
+    const regionMetrics = allMetrics[r.id]
+    if (regionMetrics) {
+      const point = buildTrendPoint(regionMetrics, now)
+      regionPoints[r.id] = point
+      totalCpu += point.cpu
+      totalMem += point.memory
+      totalDisk += point.disk
+      count += 1
+    }
+  }
+
+  const map = { ...trendMap }
+
+  for (const r of REGIONS) {
+    const point = regionPoints[r.id]
+    if (point && map[r.id]) {
+      const appended = appendTrendPoint(map[r.id], point)
+      map[r.id] = evictOldTrendPoints(appended, 30 * 60 * 1000)
+    }
+  }
+
+  if (count > 0 && map.all) {
+    const allPoint = {
+      time: now,
+      cpu: clamp(totalCpu / count, 0, 100),
+      memory: clamp(totalMem / count, 0, 100),
+      disk: clamp(totalDisk / count, 0, 100),
+    }
+    const appended = appendTrendPoint(map.all, allPoint)
+    map.all = evictOldTrendPoints(appended, 30 * 60 * 1000)
+  }
+
+  return map
+}
+
 export function appendTrendPointToMap(trendMap, regionId, newPoint) {
   if (!trendMap || !newPoint) return trendMap
   const map = { ...trendMap }
-  const keys = regionId && regionId !== 'all' ? [regionId] : ['all', ...REGIONS.map((r) => r.id)]
-  for (const key of keys) {
-    if (map[key]) {
-      const appended = appendTrendPoint(map[key], newPoint)
-      map[key] = evictOldTrendPoints(appended, 30 * 60 * 1000)
+  if (regionId && regionId !== 'all') {
+    if (map[regionId]) {
+      const appended = appendTrendPoint(map[regionId], newPoint)
+      map[regionId] = evictOldTrendPoints(appended, 30 * 60 * 1000)
+    }
+  } else {
+    if (map.all) {
+      const appended = appendTrendPoint(map.all, newPoint)
+      map.all = evictOldTrendPoints(appended, 30 * 60 * 1000)
     }
   }
   return map

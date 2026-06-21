@@ -30,6 +30,8 @@ import {
   restoreLockedSeats,
   handlePersonCountChange,
   handleMultiPersonSeatClick,
+  handleManualSeatClick,
+  mergeLockedIds,
 } from './seatSelectionCore.js';
 import './seat-selection.css';
 
@@ -94,6 +96,7 @@ function SeatSelectionPage() {
       setSelectedIds([]);
       setRemainingTime(LOCK_DURATION_SECONDS);
       setLockStartTime(null);
+      setManualFallback(false);
       clearSavedSeatState();
       showToast('选座超时，座位已释放，请重新选择', 'error');
     }
@@ -172,10 +175,17 @@ function SeatSelectionPage() {
       }
 
       if (personCount === PERSON_COUNT.SINGLE || manualFallback) {
-        const result = toggleSeatSelection(grid, row, col, selectedIds);
-        if (result.changed) {
+        const result = handleManualSeatClick(grid, row, col, personCount, selectedIds);
+        if (result.isOverLimit) {
+          showToast(`当前${PERSON_COUNT_LABELS[personCount]}模式，最多选择${personCount}个座位`, 'error');
+        } else if (result.changed) {
           setGrid(result.grid);
           setSelectedIds(result.selected);
+          if (result.selected.length === 0) {
+            setRemainingTime(LOCK_DURATION_SECONDS);
+            setLockStartTime(null);
+            setManualFallback(false);
+          }
         }
       } else {
         const result = handleMultiPersonSeatClick(grid, row, col, personCount, selectedIds);
@@ -219,8 +229,9 @@ function SeatSelectionPage() {
 
     const result = lockSelectedSeats(grid, selectedIds);
     if (result.success) {
+      const mergedLockedIds = mergeLockedIds(lockedIds, selectedIds);
       setGrid(result.grid);
-      setLockedIds((prev) => [...new Set([...prev, ...selectedIds])]);
+      setLockedIds(mergedLockedIds);
       setIsConfirmed(true);
       if (timerRef.current) {
         clearInterval(timerRef.current);
@@ -229,7 +240,7 @@ function SeatSelectionPage() {
       saveSeatState({
         grid: result.grid,
         selectedIds: [],
-        lockedIds: [...new Set([...lockedIds, ...selectedIds])],
+        lockedIds: mergedLockedIds,
         personCount,
         remainingTime: LOCK_DURATION_SECONDS,
         lockStartTime: null,

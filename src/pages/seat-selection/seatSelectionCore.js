@@ -415,3 +415,38 @@ export function handleMultiPersonSeatClick(grid, row, col, personCount, selected
 
   return { grid, selected: selectedIds, changed: false, needsFallback: true };
 }
+
+export function canAddSeat(selectedIds, personCount) {
+  if (!Array.isArray(selectedIds)) return true;
+  if (personCount === PERSON_COUNT.SINGLE) return true;
+  return selectedIds.length < personCount;
+}
+
+export function handleManualSeatClick(grid, row, col, personCount, selectedIds) {
+  const seat = grid[row]?.[col];
+  if (!seat || !canSelectSeat(seat)) {
+    return { grid, selected: selectedIds, changed: false, isOverLimit: false };
+  }
+
+  if (seat.status === SEAT_STATUS.SELECTED) {
+    const result = toggleSeatSelection(grid, row, col, selectedIds);
+    return { grid: result.grid, selected: result.selected, changed: result.changed, isOverLimit: false };
+  }
+
+  if (!canAddSeat(selectedIds, personCount)) {
+    return { grid, selected: selectedIds, changed: false, isOverLimit: true };
+  }
+
+  const result = toggleSeatSelection(grid, row, col, selectedIds);
+  return { grid: result.grid, selected: result.selected, changed: result.changed, isOverLimit: false };
+}
+
+export function mergeLockedIds(prevLockedIds, newLockedIds) {
+  if (!Array.isArray(prevLockedIds)) {
+    return Array.isArray(newLockedIds) ? [...newLockedIds] : [];
+  }
+  if (!Array.isArray(newLockedIds)) {
+    return [...prevLockedIds];
+  }
+  return [...new Set([...prevLockedIds, ...newLockedIds])];
+}

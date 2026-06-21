@@ -108,7 +108,7 @@ export function paginateRecords(records, page, pageSize = DEFAULT_PAGE_SIZE) {
   }
 }
 
-export function exportRecordsToCsv(records) {
+export function exportRecordsToCsv(records, now = Date.now()) {
   const headers = [
     '姓名',
     '手机号',
@@ -134,7 +134,7 @@ export function exportRecordsToCsv(records) {
     r.host?.department || '',
     formatDateTime(r.registerTime),
     formatDateTime(r.checkOutTime),
-    statusLabels[getVisitorStatus(r)] || '',
+    statusLabels[getVisitorStatus(r, now)] || '',
   ])
   const csvContent = [headers, ...rows]
     .map((row) => row.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(','))

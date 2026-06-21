@@ -402,6 +402,7 @@ export function getProductGroupStats(groups, productId, productGroupSize, now = 
       successGroups: 0,
       failedGroups: 0,
       totalJoinedPeople: 0,
+      activeJoinedPeople: 0,
       aggregateCurrentPeople: 0,
       aggregateTotalPeople: 0,
       averageProgress: 0,
@@ -421,6 +422,11 @@ export function getProductGroupStats(groups, productId, productGroupSize, now = 
     0
   )
 
+  const activeJoinedPeople = productGroups.reduce((sum, g) => {
+    if (!isGroupOngoing(g, now)) return sum
+    return sum + Math.min(g.currentPeople || 0, g.totalPeople || productGroupSize)
+  }, 0)
+
   const aggregateCurrentPeople = productGroups.reduce((sum, g) => {
     const status = getGroupStatus(g, now)
     if (status === GROUP_BUYING_STATUS.FAILED) return sum
@@ -436,6 +442,7 @@ export function getProductGroupStats(groups, productId, productGroupSize, now = 
   let bestProgress = 0
   let bestGroup = null
   productGroups.forEach((g) => {
+    if (isGroupFailed(g, now)) return
     const progress = calculateProgressPercentage(g.currentPeople, g.totalPeople)
     if (progress > bestProgress) {
       bestProgress = progress
@@ -454,6 +461,7 @@ export function getProductGroupStats(groups, productId, productGroupSize, now = 
     successGroups,
     failedGroups,
     totalJoinedPeople,
+    activeJoinedPeople,
     aggregateCurrentPeople,
     aggregateTotalPeople,
     averageProgress,

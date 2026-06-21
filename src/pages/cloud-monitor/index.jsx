@@ -23,15 +23,13 @@ import {
   fluctuateAllRegionMetrics,
   selectRegionMetrics,
   generateAllRegionTrendData,
-  appendTrendPointToMap,
+  fluctuateAllRegionTrendData,
   selectRegionTrendData,
   generateAlert,
   addAlertToList,
   calculateHealthScore,
   loadAutoRefreshState,
   saveAutoRefreshState,
-  clamp,
-  randomInRange,
 } from './utils'
 
 const CloudMonitorPage = () => {
@@ -86,14 +84,7 @@ const CloudMonitorPage = () => {
       }
     }
 
-    const now = Date.now()
-    const newPoint = {
-      time: now,
-      cpu: clamp(currentMetrics.cpu + randomInRange(-3, 3), 0, 100),
-      memory: clamp(currentMetrics.memory + randomInRange(-2, 2), 0, 100),
-      disk: clamp(currentMetrics.disk + randomInRange(-1, 1), 0, 100),
-    }
-    setAllTrendData((prev) => appendTrendPointToMap(prev, regionId, newPoint))
+    setAllTrendData((prev) => fluctuateAllRegionTrendData(prev, newAllMetrics))
   }, [silenced])
 
   useEffect(() => {

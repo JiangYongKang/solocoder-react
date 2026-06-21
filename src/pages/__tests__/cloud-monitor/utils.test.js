@@ -30,6 +30,8 @@ import {
   filterDataByRegion,
   generateInitialTrendData,
   generateAllRegionTrendData,
+  buildTrendPoint,
+  fluctuateAllRegionTrendData,
   appendTrendPoint,
   appendTrendPointToMap,
   selectRegionTrendData,
@@ -483,14 +485,15 @@ describe('时间序列数据追加与淘汰逻辑', () => {
     expect(result).not.toBe(points)
   })
 
-  it('appendTrendPointToMap: 全局视图更新所有地域', () => {
+  it('appendTrendPointToMap: all 视图只更新全局数据，不污染各地域独立数据', () => {
     const map = generateAllRegionTrendData()
     const newPoint = { time: Date.now(), cpu: 50, memory: 50, disk: 50 }
     const result = appendTrendPointToMap(map, 'all', newPoint)
-    for (const key of Object.keys(result)) {
-      expect(result[key].length).toBeGreaterThanOrEqual(map[key].length)
-      const lastPoint = result[key][result[key].length - 1]
-      expect(lastPoint.time).toBe(newPoint.time)
+    expect(result.all.length).toBeGreaterThanOrEqual(map.all.length)
+    const lastAll = result.all[result.all.length - 1]
+    expect(lastAll.time).toBe(newPoint.time)
+    for (const r of REGIONS) {
+      expect(result[r.id].length).toBe(map[r.id].length)
     }
   })
 
@@ -535,6 +538,109 @@ describe('时间序列数据追加与淘汰逻辑', () => {
   it('selectRegionTrendData: null map 返回空数组', () => {
     const result = selectRegionTrendData(null, 'all')
     expect(result).toEqual([])
+  })
+
+  it('buildTrendPoint 基于指标生成有效数据点', () => {
+    const metrics = { cpu: 50, memory: 60, disk: 70 }
+    const ts = 1234567890
+    const point = buildTrendPoint(metrics, ts)
+    expect(point.time).toBe(ts)
+    expect(point.cpu).toBeGreaterThanOrEqual(47)
+    expect(point.cpu).toBeLessThanOrEqual(53)
+    expect(point.memory).toBeGreaterThanOrEqual(58)
+    expect(point.memory).toBeLessThanOrEqual(62)
+    expect(point.disk).toBeGreaterThanOrEqual(69)
+    expect(point.disk).toBeLessThanOrEqual(71)
+  })
+
+  it('buildTrendPoint 默认使用当前时间', () => {
+    const metrics = { cpu: 50, memory: 50, disk: 50 }
+    const before = Date.now()
+    const point = buildTrendPoint(metrics)
+    const after = Date.now()
+    expect(point.time).toBeGreaterThanOrEqual(before)
+    expect(point.time).toBeLessThanOrEqual(after)
+  })
+
+  it('buildTrendPoint 结果值在 0-100 范围内', () => {
+    for (let i = 0; i < 50; i++) {
+      const point = buildTrendPoint({ cpu: 1, memory: 1, disk: 1 })
+      expect(point.cpu).toBeGreaterThanOrEqual(0)
+      expect(point.cpu).toBeLessThanOrEqual(100)
+      expect(point.memory).toBeGreaterThanOrEqual(0)
+      expect(point.memory).toBeLessThanOrEqual(100)
+      expect(point.disk).toBeGreaterThanOrEqual(0)
+      expect(point.disk).toBeLessThanOrEqual(100)
+    }
+  })
+
+  it('fluctuateAllRegionTrendData: 各地域生成独立的趋势数据点', () => {
+    const trendMap = generateAllRegionTrendData()
+    const allMetrics = generateAllRegionMetrics()
+    const result = fluctuateAllRegionTrendData(trendMap, allMetrics)
+
+    for (const r of REGIONS) {
+      expect(result[r.id].length).toBeGreaterThanOrEqual(trendMap[r.id].length)
+    }
+    expect(result.all.length).toBeGreaterThanOrEqual(trendMap.all.length)
+
+    const regionPoints = REGIONS.map((r) => result[r.id][result[r.id].length - 1])
+    const allPoint = result.all[result.all.length - 1]
+
+    for (const r of REGIONS) {
+      const point = result[r.id][result[r.id].length - 1]
+      expect(point.cpu).toBeGreaterThanOrEqual(0)
+      expect(point.cpu).toBeLessThanOrEqual(100)
+    }
+
+    const avgCpu = regionPoints.reduce((s, p) => s + p.cpu, 0) / regionPoints.length
+    expect(allPoint.cpu).toBeCloseTo(avgCpu, 0)
+  })
+
+  it('fluctuateAllRegionTrendData: all 数据点是各地域的平均值', () => {
+    const trendMap = { all: [], east: [], north: [], south: [], west: [], overseas: [] }
+    const allMetrics = {
+      all: { cpu: 0, memory: 0, disk: 0 },
+      east: { cpu: 20, memory: 30, disk: 40 },
+      north: { cpu: 40, memory: 50, disk: 60 },
+      south: { cpu: 60, memory: 70, disk: 80 },
+      west: { cpu: 10, memory: 20, disk: 30 },
+      overseas: { cpu: 30, memory: 40, disk: 50 },
+    }
+    const result = fluctuateAllRegionTrendData(trendMap, allMetrics)
+    expect(result.all).toHaveLength(1)
+    expect(result.east).toHaveLength(1)
+    expect(result.north).toHaveLength(1)
+    expect(result.south).toHaveLength(1)
+    expect(result.west).toHaveLength(1)
+    expect(result.overseas).toHaveLength(1)
+
+    const east = result.east[0]
+    const north = result.north[0]
+    const south = result.south[0]
+    const west = result.west[0]
+    const overseas = result.overseas[0]
+    const avgCpu = (east.cpu + north.cpu + south.cpu + west.cpu + overseas.cpu) / 5
+    expect(result.all[0].cpu).toBeCloseTo(avgCpu, 0)
+  })
+
+  it('fluctuateAllRegionTrendData: null trendMap 返回原值', () => {
+    expect(fluctuateAllRegionTrendData(null, {})).toBeNull()
+  })
+
+  it('fluctuateAllRegionTrendData: null allMetrics 返回原值', () => {
+    const trendMap = generateAllRegionTrendData()
+    expect(fluctuateAllRegionTrendData(trendMap, null)).toBe(trendMap)
+  })
+
+  it('fluctuateAllRegionTrendData: 各地域新数据点时间戳一致', () => {
+    const trendMap = generateAllRegionTrendData()
+    const allMetrics = generateAllRegionMetrics()
+    const result = fluctuateAllRegionTrendData(trendMap, allMetrics)
+    const ts = result.all[result.all.length - 1].time
+    for (const r of REGIONS) {
+      expect(result[r.id][result[r.id].length - 1].time).toBe(ts)
+    }
   })
 
   it('evictOldTrendPoints 淘汰超时数据点', () => {

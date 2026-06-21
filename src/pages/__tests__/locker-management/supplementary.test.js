@@ -472,6 +472,7 @@ describe('locker-management/utils supplementary', () => {
     it('returns error when packages is undefined', () => {
       const result = regeneratePickupCode(undefined, 'p1');
       expect(result.success).toBe(false);
+      expect(result.error).toBe('包裹不存在');
     });
 
     it('returns error when packages is empty array', () => {
@@ -483,6 +484,7 @@ describe('locker-management/utils supplementary', () => {
     it('returns error when packages is a non-array object', () => {
       const result = regeneratePickupCode({}, 'p1');
       expect(result.success).toBe(false);
+      expect(result.error).toBe('包裹不存在');
     });
 
     it('successfully regenerates code for existing package', () => {

@@ -304,11 +304,11 @@ const VisitorRegistrationPage = () => {
 
   const handleExport = useCallback(() => {
     if (filteredRecords.length === 0) return
-    const csv = exportRecordsToCsv(filteredRecords)
-    const now = new Date()
-    const ts = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`
+    const csv = exportRecordsToCsv(filteredRecords, now)
+    const d = new Date(now)
+    const ts = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}_${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}${String(d.getSeconds()).padStart(2, '0')}`
     downloadCsv(csv, `访客登记记录_${ts}.csv`)
-  }, [filteredRecords])
+  }, [filteredRecords, now])
 
   const renderPagination = () => {
     const { total, totalPage, currentPage } = pagination

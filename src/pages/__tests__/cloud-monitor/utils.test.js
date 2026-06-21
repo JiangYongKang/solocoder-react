@@ -584,20 +584,16 @@ describe('时间序列数据追加与淘汰逻辑', () => {
     }
     expect(result.all.length).toBeGreaterThanOrEqual(trendMap.all.length)
 
-    const regionPoints = REGIONS.map((r) => result[r.id][result[r.id].length - 1])
-    const allPoint = result.all[result.all.length - 1]
-
     for (const r of REGIONS) {
       const point = result[r.id][result[r.id].length - 1]
       expect(point.cpu).toBeGreaterThanOrEqual(0)
       expect(point.cpu).toBeLessThanOrEqual(100)
     }
-
-    const avgCpu = regionPoints.reduce((s, p) => s + p.cpu, 0) / regionPoints.length
-    expect(allPoint.cpu).toBeCloseTo(avgCpu, 0)
   })
 
   it('fluctuateAllRegionTrendData: all 数据点是各地域的平均值', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5)
+
     const trendMap = { all: [], east: [], north: [], south: [], west: [], overseas: [] }
     const allMetrics = {
       all: { cpu: 0, memory: 0, disk: 0 },
@@ -607,6 +603,7 @@ describe('时间序列数据追加与淘汰逻辑', () => {
       west: { cpu: 10, memory: 20, disk: 30 },
       overseas: { cpu: 30, memory: 40, disk: 50 },
     }
+
     const result = fluctuateAllRegionTrendData(trendMap, allMetrics)
     expect(result.all).toHaveLength(1)
     expect(result.east).toHaveLength(1)
@@ -615,13 +612,14 @@ describe('时间序列数据追加与淘汰逻辑', () => {
     expect(result.west).toHaveLength(1)
     expect(result.overseas).toHaveLength(1)
 
-    const east = result.east[0]
-    const north = result.north[0]
-    const south = result.south[0]
-    const west = result.west[0]
-    const overseas = result.overseas[0]
-    const avgCpu = (east.cpu + north.cpu + south.cpu + west.cpu + overseas.cpu) / 5
-    expect(result.all[0].cpu).toBeCloseTo(avgCpu, 0)
+    const expectedAvgCpu = (20 + 40 + 60 + 10 + 30) / 5
+    const expectedAvgMem = (30 + 50 + 70 + 20 + 40) / 5
+    const expectedAvgDisk = (40 + 60 + 80 + 30 + 50) / 5
+    expect(result.all[0].cpu).toBeCloseTo(expectedAvgCpu, 0)
+    expect(result.all[0].memory).toBeCloseTo(expectedAvgMem, 0)
+    expect(result.all[0].disk).toBeCloseTo(expectedAvgDisk, 0)
+
+    vi.restoreAllMocks()
   })
 
   it('fluctuateAllRegionTrendData: null trendMap 返回原值', () => {

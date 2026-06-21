@@ -1,0 +1,4 @@
+你实现的文字转语音配置器页面还存在一些问题，需要进行修复：
+
+1. normalizeHistoryRecord 的单元测试中，数组 `[]` 被和字符串、数字一起归到了"非对象输入"这个测试用例里，但 JavaScript 中 `typeof []` 返回的是 `'object'`，数组实际走的代码路径和原始类型不同，测试名称描述的场景与实际执行路径不匹配。
+2. normalizeHistoryRecord 对 undefined 输入的那个测试用例只检查了 voiceId、speed、pitch、volume 四个字段的返回值，没有检查 text 字段。而同一个测试组里 null 输入的测试用例对全部五个字段都做了检查。

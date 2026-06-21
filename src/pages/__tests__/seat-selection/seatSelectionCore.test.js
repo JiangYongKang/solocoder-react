@@ -889,6 +889,11 @@ describe('seatSelectionCore', () => {
       expect(canAddSeat(['A1', 'A2'], PERSON_COUNT.DOUBLE)).toBe(false);
     });
 
+    it('should disallow adding when over limit for DOUBLE mode', () => {
+      expect(canAddSeat(['A1', 'A2', 'B5'], PERSON_COUNT.DOUBLE)).toBe(false);
+      expect(canAddSeat(['A1', 'A2', 'B5', 'C3'], PERSON_COUNT.DOUBLE)).toBe(false);
+    });
+
     it('should allow adding when under limit for TRIPLE mode', () => {
       expect(canAddSeat([], PERSON_COUNT.TRIPLE)).toBe(true);
       expect(canAddSeat(['A1'], PERSON_COUNT.TRIPLE)).toBe(true);
@@ -897,6 +902,11 @@ describe('seatSelectionCore', () => {
 
     it('should disallow adding when at limit for TRIPLE mode', () => {
       expect(canAddSeat(['A1', 'A2', 'A3'], PERSON_COUNT.TRIPLE)).toBe(false);
+    });
+
+    it('should disallow adding when over limit for TRIPLE mode', () => {
+      expect(canAddSeat(['A1', 'A2', 'A3', 'B5'], PERSON_COUNT.TRIPLE)).toBe(false);
+      expect(canAddSeat(['A1', 'A2', 'A3', 'B5', 'C3'], PERSON_COUNT.TRIPLE)).toBe(false);
     });
 
     it('should return true for non-array selectedIds', () => {

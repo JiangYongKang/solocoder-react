@@ -227,7 +227,7 @@ describe('sortRecords', () => {
 })
 
 describe('filterRecords', () => {
-  const now = Date.now()
+  const now = new Date(2025, 5, 15, 12, 0, 0).getTime()
   const makeRecord = (id, overrides = {}) => ({
     id,
     name: '访客' + id,
@@ -425,6 +425,87 @@ describe('exportRecordsToCsv', () => {
     const csv = exportRecordsToCsv(r)
     const lines = csv.split('\n')
     expect(lines[1]).toContain(',""')
+  })
+
+  it('使用指定 now 参数判定状态（超时边界-访问中）', () => {
+    const baseTime = new Date(2025, 5, 15, 10, 0, 0).getTime()
+    const visitingRecord = {
+      id: 'v1',
+      name: '访客A',
+      phone: '13800000001',
+      idCard: '110101199001011231',
+      reason: '测试',
+      host: null,
+      registerTime: baseTime,
+      checkOutTime: null,
+    }
+    const nowBeforeTimeout = baseTime + TIMEOUT_HOURS * 60 * 60 * 1000 - 1000
+    const csv = exportRecordsToCsv([visitingRecord], nowBeforeTimeout)
+    expect(csv).toContain('访问中')
+    expect(csv).not.toContain('超时未签退')
+  })
+
+  it('使用指定 now 参数判定状态（超时边界-超时）', () => {
+    const baseTime = new Date(2025, 5, 15, 10, 0, 0).getTime()
+    const visitingRecord = {
+      id: 'v1',
+      name: '访客A',
+      phone: '13800000001',
+      idCard: '110101199001011231',
+      reason: '测试',
+      host: null,
+      registerTime: baseTime,
+      checkOutTime: null,
+    }
+    const nowAfterTimeout = baseTime + (TIMEOUT_HOURS + 1) * 60 * 60 * 1000
+    const csv = exportRecordsToCsv([visitingRecord], nowAfterTimeout)
+    expect(csv).toContain('超时未签退')
+    expect(csv).not.toContain('访问中')
+  })
+
+  it('不同 now 产生不同状态（验证同一记录的状态随 now 变化）', () => {
+    const baseTime = new Date(2025, 5, 15, 10, 0, 0).getTime()
+    const visitingRecord = {
+      id: 'v1',
+      name: '访客A',
+      phone: '13800000001',
+      idCard: '110101199001011231',
+      reason: '测试',
+      host: null,
+      registerTime: baseTime,
+      checkOutTime: null,
+    }
+    const nowInTime = baseTime + 2 * 60 * 60 * 1000
+    const nowOverdue = baseTime + (TIMEOUT_HOURS + 2) * 60 * 60 * 1000
+    const csv1 = exportRecordsToCsv([visitingRecord], nowInTime)
+    const csv2 = exportRecordsToCsv([visitingRecord], nowOverdue)
+    expect(csv1).toContain('访问中')
+    expect(csv2).toContain('超时未签退')
+    expect(csv1).not.toBe(csv2)
+  })
+
+  it('已签退记录的状态不受 now 参数影响', () => {
+    const checkedRecord = {
+      id: 'v1',
+      name: '访客B',
+      phone: '13800000002',
+      idCard: '110101199001011232',
+      reason: '测试',
+      host: null,
+      registerTime: Date.now() - 1000,
+      checkOutTime: Date.now() - 500,
+    }
+    const csv1 = exportRecordsToCsv([checkedRecord], Date.now())
+    const csv2 = exportRecordsToCsv([checkedRecord], Date.now() + 99 * 365 * 24 * 60 * 60 * 1000)
+    expect(csv1).toContain('已签退')
+    expect(csv2).toContain('已签退')
+  })
+
+  it('默认 now 参数使用当前时间（不传 now 时调用不报错）', () => {
+    const r = [{ ...records[0], checkOutTime: null }]
+    const csv = exportRecordsToCsv(r)
+    expect(typeof csv).toBe('string')
+    expect(csv.length).toBeGreaterThan(0)
   })
 })
 

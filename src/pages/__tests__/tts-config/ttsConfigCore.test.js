@@ -637,16 +637,25 @@ describe('normalizeHistoryRecord', () => {
 
   it('should return defaults for undefined input', () => {
     const result = normalizeHistoryRecord(undefined)
+    expect(result.text).toBe('')
     expect(result.voiceId).toBe(DEFAULT_VOICE_ID)
     expect(result.speed).toBe(DEFAULT_SPEED)
     expect(result.pitch).toBe(DEFAULT_PITCH)
     expect(result.volume).toBe(DEFAULT_VOLUME)
   })
 
-  it('should return defaults for non-object input', () => {
+  it('should return defaults for non-object primitive input', () => {
     expect(normalizeHistoryRecord('string').speed).toBe(DEFAULT_SPEED)
     expect(normalizeHistoryRecord(42).pitch).toBe(DEFAULT_PITCH)
-    expect(normalizeHistoryRecord([]).volume).toBe(DEFAULT_VOLUME)
+  })
+
+  it('should return defaults for array input (typeof [] is object but not a plain record)', () => {
+    const result = normalizeHistoryRecord([])
+    expect(result.text).toBe('')
+    expect(result.voiceId).toBe(DEFAULT_VOICE_ID)
+    expect(result.speed).toBe(DEFAULT_SPEED)
+    expect(result.pitch).toBe(DEFAULT_PITCH)
+    expect(result.volume).toBe(DEFAULT_VOLUME)
   })
 
   it('should preserve valid values from record', () => {

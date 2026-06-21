@@ -1,5 +1,5 @@
 产物不满意：
-1. 朗读历史记录未保存音调和音量参数。`createHistoryRecord` 函数只接收 `voiceId` 和 `speed` 两个参数，缺少 `pitch` 和 `volume`，返回对象中也仅有这两个字段。`handleHistoryClick` 恢复历史时仅还原音色和语速，音调和音量完全丢失。提示词第 6 条明确要求历史记录恢复"参数配置"，且配置包含语速、音调、音量、音色四项。正确做法是在 `createHistoryRecord` 入参和返回值中补全音调、音量字段，并在 `handleHistoryClick` 中同步调用 `setPitch` 和 `setVolume`。
+1. createHistoryRecord 只传了 voiceId 和 speed，缺 pitch 和 volume，handleHistoryClick 恢复时仅还原音色和语速，音调和音量完全丢失。提示词第6条要求恢复参数配置含语速音调音量音色四项。应补全 createHistoryRecord 的 pitch 和 volume 字段，并在 handleHistoryClick 中同步调用 setPitch 和 setVolume。
 2. 播放模拟时段落停顿标记未被实际处理。播放 effect 中通过 `getTextWithoutPauseMarkersForParagraph` 剥离了所有停顿标记后仅做逐字累加推进，遇到标记位置不会触发任何延时。提示词第 4 条定义 `<pause=500>` 表示停顿 500ms，但实际播放器将这些标记降级为纯视觉标签。正确做法是在字符索引推进到停顿标记位置时，暂停字符累加并对停顿对应的毫秒数做等待，实现真正的播放停顿效果。
 3. 试听功能仅有按钮状态切换，未展示试听文本内容。`handleAudition` 仅将状态置为 true 并启动 2 秒定时器，期间页面无任何试听文本显示。提示词第 3 条要求"模拟播放一句试听文本（如'你好，这是语音助手，当前音色为标准女声。'）"，但当前试听除按钮文字变化外零反馈。正确做法是在试听期间于按钮附近渲染试听文本，并根据当前选中音色动态生成文本中的音色名称。
 4. `formatPauseDuration` 中存在无意义的 `Number.isInteger` 分支。当毫秒数大于等于 1000 时，代码写为 `Number.isInteger(sec) ? `${sec}s` : `${sec}s``，三元表达式的两个分支返回值完全相同，isInteger 判断未产生任何差异化的格式化输出，属于一段死代码。根本原因是编写时可能意图对整数秒和小数秒做不同显示处理，但最终未体现任何区分逻辑。

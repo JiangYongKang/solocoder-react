@@ -1,11 +1,11 @@
 产物不满意：
-1. storage.js 的 saveEntries 和 loadEntries 函数完全没有对密码做 Base64 编码处理，存入 localStorage 的条目数据中密码字段是明文存储的。提示词第6条明确要求"所有存储到 localStorage 的密码数据经过模拟加密——写入前进行 Base64 编码（模拟加密），读取时解码（模拟解密）"。当前实现仅在 exportData 和 importData 中使用了编解码，但日常存储的密码却是明文，导致任何人打开浏览器开发者工具就能直接看到所有密码原文。正确做法是在 saveEntries 中对每个条目的 password 字段调用 encodeBase64 后再写入，在 loadEntries 中读取后调用 decodeBase64 还原。
-2. index.jsx 的 EntryCard 组件中 handleShowPassword 和 handleCopyPassword 函数共用了同一个 timerRef.current 来存储定时器引用，当用户先点击眼睛图标显示密码明文，再点击复制按钮时，复制操作设置的 2 秒反馈定时器会覆盖前面显示密码的 3 秒自动隐藏定时器，导致密码明文在 3 秒后不会自动恢复掩码，持续暴露在界面上。正确做法是为两个功能分别使用独立的 useRef（如 showTimerRef 和 copyTimerRef），互不干扰。
-3. index.jsx 的 handleExport 函数中，用户在点击导出按钮后直接触发文件下载，但 exportData 函数中虽然生成了 `warning: '数据仅经 Base64 编码，非真正加密'` 字段，这个警告仅存在于下载的 JSON 文件内部，用户在点击导出前完全看不到这条安全提示。提示词第6条要求"在导出数据时提示"，意味着用户在操作时必须看到此警告。正确做法是在 handleExport 中先弹出确认对话框展示警告文案，用户确认后再执行导出下载。
+1. storage.js 的 saveEntries 和 loadEntries 没对密码做 Base64 编码，存入 localStorage 的密码是明文。提示词第6条要求写入前编码、读取时解码。当前仅在 exportData 和 importData 用了编解码，日常存储却是明文，打开 DevTools 就能看到密码原文。正确做法是在 saveEntries 对密码调 encodeBase64 再写入，loadEntries 读取后调 decodeBase64 还原。
+2. index.jsx 的 EntryCard 中 handleShowPassword 和 handleCopyPassword 共用了同一个 timerRef.current 存储定时器引用。当先点击眼睛图标显示密码明文，再点复制按钮时，复制操作设的 2 秒反馈定时器会覆盖前面显示密码的 3 秒自动隐藏定时器，导致密码明文在 3 秒后不会自动恢复掩码，持续暴露在界面上。正确做法是为两个功能分别使用独立的 useRef（如 showTimerRef 和 copyTimerRef），互不干扰。
+3. index.jsx 的 handleExport 中，点击导出按钮后直接触发文件下载，但 exportData 函数虽生成了 `warning` 字段，这个警告仅存在于下载的 JSON 文件内部，点击导出前完全看不到。提示词第6条要求"在导出数据时提示"，意味着操作时必须看到此警告。正确做法是在 handleExport 中先弹出确认对话框展示警告文案，确认后再执行导出下载。
 4. index.jsx 的 EntryCard 组件中，handleCopyPassword 和 handleCopyAccount 在复制成功后通过 setCopiedPwd(true) 和 setCopiedAcct(true) 将按钮图标从 📋 切换为 ✓，但提示词第5条明确要求"按钮状态变为'已复制'显示 2 秒后恢复"。当前用 ✓ 图标表达完成状态不符合需求描述中的"已复制"文字提示，应在复制成功后将按钮内容改为显示文字"已复制"，2 秒后恢复为 📋 图标。
-5. utils.js 的 formatTimestamp 函数中判断 `if (!ts) return ''` 使用了 truthy 检查，当传入时间戳 `0`（即 1970-01-01 epoch）时 `!0` 为 true 直接返回空字符串。虽然在密码管理器的实际使用中不会出现 epoch 时间，但作为工具函数的逻辑不严谨，应该使用 `if (ts == null || ts === 0) return ''` 或单独判断 `typeof ts !== 'number'` 来区分"无效值"和"合法零值"。
+5. utils.js 的 formatTimestamp 中判断 `if (!ts) return ''` 用了 truthy 检查，当传入时间戳 `0`（即 epoch）时 `!0` 为 true 直接返回空字符串。虽密码管理器实际不会用 epoch 时间，但作为工具函数逻辑不严谨，应使用 `if (ts == null) return ''` 或判断 `typeof ts !== 'number'` 区分无效值和合法零值。
 
 过程不满意：
-1. 模型在 ESLint 修复阶段对 index.jsx 文件进行了至少 5 轮反复读取和局部修改：先修复未使用导入，再修 setIsSetup 未使用变量，再修 useEffect 中的 set-state-in-effect，再修 PasswordGenerator 中同样的 set-state-in-effect，最后修复 filterEntriesByGroup 的调用点。并且在修复 handleUsePassword 时误将清除 manualPreview 的逻辑写入了 PasswordGenerator 的 handleUsePassword 而非 EntryForm 的同名函数中，随后才发现位置错误并回退修改。这种行为模式是边改边看、逐个补漏，没有先通读一遍 ESLint 报错列表规划好全局修改方案后再一次性执行。
+1. 模型在 ESLint 修复阶段对 index.jsx 进行了至少5轮反复读取和局部修改：修导入、修未使用变量、修 useEffect 依赖、修 PasswordGenerator、修 filterEntriesByGroup 调用点。修复时还把清除 manualPreview 逻辑误写入 PasswordGenerator 而非 EntryForm 同名函数，随后才发现回退。这说明边改边看、逐个补漏，没有先通读 ESLint 报错整体规划后再一次性修完。
 2. 模型在完成全部开发后仅以"✅ ESLint 零错误零警告"和"✅ 77 个单元测试全部通过"作为验证完成的依据，完全没有检查 storage 层是否按照需求实现了 Base64 编码存储这一核心架构要求。说明模型对终端结果验证的关注维度过于局限于跑通 lint 和 test 两道关卡，没有逐条对照提示词的 7 项功能需求逐一验证逻辑正确性，导致"存储层模拟加密"这个关键功能缺失而未被发现。
 3. 模型在思考过程中文档中写道每个条目卡片显示"掩码账号、掩码密码"，并声称 7 大功能已全部实现，但实际 EntryCard 在复制反馈上使用 ✓ 而非需求要求的"已复制"文字。模型的总结描述与代码实际行为存在偏差，存在幻觉倾向——描述时用了需求原话但代码并未对应实现。

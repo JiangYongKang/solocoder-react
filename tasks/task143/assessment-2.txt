@@ -1,8 +1,8 @@
 产物不满意：
-1. utils.js 的 generateInitialTrendData 函数中第 150 行，count 被硬编码为 Math.min(MAX_TREND_POINTS, 360)，而 MAX_TREND_POINTS 常量本身通过 Math.ceil(TREND_TIME_RANGE_MS / TREND_DATA_POINT_INTERVAL) 已计算为 360，两者重复定义。当 TREND_DATA_POINT_INTERVAL 被修改时硬编码 360 不会同步更新，例如把采样间隔从 5000ms 改为 10000ms 后 MAX_TREND_POINTS 自动变为 180，但硬编码 360 仍然不变，导致生成的数据点数量远超合理范围。正确做法是直接使用 MAX_TREND_POINTS 或 Math.ceil(TREND_TIME_RANGE_MS / TREND_DATA_POINT_INTERVAL)，删除硬编码数字。
-2. index.jsx 的 refreshAll 函数在全部地域视图下存在趋势数据污染问题：当 selectedRegion 为 all 时，newPoint 由聚合指标 allMetrics.all 计算得到，appendTrendPointToMap 将此相同数据点推入全部 6 个趋势数组（all 加 5 个独立地域）。随着页面在全部地域视图下持续自动刷新，华东、华北等独立地域的趋势数据会逐渐收敛为与聚合数据完全相同的值，每个地域原有的独立历史数据被逐步挤出。用户后续切换到具体地域时，该地域的趋势图数据已被聚合数据覆盖，地域筛选在趋势维度上失效。正确做法是根据各独立地域自身的 metrics 生成各不相同的 newPoint，而非向所有地域推送同一个聚合点。
-3. GaugePanel.jsx 的 SingleGauge 组件中 prevValueRef 在第 21 行声明为 useRef(value)、第 27 行在 useEffect 中被赋值为 value，但该 ref 在整个组件中从未被任何地方读取使用。该变量在 requestAnimationFrame 动画实现过程中被创建，但最终动画逻辑只使用了 startValueRef 和 displayValue 这两个状态来跟踪过渡过程，prevValueRef 变成了悬空引用，属于动画实现完成后缺少代码清理自查的遗留物。
+1. generateInitialTrendData 中 count 硬编码为 Math.min(MAX_TREND_POINTS, 360)，但 MAX_TREND_POINTS 已计算为360，两者重复。当采样间隔修改时360不会同步更新——间隔从5000ms到10000ms后 MAX_TREND_POINTS 变180但360不变，数据点远超合理范围。正确做法是直接使用 MAX_TREND_POINTS。
+2. refreshAll 在全部地域视图下存在趋势数据污染：selectedRegion 为 all 时 newPoint 由 allMetrics.all 计算，appendTrendPointToMap 将相同数据点推入全部6个趋势数组。随持续自动刷新，各独立地域历史数据逐渐被聚合数据覆盖。切换到具体地域时该地域趋势图数据已污染，地域筛选在趋势维度失效。正确做法是根据各地域自身 metrics 生成不同 newPoint。
+3. GaugePanel 的 SingleGauge 组件中 prevValueRef 声明为 useRef(value)、在 useEffect 中被赋值为 value，但该 ref 在整个组件中从未被读取使用。该变量在 requestAnimationFrame 动画实现过程中被创建，但最终动画逻辑只用了 startValueRef 和 displayValue，prevValueRef 成了悬空引用，属于动画实现完成后缺少清理自查的遗留物。
 
 过程不满意：
 1. 模型重构 index.jsx（213 行）时使用 Write 全量覆盖而非增量修改，GaugePanel.jsx 和 utils.test.js 也采用全量覆盖方式提交内容。全量覆盖使标注审查者无法通过 diff 直观区分哪些行是有意修改、哪些行可能被无意改动，增加了引入回归缺陷的审查难度和风险。正确做法是对每个修改位置使用精确的字符串替换编辑操作，保持修改范围最小化且变更可追溯。
-2. 模型编写 appendTrendPointToMap 相关测试后首次运行发现追加后结果为 360 而非预期的 361，模型未分析 evictOldTrendPoints 在边界条件下（初始数据的最老时间点恰好等于 30 分钟前的时刻）是否合理驱逐了数据点，而是直接修改测试断言从 361 改为 360 来迁就运行结果。这种改测试配合实现而非验证实现正确性的行为模式可能掩盖逐出逻辑的真实 BUG。正确做法是先验证 evictOldTrendPoints 在恰好 30 分钟边界下的行为是否语义正确，再决定是修实现还是调测试。
+2. 模型编写 appendTrendPointToMap 相关测试后首次运行发现追加结果为360而非预期361，模型未分析 evictOldTrendPoints 在边界条件下是否合理驱逐数据点，而是直接修改断言从361改为360来迁就运行结果。这种改测试配合实现而非验证实现正确性的行为可能掩盖逐出逻辑的真实BUG。正确做法是先验证 evictOldTrendPoints 在恰好30分钟边界下的行为语义是否正确，再决定修实现还是调测试。

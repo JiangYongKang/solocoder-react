@@ -1,8 +1,8 @@
 产物不满意：
-1. 提示词第2条明确要求"修复后需要为该页面补充对应的纯 JS 函数单元测试"，但模型只修改了 utils.js 中 exportRecordsToCsv 函数的签名和内部调用，完全没有在 src/pages/__tests__/visitor-registration/ 目录下新增任何测试代码。从模型的思考过程文件中看，没有任何涉及测试文件的操作记录，产物中的测试文件 utils.test.js 只有 session 2 遗留的测试用例，本次 session 没有新增哪怕一个 test case。提示词的两条需求中有一半被直接遗漏，交付物不完整。
-2. 模型对 exportRecordsToCsv 的修复覆盖不完整。函数签名和内部 getVisitorStatus 调用已补全 now 参数传参，但该函数在 index.jsx 中唯一的调用点 handleExport 回调仍然只传 filteredRecords 不传 now 参数，handleExport 内部还声明了局部变量 const now = new Date() 用于生成下载文件名，与组件级的 now 状态变量同名但不同值。结果是 CSV 导出时 getVisitorStatus 仍通过默认参数 Date.now() 获取调用时刻的实时时间而非组件通过定时器维护的统一时间基准，提示词中描述的"跨越超时边界时 CSV 导出状态标签与页面筛选状态不一致"的问题并未真正根除。
+1. 提示词第2条要求"修复后需要为页面补充纯 JS 函数单元测试"，但模型只修改了 utils.js 中 exportRecordsToCsv 的函数签名和内部调用，完全没有在测试目录下新增任何测试代码。从思考过程看没有任何涉及测试文件的操作记录，产物中测试文件只有 session 2 遗留的用例。提示词两条需求有一半被直接遗漏，交付不完整。
+2. exportRecordsToCsv 函数签名和内部调用已补 now，但 index.jsx 中 handleExport 调用 exportRecordsToCsv 时还是只传了 filteredRecords 没传 now。handleExport 内部还声明了局部 now = new Date() 用于生成文件名，与组件级 now 同名不同值。结果导出时 getVisitorStatus 仍用默认参数取实时时间，提示词说的"跨超时边界时 CSV 状态与页面筛选不一致"问题未真正根除。
 
 过程不满意：
-1. 模型的思考过程文件仅 54 行，整个 workflow 只执行了 4 个有效操作：读取 utils.js、修改 exportRecordsToCsv 函数签名、更新 todo 状态、搜索 handleExport 和 exportRecordsToCsv 的调用位置。在完成搜索后模型没有对搜索结果做任何后续处理就直接结束了，没有读取 index.jsx 检视调用点，没有更新 handleExport 传入 now 参数，没有打开测试目录编写测试，没有运行 pnpm run test 验证产物。提示词的两条需求只完成了约一半，思考过程呈现出"读完改完就结束"的草率模式。
+1. 模型的思考过程仅54行，整个 workflow 只执行了4个有效操作：读取 utils.js、修改 exportRecordsToCsv 函数签名、更新 todo 状态、搜索调用位置。搜索后模型没有对结果做任何后续处理就结束了，没有读取 index.jsx 检视调用点，没有更新 handleExport 传入 now 参数，没有打开测试目录编写测试，没有运行 pnpm run test。提示词两条需求只完成了约一半，呈现"读完改完就结束"的草率模式。
 2. 模型在收到任务后的第一个操作就是创建 todo 列表，然后才开始读文件分析问题。按照标注规范，模型应该先分析提示词中的问题再规划执行步骤，直接建 todo 说明没有做充分的前置分析。且思考过程中多次更新 todo 状态但最终成果显示很多 todo 项并未真正完成，todo 列表沦为形式化的占位而非有效的执行计划。
-3. 模型从未执行 pnpm run test 验证产物质量。实际运行测试后，filterRecords 测试组中"按结束日期筛选"用例失败（expected 0 but got 1），原因是 session 2 遗留测试中 records 第3条的 registerTime 被设为当前时间减 9 小时，当测试在上午 9 点前运行时该记录时间落入前一天，endDate 为昨天的过滤无法排除它。模型如果按提示词要求"确保所有测试通过"而实际运行测试，会发现这个失败用例，但模型选择了不运行测试直接宣告完成。
+3. 模型从未执行 pnpm run test 验证产物。实际运行测试后，filterRecords 测试组"按结束日期筛选"用例失败（expected 0 but got 1），原因是 session 2 遗留测试中 records 第3条 registerTime 被设为当前时间减9小时，当测试在上午9点前运行时该记录时间落入前一天，endDate 为昨天的过滤无法排除。模型如按提示词要求"确保所有测试通过"而实际运行测试会发现这个失败，但模型选择了不运行直接宣告完成。

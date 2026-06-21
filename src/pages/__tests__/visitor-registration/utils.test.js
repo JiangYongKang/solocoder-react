@@ -445,6 +445,25 @@ describe('exportRecordsToCsv', () => {
     expect(csv).not.toContain('超时未签退')
   })
 
+  it('恰好等于 TIMEOUT_HOURS 时状态为访问中（严格大于判定）', () => {
+    const baseTime = new Date(2025, 5, 15, 10, 0, 0).getTime()
+    const visitingRecord = {
+      id: 'v1',
+      name: '访客临界点',
+      phone: '13800000099',
+      idCard: '110101199001011299',
+      reason: '临界点测试',
+      host: null,
+      registerTime: baseTime,
+      checkOutTime: null,
+    }
+    const nowAtExactBoundary = baseTime + TIMEOUT_HOURS * 60 * 60 * 1000
+    const csv = exportRecordsToCsv([visitingRecord], nowAtExactBoundary)
+    expect(csv).toContain('访客临界点')
+    expect(csv).toContain('访问中')
+    expect(csv).not.toContain('超时未签退')
+  })
+
   it('使用指定 now 参数判定状态（超时边界-超时）', () => {
     const baseTime = new Date(2025, 5, 15, 10, 0, 0).getTime()
     const visitingRecord = {

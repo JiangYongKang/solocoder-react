@@ -302,7 +302,7 @@ function PosterDesignerPage() {
     const fallback = bg ? bg.color : '#4a90d9'
     setColorInputValue(key, e.target.value, fallback)
     const safeColor = sanitizeColor(e.target.value, fallback)
-    setState((prev) => updateLayer(prev, 'bg', { color: safeColor, image: null }))
+    setState((prev) => updateLayer(prev, 'bg', { color: safeColor }))
   }
 
   const handleBgColorTextCommit = () => {
@@ -310,7 +310,7 @@ function PosterDesignerPage() {
     const bg = state.layers.find((l) => l.type === 'background')
     const fallback = bg ? bg.color : '#4a90d9'
     const result = commitColorChange(key, 'bg', 'color', fallback)
-    const finalState = updateLayer(state, 'bg', { color: result.value, image: null })
+    const finalState = updateLayer(state, 'bg', { color: result.value })
     setState(finalState)
     if (result.changed) commitHistory(finalState)
   }
@@ -321,7 +321,7 @@ function PosterDesignerPage() {
       ...prev,
       [key]: { value: color, valid: true, error: null },
     }))
-    const newState = updateLayer(state, 'bg', { color, image: null })
+    const newState = updateLayer(state, 'bg', { color })
     setState(newState)
     commitHistory(newState)
   }

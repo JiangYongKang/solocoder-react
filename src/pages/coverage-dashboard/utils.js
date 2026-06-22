@@ -59,6 +59,39 @@ export function calculateAverageCoverage(coverages) {
   return result
 }
 
+export function calculateWeightedAverageCoverage(items) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return { statements: 0, branches: 0, functions: 0, lines: 0 }
+  }
+
+  const weightedSums = { statements: 0, branches: 0, functions: 0, lines: 0 }
+  let totalWeight = 0
+
+  items.forEach((item) => {
+    if (!item || !item.coverage || typeof item.coverage !== 'object') return
+    const weight = typeof item.totalLines === 'number' && item.totalLines > 0 ? item.totalLines : 0
+    if (weight <= 0) return
+
+    totalWeight += weight
+    METRIC_KEYS.forEach((key) => {
+      if (typeof item.coverage[key] === 'number' && !isNaN(item.coverage[key])) {
+        weightedSums[key] += item.coverage[key] * weight
+      }
+    })
+  })
+
+  if (totalWeight === 0) {
+    return { statements: 0, branches: 0, functions: 0, lines: 0 }
+  }
+
+  const result = {}
+  METRIC_KEYS.forEach((key) => {
+    result[key] = Math.round((weightedSums[key] / totalWeight) * 10) / 10
+  })
+
+  return result
+}
+
 export function flattenFileTree(node) {
   const files = []
 
@@ -76,34 +109,69 @@ export function flattenFileTree(node) {
 }
 
 export function buildDirectoryCoverage(node) {
-  if (!node) return null
+  function traverse(current) {
+    if (!current) return null
 
-  if (node.type === 'file') {
-    return {
-      ...node,
-      averageCoverage: node.coverage ? node.coverage.lines : 0,
+    if (current.type === 'file') {
+      const lineCount = Array.isArray(current.lines) ? current.lines.length : 0
+      const enrichedFile = {
+        ...current,
+        averageCoverage: current.coverage ? current.coverage.lines : 0,
+      }
+      return {
+        node: enrichedFile,
+        subtreeData: {
+          fileCount: 1,
+          totalLines: lineCount,
+          weightedItems: current.coverage
+            ? [{ coverage: current.coverage, totalLines: lineCount }]
+            : [],
+        },
+      }
     }
+
+    if (current.type === 'directory' && current.children) {
+      const childResults = current.children
+        .map((child) => traverse(child))
+        .filter(Boolean)
+
+      const enrichedChildren = childResults.map((r) => r.node)
+
+      let fileCount = 0
+      let totalLines = 0
+      const allWeightedItems = []
+
+      childResults.forEach((child) => {
+        fileCount += child.subtreeData.fileCount
+        totalLines += child.subtreeData.totalLines
+        allWeightedItems.push(...child.subtreeData.weightedItems)
+      })
+
+      const avgCoverage = calculateWeightedAverageCoverage(allWeightedItems)
+
+      const enrichedDir = {
+        ...current,
+        children: enrichedChildren,
+        coverage: avgCoverage,
+        averageCoverage: avgCoverage.lines,
+        fileCount,
+      }
+
+      return {
+        node: enrichedDir,
+        subtreeData: {
+          fileCount,
+          totalLines,
+          weightedItems: allWeightedItems,
+        },
+      }
+    }
+
+    return { node: current, subtreeData: { fileCount: 0, totalLines: 0, weightedItems: [] } }
   }
 
-  if (node.type === 'directory' && node.children) {
-    const childResults = node.children.map(buildDirectoryCoverage).filter(Boolean)
-    const allFilesInSubtree = flattenFileTree(node)
-    const allFileCoverages = allFilesInSubtree
-      .map((f) => f.coverage)
-      .filter(Boolean)
-
-    const avgCoverage = calculateAverageCoverage(allFileCoverages)
-
-    return {
-      ...node,
-      children: childResults,
-      coverage: avgCoverage,
-      averageCoverage: avgCoverage.lines,
-      fileCount: countFiles(node),
-    }
-  }
-
-  return node
+  const result = traverse(node)
+  return result ? result.node : null
 }
 
 export function countFiles(node) {
@@ -174,8 +242,14 @@ export function calculateOverallCoverage(files) {
     return { statements: 0, branches: 0, functions: 0, lines: 0 }
   }
 
-  const fileCoverages = files.map((f) => f.coverage).filter(Boolean)
-  return calculateAverageCoverage(fileCoverages)
+  const weightedItems = files
+    .filter((f) => f.coverage)
+    .map((f) => ({
+      coverage: f.coverage,
+      totalLines: Array.isArray(f.lines) ? f.lines.length : 0,
+    }))
+
+  return calculateWeightedAverageCoverage(weightedItems)
 }
 
 export function sortFilesByCoverage(files, metric = 'lines', ascending = true) {

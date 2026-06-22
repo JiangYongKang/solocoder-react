@@ -656,33 +656,54 @@ describe('taskDagCore', () => {
     })
 
     describe('loadFromStorage / saveToStorage', () => {
-      it('初始状态应返回空图', () => {
+      it('初始状态应返回空图且无错误', () => {
         const result = loadFromStorage()
         expect(result.nodes).toEqual([])
         expect(result.edges).toEqual([])
+        expect(result.error).toBeUndefined()
       })
 
-      it('保存后应能读取', () => {
+      it('保存后应能读取且无错误', () => {
         const nodes = [{ id: 'n1', name: 'A', x: 0, y: 0 }]
         const edges = []
         expect(saveToStorage(nodes, edges)).toBe(true)
         const loaded = loadFromStorage()
         expect(loaded.nodes).toEqual(nodes)
         expect(loaded.edges).toEqual(edges)
+        expect(loaded.error).toBeUndefined()
       })
 
-      it('损坏的数据应返回空图', () => {
+      it('损坏的数据应返回空图和错误信息', () => {
         localStorage.setItem('task-dag-state', 'not json')
         const result = loadFromStorage()
         expect(result.nodes).toEqual([])
         expect(result.edges).toEqual([])
+        expect(result.error).toBeDefined()
+        expect(typeof result.error).toBe('string')
+        expect(result.error.length).toBeGreaterThan(0)
       })
 
-      it('格式错误的数据应返回空图', () => {
+      it('格式错误的数据应返回空图和错误信息', () => {
         localStorage.setItem('task-dag-state', JSON.stringify({ invalid: true }))
         const result = loadFromStorage()
         expect(result.nodes).toEqual([])
         expect(result.edges).toEqual([])
+        expect(result.error).toBeDefined()
+        expect(typeof result.error).toBe('string')
+        expect(result.error.length).toBeGreaterThan(0)
+      })
+
+      it('localStorage 异常时应返回错误信息', () => {
+        const originalGetItem = localStorage.getItem
+        vi.spyOn(localStorage, 'getItem').mockImplementation(() => {
+          throw new Error('Quota exceeded')
+        })
+        const result = loadFromStorage()
+        expect(result.nodes).toEqual([])
+        expect(result.edges).toEqual([])
+        expect(result.error).toBeDefined()
+        expect(result.error).toContain('读取本地存储失败')
+        localStorage.getItem = originalGetItem
       })
     })
 

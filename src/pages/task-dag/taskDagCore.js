@@ -432,14 +432,25 @@ export function safeSetItem(key, value) {
 
 export function loadFromStorage() {
   try {
-    const data = safeGetItem(STORAGE_KEY, null)
-    if (!data) return { nodes: [], edges: [] }
-    if (!Array.isArray(data.nodes) || !Array.isArray(data.edges)) {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (raw === null || raw === undefined) {
       return { nodes: [], edges: [] }
     }
+    let data
+    try {
+      data = JSON.parse(raw)
+    } catch (parseErr) {
+      return { nodes: [], edges: [], error: '数据解析失败: ' + (parseErr?.message || '无效 JSON') }
+    }
+    if (!data || typeof data !== 'object') {
+      return { nodes: [], edges: [], error: '数据格式错误: 不是有效对象' }
+    }
+    if (!Array.isArray(data.nodes) || !Array.isArray(data.edges)) {
+      return { nodes: [], edges: [], error: '数据格式错误: 缺少 nodes 或 edges 数组' }
+    }
     return { nodes: data.nodes, edges: data.edges }
-  } catch {
-    return { nodes: [], edges: [] }
+  } catch (err) {
+    return { nodes: [], edges: [], error: '读取本地存储失败: ' + (err?.message || '未知错误') }
   }
 }
 

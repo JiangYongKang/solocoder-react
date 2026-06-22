@@ -120,7 +120,7 @@ export default function MagicCubePage() {
     setTimeout(() => {
       processScrambleQueueRef.current && processScrambleQueueRef.current()
     }, 100)
-  }, [processScrambleQueue, isScrambling, isSolving])
+  }, [isScrambling, isSolving])
 
   const handleReset = useCallback(() => {
     if (isScrambling || isSolving) return
@@ -167,7 +167,7 @@ export default function MagicCubePage() {
     setTimeout(() => {
       processSolveQueueRef.current && processSolveQueueRef.current(solveSteps)
     }, 100)
-  }, [scrambleHistory, processSolveQueue, isScrambling, isSolving])
+  }, [scrambleHistory, isScrambling, isSolving])
 
   useEffect(() => {
     const handleKeyDown = (e) => {

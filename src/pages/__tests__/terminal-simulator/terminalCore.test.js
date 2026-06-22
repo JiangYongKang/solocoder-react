@@ -149,10 +149,12 @@ describe('terminalCore', () => {
 
     it('should not mutate filesystem when accessing nodes', () => {
       const before = JSON.stringify(fs)
-      const node = getNode(fs, '/home/user')
-      node.children = {}
+      getNode(fs, '/home/user')
+      getNode(fs, '/etc/config')
+      getNode(fs, '/home/user/documents/readme.txt')
+      getNode(fs, '/nonexistent')
       const after = JSON.stringify(fs)
-      expect(after).not.toBe(before)
+      expect(after).toBe(before)
     })
   })
 

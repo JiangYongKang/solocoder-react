@@ -300,6 +300,8 @@ export function drawPoster(ctx, state, canvasWidth, canvasHeight) {
   const bg = layers.find((l) => l.type === 'background')
   if (bg) {
     const bgColor = sanitizeColor(bg.color, DEFAULT_BG_COLOR)
+    ctx.fillStyle = bgColor
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight)
     if (bg.image && isHTMLImageElement(bg.image)) {
       try {
         ctx.save()
@@ -307,12 +309,8 @@ export function drawPoster(ctx, state, canvasWidth, canvasHeight) {
         ctx.drawImage(bg.image, 0, 0, canvasWidth, canvasHeight)
         ctx.restore()
       } catch {
-        ctx.fillStyle = bgColor
-        ctx.fillRect(0, 0, canvasWidth, canvasHeight)
+        // image draw failed, color fill already in place as fallback
       }
-    } else {
-      ctx.fillStyle = bgColor
-      ctx.fillRect(0, 0, canvasWidth, canvasHeight)
     }
   }
 

@@ -3,6 +3,7 @@ import {
   getCoverageLevel,
   formatPercentage,
   calculateAverageCoverage,
+  calculateWeightedAverageCoverage,
   flattenFileTree,
   buildDirectoryCoverage,
   countFiles,
@@ -327,16 +328,26 @@ describe('coverage-dashboard utils', () => {
   })
 
   describe('calculateOverallCoverage', () => {
+    const makeLines = (count) => Array.from({ length: count }, (_, i) => ({ line: i + 1, code: '' }))
     const mockFiles = [
-      { coverage: { statements: 80, branches: 70, functions: 90, lines: 85 } },
-      { coverage: { statements: 60, branches: 50, functions: 70, lines: 65 } },
-      { coverage: { statements: 100, branches: 100, functions: 100, lines: 100 } },
+      { coverage: { statements: 80, branches: 70, functions: 90, lines: 85 }, lines: makeLines(10) },
+      { coverage: { statements: 60, branches: 50, functions: 70, lines: 65 }, lines: makeLines(10) },
+      { coverage: { statements: 100, branches: 100, functions: 100, lines: 100 }, lines: makeLines(10) },
     ]
 
-    it('应该计算所有文件的平均覆盖率', () => {
+    it('应该按行数加权计算所有文件的平均覆盖率', () => {
       const result = calculateOverallCoverage(mockFiles)
       expect(result.statements).toBe(80)
       expect(result.lines).toBeCloseTo(83.3, 0)
+    })
+
+    it('大文件权重更高', () => {
+      const files = [
+        { coverage: { statements: 0, lines: 0 }, lines: makeLines(1000) },
+        { coverage: { statements: 100, lines: 100 }, lines: makeLines(1) },
+      ]
+      const result = calculateOverallCoverage(files)
+      expect(result.lines).toBeLessThan(1)
     })
 
     it('空数组返回全零', () => {
@@ -539,8 +550,72 @@ describe('coverage-dashboard utils', () => {
     })
   })
 
+  describe('calculateWeightedAverageCoverage', () => {
+    it('应该按代码行数加权计算平均覆盖率', () => {
+      const items = [
+        { coverage: { statements: 0, branches: 0, functions: 0, lines: 0 }, totalLines: 1000 },
+        { coverage: { statements: 100, branches: 100, functions: 100, lines: 100 }, totalLines: 1 },
+      ]
+      const result = calculateWeightedAverageCoverage(items)
+      const expected = (1000 * 0 + 1 * 100) / (1000 + 1)
+      expect(result.lines).toBeCloseTo(expected, 1)
+      expect(result.lines).toBeLessThan(1)
+    })
+
+    it('相同行数的文件应该等价于算术平均', () => {
+      const items = [
+        { coverage: { statements: 80, branches: 70, functions: 90, lines: 85 }, totalLines: 10 },
+        { coverage: { statements: 60, branches: 50, functions: 70, lines: 65 }, totalLines: 10 },
+      ]
+      const result = calculateWeightedAverageCoverage(items)
+      expect(result.lines).toBeCloseTo(75, 0)
+      expect(result.statements).toBeCloseTo(70, 0)
+    })
+
+    it('行数越多权重越大', () => {
+      const items = [
+        { coverage: { statements: 10, lines: 10 }, totalLines: 90 },
+        { coverage: { statements: 100, lines: 100 }, totalLines: 10 },
+      ]
+      const result = calculateWeightedAverageCoverage(items)
+      const expected = (90 * 10 + 10 * 100) / 100
+      expect(result.lines).toBeCloseTo(expected, 0)
+      expect(result.lines).toBe(19)
+    })
+
+    it('空数组返回全零', () => {
+      const result = calculateWeightedAverageCoverage([])
+      expect(result.lines).toBe(0)
+      expect(result.statements).toBe(0)
+    })
+
+    it('非数组返回全零', () => {
+      const result = calculateWeightedAverageCoverage(null)
+      expect(result.lines).toBe(0)
+    })
+
+    it('总权重为零时返回全零', () => {
+      const items = [
+        { coverage: { lines: 50 }, totalLines: 0 },
+        { coverage: { lines: 80 }, totalLines: -5 },
+      ]
+      const result = calculateWeightedAverageCoverage(items)
+      expect(result.lines).toBe(0)
+    })
+
+    it('保留一位小数', () => {
+      const items = [
+        { coverage: { lines: 33.333 }, totalLines: 3 },
+        { coverage: { lines: 66.666 }, totalLines: 3 },
+      ]
+      const result = calculateWeightedAverageCoverage(items)
+      expect(result.lines).toBe(50)
+    })
+  })
+
   describe('buildDirectoryCoverage', () => {
-    it('应该基于子树内所有文件计算真实加权平均覆盖率', () => {
+    it('应该基于子树内所有文件按行数加权计算覆盖率', () => {
+      const makeLines = (count) => Array.from({ length: count }, (_, i) => ({ line: i + 1, code: '' }))
       const tree = {
         name: 'src',
         type: 'directory',
@@ -556,18 +631,21 @@ describe('coverage-dashboard utils', () => {
                 type: 'file',
                 path: 'src/components/Button.jsx',
                 coverage: { statements: 90, branches: 85, functions: 95, lines: 92 },
+                lines: makeLines(100),
               },
               {
                 name: 'Input.jsx',
                 type: 'file',
                 path: 'src/components/Input.jsx',
                 coverage: { statements: 70, branches: 65, functions: 75, lines: 68 },
+                lines: makeLines(50),
               },
               {
                 name: 'Modal.jsx',
                 type: 'file',
                 path: 'src/components/Modal.jsx',
                 coverage: { statements: 50, branches: 40, functions: 55, lines: 48 },
+                lines: makeLines(200),
               },
             ],
           },
@@ -581,6 +659,7 @@ describe('coverage-dashboard utils', () => {
                 type: 'file',
                 path: 'src/utils/helper.js',
                 coverage: { statements: 100, branches: 100, functions: 100, lines: 100 },
+                lines: makeLines(50),
               },
             ],
           },
@@ -592,15 +671,14 @@ describe('coverage-dashboard utils', () => {
       expect(result.type).toBe('directory')
       expect(result.fileCount).toBe(4)
 
-      const expectedLinesAvg = (92 + 68 + 48 + 100) / 4
+      const totalWeight = 100 + 50 + 200 + 50
+      const expectedLinesAvg = (100 * 92 + 50 * 68 + 200 * 48 + 50 * 100) / totalWeight
       expect(result.coverage.lines).toBeCloseTo(expectedLinesAvg, 0)
-
-      const expectedStatementsAvg = (90 + 70 + 50 + 100) / 4
-      expect(result.coverage.statements).toBeCloseTo(expectedStatementsAvg, 0)
 
       expect(result.children[0].type).toBe('directory')
       expect(result.children[0].fileCount).toBe(3)
-      const componentsAvg = (92 + 68 + 48) / 3
+      const compWeight = 100 + 50 + 200
+      const componentsAvg = (100 * 92 + 50 * 68 + 200 * 48) / compWeight
       expect(result.children[0].coverage.lines).toBeCloseTo(componentsAvg, 0)
 
       expect(result.children[1].type).toBe('directory')
@@ -608,7 +686,38 @@ describe('coverage-dashboard utils', () => {
       expect(result.children[1].coverage.lines).toBe(100)
     })
 
+    it('大文件低覆盖率主导整体结果（1000行0% vs 1行100%）', () => {
+      const makeLines = (count) => Array.from({ length: count }, (_, i) => ({ line: i + 1, code: '' }))
+      const tree = {
+        name: 'root',
+        type: 'directory',
+        path: 'root',
+        children: [
+          {
+            name: 'bigFile.js',
+            type: 'file',
+            path: 'root/bigFile.js',
+            coverage: { statements: 0, branches: 0, functions: 0, lines: 0 },
+            lines: makeLines(1000),
+          },
+          {
+            name: 'smallFile.js',
+            type: 'file',
+            path: 'root/smallFile.js',
+            coverage: { statements: 100, branches: 100, functions: 100, lines: 100 },
+            lines: makeLines(1),
+          },
+        ],
+      }
+
+      const result = buildDirectoryCoverage(tree)
+      const expected = (1000 * 0 + 1 * 100) / 1001
+      expect(result.coverage.lines).toBeCloseTo(expected, 1)
+      expect(result.coverage.lines).toBeLessThan(1)
+    })
+
     it('多文件目录不应被少文件目录稀释权重', () => {
+      const makeLines = (count) => Array.from({ length: count }, (_, i) => ({ line: i + 1, code: '' }))
       const tree = {
         name: 'root',
         type: 'directory',
@@ -618,14 +727,13 @@ describe('coverage-dashboard utils', () => {
             name: 'big-dir',
             type: 'directory',
             path: 'root/big-dir',
-            children: [
-              ...Array.from({ length: 99 }, (_, i) => ({
-                name: `file${i}.js`,
-                type: 'file',
-                path: `root/big-dir/file${i}.js`,
-                coverage: { statements: 50, branches: 50, functions: 50, lines: 50 },
-              })),
-            ],
+            children: Array.from({ length: 99 }, (_, i) => ({
+              name: `file${i}.js`,
+              type: 'file',
+              path: `root/big-dir/file${i}.js`,
+              coverage: { statements: 50, branches: 50, functions: 50, lines: 50 },
+              lines: makeLines(10),
+            })),
           },
           {
             name: 'small-dir',
@@ -637,6 +745,7 @@ describe('coverage-dashboard utils', () => {
                 type: 'file',
                 path: 'root/small-dir/single.js',
                 coverage: { statements: 100, branches: 100, functions: 100, lines: 100 },
+                lines: makeLines(10),
               },
             ],
           },
@@ -644,11 +753,36 @@ describe('coverage-dashboard utils', () => {
       }
 
       const result = buildDirectoryCoverage(tree)
-
-      const expectedAvg = (99 * 50 + 1 * 100) / 100
+      const expectedAvg = (99 * 10 * 50 + 1 * 10 * 100) / (99 * 10 + 1 * 10)
       expect(result.coverage.lines).toBeCloseTo(expectedAvg, 0)
-
       expect(result.coverage.lines).toBeLessThan(75)
+    })
+
+    it('文件无lines数据时使用权重0（不参与计算）', () => {
+      const makeLines = (count) => Array.from({ length: count }, (_, i) => ({ line: i + 1, code: '' }))
+      const tree = {
+        name: 'root',
+        type: 'directory',
+        path: 'root',
+        children: [
+          {
+            name: 'a.js',
+            type: 'file',
+            path: 'root/a.js',
+            coverage: { statements: 50, lines: 50 },
+            lines: makeLines(100),
+          },
+          {
+            name: 'b.js',
+            type: 'file',
+            path: 'root/b.js',
+            coverage: { statements: 100, lines: 100 },
+          },
+        ],
+      }
+
+      const result = buildDirectoryCoverage(tree)
+      expect(result.coverage.lines).toBe(50)
     })
 
     it('文件节点应正确返回', () => {
@@ -657,6 +791,7 @@ describe('coverage-dashboard utils', () => {
         type: 'file',
         path: 'test.js',
         coverage: { statements: 80, branches: 70, functions: 90, lines: 85 },
+        lines: [{ line: 1, code: '' }],
       }
       const result = buildDirectoryCoverage(file)
       expect(result.type).toBe('file')
@@ -666,6 +801,51 @@ describe('coverage-dashboard utils', () => {
     it('空节点返回 null', () => {
       expect(buildDirectoryCoverage(null)).toBeNull()
       expect(buildDirectoryCoverage(undefined)).toBeNull()
+    })
+
+    it('深层嵌套目录只遍历一次（结构验证）', () => {
+      const makeLines = (count) => Array.from({ length: count }, (_, i) => ({ line: i + 1, code: '' }))
+      const tree = {
+        name: 'L0',
+        type: 'directory',
+        path: 'L0',
+        children: [{
+          name: 'L1',
+          type: 'directory',
+          path: 'L0/L1',
+          children: [{
+            name: 'L2',
+            type: 'directory',
+            path: 'L0/L1/L2',
+            children: [{
+              name: 'L3',
+              type: 'directory',
+              path: 'L0/L1/L2/L3',
+              children: [{
+                name: 'deep.js',
+                type: 'file',
+                path: 'L0/L1/L2/L3/deep.js',
+                coverage: { statements: 75, lines: 80 },
+                lines: makeLines(10),
+              }],
+            }],
+          }],
+        }],
+      }
+
+      const result = buildDirectoryCoverage(tree)
+      expect(result.fileCount).toBe(1)
+      expect(result.coverage.lines).toBe(80)
+
+      let current = result
+      for (let i = 0; i < 3; i++) {
+        expect(current.type).toBe('directory')
+        expect(current.fileCount).toBe(1)
+        expect(current.coverage.lines).toBe(80)
+        current = current.children[0]
+      }
+      expect(current.type).toBe('directory')
+      expect(current.children[0].type).toBe('file')
     })
   })
 

@@ -1,0 +1,6 @@
+产物不满意：
+1. buildDirectoryCoverage 函数在计算父目录平均覆盖率时将子目录的平均覆盖率对象与直接文件覆盖率等权计入 `allCoverages` 数组。例如 src/components/ 下含 Input.jsx 和两个子目录 Button/（2 个文件）与 Modal/（1 个文件），函数仅取三个条目求平均，Button/ 的 2 个文件只算 1 个权重，导致目录聚合视图显示的覆盖率不是子树内所有文件的真实加权平均。应遍历子树提取全部叶文件后统一计算。
+2. generateMockSummary 中硬编码 `totalFiles: 18` 和 `totalLines: 452`，但 generateMockFileTree 实际仅生成 15 个文件约 337 行代码。页面摘要卡片的"已测试文件"百分比用 `summary.testedFiles / countFiles(fileTree)` 计算，分母 15 来自实际树而分子 14 来自硬编码，mockSummary 中的覆盖率数值也与文件树遍历计算结果完全无关，硬编码数据与实际渲染数据来源割裂。应使摘要数据与文件树一致或从文件树动态计算。
+
+过程不满意：
+模型收到提示词后的第一个操作是调用 todo_write 创建了包含 10 个子任务的 TodoList，之后才通过 view_folder 和 view_files 查看项目结构和已有任务参考实现。这违反了应该先分析问题再规划的流程规范，过早制定计划导致后续开发中出现了需要逐轮修复 lint 问题的情况（如 index.jsx 中 controlGroup 等变量声明未使用）以及 calculateAverageCoverage 函数的空对象边界处理遗漏。应先通读项目结构与至少一个参考实现，再制定 TodoList。

@@ -1,0 +1,602 @@
+.pixel-font-page {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100vh;
+  background: #1a1a2e;
+  color: #eee;
+  overflow: hidden;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.pixel-font-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  background: #16213e;
+  border-bottom: 1px solid #0f3460;
+  flex-shrink: 0;
+}
+
+.pixel-font-header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.pixel-font-back-btn {
+  padding: 6px 14px;
+  background: #0f3460;
+  border: 1px solid #533483;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #eee;
+  transition: all 0.2s;
+}
+
+.pixel-font-back-btn:hover {
+  background: #533483;
+}
+
+.pixel-font-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #00d4ff;
+  letter-spacing: 2px;
+}
+
+.pixel-font-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pixel-font-btn {
+  padding: 8px 16px;
+  background: #0f3460;
+  border: 1px solid #533483;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #eee;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pixel-font-btn:hover {
+  background: #533483;
+}
+
+.pixel-font-btn--primary {
+  background: #00d4ff;
+  border-color: #00d4ff;
+  color: #1a1a2e;
+  font-weight: 600;
+}
+
+.pixel-font-btn--primary:hover {
+  background: #33ddff;
+  border-color: #33ddff;
+}
+
+.pixel-font-btn--success {
+  background: #4caf50;
+  border-color: #4caf50;
+  color: #fff;
+}
+
+.pixel-font-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pixel-font-main {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.pixel-font-left-panel {
+  width: 240px;
+  background: #16213e;
+  border-right: 1px solid #0f3460;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.pixel-font-center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  overflow: auto;
+  position: relative;
+  gap: 20px;
+}
+
+.pixel-font-right-panel {
+  width: 260px;
+  background: #16213e;
+  border-left: 1px solid #0f3460;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.pixel-font-panel-title {
+  margin: 0 0 12px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.pixel-font-section {
+  background: #0f0f1e;
+  border: 1px solid #0f3460;
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.pixel-font-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.pixel-font-section-header .pixel-font-panel-title {
+  margin-bottom: 0;
+}
+
+.pixel-font-add-btn {
+  padding: 4px 12px;
+  background: #00d4ff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  color: #1a1a2e;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.pixel-font-add-btn:hover {
+  background: #33ddff;
+}
+
+.pixel-font-current-char {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.pixel-font-char-display {
+  font-size: 36px;
+  font-weight: bold;
+  color: #00d4ff;
+  min-width: 48px;
+  text-align: center;
+}
+
+.pixel-font-char-codepoint {
+  font-size: 12px;
+  color: #888;
+  font-family: monospace;
+}
+
+.pixel-font-char-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: #666;
+  text-align: center;
+}
+
+.pixel-font-slider {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.pixel-font-slider:last-child {
+  margin-bottom: 0;
+}
+
+.pixel-font-slider label {
+  font-size: 13px;
+  color: #ccc;
+}
+
+.pixel-font-slider input[type='range'] {
+  width: 100%;
+  cursor: pointer;
+  accent-color: #00d4ff;
+}
+
+.pixel-font-slider-range {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #666;
+}
+
+.pixel-font-color-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.pixel-font-color-row:last-child {
+  margin-bottom: 0;
+}
+
+.pixel-font-color-row label {
+  font-size: 13px;
+  color: #ccc;
+  min-width: 50px;
+}
+
+.pixel-font-color-row input[type='color'] {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 2px solid #0f3460;
+  border-radius: 4px;
+  background: none;
+  cursor: pointer;
+}
+
+.pixel-font-color-value {
+  font-size: 12px;
+  color: #888;
+  font-family: monospace;
+}
+
+.pixel-font-checkbox {
+  margin-top: 10px;
+}
+
+.pixel-font-checkbox label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #ccc;
+  cursor: pointer;
+}
+
+.pixel-font-checkbox input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: #00d4ff;
+}
+
+.pixel-font-input-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pixel-font-input-row label {
+  font-size: 13px;
+  color: #ccc;
+}
+
+.pixel-font-input {
+  width: 100%;
+  padding: 8px 12px;
+  background: #0f0f1e;
+  border: 1px solid #0f3460;
+  border-radius: 4px;
+  color: #eee;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+
+.pixel-font-input:focus {
+  outline: none;
+  border-color: #00d4ff;
+}
+
+.pixel-font-transform-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.pixel-font-small-btn {
+  padding: 8px 6px;
+  background: #0f3460;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+  color: #eee;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
+.pixel-font-small-btn:hover {
+  background: #533483;
+}
+
+.pixel-font-small-btn--danger {
+  background: #e94560;
+  border-color: #e94560;
+}
+
+.pixel-font-small-btn--danger:hover {
+  background: #ff6b81;
+  border-color: #ff6b81;
+}
+
+.pixel-font-canvas-wrapper {
+  position: relative;
+  background: #2a2a4a;
+  border: 2px solid #0f3460;
+  border-radius: 4px;
+  padding: 8px;
+  background-image:
+    linear-gradient(45deg, #222 25%, transparent 25%),
+    linear-gradient(-45deg, #222 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #222 75%),
+    linear-gradient(-45deg, transparent 75%, #222 75%);
+  background-size: 20px 20px;
+  background-position: 0 0, 0 10px, 10px -10px, 10px 0px;
+}
+
+.pixel-font-canvas {
+  display: block;
+  cursor: crosshair;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+.pixel-font-hint {
+  font-size: 11px;
+  color: #666;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.pixel-font-hint strong {
+  color: #888;
+}
+
+.pixel-font-preview-section {
+  width: 100%;
+  max-width: 600px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.pixel-font-preview-section .pixel-font-panel-title {
+  text-align: center;
+}
+
+.pixel-font-preview-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  background: #0f0f1e;
+  border: 1px solid #0f3460;
+  border-radius: 6px;
+  padding: 16px;
+  display: flex;
+  justify-content: center;
+}
+
+.pixel-font-preview-canvas {
+  display: block;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+.pixel-font-character-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.pixel-font-character-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px;
+  background: #0f0f1e;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.pixel-font-character-item:hover {
+  background: #1a1a2e;
+  border-color: #533483;
+}
+
+.pixel-font-character-item--active {
+  border-color: #00d4ff;
+  background: #0f3460;
+}
+
+.pixel-font-character-thumb {
+  display: block;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+.pixel-font-character-label {
+  font-size: 10px;
+  color: #888;
+}
+
+.pixel-font-character-delete {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 18px;
+  height: 18px;
+  background: #e94560;
+  border: none;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
+  z-index: 10;
+}
+
+.pixel-font-character-item:hover .pixel-font-character-delete {
+  display: flex;
+}
+
+.pixel-font-modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.pixel-font-modal {
+  background: #16213e;
+  border: 1px solid #0f3460;
+  border-radius: 12px;
+  padding: 24px;
+  min-width: 320px;
+  max-width: 480px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.pixel-font-modal--large {
+  max-width: 640px;
+  width: 90%;
+}
+
+.pixel-font-modal-title {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  color: #00d4ff;
+}
+
+.pixel-font-modal-body {
+  margin-bottom: 20px;
+}
+
+.pixel-font-modal-body p {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  color: #ccc;
+}
+
+.pixel-font-error {
+  color: #e94560;
+  font-size: 13px;
+  margin: 8px 0 0 0;
+}
+
+.pixel-font-css-output {
+  width: 100%;
+  min-height: 300px;
+  padding: 12px;
+  background: #0f0f1e;
+  border: 1px solid #0f3460;
+  border-radius: 6px;
+  color: #eee;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.pixel-font-css-output:focus {
+  outline: none;
+  border-color: #00d4ff;
+}
+
+.pixel-font-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.pixel-font-file-input {
+  display: none;
+}
+
+@media (max-width: 1200px) {
+  .pixel-font-left-panel,
+  .pixel-font-right-panel {
+    width: 200px;
+  }
+}
+
+@media (max-width: 900px) {
+  .pixel-font-main {
+    flex-direction: column;
+  }
+
+  .pixel-font-left-panel,
+  .pixel-font-right-panel {
+    width: 100%;
+    border: none;
+    max-height: 200px;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .pixel-font-left-panel {
+    border-bottom: 1px solid #0f3460;
+  }
+
+  .pixel-font-right-panel {
+    border-top: 1px solid #0f3460;
+  }
+
+  .pixel-font-section {
+    flex: 1;
+    min-width: 200px;
+  }
+}

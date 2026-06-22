@@ -1,0 +1,503 @@
+.pd-page {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100vh;
+  background: #f0f2f5;
+  overflow: hidden;
+}
+
+.pd-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+  background: #fff;
+  border-bottom: 1px solid #e5e5e5;
+  flex-shrink: 0;
+}
+
+.pd-back-btn {
+  padding: 6px 12px;
+  background: #f0f0f0;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #333;
+  transition: all 0.2s;
+}
+
+.pd-back-btn:hover {
+  background: #e5e5e5;
+}
+
+.pd-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+}
+
+.pd-header-spacer {
+  flex: 1;
+}
+
+.pd-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pd-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 20px;
+  background: #fafafa;
+  border-bottom: 1px solid #e5e5e5;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.pd-size-btn {
+  padding: 5px 12px;
+  background: #fff;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #555;
+  transition: all 0.2s;
+}
+
+.pd-size-btn:hover {
+  border-color: #4a90d9;
+  color: #4a90d9;
+}
+
+.pd-size-btn.active {
+  background: #4a90d9;
+  border-color: #4a90d9;
+  color: #fff;
+}
+
+.pd-toolbar-divider {
+  width: 1px;
+  height: 24px;
+  background: #e0e0e0;
+  margin: 0 8px;
+}
+
+.pd-action-btn {
+  padding: 5px 12px;
+  background: #fff;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #555;
+  transition: all 0.2s;
+}
+
+.pd-action-btn:hover:not(:disabled) {
+  border-color: #4a90d9;
+  color: #4a90d9;
+}
+
+.pd-action-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pd-action-btn-primary {
+  background: #4a90d9;
+  border-color: #4a90d9;
+  color: #fff;
+}
+
+.pd-action-btn-primary:hover:not(:disabled) {
+  background: #357abd;
+  border-color: #357abd;
+  color: #fff;
+}
+
+.pd-main {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.pd-layer-panel {
+  width: 220px;
+  background: #fff;
+  border-right: 1px solid #e5e5e5;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.pd-panel-title {
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+  border-bottom: 1px solid #f0f0f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pd-add-layer-btn {
+  padding: 3px 8px;
+  background: #4a90d9;
+  border: none;
+  border-radius: 3px;
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.pd-add-layer-btn:hover {
+  background: #357abd;
+}
+
+.pd-layer-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.pd-layer-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: background 0.15s;
+  border-left: 3px solid transparent;
+  font-size: 13px;
+  color: #555;
+}
+
+.pd-layer-item:hover {
+  background: #f5f7fa;
+}
+
+.pd-layer-item.selected {
+  background: #e8f0fe;
+  border-left-color: #4a90d9;
+  color: #333;
+}
+
+.pd-layer-item.dragging {
+  opacity: 0.5;
+  background: #e0e7f5;
+}
+
+.pd-layer-item-drag-over {
+  border-top: 2px solid #4a90d9;
+}
+
+.pd-layer-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+  width: 18px;
+  text-align: center;
+}
+
+.pd-layer-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pd-layer-delete-btn {
+  padding: 2px 6px;
+  background: none;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #999;
+  opacity: 0;
+  transition: all 0.15s;
+}
+
+.pd-layer-item:hover .pd-layer-delete-btn {
+  opacity: 1;
+}
+
+.pd-layer-delete-btn:hover {
+  color: #e74c3c;
+  background: #fef0f0;
+}
+
+.pd-canvas-area {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+  padding: 24px;
+  background: #e8eaed;
+  position: relative;
+}
+
+.pd-canvas-wrapper {
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
+  position: relative;
+  flex-shrink: 0;
+}
+
+.pd-canvas {
+  display: block;
+}
+
+.pd-canvas-select-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  cursor: default;
+}
+
+.pd-text-selection-box {
+  position: absolute;
+  border: 2px solid #4a90d9;
+  pointer-events: none;
+}
+
+.pd-text-selection-box::before {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  right: -4px;
+  bottom: -4px;
+  border: 1px dashed rgba(74, 144, 217, 0.5);
+}
+
+.pd-props-panel {
+  width: 280px;
+  background: #fff;
+  border-left: 1px solid #e5e5e5;
+  overflow-y: auto;
+  flex-shrink: 0;
+  padding-bottom: 20px;
+}
+
+.pd-props-section {
+  padding: 12px 14px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.pd-props-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #888;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.pd-props-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.pd-props-row:last-child {
+  margin-bottom: 0;
+}
+
+.pd-props-label {
+  font-size: 13px;
+  color: #555;
+  min-width: 50px;
+  flex-shrink: 0;
+}
+
+.pd-props-input {
+  flex: 1;
+  padding: 5px 8px;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #333;
+  background: #fff;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.pd-props-input:focus {
+  border-color: #4a90d9;
+}
+
+.pd-props-textarea {
+  flex: 1;
+  padding: 5px 8px;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #333;
+  background: #fff;
+  outline: none;
+  resize: vertical;
+  min-height: 60px;
+  font-family: inherit;
+  transition: border-color 0.2s;
+}
+
+.pd-props-textarea:focus {
+  border-color: #4a90d9;
+}
+
+.pd-props-select {
+  flex: 1;
+  padding: 5px 8px;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #333;
+  background: #fff;
+  outline: none;
+  cursor: pointer;
+}
+
+.pd-props-select:focus {
+  border-color: #4a90d9;
+}
+
+.pd-props-slider {
+  flex: 1;
+}
+
+.pd-props-slider-value {
+  font-size: 12px;
+  color: #888;
+  min-width: 32px;
+  text-align: right;
+}
+
+.pd-props-color-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.pd-props-color-input {
+  width: 32px;
+  height: 28px;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  cursor: pointer;
+  padding: 1px;
+}
+
+.pd-props-color-hex {
+  flex: 1;
+  padding: 5px 8px;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #333;
+  background: #fff;
+  outline: none;
+  font-family: monospace;
+}
+
+.pd-props-color-hex:focus {
+  border-color: #4a90d9;
+}
+
+.pd-props-preset-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.pd-props-preset-swatch {
+  width: 20px;
+  height: 20px;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+
+.pd-props-preset-swatch:hover {
+  transform: scale(1.2);
+}
+
+.pd-bg-upload-area {
+  border: 2px dashed #d9d9d9;
+  border-radius: 6px;
+  padding: 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 8px;
+}
+
+.pd-bg-upload-area:hover {
+  border-color: #4a90d9;
+  background: #f8fbff;
+}
+
+.pd-bg-upload-area.drag-over {
+  border-color: #4a90d9;
+  background: #e8f0fe;
+}
+
+.pd-bg-upload-text {
+  font-size: 13px;
+  color: #888;
+}
+
+.pd-bg-preview {
+  width: 100%;
+  height: 60px;
+  object-fit: cover;
+  border-radius: 4px;
+  margin-top: 8px;
+}
+
+.pd-bg-remove-btn {
+  padding: 3px 8px;
+  background: #fff;
+  border: 1px solid #e74c3c;
+  border-radius: 3px;
+  color: #e74c3c;
+  font-size: 12px;
+  cursor: pointer;
+  margin-top: 6px;
+}
+
+.pd-bg-remove-btn:hover {
+  background: #fef0f0;
+}
+
+.pd-empty-props {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: #999;
+  font-size: 14px;
+}
+
+.pd-hidden-input {
+  display: none;
+}
+
+.pd-size-info {
+  font-size: 12px;
+  color: #888;
+  margin-left: auto;
+}

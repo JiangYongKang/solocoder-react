@@ -99,6 +99,7 @@ import LoadingAnimationPage from '@/pages/loading-animation/index.jsx'
 import MicroFrontendPage from '@/pages/micro-frontend/index.jsx'
 import PhoneLoginPage from '@/pages/phone-login/index.jsx'
 import LogAnalyzerPage from '@/pages/log-analyzer/index.jsx'
+import TaskDAGPage from '@/pages/task-dag/index.jsx'
 import SplashConfigPage from '@/pages/splash-config/index.jsx'
 import BillSplitterPage from '@/pages/bill-splitter/index.jsx'
 import ColorToolkitPage from '@/pages/color-toolkit/index.jsx'
@@ -116,6 +117,14 @@ import GroupBuyingPage from '@/pages/group-buying/index.jsx'
 import SerialDebuggerPage from '@/pages/serial-debugger/index.jsx'
 import CloudMonitorPage from '@/pages/cloud-monitor/index.jsx'
 import LockerManagementPage from '@/pages/locker-management/index.jsx'
+import WeeklyReportPage from '@/pages/weekly-report/index.jsx'
+import AddressCascadePage from '@/pages/address-cascade/index.jsx'
+import ABTestPage from '@/pages/ab-test/index.jsx'
+import CoverageDashboard from '@/pages/coverage-dashboard/index.jsx'
+import PosterDesignerPage from '@/pages/poster-designer/index.jsx'
+import LiveStreamPage from '@/pages/live-stream/index.jsx'
+import TerminalSimulatorPage from '@/pages/terminal-simulator/index.jsx'
+import MagicCubePage from '@/pages/magic-cube/index.jsx'
 
 const TASKS = [
     { id: 1, title: '用户认证系统', route: 'auth', description: '登录、注册、找回密码、修改密码完整的认证流程，基于 localStorage 存储。' },
@@ -216,6 +225,15 @@ const TASKS = [
     { id: 95, title: '团购活动页面', route: 'group-buying', description: '电商拼团活动页面，商品原价拼团价对比、成团进度条、倒计时、团列表实时刷新、发起与参与拼团、拼团记录与状态展示，基于 localStorage 持久化。' },
     { id: 96, title: '密码管理器', route: 'password-manager', description: '本地密码管理工具，分组管理密码条目、密码生成器、主密码解锁、掩码显示与复制、Base64模拟加密、数据导入导出，基于 localStorage 持久化。' },
     { id: 97, title: '快递柜管理模拟', route: 'locker-management', description: '快递柜模拟管理系统，支持格口配置、包裹投递、自动取件码生成、格口状态可视化、滞留超时提醒、投递取件统计，基于 localStorage 持久化。' },
+    { id: 98, title: '周报生成器', route: 'weekly-report', description: '帮助用户快速生成和管理工作周报，支持三栏 Markdown 编辑、多种模板、历史周报管理、一键复制和邮件预览，基于 localStorage 持久化。' },
+    { id: 99, title: '海报设计器', route: 'poster-designer', description: '在线海报设计工具，支持多种画布尺寸、纯色/图片背景、文字图层拖拽编辑（字体/字号/颜色/描边/阴影）、图层排序、撤销重做、PNG 导出。' },
+    { id: 119, title: '命令行终端模拟', route: 'terminal-simulator', description: '类 Unix 命令行终端界面，支持 ls/cd/cat/mkdir/pwd 等文件系统操作，命令历史回显、Tab 自动补全、实时语法高亮、清屏功能。' },
+    { id: 120, title: '单元测试覆盖率面板', route: 'coverage-dashboard', description: '前端项目测试覆盖率可视化面板，文件树覆盖率着色、环形图展示、未覆盖代码行展开、目录聚合视图、历史趋势图。' },
+    { id: 121, title: '地址级联选择器', route: 'address-cascade', description: '省/市/区/街道四级联动地址选择，搜索模糊匹配、热门城市快捷选择、历史记录、Canvas 地图标记联动，基于 localStorage 持久化。' },
+    { id: 122, title: 'A/B 测试配置平台', route: 'ab-test', description: 'A/B 测试实验管理平台，支持实验创建、流量分配滑块、多指标监控、实时数据对比折线图、显著性计算、实验启停，数据 localStorage 持久化。' },
+    { id: 123, title: '任务依赖图', route: 'task-dag', description: '可视化任务依赖关系编辑器，支持节点拖拽、连线建立依赖、环路检测、拓扑排序、关键路径高亮、自动布局、JSON导入导出，数据本地持久化。' },
+    { id: 124, title: '直播带货模拟', route: 'live-stream', description: '模拟直播间带货场景，商品轮播高亮讲解、弹幕滚动互动、购物袋侧边栏、优惠券倒计时领取、点赞飘心动画、在线人数动态波动。' },
+    { id: 125, title: '魔术方块', route: 'magic-cube', description: '3×3三阶魔方模拟器，CSS 3D渲染，支持视角拖拽旋转、六面按钮和键盘快捷键操作、自动打乱和还原步骤展示。' },
 ]
 
 function HomePage() {
@@ -355,6 +373,16 @@ function App() {
             <Route path="/password-manager" element={<PasswordManagerPage />} />
             <Route path="/tts-config" element={<TtsConfigPage />} />
             <Route path="/locker-management" element={<LockerManagementPage />} />
+            <Route path="/weekly-report" element={<WeeklyReportPage />} />
+            <Route path="/address-cascade" element={<AddressCascadePage />} />
+            <Route path="/poster-designer" element={<PosterDesignerPage />} />
+            <Route path="/terminal-simulator" element={<TerminalSimulatorPage />} />
+            <Route path="/coverage-dashboard" element={<CoverageDashboard />} />
+            <Route path="/ab-test" element={<ABTestPage />} />
+            <Route path="/ab-test/:experimentId" element={<ABTestPage />} />
+            <Route path="/task-dag" element={<TaskDAGPage />} />
+            <Route path="/live-stream" element={<LiveStreamPage />} />
+            <Route path="/magic-cube" element={<MagicCubePage />} />
         </Routes>
     )
 }

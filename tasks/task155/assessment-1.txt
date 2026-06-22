@@ -1,0 +1,10 @@
+产物不满意：
+1. 在terminal.css文件的`.terminal-autocomplete`样式规则中，`margin-top: 4px 0;`是无效的CSS语法，`margin-top`属性只能接受单一长度值，两个值属于非法声明，浏览器会直接忽略整条属性。这导致自动补全菜单与终端内容区域之间的上下间距丢失，菜单紧贴上方内容显示，降低了补全列表的可读性和界面层次感。正确写法应为`margin: 4px 0;`使用简写属性，或者分开写成`margin-top: 4px; margin-bottom: 0;`。
+2. 在terminal.css文件的`.hidden-input`样式规则中，`position: absolute;`被重复声明了两次——第242行和第244行各写了一次，中间隔着`opacity: 0;`。虽然浏览器按CSS层叠规则取最后一次生效，不会导致功能异常，但这种重复声明完全是代码冗余，反映出模型在完成CSS编写后没有做逐行自查来清理文件中低级的重复声明问题。正确做法是删除重复的那个`position: absolute;`声明。
+3. 在terminalCore.js的`tokenizeForHighlight`函数中，当用户输入带引号的参数如`echo 'hello world'`时，函数先通过`parseCommand`获得去引号的解析结果（args为`['hello world']`），然后试图在原始字符串中按arg内容逐段匹配来重建token序列。但原始字符串中被parseCommand时跳过未收集的闭合引号字符，既不在空白token的slice范围内也不在参数token的值范围内，导致渲染时该字符凭空消失。例如输入`echo 'hello world'`后高亮显示行会变成`echo 'hello world`，末尾单引号丢失，与提示词第5条要求的"高亮在用户输入过程中实时渲染"的准确性不符。
+4. 在terminalCore.test.js中的`'should not mutate filesystem when accessing nodes'`测试用例，其用例名称声称验证`getNode`不会修改文件系统，但测试体实际做的是新建一个独立的`fs2`文件系统副本然后验证新副本有children内容，根本没有对`getNode(fs, '/home/user')`返回后的原文件系统做修改前与修改后的对比校验。事实上`getNode`直接返回节点对象引用，对返回对象做属性赋值必然污染文件系统，测试名称描述的行为根本不成立。该测试用例的名称与验证逻辑完全脱节，属于虚假的测试覆盖，按名称所声称的语义来说测试并未真正执行。
+5. 在terminalCore.js的`tokenizeForHighlight`函数中，路径类型的判断条件仅为参数包含斜杠、以点号或波浪号开头、或完全等于`..`和`.`时方才分类为path高亮。像`cd documents`中的`documents`或`ls projects`中的`projects`这种纯字母的相对路径不会被识别为蓝色路径高亮，而是被渲染为白色普通参数，与提示词第5条要求的"路径用第三种颜色（如蓝色）"存在偏差。虽然纯字母字符串无法绝对区分路径和参数，但对于`cd`、`ls`这类命令，其参数在上下文中有极大概率就是路径，应依据命令类型做更积极的推断来提升高亮覆盖率。
+
+过程不满意：
+1. 模型在编写完terminalCore.test.js后首次运行测试直接报错`beforeEach is not defined`，说明模型写完测试文件后没有对文件顶部的导入语句做逐行自检就立即执行了测试命令，遗漏了vitest其实还需要手动导入`beforeEach`才可使用。虽然后续补上了导入并修复通过，但这反映出模型写完代码后缺少先通读审视一遍自身刚产出内容是否完整的自检习惯。正确做法是在执行测试命令前先确认测试文件的导入区已包含所有实际用到的vitest API。
+2. 模型在首次运行`npx vite build`时收到CSS编译错误（`linear-gradient`缺少闭合括号），随后打开terminal.css修复了该问题。但模型在修复后仅关注了build是否成功通过，当第二次build仍失败且报错指向live-stream/index.jsx的JSX问题时，模型直接判定这是"项目已有文件的历史问题"并停止了对其自身终端模块代码的审查。而其自身CSS文件中尚存在`margin-top: 4px 0;`和重复`position: absolute;`等多处语法与冗余问题未被发现。模型过度依赖构建工具的错误输出来发现问题，未对已修改文件做完整的逐行人工审阅。正确做法是在修复build报错后通读当前任务包下所有文件，主动排查构建工具未覆盖到的语法和风格问题。

@@ -1,0 +1,7 @@
+产物不满意：
+1. posterDesignerCore.js 的 pushHistory 函数通过 `JSON.parse(JSON.stringify(state))` 深克隆状态做历史快照，但 background 图层的 `image` 属性是 HTMLImageElement 类型的 DOM 对象，JSON.stringify 无法序列化 DOM 对象，会将其转成空对象 `{}`。当用户上传背景图片后执行 Ctrl+Z 撤销，undo 恢复的快照中 `bg.image` 为 `{}`，drawPoster 的 `if (bg.image)` 对空对象判定为真进入 drawImage 分支，执行 `ctx.drawImage({})` 触发 TypeError，整个 Canvas 渲染崩溃页面白屏。根本原因是深克隆方案未处理不可序列化对象。正确做法是在快照中保留 imageSrc 数据 URL 替代 image，undo 恢复时从 imageSrc 重建 Image 对象。
+2. index.jsx 的 `handleBgColorChange` 将颜色文本输入框的原始值直接写入 layer.color 属性，没有任何格式校验。用户误输入 `zzz` 等非法字符串后，drawPoster 中 `ctx.fillStyle` 对无效颜色静默忽略，导致图层不渲染，文字颜色、描边颜色、阴影颜色的十六进制文本输入框存在同样缺陷。根本原因是未对自由文本输入做防错处理。正确做法是在写入状态前用正则校验 hex 格式，不合法时阻止更新并提示用户。
+
+过程不满意：
+1. 模型收到提示词后第一个工具调用就创建了包含 6 项的 TodoList，然后才读取 App.jsx、package.json、whiteboard 等文件了解项目结构。TodoList 建立在需求分析和代码探索之前，规划缺乏对项目路由模式、ESLint 配置、核心逻辑文件命名惯例的了解，属于空洞规划。正确做法是先读项目骨架和类似页面实现，确认约束后再制定计划。
+2. 模型写完 index.jsx 初版后首次 ESLint 报告了未使用导入、未使用 ref、effect 中 setState、渲染期间读 ref 四类问题。模型未用 StrReplace 逐类定点修复，而是用 Write 工具全量重写了 index.jsx。重写后仍遗留 effect 中 setState 的问题，又做了一轮 StrReplace 才通过。同一个文件经历「写完→全量重写→局部修复」三轮才稳定，浪费了一轮开发时间。正确做法是逐类分析错误后用 StrReplace 精准修改。

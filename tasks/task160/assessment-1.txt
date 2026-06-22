@@ -1,0 +1,9 @@
+产物不满意：
+1. 模型跨任务边界修改了非本任务代码。运行构建时遇到 `live-stream/index.jsx` 和 `terminal-simulator/terminalCore.js` 的报错，模型直接编辑了这两个其他任务的源文件，在 `terminalCore.js` 中新增了 `export { HOME_DIR }` 重导出语句。这违反了提示词"代码实现需要放在 src/pages/task-dag/ 下"的明确要求，对不属于本任务的代码包产生了意外的修改副作用。根本原因是模型发现构建报错来自其他任务时，没有意识到任务边界隔离的重要性，看到报错就修而不判断归属。正确做法是只确保自己的 task-dag 包代码不引入编译错误，其他包的构建问题不应触碰。
+2. 模型在 `App.jsx` 中批量添加了 weekly-report、address-cascade、ab-test、coverage-dashboard、poster-designer、live-stream、terminal-simulator、magic-cube 共 8 个其他任务的导入、路由和任务卡片，而这些任务不属于 task160 的范围。当构建因其他任务代码未接入 App.jsx 而失败时，模型选择将所有待接入任务一并写入。根本原因是对提示词范围把握偏差，将"为当前任务添加路由"泛化为了"为所有待接入任务添加路由"。正确做法是在 App.jsx 中仅添加 TaskDAGPage 的导入、路由和卡片。
+3. 模型在 `index.jsx` 中定义了模块级可变变量 `_initStorageCache` 和 `_initStorageError`，通过 `_getInitStorage()` 函数将 localStorage 错误从模块作用域传递到组件状态中。当 lint 报告 effect 中调用 setState 的违规时，模型没有做最小修正而是将整个初始化逻辑迁移到模块作用域。这引入了模块级可变状态，多个组件实例会共享这些变量。正确做法是将加载逻辑保留在 `useState` 惰性初始化函数内，通过 try-catch 直接返回错误信息而非使用模块级中间变量传递。
+
+过程不满意：
+1. 模型运行 `npm run build` 后发现 live-stream 和 terminal-simulator 的构建错误，思考过程中明确写道"这是项目中已有的问题，与我们的 task-dag 代码无关"，清楚认知到这些错误不属于自己任务，但紧接着写道"但让我修复它以确保整个项目能正常构建"，随后读取并修改了两个其他任务的源文件。这种明知越界仍然动手的行为，暴露出模型缺乏任务边界意识和合规校验能力。正确做法是确保 task-dag 代码自身通过 lint 和测试即可，其他包的构建问题应标记说明而非越界修改。
+2. 模型处理 lint 错误时对 `index.jsx` 进行了多轮大段替换式修改。特别是处理"effect 中调用 setState"这条规则时，没有对触发错误的 `useEffect` 做精准调整，而是将整个 localStorage 初始化逻辑从组件内部搬到了模块作用域，用 `_getInitStorage()` 加两个模块级变量替代了组件内状态管理。这个改动改变了代码架构，属于推倒重来式修复而非针对报错行的最小修正。正确做法是逐条分析 lint 报错原因，对每条错误做最小化的代码调整。
+3. 模型在完成 task-dag 的 `index.jsx` 编写后，读了两遍 App.jsx，执行三次 `edit_file_search_replace` 将 8 个其他任务的导入和路由全部批量写入。模型将"为当前任务添加到 App.jsx"错误地泛化成了"为所有待接入任务添加到 App.jsx"，对提示词中任务范围的把握出现明显偏差。正确做法是根据提示词只处理 task-dag 这一个任务的 App.jsx 接入，不应代劳其他任务。

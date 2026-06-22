@@ -122,7 +122,6 @@ export function buildDirectoryCoverage(node) {
         node: enrichedFile,
         subtreeData: {
           fileCount: 1,
-          totalLines: lineCount,
           weightedItems: current.coverage
             ? [{ coverage: current.coverage, totalLines: lineCount }]
             : [],
@@ -138,12 +137,10 @@ export function buildDirectoryCoverage(node) {
       const enrichedChildren = childResults.map((r) => r.node)
 
       let fileCount = 0
-      let totalLines = 0
       const allWeightedItems = []
 
       childResults.forEach((child) => {
         fileCount += child.subtreeData.fileCount
-        totalLines += child.subtreeData.totalLines
         allWeightedItems.push(...child.subtreeData.weightedItems)
       })
 
@@ -161,13 +158,12 @@ export function buildDirectoryCoverage(node) {
         node: enrichedDir,
         subtreeData: {
           fileCount,
-          totalLines,
           weightedItems: allWeightedItems,
         },
       }
     }
 
-    return { node: current, subtreeData: { fileCount: 0, totalLines: 0, weightedItems: [] } }
+    return { node: current, subtreeData: { fileCount: 0, weightedItems: [] } }
   }
 
   const result = traverse(node)

@@ -27,6 +27,7 @@ import {
   serializeState,
   isValidColor,
   sanitizeColor,
+  drawPoster,
 } from '../../poster-designer/posterDesignerCore.js'
 import {
   DEFAULT_CANVAS_SIZE,
@@ -672,6 +673,173 @@ describe('posterDesignerCore', () => {
       expect(snapshot.layers[0].imageSrc).toBe('data:image/png;base64,HELLO')
       expect(typeof snapshot).toBe('object')
       expect(() => JSON.stringify(snapshot)).not.toThrow()
+    })
+  })
+
+  describe('regression: background color change must not clear image', () => {
+    it('updateLayer color on bg should preserve image and imageSrc', () => {
+      const initial = createInitialState()
+      const fakeImage = { nodeName: 'IMG', naturalWidth: 800, naturalHeight: 600 }
+      const withImage = updateLayer(initial, 'bg', {
+        image: fakeImage,
+        imageSrc: 'data:image/png;base64,ABC',
+        imageOpacity: 0.7,
+      })
+      const colorChanged = updateLayer(withImage, 'bg', { color: '#00ff00' })
+      const bg = colorChanged.layers[0]
+      expect(bg.color).toBe('#00ff00')
+      expect(bg.image).toBe(fakeImage)
+      expect(bg.imageSrc).toBe('data:image/png;base64,ABC')
+      expect(bg.imageOpacity).toBe(0.7)
+    })
+
+    it('updateLayer color on bg should preserve image even after multiple color changes', () => {
+      const initial = createInitialState()
+      const fakeImage = { nodeName: 'IMG', naturalWidth: 100, naturalHeight: 100 }
+      const withImage = updateLayer(initial, 'bg', {
+        image: fakeImage,
+        imageSrc: 'data:image/png;base64,XYZ',
+      })
+      let state = withImage
+      for (const color of ['#ff0000', '#00ff00', '#0000ff', '#4a90d9']) {
+        state = updateLayer(state, 'bg', { color })
+      }
+      const bg = state.layers[0]
+      expect(bg.color).toBe('#4a90d9')
+      expect(bg.image).toBe(fakeImage)
+      expect(bg.imageSrc).toBe('data:image/png;base64,XYZ')
+    })
+
+    it('updateLayer should only modify specified properties, never touch unrelated fields', () => {
+      const initial = createInitialState()
+      const fakeImage = { nodeName: 'IMG', naturalWidth: 200, naturalHeight: 200 }
+      const withImage = updateLayer(initial, 'bg', {
+        image: fakeImage,
+        imageSrc: 'data:image/png;base64,MULTI',
+        imageOpacity: 0.4,
+        color: '#111111',
+      })
+      const opacityChanged = updateLayer(withImage, 'bg', { imageOpacity: 0.8 })
+      const bg = opacityChanged.layers[0]
+      expect(bg.image).toBe(fakeImage)
+      expect(bg.imageSrc).toBe('data:image/png;base64,MULTI')
+      expect(bg.color).toBe('#111111')
+      expect(bg.imageOpacity).toBe(0.8)
+    })
+  })
+
+  describe('drawPoster: fill-then-overlay rendering', () => {
+    function createMockCtx() {
+      const calls = []
+      return {
+        calls,
+        clearRect(...args) { calls.push({ fn: 'clearRect', args }) },
+        fillRect(...args) { calls.push({ fn: 'fillRect', args }) },
+        drawImage(...args) { calls.push({ fn: 'drawImage', args }) },
+        save() { calls.push({ fn: 'save' }) },
+        restore() { calls.push({ fn: 'restore' }) },
+        strokeText(...args) { calls.push({ fn: 'strokeText', args }) },
+        fillText(...args) { calls.push({ fn: 'fillText', args }) },
+        set fillStyle(v) { calls.push({ fn: 'fillStyle', value: v }) },
+        set strokeStyle(v) { calls.push({ fn: 'strokeStyle', value: v }) },
+        set globalAlpha(v) { calls.push({ fn: 'globalAlpha', value: v }) },
+        set lineWidth(v) { calls.push({ fn: 'lineWidth', value: v }) },
+        set lineJoin(v) { calls.push({ fn: 'lineJoin', value: v }) },
+        set font(v) { calls.push({ fn: 'font', value: v }) },
+        set textBaseline(v) { calls.push({ fn: 'textBaseline', value: v }) },
+        set shadowColor(v) { calls.push({ fn: 'shadowColor', value: v }) },
+        set shadowBlur(v) { calls.push({ fn: 'shadowBlur', value: v }) },
+        set shadowOffsetX(v) { calls.push({ fn: 'shadowOffsetX', value: v }) },
+        set shadowOffsetY(v) { calls.push({ fn: 'shadowOffsetY', value: v }) },
+        setTransform(...args) { calls.push({ fn: 'setTransform', args }) },
+      }
+    }
+
+    it('should draw color fill first, then overlay image on top', () => {
+      const ctx = createMockCtx()
+      const fakeImage = { nodeName: 'IMG', naturalWidth: 100, naturalHeight: 100 }
+      const state = createInitialState()
+      const withImage = updateLayer(state, 'bg', {
+        color: '#336699',
+        image: fakeImage,
+        imageSrc: 'data:image/png;base64,TEST',
+        imageOpacity: 0.6,
+      })
+      drawPoster(ctx, withImage, 800, 600)
+      const fillRectCalls = ctx.calls.filter((c) => c.fn === 'fillRect')
+      const drawImageCalls = ctx.calls.filter((c) => c.fn === 'drawImage')
+      expect(fillRectCalls.length).toBeGreaterThanOrEqual(1)
+      expect(drawImageCalls.length).toBe(1)
+      const fillRectIndex = ctx.calls.findIndex((c) => c.fn === 'fillRect')
+      const drawImageIndex = ctx.calls.findIndex((c) => c.fn === 'drawImage')
+      expect(fillRectIndex).toBeLessThan(drawImageIndex)
+      expect(drawImageCalls[0].args[0]).toBe(fakeImage)
+      expect(drawImageCalls[0].args[1]).toBe(0)
+      expect(drawImageCalls[0].args[2]).toBe(0)
+      expect(drawImageCalls[0].args[3]).toBe(800)
+      expect(drawImageCalls[0].args[4]).toBe(600)
+    })
+
+    it('should draw color fill even when no image is present', () => {
+      const ctx = createMockCtx()
+      const state = createInitialState()
+      const withColor = updateLayer(state, 'bg', { color: '#ff5500' })
+      drawPoster(ctx, withColor, 800, 600)
+      const fillRectCalls = ctx.calls.filter((c) => c.fn === 'fillRect')
+      const drawImageCalls = ctx.calls.filter((c) => c.fn === 'drawImage')
+      expect(fillRectCalls.length).toBeGreaterThanOrEqual(1)
+      expect(drawImageCalls.length).toBe(0)
+      const fillStyleCall = ctx.calls.find((c) => c.fn === 'fillStyle' && c.value === '#ff5500')
+      expect(fillStyleCall).toBeDefined()
+    })
+
+    it('should apply imageOpacity to globalAlpha when drawing image', () => {
+      const ctx = createMockCtx()
+      const fakeImage = { nodeName: 'IMG', naturalWidth: 100, naturalHeight: 100 }
+      const state = createInitialState()
+      const withImage = updateLayer(state, 'bg', {
+        image: fakeImage,
+        imageSrc: 'data:image/png;base64,OPA',
+        imageOpacity: 0.35,
+      })
+      drawPoster(ctx, withImage, 800, 600)
+      const alphaCall = ctx.calls.find((c) => c.fn === 'globalAlpha' && c.value === 0.35)
+      expect(alphaCall).toBeDefined()
+    })
+
+    it('should fallback to color fill if drawImage throws', () => {
+      const ctx = createMockCtx()
+      const badImage = { nodeName: 'IMG', naturalWidth: 100, naturalHeight: 100 }
+      const state = createInitialState()
+      const withBadImage = updateLayer(state, 'bg', {
+        color: '#aabbcc',
+        image: badImage,
+        imageSrc: 'data:image/png;base64,BAD',
+      })
+      const origDrawImage = ctx.drawImage
+      ctx.drawImage = function () { throw new Error('broken image') }
+      expect(() => drawPoster(ctx, withBadImage, 800, 600)).not.toThrow()
+      ctx.drawImage = origDrawImage
+      const fillRectCalls = ctx.calls.filter((c) => c.fn === 'fillRect')
+      expect(fillRectCalls.length).toBeGreaterThanOrEqual(1)
+    })
+
+    it('should render text layers on top of background color and image', () => {
+      const ctx = createMockCtx()
+      const fakeImage = { nodeName: 'IMG', naturalWidth: 100, naturalHeight: 100 }
+      const state = createInitialState()
+      const withImage = updateLayer(state, 'bg', {
+        image: fakeImage,
+        imageSrc: 'data:image/png;base64,TXT',
+      })
+      const withText = addLayer(withImage, createTextLayer({ text: 'Hello', x: 50, y: 100 }))
+      drawPoster(ctx, withText, 800, 600)
+      const fillTextCalls = ctx.calls.filter((c) => c.fn === 'fillText')
+      expect(fillTextCalls.length).toBe(1)
+      expect(fillTextCalls[0].args[0]).toBe('Hello')
+      const drawImageIndex = ctx.calls.findIndex((c) => c.fn === 'drawImage')
+      const fillTextIndex = ctx.calls.findIndex((c) => c.fn === 'fillText')
+      expect(drawImageIndex).toBeLessThan(fillTextIndex)
     })
   })
 })

@@ -360,6 +360,29 @@ describe('coverage-dashboard utils', () => {
       const result = calculateOverallCoverage(null)
       expect(result.statements).toBe(0)
     })
+
+    it('部分文件缺少 lines 字段时应只按有 lines 的文件加权', () => {
+      const makeLines = (count) => Array.from({ length: count }, (_, i) => ({ line: i + 1, code: '' }))
+      const files = [
+        { coverage: { statements: 20, lines: 20 }, lines: makeLines(100) },
+        { coverage: { statements: 80, lines: 80 } },
+        { coverage: { statements: 60, lines: 60 }, lines: makeLines(100) },
+      ]
+      const result = calculateOverallCoverage(files)
+      const expected = (100 * 20 + 100 * 60) / (100 + 100)
+      expect(result.lines).toBeCloseTo(expected, 0)
+      expect(result.statements).toBeCloseTo(expected, 0)
+    })
+
+    it('所有文件都缺少 lines 字段时返回全零', () => {
+      const files = [
+        { coverage: { statements: 80, lines: 80 } },
+        { coverage: { statements: 60, lines: 60 } },
+      ]
+      const result = calculateOverallCoverage(files)
+      expect(result.lines).toBe(0)
+      expect(result.statements).toBe(0)
+    })
   })
 
   describe('sortFilesByCoverage', () => {
@@ -803,7 +826,7 @@ describe('coverage-dashboard utils', () => {
       expect(buildDirectoryCoverage(undefined)).toBeNull()
     })
 
-    it('深层嵌套目录只遍历一次（结构验证）', () => {
+    it('深层嵌套目录结构验证', () => {
       const makeLines = (count) => Array.from({ length: count }, (_, i) => ({ line: i + 1, code: '' }))
       const tree = {
         name: 'L0',
@@ -846,6 +869,119 @@ describe('coverage-dashboard utils', () => {
       }
       expect(current.type).toBe('directory')
       expect(current.children[0].type).toBe('file')
+    })
+
+    it('每个节点只遍历一次（O(n) 单次遍历验证）', () => {
+      const makeLines = (count) => Array.from({ length: count }, (_, i) => ({ line: i + 1, code: '' }))
+      const visitedPaths = new Set()
+
+      const makeFile = (path, coverage, lineCount) => {
+        const file = {
+          name: path.split('/').pop(),
+          type: 'file',
+          path,
+          coverage,
+          lines: makeLines(lineCount),
+        }
+        return new Proxy(file, {
+          get(target, prop, receiver) {
+            if (prop === 'type') {
+              visitedPaths.add(target.path)
+            }
+            return Reflect.get(target, prop, receiver)
+          },
+        })
+      }
+
+      const makeDir = (path, children) => ({
+        name: path.split('/').pop(),
+        type: 'directory',
+        path,
+        children,
+      })
+
+      const tree = makeDir('root', [
+        makeDir('root/a', [
+          makeDir('root/a/x', [
+            makeFile('root/a/x/f1.js', { lines: 50 }, 10),
+            makeFile('root/a/x/f2.js', { lines: 60 }, 20),
+          ]),
+          makeDir('root/a/y', [
+            makeFile('root/a/y/f3.js', { lines: 70 }, 30),
+          ]),
+        ]),
+        makeDir('root/b', [
+          makeFile('root/b/f4.js', { lines: 80 }, 40),
+        ]),
+      ])
+
+      buildDirectoryCoverage(tree)
+
+      const expectedFiles = [
+        'root/a/x/f1.js',
+        'root/a/x/f2.js',
+        'root/a/y/f3.js',
+        'root/b/f4.js',
+      ]
+      expect(visitedPaths.size).toBe(expectedFiles.length)
+      expectedFiles.forEach((p) => expect(visitedPaths.has(p)).toBe(true))
+    })
+
+    it('每个节点只遍历一次（文件访问计数验证）', () => {
+      const makeLines = (count) => Array.from({ length: count }, (_, i) => ({ line: i + 1, code: '' }))
+      const visitedPaths = new Set()
+
+      const countingFile = (path, cov, lineCount) => ({
+        get type() {
+          visitedPaths.add(path)
+          return 'file'
+        },
+        name: path.split('/').pop(),
+        path,
+        coverage: { lines: cov },
+        lines: makeLines(lineCount),
+      })
+
+      const tree = {
+        type: 'directory',
+        name: 'root',
+        path: 'root',
+        children: [
+          {
+            type: 'directory',
+            name: 'sub1',
+            path: 'root/sub1',
+            children: [
+              countingFile('root/sub1/a.js', 50, 10),
+              countingFile('root/sub1/b.js', 80, 10),
+            ],
+          },
+          {
+            type: 'directory',
+            name: 'sub2',
+            path: 'root/sub2',
+            children: [
+              countingFile('root/sub2/c.js', 70, 10),
+              {
+                type: 'directory',
+                name: 'subsub',
+                path: 'root/sub2/subsub',
+                children: [
+                  countingFile('root/sub2/subsub/d.js', 90, 10),
+                ],
+              },
+            ],
+          },
+        ],
+      }
+
+      buildDirectoryCoverage(tree)
+
+      expect(visitedPaths.size).toBe(4)
+      expect(visitedPaths.has('root/sub1/a.js')).toBe(true)
+      expect(visitedPaths.has('root/sub1/b.js')).toBe(true)
+      expect(visitedPaths.has('root/sub2/c.js')).toBe(true)
+      expect(visitedPaths.has('root/sub2/subsub/d.js')).toBe(true)
     })
   })
 

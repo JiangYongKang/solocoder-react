@@ -258,7 +258,7 @@ function TaskDAGPage() {
     return {
       nodes: saved.nodes || [],
       edges: saved.edges || [],
-      toast: saved.error ? { message: '读取本地存储失败: ' + saved.error, type: 'error' } : null,
+      toast: saved.error ? { message: saved.error, type: 'error' } : null,
     }
   }, [])
 

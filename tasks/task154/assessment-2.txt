@@ -1,5 +1,5 @@
 产物不满意：无。
 
 过程不满意：
-1. 模型在首次修复搜索下拉联动问题时，选择了 useEffect 方案——在 searchKeyword 变化的副作用中调用 setShowSearch 来同步下拉可见性。这是一个架构选择错误，因为 showSearch 的取值完全可以从 searchFocused 和 searchKeyword 两个已有状态直接派生计算得出，不需要引入副作用管理。该方案在首次 lint 运行时即被 ESLint 的 React Compiler 规则拒绝，模型才切换到派生计算的正确方案。根本原因是在动手写代码前没有先分析 showSearch 的计算依赖：它不具有任何副作用语义，只是一个纯派生值。正确做法是先判断目标值能否由现有状态直接计算得出，能则用 useMemo 或行内表达式，不能才考虑 useEffect。
-2. 模型对 index.jsx 同一个文件的搜索下拉修复执行了六次独立的文件编辑操作：第一次加入 useEffect 方案、第二次引入 searchFocused 状态、第三次移除 useEffect 并添加 showSearch 派生逻辑、第四次修改点击外部处理函数、第五次修改 handleSearchSelect、第六次修改 onFocus 处理器。这六次编辑本质上是一个完整的逻辑重构——将直接控制的 showSearch 状态替换为 searchFocused 加派生计算的模式，完全可以在一次文件编辑中整体完成。碎片化编辑增加了漏改旧变量引用的风险，也增加了中间态不一致的可能性。正确做法是先完整阅读文件，在脑海中规划好所有需要修改的点位，再执行一次或至多两次整体性编辑。
+1. 模型首次修复搜索下拉时选了 useEffect 在 searchKeyword 副作用中调 setShowSearch。这是架构选择错误，showSearch 完全可由 searchFocused 和 searchKeyword 直接派生，不需要副作用。该方案首次 lint 因 React Compiler 被拒后才切到派生。原因是动手前没分析计算依赖：它只是纯派生值。应先判断能否由现有状态直接计算，能则用 useMemo 或行内表达式，不能才考虑 useEffect。
+2. 模型对 index.jsx 搜索下拉修复执行了六次独立编辑：加入 useEffect、引入 searchFocused、移除 useEffect 添派生逻辑、修改外部点击处理、修改 handleSearchSelect、修改 onFocus。这六次本质是一个完整重构——将直接控制的 showSearch 替换为 searchFocused 加派生计算，一次编辑就能完成。碎片化编辑增加漏改旧引用的风险和中间态不一致可能。应先完整阅读文件，规划好所有修改点，再执行一到两次整体编辑。

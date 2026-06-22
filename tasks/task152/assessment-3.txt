@@ -1,7 +1,7 @@
 产物不满意：
-1. buildDirectoryCoverage 内部的 traverse 函数中，目录节点通过 childResults.forEach 累加了 totalLines 字段并存入 subtreeData，但父级目录在遍历子节点时只消费 subtreeData.fileCount 和 subtreeData.weightedItems，从未读取 subtreeData.totalLines 的值。外层 buildDirectoryCoverage 也只返回 result.node 丢弃了整份 subtreeData。totalLines 的累加和存储全程未被使用，属于无效死代码，每次聚合都产生不必要的计算开销。应删除 totalLines 的累加逻辑以及 subtreeData 中的字段定义，或在界面中实际展示该值。
+1. buildDirectoryCoverage 的 traverse 函数中，目录节点通过 childResults.forEach 累加了 totalLines 存入 subtreeData，但父级遍历子节点时只读 fileCount 和 weightedItems，从未用 totalLines。外层也只返回 result.node 丢弃了整个 subtreeData。totalLines 的累加全程未使用，是死代码，每次聚合都白做计算。应删除其累加逻辑和字段定义，或在界面中实际展示。
 2. 测试用例"深层嵌套目录只遍历一次（结构验证）"仅通过断言各层级目录的 fileCount 和 coverage.lines 数值是否正确来验证计算结果的正确性，并没有对 traverse 的调用次数或文件节点的访问次数做任何验证。测试名称中"只遍历一次"是一个关于性能特征的断言，但当前测试代码完全无法证实它，名称与实际验证内容严重脱节，存在误导性。如果要验证遍历次数，应在 traverse 中加入计数器或使用 spy 来确认每个文件节点只被访问一次。
-3. calculateOverallCoverage 函数改为调用 calculateWeightedAverageCoverage 后，依赖文件的 lines 数据来计算权重。当传入的 files 数组中某个文件缺少 lines 字段时，该文件的 totalLines 被设为 0，在加权计算中权重为 0 被直接跳过，相当于该文件被静默排除在总体覆盖率计算之外。但 calculateOverallCoverage 的测试用例中所有 mockFiles 都携带了 lines 数据，完全未覆盖"部分文件缺少 lines 字段"的边界情况，如果模拟数据生成逻辑变更导致某些文件缺少 lines，整体覆盖率数值可能无预警地发生偏移。
+3. calculateOverallCoverage 改为加权后依赖文件 lines 数据算权重，当某文件缺 lines 时 totalLines 为 0、权重为 0 被跳过，该文件被静默排除在总体覆盖率外。但测试中所有 mockFiles 都带了 lines，完全没覆盖缺 lines 的边界情况。若数据生成逻辑变更导致缺字段，整体覆盖率数值可能无预警偏移。
 
 过程不满意：
 模型在刚收到提示词后，第一步操作是创建 TodoList（5 个待办事项），然后才打开 utils.js 阅读现有代码。按照标注规范的要求，应先阅读相关文件和 git diff 了解当前实现状态、确认问题根因，再制定修复计划。提前创建 TodoList 可能导致计划与代码实际状况不符，例如规划了不必要的步骤或遗漏了关键修复点。正确做法是先通过代码审查明确两个问题的具体位置和影响范围，再基于分析结果制定 TodoList。

@@ -1,5 +1,5 @@
 产物不满意：
-1. index.jsx 中搜索框下拉展示逻辑存在缺陷：showSearch 状态仅在 onFocus 事件中当 searchKeyword 已有内容时设为 true，而 onChange 仅更新 searchKeyword 不调用 setShowSearch。当用户首次点击搜索框并输入关键词时，searchResults 虽通过 useMemo 正确计算了匹配结果，但因 showSearch 为 false，下拉列表不显示。用户必须先失焦再重新聚焦才能看到结果，违反提示词第 2 条"输入地址关键词后展示匹配结果"的要求。根本原因是搜索结果可见性仅绑定在聚焦事件上，未在输入变更时同步触发。正确做法是在 onChange 中也判断有内容时调用 setShowSearch(true)，使下拉即时展现。
+1. index.jsx 搜索框下拉有缺陷：showSearch 仅在 onFocus 中当 keyword 有内容时设 true，onChange 只更新 keyword 不调 setShowSearch。首次点击搜索框输入关键词时，searchResults 通过 useMemo 正确计算，但 showSearch 为 false 下拉不显示，必须先失焦再聚焦才看到。原因是可见性仅绑在聚焦事件，未在输入变更时同步触发。应在 onChange 中也判有内容时设 showSearch 为 true。
 2. addressData.js 的 ADDRESS_DATA 末尾存在残留数据 `'510000_extra': null`，虽然 getProvinces 函数中 filter 条件和 fuzzyMatchAddresses 中的空值守卫均过滤掉了该条目，功能上未造成错误，但它作为一个无效键值对存在于数据源中，属于未被清理的拷贝残留。根本原因是模型在构建大型数据对象后没有做文件末尾审查来清理异常键。正确做法是数据编辑完成后回扫全文，删除所有无效或测试用的残留条目。
 
 过程不满意：

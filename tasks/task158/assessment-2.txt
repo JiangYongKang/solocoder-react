@@ -1,5 +1,5 @@
-产物不满意：handleTemplateChange 修复后在 index.jsx 中同时调用了 setSelectedTemplate 和 setDraft(getTemplateContent(templateId))，实现了切换模板联动填充三栏编辑区，功能正确。但该修复引入了数据丢失风险：当用户已在编辑区输入了自定义内容后切换模板，所有编辑成果被静默覆盖且无法恢复。同时 saveCurrentDraft 的 useEffect 会把被覆盖后的模板内容持久化到 localStorage，导致刷新页面后原草稿彻底丢失。虽然提示词要求切换模板联动填充，但应增加切换确认弹窗或在 draft 为空时才触发覆盖操作，避免切换模板导致用户编辑成果意外丢失。
+产物不满意：handleTemplateChange 修复后实现了切换模板联动填充三栏编辑区，功能正确。但引入了数据丢失风险：当已在编辑区输入了自定义内容后切换模板，所有编辑成果被静默覆盖且无法恢复。saveCurrentDraft 的 useEffect 会把被覆盖后的模板存到 localStorage，刷新后原草稿彻底丢失。虽提示词要求切换联动填充，但应加切换确认弹窗或在 draft 为空时才覆盖，避免编辑成果意外丢失。
 
 过程不满意：
-1. 模型在最终验证阶段执行了 `pnpm test -- src/pages/__tests__/weekly-report/ ; pnpm build undefined` 命令，命令末尾出现了 `undefined` 字面量，说明模型在构造 Shell 命令时存在模板变量未被正确解析替换的问题。虽然该命令因 `pnpm test` 部分正常执行而返回了成功结果，但 `pnpm build undefined` 部分完全无效，模型在回复中声称"项目构建成功"是基于错误命令得出的虚假结论，没有检查命令中 `undefined` 是否影响执行结果。正确做法是确认命令字符串中不含未解析的模板占位符后再执行，并逐条检查命令输出而非仅看退出码。
-2. 模型在规划修复方案时只阅读了 index.jsx、utils.test.js 和 storage.test.js 三个文件，在修改 handleTemplateChange 函数时直接调用了 getTemplateContent 方法，但没有阅读 utils.js 确认该函数确实存在及其返回值的字段结构与 draft 的 state 结构是否兼容。虽然本轮修复恰好正确，但这种跳过依赖文件验证的行为在更复杂的修复中可能因为函数签名变化或不存在的导出导致运行时错误。正确做法是在调用跨文件函数前先用读取工具确认目标文件中的函数定义和导出情况。
+1. 模型最终验证执行了 pnpm test ...; pnpm build undefined，命令末尾出现了 undefined 字面量，说明构造 Shell 命令时模板变量未被正确解析。虽然 test 正常执行返回成功，但 build undefined 完全无效，模型声称"项目构建成功"是基于错误命令的虚假结论，没检查 undefined 是否影响结果。应确认命令不含未解析占位符后再执行，并逐条检查输出而非仅看退出码。
+2. 模型规划修复时只读了 index.jsx、utils.test.js 和 storage.test.js，修改 handleTemplateChange 时直接调了 getTemplateContent，但没读 utils.js 确认该函数确实存在且返回值结构与 draft state 兼容。虽本轮恰好正确，但跳过依赖文件验证在更复杂修复中可能因函数签名变化导致运行时错误。调用跨文件函数前应先确认目标文件中的函数定义和导出情况。

@@ -1,7 +1,7 @@
 产物不满意：
-触发节点：用户已上传背景图片后，通过背景色文本输入框或颜色选择器修改背景色时。实际行为：`handleBgColorTextChange` 在调用 `updateLayer` 更新背景色时传入了 `image: null`，强制清除已有背景图片，`handleBgColorTextCommit` 和 `handleBgColorPickerChange` 同样包含 `image: null`。业务影响：用户修改背景色时背景图片被无条件清除，而 `handleRemoveBgImage` 已提供了独立的移除图片按钮，颜色变更和图片移除本应互不影响。根本原因：提示词只要求添加颜色格式校验，但模型擅自扩展了变更范围，在三个颜色处理函数中追加了 `image: null`。解决方案：从三个函数中移除 `image: null`，只保留颜色属性更新。
+触发节点：已上传背景图片后，通过背景色文本框或颜色选择器改背景色时。实际行为：handleBgColorTextChange 等三个函数在 updateLayer 时额外传了 image: null，强制清除了已有背景图片。业务影响：改背景色误清图片，而 handleRemoveBgImage 已有独立移除按钮，颜色变更和图片移除本应互不影响。根本原因：提示词只要求加格式校验，模型擅自扩展范围追加了 image: null。解决方案：移除三个函数中的 image: null，只保留颜色更新。
 
 过程不满意：
 1. 模型在 session-2 第一个工具调用就创建了 TodoList，然后才读取 posterDesignerCore.js 和 index.jsx 分析问题根因。这种先规划后分析的模式在 assessment-1 中已被标记为空洞规划问题，但模型在本轮完全重复了同样的行为。正确做法是先读取代码文件定位根因和影响范围，再根据分析结果创建有针对性的 TodoList。
-2. 模型在 session-2 修改 index.jsx 时，StrReplace 的 `old_string` 匹配范围过于宽泛，导致 `selectedLayer`、`canvasScale`、`textSelectionBox`、`resizeObserver`、`redraw`、`commitHistory` 等重要代码段被意外覆盖删除。模型随后不得不花费多轮额外的读-补-删操作来恢复被覆盖的代码并清理产生的重复 keydown effect，说明模型对 StrReplace 工具的边界控制能力不足。正确做法是让 old_string 精确匹配最小变更块，修改后立即确认结果。
+2. 模型修改 index.jsx 时 StrReplace 的 old_string 匹配范围太宽，导致 selectedLayer、canvasScale 等代码段被意外覆盖删除，随后花多轮操作恢复并清理产生的重复 keydown effect。说明 StrReplace 边界控制不足。应让 old_string 精确匹配最小变更块，修改后立即确认结果。
 3. 模型在 session-2 准备添加 CSS 样式时，连续三次读取 `poster-designer.css` 文件，三次读取之间没有任何代码修改操作，属于无意义的重复工具调用。正确做法是使用 Grep 先搜索 CSS 中的已有类名确定目标位置，再定向读取相关区域而非全量反复读取。

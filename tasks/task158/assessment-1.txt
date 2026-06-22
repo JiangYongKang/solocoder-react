@@ -1,7 +1,7 @@
 产物不满意：
-1. 用户在下拉菜单中切换模板后，handleTemplateChange 函数只更新了 selectedTemplate 状态，没有调用 getTemplateContent 获取新模板内容并同步到 draft 中，导致下拉切换后三栏编辑区内容没有任何变化，必须额外点击"重置为模板"按钮才能看到模板内容。提示词第2条明确要求"选择模板后对应栏中预填模板的结构化内容作为引导"，当前实现未满足该需求。正确做法是在 handleTemplateChange 中同时调用 getTemplateContent 获取对应模板内容并用 setDraft 更新编辑器状态。
+1. 下拉菜单中切换模板后，handleTemplateChange 只更新了 selectedTemplate，没调 getTemplateContent 获取模板内容同步到 draft，导致切换后三栏编辑区内容没变化，必须额外点击"重置为模板"按钮才能看到内容。提示词第 2 条明确要求"选择模板后预填模板内容作为引导"，当前未满足。应在 handleTemplateChange 中同时调 getTemplateContent 并用 setDraft 更新编辑器状态。
 2. utils.test.js 文件第1行从 vitest 导入了 `beforeEach`，但该测试文件中所有测试用例均直接在内联构造测试数据，没有任何用例使用 beforeEach 做前置准备，ESLint 报出 `'beforeEach' is defined but never used` 错误。根本原因是模型编写测试时按习惯导入了全套 Vitest 工具函数，但写完测试后未运行 lint 检查测试文件，或者检查了但忽略了该告警，导致未使用的导入残留在产物中。
 
 过程不满意：
 1. 模型在修改 App.jsx 添加周报生成器路由和任务卡片时，首次编辑操作产生了语法错误导致 App.jsx 文件损坏，随后重新读取文件内容定位到错误行才修复完成。这表明模型在执行结构性修改（在已有大段代码中插入新的 import、TASKS 条目和 Route 配置）时，首次编辑的上下文匹配不够严谨，直接使用 search_replace 却未充分验证替换字符串的唯一性和完整性，造成语法级回退修复。正确做法是查看目标插入位置前后的完整上下文后再构造替换字符串，确保一次修改成功。
-2. 模型在首次运行 lint 后发现 utils.js 中存在正则表达式中不必要的转义字符告警，随后对该文件执行了两次 edit_file_search_replace 操作试图修复，但修复完成后只运行了 `pnpm test` 和 `pnpm build`，没有重新运行 `pnpm lint` 确认修复是否生效。虽然 utils.js 当前 lint 检查结果为 0 错误，但模型在修复后跳过验证环节的做法风险较高——如果修复不完整或引入了新问题，依赖测试和构建无法替代 lint 对此类代码风格问题的验证。
+2. 模型首次 lint 发现 utils.js 正则有不必要转义字符告警，执行两次 edit_file_search_replace 修复后只跑了 pnpm test 和 pnpm build，没重新跑 pnpm lint 确认修复是否生效。虽 utils.js 当前 lint 为零，但修复后跳过验证风险较高——若修复不完整或引入新问题，测试和构建无法替代 lint 对此类风格问题的验证。

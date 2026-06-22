@@ -1,6 +1,6 @@
 产物不满意：
-1. posterDesignerCore.js 的 pushHistory 函数通过 `JSON.parse(JSON.stringify(state))` 深克隆状态做历史快照，但 background 图层的 `image` 属性是 HTMLImageElement 类型的 DOM 对象，JSON.stringify 无法序列化 DOM 对象，会将其转成空对象 `{}`。当用户上传背景图片后执行 Ctrl+Z 撤销，undo 恢复的快照中 `bg.image` 为 `{}`，drawPoster 的 `if (bg.image)` 对空对象判定为真进入 drawImage 分支，执行 `ctx.drawImage({})` 触发 TypeError，整个 Canvas 渲染崩溃页面白屏。根本原因是深克隆方案未处理不可序列化对象。正确做法是在快照中保留 imageSrc 数据 URL 替代 image，undo 恢复时从 imageSrc 重建 Image 对象。
-2. index.jsx 的 `handleBgColorChange` 将颜色文本输入框的原始值直接写入 layer.color 属性，没有任何格式校验。用户误输入 `zzz` 等非法字符串后，drawPoster 中 `ctx.fillStyle` 对无效颜色静默忽略，导致图层不渲染，文字颜色、描边颜色、阴影颜色的十六进制文本输入框存在同样缺陷。根本原因是未对自由文本输入做防错处理。正确做法是在写入状态前用正则校验 hex 格式，不合法时阻止更新并提示用户。
+1. posterDesignerCore.js 的 pushHistory 用 JSON 深克隆做历史快照，background 图层的 image 是 DOM 对象无法被 JSON.stringify 序列化，会转成 {}。上传背景图后 Ctrl+Z 撤销，undo 的快照中 bg.image 为 {}，ctx.drawImage({}) 触发 TypeError 导致白屏。原因是深克隆未处理不可序列化对象。应在快照保留 imageSrc，undo 时从 imageSrc 重建 Image。
+1. index.jsx 的 `handleBgColorChange` 将颜色文本输入框的原始值直接写入 layer.color 属性，没有任何格式校验。误输入 `zzz` 等非法字符串后，drawPoster 中 `ctx.fillStyle` 对无效颜色静默忽略，导致图层不渲染，文字颜色、描边颜色、阴影颜色的十六进制文本输入框存在同样缺陷。根本原因是未对自由文本输入做防错处理。正确做法是在写入状态前用正则校验 hex 格式，不合法时阻止更新并给出提示。
 
 过程不满意：
 1. 模型收到提示词后第一个工具调用就创建了包含 6 项的 TodoList，然后才读取 App.jsx、package.json、whiteboard 等文件了解项目结构。TodoList 建立在需求分析和代码探索之前，规划缺乏对项目路由模式、ESLint 配置、核心逻辑文件命名惯例的了解，属于空洞规划。正确做法是先读项目骨架和类似页面实现，确认约束后再制定计划。

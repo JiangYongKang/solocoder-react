@@ -1,3 +1,3 @@
-产物不满意："图片绘制异常不崩溃"用例替换 ctx.drawImage 为抛出异常的函数来模拟故障，断言 drawPoster 不抛异常且 fillRect 执行过，但 mock 对象的 calls 数组已完整记录了 save 和 restore 的每次调用，测试却未校验二者的调用次数是否相等。实际上 drawPoster 在 drawImage 抛异常时 try 块中 ctx.save 已执行但 ctx.restore 被跳过，catch 块中仅有一条注释未补充 restore，导致 Canvas 上下文状态栈出现不平衡。若测试额外验证 saveCalls 与 restoreCalls 数量一致即可自动暴露此状态泄漏，但该断言缺失使测试通过了存在 save 与 restore 不配对的生产代码。
+产物不满意："图片绘制异常不崩溃"测试替换 ctx.drawImage 为抛异常函数，断言不崩溃且 fillRect 执行过。mock 对象已记录 save 和 restore 调用，测试没校验两者次数是否相等。drawPoster 在 drawImage 抛异常时 save 已执行但 restore 被跳过，catch 只有注释没 restore，Canvas 状态栈不平衡。若验证 saveCalls 与 restoreCalls 一致就能暴露问题，断言缺失让有问题的代码通过了。
 
 过程不满意：模型在查看两个文件后未做任何问题分析或任务规划，直接编辑测试文件追加代码。首次运行 vitest 和 eslint 即暴露两个基础错误：import 语句遗漏了新增函数 drawPoster 的导入，以及测试组内定义了一个 fillStyleCalls 变量但未在任何断言中使用。这说明模型添加了 drawPoster 调用却未同步更新顶层 import 列表，设计了中间收集变量但在改换验证策略后没有清理废弃代码。两处错误迫使模型额外两轮修复才通过全部校验，反映出"编辑完即自检"的基本步骤缺失。

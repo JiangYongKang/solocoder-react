@@ -16,14 +16,26 @@ const HEART_COLORS = ['#ff4d6d', '#ff006e', '#ff70a6', '#ff9770', '#ffd670', '#e
 export function LikeButton({ likeCount, setLikeCount }) {
   const [hearts, setHearts] = useState([]);
   const autoLikeRef = useRef(null);
+  const heartsLayerRef = useRef(null);
+  const btnRef = useRef(null);
+  const heartTimersRef = useRef([]);
 
   useEffect(() => {
     autoLikeRef.current = setInterval(() => {
       const inc = 1 + Math.floor(Math.random() * 3);
       setLikeCount((prev) => (prev || LIVE_STATS_INITIAL.likeCount) + inc);
     }, 1500);
-    return () => autoLikeRef.current && clearInterval(autoLikeRef.current);
+    return () => {
+      autoLikeRef.current && clearInterval(autoLikeRef.current);
+      heartTimersRef.current.forEach((id) => clearTimeout(id));
+      heartTimersRef.current = [];
+    };
   }, [setLikeCount]);
+
+  const registerHeartTimer = (id) => {
+    if (id != null) heartTimersRef.current.push(id);
+    return id;
+  };
 
   const spawnHeart = (originX, originY) => {
     const id = `heart-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -37,18 +49,23 @@ export function LikeButton({ likeCount, setLikeCount }) {
       return next.slice(-LIKE_MAX_FLOATING);
     });
 
-    setTimeout(() => {
+    registerHeartTimer(setTimeout(() => {
       setHearts((prev) => prev.filter((h) => h.id !== id));
-    }, duration + 100);
+    }, duration + 100));
   };
 
-  const handleClick = (e) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const containerRect = e.currentTarget.offsetParent?.getBoundingClientRect() || { left: 0, top: 0 };
-    const x = rect.left + rect.width / 2 - containerRect.left;
-    const y = rect.top + rect.height / 2 - containerRect.top;
+  const handleClick = () => {
+    const layerRect = heartsLayerRef.current?.getBoundingClientRect();
+    const btnRect = btnRef.current?.getBoundingClientRect();
+    if (!layerRect || !btnRect) return;
+
+    const centerX = btnRect.left + btnRect.width / 2;
+    const centerY = btnRect.top + btnRect.height / 2;
+    const x = centerX - layerRect.left;
+    const y = centerY - layerRect.top;
+
     for (let i = 0; i < 3; i++) {
-      setTimeout(() => spawnHeart(x, y), i * 60);
+      registerHeartTimer(setTimeout(() => spawnHeart(x, y), i * 60));
     }
     setLikeCount((prev) => (prev || LIVE_STATS_INITIAL.likeCount) + 1);
   };
@@ -61,7 +78,7 @@ export function LikeButton({ likeCount, setLikeCount }) {
 
   return (
     <div className="ls-like-container">
-      <div className="ls-hearts-layer">
+      <div className="ls-hearts-layer" ref={heartsLayerRef}>
         {hearts.map((h) => (
           <span
             key={h.id}
@@ -79,7 +96,7 @@ export function LikeButton({ likeCount, setLikeCount }) {
           </span>
         ))}
       </div>
-      <button className="ls-like-btn" onClick={handleClick} aria-label="点赞">
+      <button className="ls-like-btn" ref={btnRef} onClick={handleClick} aria-label="点赞">
         <span className="ls-like-icon">❤️</span>
         <span className="ls-like-count">{formatCount(likeCount || LIVE_STATS_INITIAL.likeCount)}</span>
       </button>
@@ -90,22 +107,33 @@ export function LikeButton({ likeCount, setLikeCount }) {
 export function OnlineCounter() {
   const [count, setCount] = useState(() => generateInitialOnlineCount());
   const [isIncreasing, setIsIncreasing] = useState(true);
+  const timersRef = useRef([]);
+  const prevValueRef = useRef(count);
 
   useEffect(() => {
-    let timer;
+    const registerTimer = (id) => {
+      if (id != null) timersRef.current.push(id);
+      return id;
+    };
+
     const tick = () => {
-      setCount((prev) => {
-        const next = nextOnlineCount(prev);
-        setIsIncreasing(next >= prev);
-        return next;
-      });
+      const prev = prevValueRef.current;
+      const next = nextOnlineCount(prev);
+      setIsIncreasing(next >= prev);
+      prevValueRef.current = next;
+      setCount(next);
       const nextInterval =
         ONLINE_CHANGE_INTERVAL_MIN +
         Math.random() * (ONLINE_CHANGE_INTERVAL_MAX - ONLINE_CHANGE_INTERVAL_MIN);
-      timer = setTimeout(tick, nextInterval);
+      registerTimer(setTimeout(tick, nextInterval));
     };
-    timer = setTimeout(tick, 2000);
-    return () => timer && clearTimeout(timer);
+
+    registerTimer(setTimeout(tick, 2000));
+
+    return () => {
+      timersRef.current.forEach((id) => clearTimeout(id));
+      timersRef.current = [];
+    };
   }, []);
 
   return (

@@ -1,51 +1,49 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  DEFAULT_GRID_SIZE,
-  MIN_GRID_SIZE,
-  MAX_GRID_SIZE,
-  DEFAULT_CELL_SIZE,
-  DEFAULT_FOREGROUND_COLOR,
-  DEFAULT_BACKGROUND_COLOR,
-  DEFAULT_GRID_LINE_COLOR,
-  DEFAULT_CHARACTER_SPACING,
-  MIN_CHARACTER_SPACING,
-  MAX_CHARACTER_SPACING,
-  DEFAULT_FONT_FAMILY,
-  DEFAULT_PREVIEW_TEXT,
-  DEFAULT_CHARACTERS,
+    DEFAULT_BACKGROUND_COLOR,
+    DEFAULT_CELL_SIZE,
+    DEFAULT_CHARACTER_SPACING,
+    DEFAULT_CHARACTERS,
+    DEFAULT_FONT_FAMILY,
+    DEFAULT_FOREGROUND_COLOR,
+    DEFAULT_GRID_LINE_COLOR,
+    DEFAULT_GRID_SIZE,
+    DEFAULT_PREVIEW_TEXT,
+    MAX_CHARACTER_SPACING,
+    MAX_GRID_SIZE,
+    MIN_CHARACTER_SPACING,
+    MIN_GRID_SIZE,
 } from './constants.js'
-import {
-  createEmptyGlyph,
-  cloneGlyph,
-  togglePixel,
-  setPixel,
-  resizeGlyph,
-  renderGlyphToCanvas,
-  renderPreviewText,
-  getCellFromMouseEvent,
-  generateCSSFontFace,
-  exportToJSON,
-  validateAndParseJSON,
-  initializeGlyphs,
-  addCharacter,
-  removeCharacter,
-  saveFontData,
-  loadFontData,
-  copyToClipboard,
-  downloadJSONFile,
-  isGlyphEmpty,
-  countFilledPixels,
-  flipGlyphHorizontal,
-  flipGlyphVertical,
-  rotateGlyph90,
-  shiftGlyph,
-  clearGlyph,
-  getCharacterFromCodePoint,
-  getCodePointString,
-  validateGridSize,
-} from './pixelFontCore.js'
 import './pixel-font.css'
+import {
+    addCharacter,
+    clearGlyph,
+    copyToClipboard,
+    countFilledPixels,
+    createEmptyGlyph,
+    downloadJSONFile,
+    exportToJSON,
+    flipGlyphHorizontal,
+    flipGlyphVertical,
+    generateCSSFontFace,
+    getCellFromMouseEvent,
+    getCharacterFromCodePoint,
+    getCodePointString,
+    initializeGlyphs,
+    isGlyphEmpty,
+    loadFontData,
+    removeCharacter,
+    renderGlyphToCanvas,
+    renderPreviewText,
+    resizeGlyph,
+    rotateGlyph90,
+    saveFontData,
+    setPixel,
+    shiftGlyph,
+    validateAndParseJSON,
+    validateGridSize,
+} from './pixelFontCore.js'
 
 function PixelFontPage() {
   const navigate = useNavigate()
@@ -622,7 +620,7 @@ function PixelFontPage() {
               </button>
             </div>
             <div className="pixel-font-character-grid">
-              {Object.entries(glyphs).map(([char, data]) => (
+              {Object.entries(glyphs).map(([char]) => (
                 <div
                   key={char}
                   className={`pixel-font-character-item ${currentChar === char ? 'pixel-font-character-item--active' : ''}`}

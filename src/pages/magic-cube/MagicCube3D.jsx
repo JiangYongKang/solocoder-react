@@ -56,7 +56,7 @@ function Cubie({ x, y, z, colors, rotation }) {
   )
 }
 
-export default function MagicCube3D({ faces, viewRotation, animatingFace, animatingClockwise, animationProgress }) {
+export default function MagicCube3D({ faces, viewRotation, zoom = 1, animatingFace, animatingClockwise, animationProgress }) {
   const cubies = []
 
   let animationTransform = ''
@@ -125,7 +125,7 @@ export default function MagicCube3D({ faces, viewRotation, animatingFace, animat
     }
   }
 
-  const cubeTransform = `rotateX(${viewRotation.x}deg) rotateY(${viewRotation.y}deg)`
+  const cubeTransform = `rotateX(${viewRotation.x}deg) rotateY(${viewRotation.y}deg) scale(${zoom})`
 
   return (
     <div className="magic-cube-3d" style={{ transform: cubeTransform }}>

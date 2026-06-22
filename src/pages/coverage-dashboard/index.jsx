@@ -9,7 +9,6 @@ import TrendChart from './TrendChart'
 
 import {
   generateMockFileTree,
-  generateMockSummary,
   generateMockTrendData,
 } from './mockData'
 
@@ -20,6 +19,9 @@ import {
   getCoverageStats,
   countFiles,
   countDirectories,
+  countTotalLines,
+  countCoveredLines,
+  countTestedFiles,
 } from './utils'
 
 import { VIEW_MODES, COVERAGE_COLORS, METRIC_KEYS } from './constants'
@@ -28,7 +30,6 @@ const CoverageDashboard = () => {
   const navigate = useNavigate()
 
   const [fileTree] = useState(() => generateMockFileTree())
-  const [summary] = useState(() => generateMockSummary())
   const [trendData] = useState(() => generateMockTrendData())
   const [viewMode, setViewMode] = useState(VIEW_MODES.FILE_TREE)
   const [selectedFile, setSelectedFile] = useState(null)
@@ -41,6 +42,9 @@ const CoverageDashboard = () => {
   const coverageStats = useMemo(() => getCoverageStats(allFiles), [allFiles])
   const totalFiles = useMemo(() => countFiles(fileTree), [fileTree])
   const totalDirs = useMemo(() => countDirectories(fileTree), [fileTree])
+  const totalLines = useMemo(() => countTotalLines(allFiles), [allFiles])
+  const coveredLines = useMemo(() => countCoveredLines(allFiles), [allFiles])
+  const testedFiles = useMemo(() => countTestedFiles(allFiles), [allFiles])
 
   const handleFileSelect = (file) => {
     setSelectedFile(file)
@@ -95,13 +99,13 @@ const CoverageDashboard = () => {
         </div>
         <div className="cv-summary-card">
           <div className="cv-summary-label">已测试文件</div>
-          <div className="cv-summary-value">{summary.testedFiles}</div>
-          <div className="cv-summary-sub">覆盖率: {((summary.testedFiles / totalFiles) * 100).toFixed(1)}%</div>
+          <div className="cv-summary-value">{testedFiles}</div>
+          <div className="cv-summary-sub">覆盖率: {totalFiles > 0 ? ((testedFiles / totalFiles) * 100).toFixed(1) : '0.0'}%</div>
         </div>
         <div className="cv-summary-card">
           <div className="cv-summary-label">代码总行数</div>
-          <div className="cv-summary-value">{summary.totalLines}</div>
-          <div className="cv-summary-sub">已覆盖: {summary.coveredLines} 行</div>
+          <div className="cv-summary-value">{totalLines}</div>
+          <div className="cv-summary-sub">已覆盖: {coveredLines} 行</div>
         </div>
         <div className="cv-summary-card">
           <div className="cv-summary-label">覆盖率分布</div>

@@ -238,7 +238,14 @@ describe('magicCubeCore - Center pieces never change', () => {
 describe('magicCubeCore - Scramble and Solution', () => {
   describe('generateScramble', () => {
     it('should generate exactly SCRAMBLE_STEPS moves', () => {
-      const moves = generateScramble(() => 0)
+      const mockRandom = (() => {
+        let counter = 0
+        return () => {
+          counter++
+          return (counter % 6) / 6
+        }
+      })()
+      const moves = generateScramble(mockRandom)
       expect(moves.length).toBe(SCRAMBLE_STEPS)
     })
 

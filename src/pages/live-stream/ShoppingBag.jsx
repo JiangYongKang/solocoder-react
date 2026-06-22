@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   addToBag,
   updateBagQuantity,
@@ -17,8 +17,37 @@ export default function ShoppingBag({
   isOpen,
   setIsOpen,
 }) {
+  const perProductRef = useRef(new Map());
   const [addQuantity, setAddQuantity] = useState(1);
   const [selectedSpecs, setSelectedSpecs] = useState(() => getInitialSpecs(currentProduct));
+
+  useEffect(() => {
+    if (!currentProduct) return;
+    const cached = perProductRef.current.get(currentProduct.id);
+    if (cached) {
+      setSelectedSpecs(cached.selectedSpecs);
+      setAddQuantity(cached.addQuantity);
+    } else {
+      const defaults = {
+        selectedSpecs: getInitialSpecs(currentProduct),
+        addQuantity: 1,
+      };
+      perProductRef.current.set(currentProduct.id, defaults);
+      setSelectedSpecs(defaults.selectedSpecs);
+      setAddQuantity(defaults.addQuantity);
+    }
+  }, [currentProduct]);
+
+  const syncCache = (patch = {}) => {
+    if (!currentProduct) return;
+    const existing = perProductRef.current.get(currentProduct.id) || {};
+    perProductRef.current.set(currentProduct.id, {
+      selectedSpecs,
+      addQuantity,
+      ...existing,
+      ...patch,
+    });
+  };
 
   const count = calcBagCount(bag);
   const totalInfo = calcBagTotal(bag, coupons);
@@ -28,7 +57,9 @@ export default function ShoppingBag({
   const handleAddCurrent = () => {
     if (!currentProduct) return;
     setBag((prev) => addToBag(prev, currentProduct, selectedSpecs, addQuantity));
-    setAddQuantity(1);
+    const resetQty = 1;
+    setAddQuantity(resetQty);
+    syncCache({ addQuantity: resetQty });
   };
 
   const handleQuantityChange = (cartItemId, delta) => {
@@ -47,7 +78,19 @@ export default function ShoppingBag({
   };
 
   const handleSpecChange = (specName, option) => {
-    setSelectedSpecs((prev) => ({ ...prev, [specName]: option }));
+    setSelectedSpecs((prev) => {
+      const next = { ...prev, [specName]: option };
+      syncCache({ selectedSpecs: next });
+      return next;
+    });
+  };
+
+  const handleSetAddQty = (updater) => {
+    setAddQuantity((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      syncCache({ addQuantity: next });
+      return next;
+    });
   };
 
   return (
@@ -112,11 +155,11 @@ export default function ShoppingBag({
             <span>数量</span>
             <div className="ls-qty-ctrl">
               <button
-                onClick={() => setAddQuantity((q) => Math.max(1, q - 1))}
+                onClick={() => handleSetAddQty((q) => Math.max(1, q - 1))}
                 disabled={addQuantity <= 1}
               >-</button>
               <span>{addQuantity}</span>
-              <button onClick={() => setAddQuantity((q) => q + 1)}>+</button>
+              <button onClick={() => handleSetAddQty((q) => q + 1)}>+</button>
             </div>
             <button className="ls-btn-primary ls-add-btn" onClick={handleAddCurrent}>
               加入购物袋

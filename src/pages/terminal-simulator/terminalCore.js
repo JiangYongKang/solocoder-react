@@ -149,58 +149,78 @@ export function parseCommand(input) {
   }
 }
 
+const PATH_TAKING_COMMANDS = new Set([COMMANDS.CD, COMMANDS.CAT, COMMANDS.LS, COMMANDS.MKDIR])
+
 export function tokenizeForHighlight(commandStr) {
   if (!commandStr) {
     return []
   }
 
-  const { command, args } = parseCommand(commandStr)
   const tokens = []
+  let i = 0
 
-  if (command) {
-    const isSupported = SUPPORTED_COMMANDS.includes(command)
-    tokens.push({
-      type: isSupported ? 'command' : 'command-unknown',
-      value: command,
-    })
+  while (i < commandStr.length && commandStr[i] === ' ') {
+    i++
   }
 
-  let processedLength = command.length
+  const cmdStart = i
+  while (i < commandStr.length && commandStr[i] !== ' ') {
+    i++
+  }
+  const cmdValue = commandStr.slice(cmdStart, i)
 
-  for (const arg of args) {
-    const remaining = commandStr.slice(processedLength)
-    const argStart = remaining.indexOf(arg)
-    if (argStart > 0) {
-      tokens.push({
-        type: 'whitespace',
-        value: remaining.slice(0, argStart),
-      })
-      processedLength += argStart
-    } else {
-      const spaceMatch = commandStr.slice(processedLength).match(/^\s+/)
-      if (spaceMatch) {
-        tokens.push({
-          type: 'whitespace',
-          value: spaceMatch[0],
-        })
-        processedLength += spaceMatch[0].length
+  if (cmdValue === '') {
+    return []
+  }
+
+  const isSupported = SUPPORTED_COMMANDS.includes(cmdValue)
+  tokens.push({
+    type: isSupported ? 'command' : 'command-unknown',
+    value: cmdValue,
+  })
+
+  while (i < commandStr.length) {
+    const wsStart = i
+    while (i < commandStr.length && commandStr[i] === ' ') {
+      i++
+    }
+    if (i > wsStart) {
+      tokens.push({ type: 'whitespace', value: commandStr.slice(wsStart, i) })
+    }
+
+    if (i >= commandStr.length) break
+
+    const argStart = i
+    let inSingleQuote = false
+    let inDoubleQuote = false
+
+    while (i < commandStr.length) {
+      const ch = commandStr[i]
+      if (ch === "'" && !inDoubleQuote) {
+        inSingleQuote = !inSingleQuote
+        i++
+      } else if (ch === '"' && !inSingleQuote) {
+        inDoubleQuote = !inDoubleQuote
+        i++
+      } else if (ch === ' ' && !inSingleQuote && !inDoubleQuote) {
+        break
+      } else {
+        i++
       }
     }
 
+    const argValue = commandStr.slice(argStart, i)
+
     let type = 'argument'
-    if (arg.startsWith('-')) {
+    if (argValue.startsWith('-')) {
       type = 'flag'
-    } else if (arg.includes('/') || arg.startsWith('.') || arg.startsWith('~')) {
+    } else if (PATH_TAKING_COMMANDS.has(cmdValue)) {
       type = 'path'
-    } else if (arg === '..' || arg === '.') {
+    } else if (argValue.includes('/') || argValue === '..' || argValue === '.' || argValue.startsWith('~')) {
       type = 'path'
     }
 
-    tokens.push({
-      type,
-      value: arg,
-    })
-    processedLength += arg.length
+    tokens.push({ type, value: argValue })
   }
 
   return tokens

@@ -87,18 +87,12 @@ export function buildDirectoryCoverage(node) {
 
   if (node.type === 'directory' && node.children) {
     const childResults = node.children.map(buildDirectoryCoverage).filter(Boolean)
-    const fileCoverages = childResults
-      .filter((c) => c.type === 'file')
-      .map((c) => c.coverage)
+    const allFilesInSubtree = flattenFileTree(node)
+    const allFileCoverages = allFilesInSubtree
+      .map((f) => f.coverage)
+      .filter(Boolean)
 
-    const allCoverages = [...fileCoverages]
-    childResults
-      .filter((c) => c.type === 'directory')
-      .forEach((dir) => {
-        if (dir.coverage) allCoverages.push(dir.coverage)
-      })
-
-    const avgCoverage = calculateAverageCoverage(allCoverages)
+    const avgCoverage = calculateAverageCoverage(allFileCoverages)
 
     return {
       ...node,
@@ -129,6 +123,31 @@ export function countDirectories(node) {
     count += node.children.reduce((sum, child) => sum + countDirectories(child), 0)
   }
   return count
+}
+
+export function countTotalLines(files) {
+  if (!Array.isArray(files)) return 0
+  return files.reduce((sum, file) => {
+    const lineCount = Array.isArray(file.lines) ? file.lines.length : 0
+    return sum + lineCount
+  }, 0)
+}
+
+export function countCoveredLines(files) {
+  if (!Array.isArray(files)) return 0
+  return files.reduce((sum, file) => {
+    const totalLines = Array.isArray(file.lines) ? file.lines.length : 0
+    const uncoveredCount = Array.isArray(file.uncoveredLines) ? file.uncoveredLines.length : 0
+    return sum + Math.max(0, totalLines - uncoveredCount)
+  }, 0)
+}
+
+export function countTestedFiles(files) {
+  if (!Array.isArray(files)) return 0
+  return files.filter((file) => {
+    const lineCov = file.coverage?.lines ?? 0
+    return lineCov > 0
+  }).length
 }
 
 export function findFileByPath(node, path) {

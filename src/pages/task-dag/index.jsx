@@ -26,19 +26,6 @@ import {
   importFromJson,
 } from './taskDagCore.js'
 
-let _initStorageCache = null
-let _initStorageError = null
-
-function _getInitStorage() {
-  if (!_initStorageCache) {
-    _initStorageCache = loadFromStorage()
-    if (_initStorageCache?.error) {
-      _initStorageError = _initStorageCache.error
-    }
-  }
-  return _initStorageCache
-}
-
 function Toast({ message, type, onClose }) {
   useEffect(() => {
     const timer = setTimeout(onClose, 2500)
@@ -266,22 +253,18 @@ function TaskDAGPage() {
   const innerRef = useRef(null)
   const lastSaveAlertRef = useRef(0)
 
-  const [nodes, setNodes] = useState(() => {
-    const saved = _getInitStorage()
-    return saved.nodes || []
-  })
-  const [edges, setEdges] = useState(() => {
-    const saved = _getInitStorage()
-    return saved.edges || []
-  })
-  const [toast, setToast] = useState(() => {
-    if (_initStorageError) {
-      const err = _initStorageError
-      _initStorageError = null
-      return { message: '读取本地存储失败: ' + err, type: 'error' }
+  const initialState = useMemo(() => {
+    const saved = loadFromStorage()
+    return {
+      nodes: saved.nodes || [],
+      edges: saved.edges || [],
+      toast: saved.error ? { message: '读取本地存储失败: ' + saved.error, type: 'error' } : null,
     }
-    return null
-  })
+  }, [])
+
+  const [nodes, setNodes] = useState(initialState.nodes)
+  const [edges, setEdges] = useState(initialState.edges)
+  const [toast, setToast] = useState(initialState.toast)
   const [selectedNodeId, setSelectedNodeId] = useState(null)
   const [editingId, setEditingId] = useState(null)
   const [zoom, setZoom] = useState(1)

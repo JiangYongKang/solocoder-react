@@ -24,6 +24,9 @@ import {
   redo,
   hitTestTextLayer,
   getSelectedLayer,
+  serializeState,
+  isValidColor,
+  sanitizeColor,
 } from '../../poster-designer/posterDesignerCore.js'
 import {
   DEFAULT_CANVAS_SIZE,
@@ -516,6 +519,159 @@ describe('posterDesignerCore', () => {
 
       const redoResult = redo(history, undoResult.historyIndex)
       expect(redoResult.state.layers[0].color).toBe('#ff0000')
+    })
+  })
+
+  describe('serializeState', () => {
+    it('should strip image object from background layer', () => {
+      const state = createInitialState()
+      const fakeImage = { nodeName: 'IMG', naturalWidth: 100, naturalHeight: 100 }
+      const withImage = updateLayer(state, 'bg', {
+        image: fakeImage,
+        imageSrc: 'data:image/png;base64,FAKE',
+      })
+      const serialized = serializeState(withImage)
+      expect(serialized.layers[0].image).toBeNull()
+      expect(serialized.layers[0].imageSrc).toBe('data:image/png;base64,FAKE')
+    })
+
+    it('should preserve text layers unchanged', () => {
+      const state = createInitialState()
+      const layer = createTextLayer({ text: 'Test' })
+      const withText = addLayer(state, layer)
+      const serialized = serializeState(withText)
+      expect(serialized.layers).toHaveLength(2)
+      expect(serialized.layers[1].text).toBe('Test')
+      expect(serialized.layers[1].id).toBe(layer.id)
+    })
+
+    it('should allow JSON round-trip without errors', () => {
+      const state = createInitialState()
+      const fakeImage = { nodeName: 'IMG' }
+      const withImage = updateLayer(state, 'bg', {
+        image: fakeImage,
+        imageSrc: 'data:image/png;base64,XX',
+        imageOpacity: 0.5,
+      })
+      const serialized = serializeState(withImage)
+      const roundTrip = JSON.parse(JSON.stringify(serialized))
+      expect(roundTrip.layers[0].image).toBeNull()
+      expect(roundTrip.layers[0].imageSrc).toBe('data:image/png;base64,XX')
+      expect(roundTrip.layers[0].imageOpacity).toBe(0.5)
+    })
+  })
+
+  describe('isValidColor', () => {
+    it('should accept 3-digit HEX colors', () => {
+      expect(isValidColor('#fff')).toBe(true)
+      expect(isValidColor('#F00')).toBe(true)
+      expect(isValidColor('#a1b')).toBe(true)
+    })
+
+    it('should accept 6-digit HEX colors', () => {
+      expect(isValidColor('#ffffff')).toBe(true)
+      expect(isValidColor('#FF0000')).toBe(true)
+      expect(isValidColor('#1a2b3c')).toBe(true)
+    })
+
+    it('should accept 4-digit HEX (with alpha)', () => {
+      expect(isValidColor('#ffff')).toBe(true)
+      expect(isValidColor('#F00F')).toBe(true)
+    })
+
+    it('should accept 8-digit HEX (with alpha)', () => {
+      expect(isValidColor('#ffffffff')).toBe(true)
+      expect(isValidColor('#FF000080')).toBe(true)
+    })
+
+    it('should accept rgb() format', () => {
+      expect(isValidColor('rgb(255, 0, 0)')).toBe(true)
+      expect(isValidColor('rgb(0, 128, 255)')).toBe(true)
+      expect(isValidColor('RGB(255,255,255)')).toBe(true)
+    })
+
+    it('should accept rgba() format with valid alpha', () => {
+      expect(isValidColor('rgba(255, 0, 0, 0.5)')).toBe(true)
+      expect(isValidColor('rgba(0, 0, 0, 1)')).toBe(true)
+      expect(isValidColor('rgba(0, 0, 0, 0)')).toBe(true)
+      expect(isValidColor('rgba(0, 0, 0, 1.0)')).toBe(true)
+    })
+
+    it('should accept hsl() format', () => {
+      expect(isValidColor('hsl(120, 50%, 50%)')).toBe(true)
+      expect(isValidColor('hsl(360, 100%, 0%)')).toBe(true)
+    })
+
+    it('should accept hsla() format', () => {
+      expect(isValidColor('hsla(120, 50%, 50%, 0.5)')).toBe(true)
+      expect(isValidColor('hsla(0, 100%, 100%, 1)')).toBe(true)
+    })
+
+    it('should reject invalid HEX formats', () => {
+      expect(isValidColor('#ggg')).toBe(false)
+      expect(isValidColor('#gggggg')).toBe(false)
+      expect(isValidColor('red')).toBe(false)
+      expect(isValidColor('#12')).toBe(false)
+      expect(isValidColor('#12345')).toBe(false)
+      expect(isValidColor('#1234567')).toBe(false)
+      expect(isValidColor('#gggg')).toBe(false)
+      expect(isValidColor('#gggggggg')).toBe(false)
+    })
+
+    it('should reject out-of-range rgb values', () => {
+      expect(isValidColor('rgb(256, 0, 0)')).toBe(false)
+      expect(isValidColor('rgb(0, 300, 0)')).toBe(false)
+      expect(isValidColor('rgb(0, 0, -1)')).toBe(false)
+    })
+
+    it('should reject out-of-range hsl values', () => {
+      expect(isValidColor('hsl(361, 50%, 50%)')).toBe(false)
+      expect(isValidColor('hsl(120, 101%, 50%)')).toBe(false)
+      expect(isValidColor('hsl(120, 50%, 101%)')).toBe(false)
+    })
+
+    it('should reject empty/null/non-string values', () => {
+      expect(isValidColor('')).toBe(false)
+      expect(isValidColor(null)).toBe(false)
+      expect(isValidColor(undefined)).toBe(false)
+      expect(isValidColor(123)).toBe(false)
+      expect(isValidColor({})).toBe(false)
+      expect(isValidColor('   ')).toBe(false)
+    })
+
+    it('should reject malformed formats', () => {
+      expect(isValidColor('abc')).toBe(false)
+      expect(isValidColor('rgb(0,0,0')).toBe(false)
+      expect(isValidColor('hsl(abc)')).toBe(false)
+      expect(isValidColor('blurple')).toBe(false)
+    })
+  })
+
+  describe('sanitizeColor', () => {
+    it('should return color if valid', () => {
+      expect(sanitizeColor('#ff0000', '#000000')).toBe('#ff0000')
+    })
+
+    it('should return fallback if invalid', () => {
+      expect(sanitizeColor('blurple', '#ffffff')).toBe('#ffffff')
+      expect(sanitizeColor('', '#111111')).toBe('#111111')
+    })
+  })
+
+  describe('integration: pushHistory with background image', () => {
+    it('should store imageSrc and strip image object in snapshot', () => {
+      const initial = createInitialState()
+      const fakeImage = { nodeName: 'IMG', naturalWidth: 800, naturalHeight: 600 }
+      const withImage = updateLayer(initial, 'bg', {
+        image: fakeImage,
+        imageSrc: 'data:image/png;base64,HELLO',
+      })
+      const result = pushHistory([], -1, withImage)
+      const snapshot = result.history[0]
+      expect(snapshot.layers[0].image).toBeNull()
+      expect(snapshot.layers[0].imageSrc).toBe('data:image/png;base64,HELLO')
+      expect(typeof snapshot).toBe('object')
+      expect(() => JSON.stringify(snapshot)).not.toThrow()
     })
   })
 })

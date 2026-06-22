@@ -14,7 +14,6 @@ import {
   updateTimeSeriesData,
   calculateSignificance,
   calculatePValue,
-  gammaLn,
   getControlGroup,
   getExperimentGroups,
   hasSignificantResult,
@@ -426,16 +425,43 @@ describe('abTestCore - 时间序列数据', () => {
   })
 
   describe('updateTimeSeriesData', () => {
-    it('运行中的实验应该更新数据', () => {
+    it('运行中的实验应该追加新数据点', () => {
       const exp = createTestExperiment()
       exp.timeSeriesData = generateInitialTimeSeriesData(exp)
-      const originalLastDay = { ...exp.timeSeriesData.click_rate[exp.timeSeriesData.click_rate.length - 1] }
+      const originalLength = exp.timeSeriesData.click_rate.length
+      const originalLastDay = exp.timeSeriesData.click_rate[exp.timeSeriesData.click_rate.length - 1]
+
+      const updated = updateTimeSeriesData(exp)
+      const newData = updated.timeSeriesData.click_rate
+
+      expect(newData.length).toBe(originalLength + 1)
+      expect(newData[newData.length - 2]).toEqual(originalLastDay)
+    })
+
+    it('追加的新数据点应该包含所有组的值且样本数递增', () => {
+      const exp = createTestExperiment()
+      exp.timeSeriesData = generateInitialTimeSeriesData(exp)
+      const originalLastDay = exp.timeSeriesData.click_rate[exp.timeSeriesData.click_rate.length - 1]
 
       const updated = updateTimeSeriesData(exp)
       const newLastDay = updated.timeSeriesData.click_rate[updated.timeSeriesData.click_rate.length - 1]
 
+      expect(newLastDay.g1).toBeDefined()
+      expect(newLastDay.g2).toBeDefined()
       expect(newLastDay.g1_samples).toBeGreaterThan(originalLastDay.g1_samples)
       expect(newLastDay.g2_samples).toBeGreaterThan(originalLastDay.g2_samples)
+    })
+
+    it('新数据点的日期应为最后一天的次日', () => {
+      const exp = createTestExperiment()
+      exp.timeSeriesData = generateInitialTimeSeriesData(exp)
+      const originalLastDay = exp.timeSeriesData.click_rate[exp.timeSeriesData.click_rate.length - 1]
+
+      const updated = updateTimeSeriesData(exp)
+      const newLastDay = updated.timeSeriesData.click_rate[updated.timeSeriesData.click_rate.length - 1]
+
+      expect(newLastDay.date).toBeDefined()
+      expect(newLastDay.date).not.toBe(originalLastDay.date)
     })
 
     it('未运行的实验不应该更新数据', () => {
@@ -450,14 +476,6 @@ describe('abTestCore - 时间序列数据', () => {
 })
 
 describe('abTestCore - 显著性计算', () => {
-  describe('gammaLn', () => {
-    it('应该正确计算 gamma 函数的对数', () => {
-      expect(gammaLn(1)).toBeCloseTo(0, 5)
-      expect(gammaLn(2)).toBeCloseTo(0, 5)
-      expect(gammaLn(5)).toBeCloseTo(Math.log(24), 5)
-    })
-  })
-
   describe('calculatePValue', () => {
     it('t 值为 0 时 p 值应为 1', () => {
       expect(calculatePValue(0, 100)).toBeCloseTo(1, 3)

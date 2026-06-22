@@ -196,17 +196,27 @@ export function updateTimeSeriesData(experiment) {
     const currentData = newTimeSeriesData[metricKey] || []
     if (currentData.length === 0) return
 
-    const lastEntry = { ...currentData[currentData.length - 1] }
+    const lastEntry = currentData[currentData.length - 1]
     const metric = METRICS.find((m) => m.key === metricKey)
+
+    const parts = lastEntry.date.split('/')
+    const month = parseInt(parts[0], 10)
+    const day = parseInt(parts[1], 10)
+    const now = new Date()
+    const nextDate = new Date(now.getFullYear(), month - 1, day)
+    nextDate.setDate(nextDate.getDate() + 1)
+    const nextDateStr = `${nextDate.getMonth() + 1}/${nextDate.getDate()}`
+
+    const newEntry = { date: nextDateStr }
 
     experiment.groups.forEach((group) => {
       const currentValue = lastEntry[group.id] || metric.baseValue
-      const delta = (Math.random() - 0.5) * metric.baseValue * 0.05
-      lastEntry[group.id] = Math.max(0, Math.round((currentValue + delta) * 100) / 100)
-      lastEntry[`${group.id}_samples`] = (lastEntry[`${group.id}_samples`] || 100) + Math.floor(Math.random() * 50)
+      const delta = (Math.random() - 0.5) * metric.baseValue * 0.1
+      newEntry[group.id] = Math.max(0, Math.round((currentValue + delta) * 100) / 100)
+      newEntry[`${group.id}_samples`] = (lastEntry[`${group.id}_samples`] || 100) + Math.floor(Math.random() * 50)
     })
 
-    newTimeSeriesData[metricKey] = [...currentData.slice(0, -1), lastEntry]
+    newTimeSeriesData[metricKey] = [...currentData, newEntry]
   })
 
   return { ...experiment, timeSeriesData: newTimeSeriesData }
@@ -296,103 +306,6 @@ export function calculatePValue(tStatistic, degreesOfFreedom) {
   }
 
   return 1 - 0.2 * t
-}
-
-export function regularizedIncompleteBeta(x, a, b) {
-  if (x < 0 || x > 1) return 0
-  if (x === 0) return 0
-  if (x === 1) return 1
-
-  if (a <= 0 || b <= 0) return 0
-
-  try {
-    const lnGammaAB = gammaLn(a + b)
-    const lnGammaA = gammaLn(a)
-    const lnGammaB = gammaLn(b)
-    const lnX = Math.log(x)
-    const ln1MinusX = Math.log(1 - x)
-
-    const bt = Math.exp(lnGammaAB - lnGammaA - lnGammaB + a * lnX + b * ln1MinusX)
-
-    if (isNaN(bt) || !isFinite(bt)) {
-      return x < 0.5 ? 0 : 1
-    }
-
-    if (x < (a + 1) / (a + b + 2)) {
-      const cf = betaCF(x, a, b)
-      const result = bt * cf / a
-      return isFinite(result) ? result : (x < 0.5 ? 0 : 1)
-    } else {
-      const cf = betaCF(1 - x, b, a)
-      const result = 1 - bt * cf / b
-      return isFinite(result) ? Math.max(0, Math.min(1, result)) : (x < 0.5 ? 0 : 1)
-    }
-  } catch {
-    return x < 0.5 ? 0 : 1
-  }
-}
-
-export function gammaLn(x) {
-  const coef = [
-    76.18009172947146,
-    -86.5053203294168,
-    24.01409824083091,
-    -1.231739572450155,
-    0.1208650973866179e-2,
-    -0.5395239384953e-5,
-  ]
-
-  let y = x
-  let tmp = x + 5.5
-  tmp -= (x + 0.5) * Math.log(tmp)
-  let ser = 1.00000000019
-
-  for (let j = 0; j < 6; j++) {
-    y += 1
-    ser += coef[j] / y
-  }
-
-  return -tmp + Math.log(2.506628274631 * ser / x)
-}
-
-export function betaCF(x, a, b) {
-  const maxIterations = 100
-  const epsilon = 3e-7
-
-  let bm = 1
-  let az = 1
-  let am = 1
-
-  let qab = a + b
-  let qap = a + 1
-  let qam = a - 1
-  let bz = 1 - qab * x / qap
-
-  if (bz === 0) bz = epsilon
-
-  for (let m = 1; m <= maxIterations; m++) {
-    let em = m
-    let tem = em + em
-    let d = em * (b - m) * x / ((qam + tem) * (a + tem))
-    let ap = az + d * am
-    let bp = bz + d * bm
-    d = -(a + em) * (qab + em) * x / ((a + tem) * (qap + tem))
-    let app = ap + d * az
-    let bpp = bp + d * bz
-    let aold = az
-
-    if (bpp === 0) bpp = epsilon
-
-    am = ap / bpp
-    bm = bp / bpp
-    az = app / bpp
-
-    if (Math.abs(az - aold) < epsilon * Math.abs(az)) break
-  }
-
-  if (!isFinite(az)) return 1
-
-  return az
 }
 
 export function getControlGroup(groups) {

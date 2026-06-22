@@ -94,7 +94,6 @@ export default function LiveStreamPage() {
       </div>
 
       <ShoppingBag
-        key={currentProduct?.id}
         bag={bag}
         setBag={setBag}
         currentProduct={currentProduct}

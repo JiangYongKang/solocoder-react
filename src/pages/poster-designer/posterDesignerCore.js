@@ -149,15 +149,75 @@ export function clampBgOpacity(opacity) {
   return clampValue(opacity, MIN_BG_OPACITY, MAX_BG_OPACITY)
 }
 
+export function serializeState(state) {
+  return {
+    ...state,
+    layers: state.layers.map((layer) => {
+      if (layer.type === 'background') {
+        return { ...layer, image: null }
+      }
+      return { ...layer }
+    }),
+  }
+}
+
 export function pushHistory(history, historyIndex, state) {
   const newHistory = history.slice(0, historyIndex + 1)
-  const snapshot = JSON.parse(JSON.stringify(state))
+  const serializable = serializeState(state)
+  const snapshot = JSON.parse(JSON.stringify(serializable))
   newHistory.push(snapshot)
   if (newHistory.length > MAX_HISTORY) {
     newHistory.shift()
     return { history: newHistory, historyIndex: newHistory.length - 1 }
   }
   return { history: newHistory, historyIndex: newHistory.length - 1 }
+}
+
+export function isValidColor(color) {
+  if (typeof color !== 'string') return false
+  const trimmed = color.trim()
+  if (!trimmed) return false
+  if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(trimmed)) return true
+  if (/^#([0-9a-f]{4}|[0-9a-f]{8})$/i.test(trimmed)) return true
+  const rgbaMatch = /^rgba?\s*\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*(?:,\s*(0|1|0?\.\d+|1\.0)\s*)?\)$/i.exec(trimmed)
+  if (rgbaMatch) {
+    const r = Number(rgbaMatch[1])
+    const g = Number(rgbaMatch[2])
+    const b = Number(rgbaMatch[3])
+    return r <= 255 && g <= 255 && b <= 255
+  }
+  const hslaMatch = /^hsla?\s*\(\s*(\d{1,3})\s*,\s*(\d{1,3})%\s*,\s*(\d{1,3})%\s*(?:,\s*(0|1|0?\.\d+|1\.0)\s*)?\)$/i.exec(trimmed)
+  if (hslaMatch) {
+    const h = Number(hslaMatch[1])
+    const s = Number(hslaMatch[2])
+    const l = Number(hslaMatch[3])
+    return h <= 360 && s <= 100 && l <= 100
+  }
+  return false
+}
+
+export function sanitizeColor(color, fallback) {
+  return isValidColor(color) ? color : fallback
+}
+
+export function restoreBackgroundImage(state) {
+  const bgLayer = state.layers.find((l) => l.type === 'background')
+  if (!bgLayer || !bgLayer.imageSrc) return Promise.resolve(state)
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => {
+      resolve({
+        ...state,
+        layers: state.layers.map((l) =>
+          l.id === bgLayer.id ? { ...l, image: img } : l
+        ),
+      })
+    }
+    img.onerror = () => {
+      resolve(state)
+    }
+    img.src = bgLayer.imageSrc
+  })
 }
 
 export function canUndo(historyIndex) {
@@ -225,6 +285,13 @@ export function exportCanvasToPng(canvas) {
   })
 }
 
+function isHTMLImageElement(obj) {
+  if (typeof obj === 'undefined' || obj === null) return false
+  if (typeof HTMLImageElement !== 'undefined' && obj instanceof HTMLImageElement) return true
+  if (obj.nodeName === 'IMG' && typeof obj.naturalWidth === 'number') return true
+  return false
+}
+
 export function drawPoster(ctx, state, canvasWidth, canvasHeight) {
   const { layers } = state
 
@@ -232,13 +299,19 @@ export function drawPoster(ctx, state, canvasWidth, canvasHeight) {
 
   const bg = layers.find((l) => l.type === 'background')
   if (bg) {
-    if (bg.image) {
-      ctx.save()
-      ctx.globalAlpha = clampBgOpacity(bg.imageOpacity)
-      ctx.drawImage(bg.image, 0, 0, canvasWidth, canvasHeight)
-      ctx.restore()
+    const bgColor = sanitizeColor(bg.color, DEFAULT_BG_COLOR)
+    if (bg.image && isHTMLImageElement(bg.image)) {
+      try {
+        ctx.save()
+        ctx.globalAlpha = clampBgOpacity(bg.imageOpacity)
+        ctx.drawImage(bg.image, 0, 0, canvasWidth, canvasHeight)
+        ctx.restore()
+      } catch {
+        ctx.fillStyle = bgColor
+        ctx.fillRect(0, 0, canvasWidth, canvasHeight)
+      }
     } else {
-      ctx.fillStyle = bg.color || DEFAULT_BG_COLOR
+      ctx.fillStyle = bgColor
       ctx.fillRect(0, 0, canvasWidth, canvasHeight)
     }
   }
@@ -246,25 +319,40 @@ export function drawPoster(ctx, state, canvasWidth, canvasHeight) {
   const textLayers = layers.filter((l) => l.type === 'text')
   textLayers.forEach((layer) => {
     ctx.save()
-    ctx.font = `${layer.fontSize}px ${layer.fontFamily}`
+    ctx.font = `${clampFontSize(layer.fontSize)}px ${layer.fontFamily || DEFAULT_FONT}`
     ctx.textBaseline = 'alphabetic'
 
-    if (layer.shadowBlur > 0 || layer.shadowOffsetX !== 0 || layer.shadowOffsetY !== 0) {
-      ctx.shadowColor = layer.shadowColor
-      ctx.shadowBlur = layer.shadowBlur
-      ctx.shadowOffsetX = layer.shadowOffsetX
-      ctx.shadowOffsetY = layer.shadowOffsetY
+    const shadowColor = sanitizeColor(layer.shadowColor, DEFAULT_SHADOW_COLOR)
+    const shadowBlur = clampShadowBlur(layer.shadowBlur)
+    const shadowOffsetX = clampShadowOffset(layer.shadowOffsetX)
+    const shadowOffsetY = clampShadowOffset(layer.shadowOffsetY)
+    if (shadowBlur > 0 || shadowOffsetX !== 0 || shadowOffsetY !== 0) {
+      ctx.shadowColor = shadowColor
+      ctx.shadowBlur = shadowBlur
+      ctx.shadowOffsetX = shadowOffsetX
+      ctx.shadowOffsetY = shadowOffsetY
     }
 
-    if (layer.strokeWidth > 0) {
-      ctx.strokeStyle = layer.strokeColor
-      ctx.lineWidth = layer.strokeWidth
+    const strokeWidth = clampStrokeWidth(layer.strokeWidth)
+    if (strokeWidth > 0) {
+      const strokeColor = sanitizeColor(layer.strokeColor, DEFAULT_STROKE_COLOR)
+      ctx.strokeStyle = strokeColor
+      ctx.lineWidth = strokeWidth
       ctx.lineJoin = 'round'
-      ctx.strokeText(layer.text, layer.x, layer.y)
+      try {
+        ctx.strokeText(layer.text, layer.x, layer.y)
+      } catch {
+        // skip stroke on error
+      }
     }
 
-    ctx.fillStyle = layer.color
-    ctx.fillText(layer.text, layer.x, layer.y)
+    const textColor = sanitizeColor(layer.color, DEFAULT_TEXT_COLOR)
+    ctx.fillStyle = textColor
+    try {
+      ctx.fillText(layer.text, layer.x, layer.y)
+    } catch {
+      // skip fill on error
+    }
     ctx.restore()
   })
 }

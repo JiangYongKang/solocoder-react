@@ -123,7 +123,7 @@ export function decodeGlyphFromBase64(base64, size = DEFAULT_GRID_SIZE) {
       glyph[y][x] = allBits[i] === '1' ? 1 : 0
     }
     return glyph
-  } catch (e) {
+  } catch {
     return createEmptyGlyph(size)
   }
 }
@@ -429,7 +429,7 @@ export function copyToClipboard(text) {
   try {
     navigator.clipboard.writeText(text)
     return true
-  } catch (e) {
+  } catch {
     const textarea = document.createElement('textarea')
     textarea.value = text
     textarea.style.position = 'fixed'
@@ -440,7 +440,7 @@ export function copyToClipboard(text) {
       document.execCommand('copy')
       document.body.removeChild(textarea)
       return true
-    } catch (err) {
+    } catch {
       document.body.removeChild(textarea)
       return false
     }
@@ -465,7 +465,7 @@ export function safeGetItem(key, fallback = null, storage = localStorage) {
     const item = storage?.getItem(key)
     if (!item) return fallback
     return JSON.parse(item)
-  } catch (e) {
+  } catch {
     return fallback
   }
 }
@@ -474,7 +474,7 @@ export function safeSetItem(key, value, storage = localStorage) {
   try {
     storage?.setItem(key, JSON.stringify(value))
     return true
-  } catch (e) {
+  } catch {
     return false
   }
 }
@@ -491,7 +491,7 @@ export function clearFontData(storage = localStorage) {
   try {
     storage?.removeItem(STORAGE_KEY)
     return true
-  } catch (e) {
+  } catch {
     return false
   }
 }
@@ -598,7 +598,7 @@ export function getCharacterFromCodePoint(codePoint) {
   if (isNaN(num)) return null
   try {
     return String.fromCodePoint(num)
-  } catch (e) {
+  } catch {
     return null
   }
 }

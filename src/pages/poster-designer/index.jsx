@@ -20,6 +20,9 @@ import {
   drawPoster,
   getSelectedLayer,
   exportCanvasToPng,
+  isValidColor,
+  restoreBackgroundImage,
+  sanitizeColor,
 } from './posterDesignerCore.js'
 import {
   CANVAS_SIZES,
@@ -72,7 +75,18 @@ function PosterDesignerPage() {
   const [activeSizeIndex, setActiveSizeIndex] = useState(0)
   const [bgDragOver, setBgDragOver] = useState(false)
   const [containerSize, setContainerSize] = useState({ w: 0, h: 0 })
+  const [colorInputStates, setColorInputStates] = useState({})
+  const [toast, setToast] = useState(null)
   const canvasAreaRef = useRef(null)
+
+  const showToast = useCallback((message) => {
+    setToast(message)
+    setTimeout(() => setToast(null), 2000)
+  }, [])
+
+  const applyRestoredState = useCallback((restoredState) => {
+    setState(restoredState)
+  }, [])
 
   const selectedLayer = getSelectedLayer(state)
 
@@ -123,16 +137,20 @@ function PosterDesignerPage() {
   const handleUndo = useCallback(() => {
     if (!canUndo(historyIndex)) return
     const result = undo(history, historyIndex)
-    setState(result.state)
     setHistoryIndex(result.historyIndex)
-  }, [history, historyIndex])
+    restoreBackgroundImage(result.state).then((restored) => {
+      applyRestoredState(restored)
+    })
+  }, [history, historyIndex, applyRestoredState])
 
   const handleRedo = useCallback(() => {
     if (!canRedo(history, historyIndex)) return
     const result = redo(history, historyIndex)
-    setState(result.state)
     setHistoryIndex(result.historyIndex)
-  }, [history, historyIndex])
+    restoreBackgroundImage(result.state).then((restored) => {
+      applyRestoredState(restored)
+    })
+  }, [history, historyIndex, applyRestoredState])
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -150,6 +168,32 @@ function PosterDesignerPage() {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [handleUndo, handleRedo])
+
+  const setColorInputValue = useCallback((key, value, fallbackColor) => {
+    const valid = isValidColor(value)
+    setColorInputStates((prev) => ({
+      ...prev,
+      [key]: { value, valid, error: valid ? null : '颜色格式无效' },
+    }))
+    if (valid) {
+      return value
+    }
+    return fallbackColor
+  }, [])
+
+  const commitColorChange = useCallback((key, layerId, prop, fallbackColor) => {
+    const input = colorInputStates[key]
+    if (!input) return { changed: false }
+    if (input.valid) {
+      return { changed: true, value: input.value }
+    }
+    showToast(`颜色格式无效：${input.value}`)
+    setColorInputStates((prev) => ({
+      ...prev,
+      [key]: { value: fallbackColor, valid: true, error: null },
+    }))
+    return { changed: false, value: fallbackColor }
+  }, [colorInputStates, showToast])
 
   const handleCanvasSizeChange = (idx) => {
     setActiveSizeIndex(idx)
@@ -252,7 +296,31 @@ function PosterDesignerPage() {
     isDraggingTextRef.current = false
   }
 
-  const handleBgColorChange = (color) => {
+  const handleBgColorTextChange = (e) => {
+    const key = 'bg_color'
+    const bg = state.layers.find((l) => l.type === 'background')
+    const fallback = bg ? bg.color : '#4a90d9'
+    setColorInputValue(key, e.target.value, fallback)
+    const safeColor = sanitizeColor(e.target.value, fallback)
+    setState((prev) => updateLayer(prev, 'bg', { color: safeColor, image: null }))
+  }
+
+  const handleBgColorTextCommit = () => {
+    const key = 'bg_color'
+    const bg = state.layers.find((l) => l.type === 'background')
+    const fallback = bg ? bg.color : '#4a90d9'
+    const result = commitColorChange(key, 'bg', 'color', fallback)
+    const finalState = updateLayer(state, 'bg', { color: result.value, image: null })
+    setState(finalState)
+    if (result.changed) commitHistory(finalState)
+  }
+
+  const handleBgColorPickerChange = (color) => {
+    const key = 'bg_color'
+    setColorInputStates((prev) => ({
+      ...prev,
+      [key]: { value: color, valid: true, error: null },
+    }))
     const newState = updateLayer(state, 'bg', { color, image: null })
     setState(newState)
     commitHistory(newState)
@@ -313,6 +381,40 @@ function PosterDesignerPage() {
     const newState = updateLayer(state, state.selectedLayerId, { [prop]: value })
     setState(newState)
     commitHistory(newState)
+  }
+
+  const handleTextColorTextChange = (prop, fallback) => (e) => {
+    if (!state.selectedLayerId) return
+    const key = `${state.selectedLayerId}_${prop}`
+    setColorInputValue(key, e.target.value, fallback)
+    const safeColor = sanitizeColor(e.target.value, fallback)
+    setState((prev) => updateLayer(prev, prev.selectedLayerId, { [prop]: safeColor }))
+  }
+
+  const handleTextColorCommit = (prop, fallback) => () => {
+    if (!state.selectedLayerId) return
+    const key = `${state.selectedLayerId}_${prop}`
+    const result = commitColorChange(key, state.selectedLayerId, prop, fallback)
+    const finalState = updateLayer(state, state.selectedLayerId, { [prop]: result.value })
+    setState(finalState)
+    if (result.changed) commitHistory(finalState)
+  }
+
+  const handleTextColorPickerChange = (prop, value) => {
+    if (!state.selectedLayerId) return
+    const key = `${state.selectedLayerId}_${prop}`
+    setColorInputStates((prev) => ({
+      ...prev,
+      [key]: { value, valid: true, error: null },
+    }))
+    const newState = updateLayer(state, state.selectedLayerId, { [prop]: value })
+    setState(newState)
+    commitHistory(newState)
+  }
+
+  const getColorInputState = (key, defaultValue) => {
+    const input = colorInputStates[key]
+    return input ?? { value: defaultValue, valid: true, error: null }
   }
 
   const handleExport = async () => {
@@ -382,6 +484,8 @@ function PosterDesignerPage() {
   const renderBgProps = () => {
     const bg = state.layers.find((l) => l.type === 'background')
     if (!bg) return null
+    const bgColorInput = getColorInputState('bg_color', bg.color)
+    const hasBgColorError = !bgColorInput.valid
     return (
       <div className="pd-props-section">
         <div className="pd-props-section-title">背景设置</div>
@@ -391,22 +495,26 @@ function PosterDesignerPage() {
             type="color"
             className="pd-props-color-input"
             value={bg.color}
-            onChange={(e) => handleBgColorChange(e.target.value)}
+            onChange={(e) => handleBgColorPickerChange(e.target.value)}
           />
           <input
             type="text"
-            className="pd-props-color-hex"
-            value={bg.color}
-            onChange={(e) => handleBgColorChange(e.target.value)}
+            className={`pd-props-color-hex ${hasBgColorError ? 'pd-input-error' : ''}`}
+            value={bgColorInput.value}
+            onChange={handleBgColorTextChange}
+            onBlur={handleBgColorTextCommit}
           />
         </div>
+        {hasBgColorError && (
+          <div className="pd-field-error">颜色格式无效，请使用 #RGB / #RRGGBB 或 rgb()/rgba()</div>
+        )}
         <div className="pd-props-preset-colors">
           {PRESET_COLORS.map((c) => (
             <button
               key={c}
               className="pd-props-preset-swatch"
               style={{ backgroundColor: c }}
-              onClick={() => handleBgColorChange(c)}
+              onClick={() => handleBgColorPickerChange(c)}
             />
           ))}
         </div>
@@ -512,16 +620,19 @@ function PosterDesignerPage() {
               type="color"
               className="pd-props-color-input"
               value={selectedLayer.color}
-              onChange={(e) => handleTextPropCommit('color', e.target.value)}
+              onChange={(e) => handleTextColorPickerChange('color', e.target.value)}
             />
             <input
               type="text"
-              className="pd-props-color-hex"
-              value={selectedLayer.color}
-              onChange={(e) => handleTextPropChange('color', e.target.value)}
-              onBlur={() => handleTextPropCommit('color', selectedLayer.color)}
+              className={`pd-props-color-hex ${!getColorInputState(`${selectedLayer.id}_color`, selectedLayer.color).valid ? 'pd-input-error' : ''}`}
+              value={getColorInputState(`${selectedLayer.id}_color`, selectedLayer.color).value}
+              onChange={handleTextColorTextChange('color', '#ffffff')}
+              onBlur={handleTextColorCommit('color', '#ffffff')}
             />
           </div>
+          {!getColorInputState(`${selectedLayer.id}_color`, selectedLayer.color).valid && (
+            <div className="pd-field-error">颜色格式无效</div>
+          )}
         </div>
         <div className="pd-props-section">
           <div className="pd-props-section-title">描边</div>
@@ -531,16 +642,19 @@ function PosterDesignerPage() {
               type="color"
               className="pd-props-color-input"
               value={selectedLayer.strokeColor}
-              onChange={(e) => handleTextPropCommit('strokeColor', e.target.value)}
+              onChange={(e) => handleTextColorPickerChange('strokeColor', e.target.value)}
             />
             <input
               type="text"
-              className="pd-props-color-hex"
-              value={selectedLayer.strokeColor}
-              onChange={(e) => handleTextPropChange('strokeColor', e.target.value)}
-              onBlur={() => handleTextPropCommit('strokeColor', selectedLayer.strokeColor)}
+              className={`pd-props-color-hex ${!getColorInputState(`${selectedLayer.id}_strokeColor`, selectedLayer.strokeColor).valid ? 'pd-input-error' : ''}`}
+              value={getColorInputState(`${selectedLayer.id}_strokeColor`, selectedLayer.strokeColor).value}
+              onChange={handleTextColorTextChange('strokeColor', '#000000')}
+              onBlur={handleTextColorCommit('strokeColor', '#000000')}
             />
           </div>
+          {!getColorInputState(`${selectedLayer.id}_strokeColor`, selectedLayer.strokeColor).valid && (
+            <div className="pd-field-error">颜色格式无效</div>
+          )}
           <div className="pd-props-row">
             <span className="pd-props-label">宽度</span>
             <input
@@ -563,16 +677,19 @@ function PosterDesignerPage() {
               type="color"
               className="pd-props-color-input"
               value={selectedLayer.shadowColor}
-              onChange={(e) => handleTextPropCommit('shadowColor', e.target.value)}
+              onChange={(e) => handleTextColorPickerChange('shadowColor', e.target.value)}
             />
             <input
               type="text"
-              className="pd-props-color-hex"
-              value={selectedLayer.shadowColor}
-              onChange={(e) => handleTextPropChange('shadowColor', e.target.value)}
-              onBlur={() => handleTextPropCommit('shadowColor', selectedLayer.shadowColor)}
+              className={`pd-props-color-hex ${!getColorInputState(`${selectedLayer.id}_shadowColor`, selectedLayer.shadowColor).valid ? 'pd-input-error' : ''}`}
+              value={getColorInputState(`${selectedLayer.id}_shadowColor`, selectedLayer.shadowColor).value}
+              onChange={handleTextColorTextChange('shadowColor', '#000000')}
+              onBlur={handleTextColorCommit('shadowColor', '#000000')}
             />
           </div>
+          {!getColorInputState(`${selectedLayer.id}_shadowColor`, selectedLayer.shadowColor).valid && (
+            <div className="pd-field-error">颜色格式无效</div>
+          )}
           <div className="pd-props-row">
             <span className="pd-props-label">X偏移</span>
             <input
@@ -712,6 +829,12 @@ function PosterDesignerPage() {
 
         {renderPropsPanel()}
       </div>
+
+      {toast && (
+        <div className="pd-toast" role="alert">
+          {toast}
+        </div>
+      )}
     </div>
   )
 }

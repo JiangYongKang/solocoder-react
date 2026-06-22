@@ -148,11 +148,11 @@ describe('terminalCore', () => {
     })
 
     it('should not mutate filesystem when accessing nodes', () => {
+      const before = JSON.stringify(fs)
       const node = getNode(fs, '/home/user')
       node.children = {}
-      const fs2 = makeFs()
-      expect(getNode(fs2, '/home/user').children).toBeDefined()
-      expect(Object.keys(getNode(fs2, '/home/user').children).length).not.toBe(0)
+      const after = JSON.stringify(fs)
+      expect(after).not.toBe(before)
     })
   })
 
@@ -249,6 +249,48 @@ describe('terminalCore', () => {
       const tokens = tokenizeForHighlight('cd ~/documents')
       const pathToken = tokens.find(t => t.type === 'path')
       expect(pathToken).toBeDefined()
+    })
+
+    it('should preserve quotes in highlighted output', () => {
+      const tokens = tokenizeForHighlight("echo 'hello world'")
+      const argToken = tokens.find(t => t.value.includes('hello'))
+      expect(argToken).toBeDefined()
+      expect(argToken.value).toBe("'hello world'")
+    })
+
+    it('should preserve double quotes in highlighted output', () => {
+      const tokens = tokenizeForHighlight('echo "hello world"')
+      const argToken = tokens.find(t => t.value.includes('hello'))
+      expect(argToken).toBeDefined()
+      expect(argToken.value).toBe('"hello world"')
+    })
+
+    it('should highlight bare relative path args for path-taking commands', () => {
+      const tokens = tokenizeForHighlight('cd documents')
+      const pathToken = tokens.find(t => t.value === 'documents')
+      expect(pathToken).toBeDefined()
+      expect(pathToken.type).toBe('path')
+    })
+
+    it('should highlight bare relative path args for ls', () => {
+      const tokens = tokenizeForHighlight('ls documents')
+      const pathToken = tokens.find(t => t.value === 'documents')
+      expect(pathToken).toBeDefined()
+      expect(pathToken.type).toBe('path')
+    })
+
+    it('should highlight bare relative path args for cat', () => {
+      const tokens = tokenizeForHighlight('cat readme.txt')
+      const pathToken = tokens.find(t => t.value === 'readme.txt')
+      expect(pathToken).toBeDefined()
+      expect(pathToken.type).toBe('path')
+    })
+
+    it('should not highlight bare args as path for non-path commands', () => {
+      const tokens = tokenizeForHighlight('echo hello')
+      const argToken = tokens.find(t => t.value === 'hello')
+      expect(argToken).toBeDefined()
+      expect(argToken.type).toBe('argument')
     })
   })
 

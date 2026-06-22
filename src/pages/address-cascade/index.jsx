@@ -89,7 +89,7 @@ export default function AddressCascadePage() {
   const [streetCode, setStreetCode] = useState('')
 
   const [searchKeyword, setSearchKeyword] = useState('')
-  const [showSearch, setShowSearch] = useState(false)
+  const [searchFocused, setSearchFocused] = useState(false)
 
   const [history, setHistory] = useState(() => loadHistory())
 
@@ -119,10 +119,12 @@ export default function AddressCascadePage() {
     return fuzzyMatchAddresses(searchKeyword)
   }, [searchKeyword])
 
+  const showSearch = searchFocused && searchKeyword.trim().length > 0
+
   useEffect(() => {
     function handleClick(e) {
       if (searchRef.current && !searchRef.current.contains(e.target)) {
-        setShowSearch(false)
+        setSearchFocused(false)
       }
     }
     document.addEventListener('mousedown', handleClick)
@@ -174,7 +176,7 @@ export default function AddressCascadePage() {
   const handleSearchSelect = useCallback((item) => {
     commitSelection(item.provinceCode, item.cityCode, item.districtCode, item.streetCode || '')
     setSearchKeyword('')
-    setShowSearch(false)
+    setSearchFocused(false)
   }, [commitSelection])
 
   const handleHotCity = useCallback((city) => {
@@ -220,7 +222,7 @@ export default function AddressCascadePage() {
                 placeholder="搜索地址关键词（如「朝阳」）"
                 value={searchKeyword}
                 onChange={(e) => setSearchKeyword(e.target.value)}
-                onFocus={() => searchKeyword.trim() && setShowSearch(true)}
+                onFocus={() => setSearchFocused(true)}
               />
               {showSearch && searchResults.length > 0 && (
                 <div className="ac-search-results">

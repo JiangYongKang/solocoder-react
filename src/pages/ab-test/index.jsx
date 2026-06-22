@@ -529,10 +529,6 @@ function ExperimentDetail({ experiment, onBack, onStart, onStop }) {
   const [isRefreshing, setIsRefreshing] = useState(false)
 
   useEffect(() => {
-    setCurrentExperiment(experiment)
-  }, [experiment])
-
-  useEffect(() => {
     if (currentExperiment.status !== EXPERIMENT_STATUS.RUNNING) return
 
     const interval = setInterval(() => {
@@ -667,16 +663,7 @@ function ABTestPage() {
 
   const [experiments, setExperiments] = useState(() => loadExperiments())
   const [showCreateForm, setShowCreateForm] = useState(false)
-  const [viewingExperiment, setViewingExperiment] = useState(null)
-
-  useEffect(() => {
-    if (experimentId) {
-      const exp = getExperimentById(experiments, experimentId)
-      if (exp) {
-        setViewingExperiment(exp)
-      }
-    }
-  }, [experimentId, experiments])
+  const viewingExperiment = experimentId ? getExperimentById(experiments, experimentId) : null
 
   const handleCreateExperiment = useCallback((experiment) => {
     const updated = addExperiment(experiments, experiment)
@@ -685,53 +672,32 @@ function ABTestPage() {
   }, [experiments])
 
   const handleStartExperiment = useCallback((id, updatedExp) => {
-    if (updatedExp) {
-      const updated = updateExperiment(experiments, id, updatedExp)
-      setExperiments(updated)
-      if (viewingExperiment?.id === id) {
-        setViewingExperiment(updatedExp)
+    setExperiments((prev) => {
+      if (updatedExp) {
+        return updateExperiment(prev, id, updatedExp)
       }
-    } else {
-      setExperiments((prev) => {
-        const exp = prev.find((e) => e.id === id)
-        if (!exp) return prev
-        const updated = startExperiment(exp)
-        const list = updateExperiment(prev, id, updated)
-        if (viewingExperiment?.id === id) {
-          setViewingExperiment(updated)
-        }
-        return list
-      })
-    }
-  }, [experiments, viewingExperiment])
+      const exp = prev.find((e) => e.id === id)
+      if (!exp) return prev
+      return updateExperiment(prev, id, startExperiment(exp))
+    })
+  }, [])
 
   const handleStopExperiment = useCallback((id, updatedExp) => {
-    if (updatedExp) {
-      const updated = updateExperiment(experiments, id, updatedExp)
-      setExperiments(updated)
-      if (viewingExperiment?.id === id) {
-        setViewingExperiment(updatedExp)
+    setExperiments((prev) => {
+      if (updatedExp) {
+        return updateExperiment(prev, id, updatedExp)
       }
-    } else {
-      setExperiments((prev) => {
-        const exp = prev.find((e) => e.id === id)
-        if (!exp) return prev
-        const updated = stopExperiment(exp)
-        const list = updateExperiment(prev, id, updated)
-        if (viewingExperiment?.id === id) {
-          setViewingExperiment(updated)
-        }
-        return list
-      })
-    }
-  }, [experiments, viewingExperiment])
+      const exp = prev.find((e) => e.id === id)
+      if (!exp) return prev
+      return updateExperiment(prev, id, stopExperiment(exp))
+    })
+  }, [])
 
   const handleViewExperiment = useCallback((id) => {
     navigate(`/ab-test/${id}`)
   }, [navigate])
 
   const handleBackToList = useCallback(() => {
-    setViewingExperiment(null)
     navigate('/ab-test')
   }, [navigate])
 
@@ -748,6 +714,7 @@ function ABTestPage() {
 
       {viewingExperiment ? (
         <ExperimentDetail
+          key={viewingExperiment.id}
           experiment={viewingExperiment}
           onBack={handleBackToList}
           onStart={handleStartExperiment}

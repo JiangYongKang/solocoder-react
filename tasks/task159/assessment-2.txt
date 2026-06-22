@@ -1,0 +1,6 @@
+产物不满意：无。
+
+过程不满意：
+1. 模型在修复三个 BUG 时使用 Write 工具完全重写了 DanmakuArea.jsx、ShoppingBag.jsx 和 LiveWidgets.jsx 三个文件，而非使用 edit_file_search_replace 进行最小化精准修改。从最终 diff 来看，每个文件的改动都是增量式的——添加 timersRef 和 registerTimer 定时器跟踪、添加 perProductRef 商品状态缓存、修正坐标计算逻辑，这些都可以通过精确替换旧代码块来实现。使用 Write 全量重写的方式增加了 diff 审查难度，评审者无法快速看清哪些是修复改动、哪些是原有代码未变部分。正确做法是对每个修复点使用 StrReplace 进行精准替换，保持修改范围的透明可控。
+2. 模型在收到提示词后的第一步就创建了 TodoList 并列出四个待办项，没有先读取相关文件来分析每个 BUG 的根因和波及范围。根据标注规范，模型应先分析问题再规划任务，而不是在对问题全貌没有理解的情况下就制定执行计划。从后续执行过程看，模型只读取了 DanmakuArea.jsx、LiveWidgets.jsx、index.jsx 三个文件就开始修复，遗漏了同样需要修改的 ShoppingBag.jsx，直到需要处理第二个问题时才去读取该文件。这种先规划后分析的做法导致文件调查阶段不完整，如果提前通读全部受影响文件，可以建立更准确的问题全貌认识。
+3. 模型在修复完点赞爱心位置偏移后，声称在 OnlineCounter 中发现了一个逻辑 bug，说原始代码"先赋值了 prevValue=next 再比较导致一直是 false"，并对其进行了重构。但从 diff 对比看，原始 OnlineCounter 使用的是 setCount 的函数式更新 prev 参数，`const next = nextOnlineCount(prev); setIsIncreasing(next >= prev)` 中 prev 是 React 传入的当前状态值，next >= prev 的比较逻辑本身是正确的，不存在模型描述的 bug。模型将一个不存在的 bug 误判为需要修复的问题，对原本正确运行的代码进行了不必要的重构，属于幻觉式 debug。该修改也超出了提示词指定的仅修复三个 BUG 的范围。正确做法是在修复完指定 BUG 后不主动扩展修改其他未要求的功能。

@@ -1604,7 +1604,6 @@ export const ADDRESS_DATA = {
       },
     },
   },
-  '510000_extra': null,
 }
 
 export const HOT_CITIES = [

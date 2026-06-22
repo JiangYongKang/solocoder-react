@@ -538,19 +538,6 @@ export function generateMockFileTree() {
   }
 }
 
-export function generateMockSummary() {
-  return {
-    statements: 72.5,
-    branches: 58.3,
-    functions: 75.8,
-    lines: 70.2,
-    totalFiles: 18,
-    testedFiles: 14,
-    totalLines: 452,
-    coveredLines: 317,
-  }
-}
-
 export function generateMockTrendData() {
   const data = []
   const today = new Date()

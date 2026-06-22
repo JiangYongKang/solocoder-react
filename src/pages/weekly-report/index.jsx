@@ -109,6 +109,7 @@ export default function WeeklyReportPage() {
 
   const handleTemplateChange = (templateId) => {
     setSelectedTemplate(templateId)
+    setDraft(getTemplateContent(templateId))
   }
 
   const handleResetToTemplate = () => {

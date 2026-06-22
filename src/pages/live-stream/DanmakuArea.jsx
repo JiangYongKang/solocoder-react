@@ -19,6 +19,24 @@ export default function DanmakuArea({ currentProduct, onDanmakuChange, onPurchas
   const [inputValue, setInputValue] = useState('');
   const scrollTracksRef = useRef(new Array(SCROLLING_POOL_SIZE).fill(0));
   const containerRef = useRef(null);
+  const timersRef = useRef([]);
+
+  const registerTimer = useCallback((id) => {
+    if (id != null) timersRef.current.push(id);
+    return id;
+  }, []);
+
+  const clearAllTimers = useCallback(() => {
+    timersRef.current.forEach((id) => {
+      if (typeof id === 'number' || typeof id === 'object') {
+        clearTimeout(id);
+        clearInterval(id);
+      }
+    });
+    timersRef.current = [];
+  }, []);
+
+  useEffect(() => clearAllTimers, [clearAllTimers]);
 
   const findAvailableTrack = useCallback(() => {
     const now = Date.now();
@@ -45,11 +63,11 @@ export default function DanmakuArea({ currentProduct, onDanmakuChange, onPurchas
     setScrollingList((prev) => [...prev, scrollingItem]);
     setDanmakuHistory((prev) => pushDanmaku(prev, danmaku));
 
-    setTimeout(() => {
+    registerTimer(setTimeout(() => {
       setScrollingList((prev) => prev.filter((x) => x.id !== danmaku.id));
       scrollTracksRef.current[track] = 0;
-    }, DANMAKU_SCROLL_DURATION);
-  }, [findAvailableTrack]);
+    }, DANMAKU_SCROLL_DURATION));
+  }, [findAvailableTrack, registerTimer]);
 
   useEffect(() => {
     onDanmakuChange && onDanmakuChange(danmakuHistory);
@@ -57,12 +75,11 @@ export default function DanmakuArea({ currentProduct, onDanmakuChange, onPurchas
 
   useEffect(() => {
     for (let i = 0; i < 6; i++) {
-      setTimeout(() => {
-        const d = generateRandomCommentDanmaku();
-        addDanmaku(d);
-      }, i * 400);
+      registerTimer(setTimeout(() => {
+        addDanmaku(generateRandomCommentDanmaku());
+      }, i * 400));
     }
-  }, [addDanmaku]);
+  }, [addDanmaku, registerTimer]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -73,8 +90,9 @@ export default function DanmakuArea({ currentProduct, onDanmakuChange, onPurchas
       else d = generateRandomPurchaseDanmaku(currentProduct?.name);
       addDanmaku(d);
     }, 1800);
+    registerTimer(timer);
     return () => clearInterval(timer);
-  }, [addDanmaku, currentProduct]);
+  }, [addDanmaku, currentProduct, registerTimer]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -82,8 +100,9 @@ export default function DanmakuArea({ currentProduct, onDanmakuChange, onPurchas
       addDanmaku(d);
       onPurchaseNotice && onPurchaseNotice(d);
     }, 5200);
+    registerTimer(timer);
     return () => clearInterval(timer);
-  }, [addDanmaku, currentProduct, onPurchaseNotice]);
+  }, [addDanmaku, currentProduct, onPurchaseNotice, registerTimer]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -91,8 +110,9 @@ export default function DanmakuArea({ currentProduct, onDanmakuChange, onPurchas
         addDanmaku(generateRandomLikeDanmaku());
       }
     }, 1200);
+    registerTimer(timer);
     return () => clearInterval(timer);
-  }, [addDanmaku]);
+  }, [addDanmaku, registerTimer]);
 
   const handleSend = () => {
     const trimmed = inputValue.trim();

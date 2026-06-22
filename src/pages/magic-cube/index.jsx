@@ -13,11 +13,16 @@ import { FACE_NAMES, FACE_KEY_MAP, ANIMATION_DURATION } from './constants.js'
 import './magic-cube.css'
 
 const DEFAULT_VIEW = { x: -25, y: -35 }
+const DEFAULT_ZOOM = 1
+const MIN_ZOOM = 0.5
+const MAX_ZOOM = 2
+const ZOOM_STEP = 0.1
 
 export default function MagicCubePage() {
   const navigate = useNavigate()
   const [faces, setFaces] = useState(createInitialFaces)
   const [viewRotation, setViewRotation] = useState(DEFAULT_VIEW)
+  const [zoom, setZoom] = useState(DEFAULT_ZOOM)
   const [isAnimating, setIsAnimating] = useState(false)
   const [animatingFace, setAnimatingFace] = useState(null)
   const [animatingClockwise, setAnimatingClockwise] = useState(true)
@@ -34,6 +39,8 @@ export default function MagicCubePage() {
   const animationStartTimeRef = useRef(0)
   const stateRef = useRef({ faces, isAnimating })
   const scrambleQueueRef = useRef([])
+  const processScrambleQueueRef = useRef(null)
+  const processSolveQueueRef = useRef(null)
 
   useEffect(() => {
     stateRef.current = { faces, isAnimating }
@@ -81,7 +88,7 @@ export default function MagicCubePage() {
     runAnimation(face, clockwise)
   }, [runAnimation, isScrambling, isSolving])
 
-  function processScrambleQueue() {
+  const processScrambleQueue = useCallback(() => {
     if (scrambleQueueRef.current.length === 0) {
       setIsScrambling(false)
       const steps = scrambleQueueRef._originalMoves || []
@@ -91,9 +98,13 @@ export default function MagicCubePage() {
 
     const next = scrambleQueueRef.current.shift()
     runAnimation(next.face, next.clockwise, () => {
-      processScrambleQueue()
+      processScrambleQueueRef.current && processScrambleQueueRef.current()
     })
-  }
+  }, [runAnimation])
+
+  useEffect(() => {
+    processScrambleQueueRef.current = processScrambleQueue
+  }, [processScrambleQueue])
 
   const handleScramble = useCallback(() => {
     if (stateRef.current.isAnimating || isScrambling || isSolving) return
@@ -107,9 +118,9 @@ export default function MagicCubePage() {
     setIsScrambling(true)
 
     setTimeout(() => {
-      processScrambleQueue()
+      processScrambleQueueRef.current && processScrambleQueueRef.current()
     }, 100)
-  }, [isScrambling, isSolving])
+  }, [processScrambleQueue, isScrambling, isSolving])
 
   const handleReset = useCallback(() => {
     if (isScrambling || isSolving) return
@@ -123,7 +134,7 @@ export default function MagicCubePage() {
     setAnimationProgress(0)
   }, [cancelAnimation, isScrambling, isSolving])
 
-  function processSolveQueue(steps) {
+  const processSolveQueue = useCallback((steps) => {
     if (steps.length === 0) {
       setIsSolving(false)
       return
@@ -131,9 +142,13 @@ export default function MagicCubePage() {
 
     const next = steps.shift()
     runAnimation(next.face, next.clockwise, () => {
-      processSolveQueue(steps)
+      processSolveQueueRef.current && processSolveQueueRef.current(steps)
     })
-  }
+  }, [runAnimation])
+
+  useEffect(() => {
+    processSolveQueueRef.current = processSolveQueue
+  }, [processSolveQueue])
 
   const handleShowSolution = useCallback(() => {
     if (scrambleHistory.length === 0) return
@@ -150,9 +165,9 @@ export default function MagicCubePage() {
     setShowSolution(false)
 
     setTimeout(() => {
-      processSolveQueue(solveSteps)
+      processSolveQueueRef.current && processSolveQueueRef.current(solveSteps)
     }, 100)
-  }, [scrambleHistory, isScrambling, isSolving])
+  }, [scrambleHistory, processSolveQueue, isScrambling, isSolving])
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -193,6 +208,15 @@ export default function MagicCubePage() {
 
   const handleWheel = useCallback((e) => {
     e.preventDefault()
+    setZoom((prev) => {
+      const delta = e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP
+      return Math.min(Math.max(prev + delta, MIN_ZOOM), MAX_ZOOM)
+    })
+  }, [])
+
+  const handleResetView = useCallback(() => {
+    setViewRotation(DEFAULT_VIEW)
+    setZoom(DEFAULT_ZOOM)
   }, [])
 
   useEffect(() => {
@@ -233,6 +257,22 @@ export default function MagicCubePage() {
             <span>打乱步数：</span>
             <span>{scrambleHistory.length}</span>
           </div>
+          <div className="status-item">
+            <span>缩放：</span>
+            <span>{Math.round(zoom * 100)}%</span>
+          </div>
+          <button
+            className="action-btn"
+            onClick={handleResetView}
+            style={{
+              padding: '4px 12px',
+              minWidth: 'auto',
+              fontSize: '12px',
+              background: 'linear-gradient(135deg, #74b9ff, #0984e3)',
+            }}
+          >
+            重置视角
+          </button>
         </div>
 
         <div
@@ -244,11 +284,12 @@ export default function MagicCubePage() {
           onWheel={handleWheel}
         >
           <div className="magic-cube-stage-info">
-            💡 拖拽旋转视角
+            💡 拖拽旋转 · 滚轮缩放
           </div>
           <MagicCube3D
             faces={faces}
             viewRotation={viewRotation}
+            zoom={zoom}
             animatingFace={animatingFace}
             animatingClockwise={animatingClockwise}
             animationProgress={animationProgress}

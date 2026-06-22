@@ -23,8 +23,6 @@ export const METRICS = [
   { key: 'bounce_rate', label: '跳出率', unit: '%', baseValue: 40 },
 ]
 
-export const METRIC_KEYS = METRICS.map((m) => m.key)
-
 export const GROUP_COLORS = [
   '#6366f1',
   '#10b981',

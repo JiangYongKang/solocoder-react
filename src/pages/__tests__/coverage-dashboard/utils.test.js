@@ -4,8 +4,12 @@ import {
   formatPercentage,
   calculateAverageCoverage,
   flattenFileTree,
+  buildDirectoryCoverage,
   countFiles,
   countDirectories,
+  countTotalLines,
+  countCoveredLines,
+  countTestedFiles,
   findFileByPath,
   getUncoveredLines,
   calculateOverallCoverage,
@@ -532,6 +536,211 @@ describe('coverage-dashboard utils', () => {
     it('数据不足返回 stable', () => {
       expect(getTrendDirection([], 'statements')).toBe('stable')
       expect(getTrendDirection([{ statements: 70 }], 'statements')).toBe('stable')
+    })
+  })
+
+  describe('buildDirectoryCoverage', () => {
+    it('应该基于子树内所有文件计算真实加权平均覆盖率', () => {
+      const tree = {
+        name: 'src',
+        type: 'directory',
+        path: 'src',
+        children: [
+          {
+            name: 'components',
+            type: 'directory',
+            path: 'src/components',
+            children: [
+              {
+                name: 'Button.jsx',
+                type: 'file',
+                path: 'src/components/Button.jsx',
+                coverage: { statements: 90, branches: 85, functions: 95, lines: 92 },
+              },
+              {
+                name: 'Input.jsx',
+                type: 'file',
+                path: 'src/components/Input.jsx',
+                coverage: { statements: 70, branches: 65, functions: 75, lines: 68 },
+              },
+              {
+                name: 'Modal.jsx',
+                type: 'file',
+                path: 'src/components/Modal.jsx',
+                coverage: { statements: 50, branches: 40, functions: 55, lines: 48 },
+              },
+            ],
+          },
+          {
+            name: 'utils',
+            type: 'directory',
+            path: 'src/utils',
+            children: [
+              {
+                name: 'helper.js',
+                type: 'file',
+                path: 'src/utils/helper.js',
+                coverage: { statements: 100, branches: 100, functions: 100, lines: 100 },
+              },
+            ],
+          },
+        ],
+      }
+
+      const result = buildDirectoryCoverage(tree)
+
+      expect(result.type).toBe('directory')
+      expect(result.fileCount).toBe(4)
+
+      const expectedLinesAvg = (92 + 68 + 48 + 100) / 4
+      expect(result.coverage.lines).toBeCloseTo(expectedLinesAvg, 0)
+
+      const expectedStatementsAvg = (90 + 70 + 50 + 100) / 4
+      expect(result.coverage.statements).toBeCloseTo(expectedStatementsAvg, 0)
+
+      expect(result.children[0].type).toBe('directory')
+      expect(result.children[0].fileCount).toBe(3)
+      const componentsAvg = (92 + 68 + 48) / 3
+      expect(result.children[0].coverage.lines).toBeCloseTo(componentsAvg, 0)
+
+      expect(result.children[1].type).toBe('directory')
+      expect(result.children[1].fileCount).toBe(1)
+      expect(result.children[1].coverage.lines).toBe(100)
+    })
+
+    it('多文件目录不应被少文件目录稀释权重', () => {
+      const tree = {
+        name: 'root',
+        type: 'directory',
+        path: 'root',
+        children: [
+          {
+            name: 'big-dir',
+            type: 'directory',
+            path: 'root/big-dir',
+            children: [
+              ...Array.from({ length: 99 }, (_, i) => ({
+                name: `file${i}.js`,
+                type: 'file',
+                path: `root/big-dir/file${i}.js`,
+                coverage: { statements: 50, branches: 50, functions: 50, lines: 50 },
+              })),
+            ],
+          },
+          {
+            name: 'small-dir',
+            type: 'directory',
+            path: 'root/small-dir',
+            children: [
+              {
+                name: 'single.js',
+                type: 'file',
+                path: 'root/small-dir/single.js',
+                coverage: { statements: 100, branches: 100, functions: 100, lines: 100 },
+              },
+            ],
+          },
+        ],
+      }
+
+      const result = buildDirectoryCoverage(tree)
+
+      const expectedAvg = (99 * 50 + 1 * 100) / 100
+      expect(result.coverage.lines).toBeCloseTo(expectedAvg, 0)
+
+      expect(result.coverage.lines).toBeLessThan(75)
+    })
+
+    it('文件节点应正确返回', () => {
+      const file = {
+        name: 'test.js',
+        type: 'file',
+        path: 'test.js',
+        coverage: { statements: 80, branches: 70, functions: 90, lines: 85 },
+      }
+      const result = buildDirectoryCoverage(file)
+      expect(result.type).toBe('file')
+      expect(result.averageCoverage).toBe(85)
+    })
+
+    it('空节点返回 null', () => {
+      expect(buildDirectoryCoverage(null)).toBeNull()
+      expect(buildDirectoryCoverage(undefined)).toBeNull()
+    })
+  })
+
+  describe('countTotalLines', () => {
+    const mockFiles = [
+      { lines: [{ line: 1 }, { line: 2 }, { line: 3 }] },
+      { lines: [{ line: 1 }, { line: 2 }] },
+      { lines: [] },
+      {},
+    ]
+
+    it('应该正确计算所有文件的总行数', () => {
+      expect(countTotalLines(mockFiles)).toBe(5)
+    })
+
+    it('空数组返回 0', () => {
+      expect(countTotalLines([])).toBe(0)
+    })
+
+    it('非数组返回 0', () => {
+      expect(countTotalLines(null)).toBe(0)
+      expect(countTotalLines(undefined)).toBe(0)
+    })
+  })
+
+  describe('countCoveredLines', () => {
+    const mockFiles = [
+      { lines: [{ line: 1 }, { line: 2 }, { line: 3 }, { line: 4 }, { line: 5 }], uncoveredLines: [2, 4] },
+      { lines: [{ line: 1 }, { line: 2 }, { line: 3 }], uncoveredLines: [] },
+      { lines: [], uncoveredLines: [] },
+      {},
+    ]
+
+    it('应该正确计算已覆盖行数（总行数 - 未覆盖行数）', () => {
+      expect(countCoveredLines(mockFiles)).toBe((5 - 2) + (3 - 0) + 0 + 0)
+    })
+
+    it('空数组返回 0', () => {
+      expect(countCoveredLines([])).toBe(0)
+    })
+
+    it('非数组返回 0', () => {
+      expect(countCoveredLines(null)).toBe(0)
+      expect(countCoveredLines(undefined)).toBe(0)
+    })
+
+    it('当未覆盖行数超过总行数时不应返回负数', () => {
+      const files = [
+        { lines: [{ line: 1 }], uncoveredLines: [1, 2, 3] },
+      ]
+      expect(countCoveredLines(files)).toBe(0)
+    })
+  })
+
+  describe('countTestedFiles', () => {
+    const mockFiles = [
+      { name: 'tested1.js', coverage: { lines: 80 } },
+      { name: 'tested2.js', coverage: { lines: 50 } },
+      { name: 'tested3.js', coverage: { lines: 0.1 } },
+      { name: 'untested1.js', coverage: { lines: 0 } },
+      { name: 'untested2.js', coverage: { lines: -5 } },
+      { name: 'nocov.js' },
+    ]
+
+    it('应该正确统计已测试文件数（行覆盖率 > 0）', () => {
+      expect(countTestedFiles(mockFiles)).toBe(3)
+    })
+
+    it('空数组返回 0', () => {
+      expect(countTestedFiles([])).toBe(0)
+    })
+
+    it('非数组返回 0', () => {
+      expect(countTestedFiles(null)).toBe(0)
+      expect(countTestedFiles(undefined)).toBe(0)
     })
   })
 })

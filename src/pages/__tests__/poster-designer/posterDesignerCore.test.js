@@ -731,13 +731,24 @@ describe('posterDesignerCore', () => {
   describe('drawPoster: fill-then-overlay rendering', () => {
     function createMockCtx() {
       const calls = []
+      let saveDepth = 0
+      let saveRestoreBalanced = true
       return {
         calls,
+        get saveDepth() { return saveDepth },
+        get saveRestoreBalanced() { return saveRestoreBalanced && saveDepth === 0 },
         clearRect(...args) { calls.push({ fn: 'clearRect', args }) },
         fillRect(...args) { calls.push({ fn: 'fillRect', args }) },
         drawImage(...args) { calls.push({ fn: 'drawImage', args }) },
-        save() { calls.push({ fn: 'save' }) },
-        restore() { calls.push({ fn: 'restore' }) },
+        save() {
+          saveDepth += 1
+          calls.push({ fn: 'save' })
+        },
+        restore() {
+          saveDepth -= 1
+          if (saveDepth < 0) saveRestoreBalanced = false
+          calls.push({ fn: 'restore' })
+        },
         strokeText(...args) { calls.push({ fn: 'strokeText', args }) },
         fillText(...args) { calls.push({ fn: 'fillText', args }) },
         set fillStyle(v) { calls.push({ fn: 'fillStyle', value: v }) },
@@ -778,6 +789,7 @@ describe('posterDesignerCore', () => {
       expect(drawImageCalls[0].args[2]).toBe(0)
       expect(drawImageCalls[0].args[3]).toBe(800)
       expect(drawImageCalls[0].args[4]).toBe(600)
+      expect(ctx.saveRestoreBalanced).toBe(true)
     })
 
     it('should draw color fill even when no image is present', () => {
@@ -791,6 +803,7 @@ describe('posterDesignerCore', () => {
       expect(drawImageCalls.length).toBe(0)
       const fillStyleCall = ctx.calls.find((c) => c.fn === 'fillStyle' && c.value === '#ff5500')
       expect(fillStyleCall).toBeDefined()
+      expect(ctx.saveRestoreBalanced).toBe(true)
     })
 
     it('should apply imageOpacity to globalAlpha when drawing image', () => {
@@ -805,9 +818,10 @@ describe('posterDesignerCore', () => {
       drawPoster(ctx, withImage, 800, 600)
       const alphaCall = ctx.calls.find((c) => c.fn === 'globalAlpha' && c.value === 0.35)
       expect(alphaCall).toBeDefined()
+      expect(ctx.saveRestoreBalanced).toBe(true)
     })
 
-    it('should fallback to color fill if drawImage throws', () => {
+    it('should fallback to color fill if drawImage throws and keep save/restore balanced', () => {
       const ctx = createMockCtx()
       const badImage = { nodeName: 'IMG', naturalWidth: 100, naturalHeight: 100 }
       const state = createInitialState()
@@ -822,6 +836,11 @@ describe('posterDesignerCore', () => {
       ctx.drawImage = origDrawImage
       const fillRectCalls = ctx.calls.filter((c) => c.fn === 'fillRect')
       expect(fillRectCalls.length).toBeGreaterThanOrEqual(1)
+      const saveCalls = ctx.calls.filter((c) => c.fn === 'save')
+      const restoreCalls = ctx.calls.filter((c) => c.fn === 'restore')
+      expect(saveCalls.length).toBe(restoreCalls.length)
+      expect(ctx.saveDepth).toBe(0)
+      expect(ctx.saveRestoreBalanced).toBe(true)
     })
 
     it('should render text layers on top of background color and image', () => {
@@ -840,6 +859,26 @@ describe('posterDesignerCore', () => {
       const drawImageIndex = ctx.calls.findIndex((c) => c.fn === 'drawImage')
       const fillTextIndex = ctx.calls.findIndex((c) => c.fn === 'fillText')
       expect(drawImageIndex).toBeLessThan(fillTextIndex)
+      expect(ctx.saveRestoreBalanced).toBe(true)
+    })
+
+    it('should keep save/restore balanced when strokeText or fillText throw during text rendering', () => {
+      const ctx = createMockCtx()
+      const state = createInitialState()
+      const withText = addLayer(state, createTextLayer({
+        text: 'Hello',
+        x: 50,
+        y: 100,
+        strokeWidth: 2,
+      }))
+      const origStrokeText = ctx.strokeText
+      const origFillText = ctx.fillText
+      ctx.strokeText = function () { throw new Error('stroke fail') }
+      ctx.fillText = function () { throw new Error('fill fail') }
+      expect(() => drawPoster(ctx, withText, 800, 600)).not.toThrow()
+      ctx.strokeText = origStrokeText
+      ctx.fillText = origFillText
+      expect(ctx.saveRestoreBalanced).toBe(true)
     })
   })
 })

@@ -439,18 +439,18 @@ export function loadFromStorage() {
     let data
     try {
       data = JSON.parse(raw)
-    } catch (parseErr) {
-      return { nodes: [], edges: [], error: '数据解析失败: ' + (parseErr?.message || '无效 JSON') }
+    } catch {
+      return { nodes: [], edges: [], error: '存储数据已损坏，已重置为空图' }
     }
     if (!data || typeof data !== 'object') {
-      return { nodes: [], edges: [], error: '数据格式错误: 不是有效对象' }
+      return { nodes: [], edges: [], error: '存储数据格式无效，已重置为空图' }
     }
     if (!Array.isArray(data.nodes) || !Array.isArray(data.edges)) {
-      return { nodes: [], edges: [], error: '数据格式错误: 缺少 nodes 或 edges 数组' }
+      return { nodes: [], edges: [], error: '存储数据格式无效，已重置为空图' }
     }
     return { nodes: data.nodes, edges: data.edges }
-  } catch (err) {
-    return { nodes: [], edges: [], error: '读取本地存储失败: ' + (err?.message || '未知错误') }
+  } catch {
+    return { nodes: [], edges: [], error: '读取本地存储失败，已重置为空图' }
   }
 }
 

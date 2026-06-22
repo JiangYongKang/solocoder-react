@@ -1,0 +1,3 @@
+产物不满意：增强后的异常测试用例中同时断言的 saveCalls.length === restoreCalls.length 和 saveDepth === 0 是冗余的，因为 saveDepth 从零开始且每次 save 和 restore 都同步更新，两者验证的是完全相同的条件，多余的断言降低了测试代码的简洁性。另外模型在所有 drawPoster 测试中统一追加了 expect(ctx.saveRestoreBalanced).toBe(true)，但在"无图片纯颜色填充"测试中，背景图层没有 image、也没有文字图层，整个 drawPoster 执行过程中不会调用任何 save 或 restore，saveDepth 始终为零，该断言沦为空洞真值，没有实际验证 save/restore 配对逻辑，属于无效断言。
+
+过程不满意：模型在增强测试时新增了验证文字图层 strokeText 和 fillText 同时抛错时 save/restore 仍保持平衡的测试用例。提示词 prompt-5.txt 只要求修复背景图片 drawImage 抛错时的 save/restore 不平衡问题，并未要求为文字图层新增异常测试。虽然该测试本身正确且体现了细致，但超出提示词要求的范围属于无提示扩展，若批量标注时每个会话都随意扩展测试范围，会增加标注审查工作量。正确做法是严格按提示词要求的修改范围完成，不做超出范围的功能或测试扩展。

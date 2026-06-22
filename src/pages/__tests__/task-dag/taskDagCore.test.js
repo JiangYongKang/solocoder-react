@@ -673,27 +673,23 @@ describe('taskDagCore', () => {
         expect(loaded.error).toBeUndefined()
       })
 
-      it('损坏的数据应返回空图和错误信息', () => {
+      it('损坏的数据应返回用户友好的错误信息', () => {
         localStorage.setItem('task-dag-state', 'not json')
         const result = loadFromStorage()
         expect(result.nodes).toEqual([])
         expect(result.edges).toEqual([])
-        expect(result.error).toBeDefined()
-        expect(typeof result.error).toBe('string')
-        expect(result.error.length).toBeGreaterThan(0)
+        expect(result.error).toBe('存储数据已损坏，已重置为空图')
       })
 
-      it('格式错误的数据应返回空图和错误信息', () => {
+      it('格式错误的数据应返回用户友好的错误信息', () => {
         localStorage.setItem('task-dag-state', JSON.stringify({ invalid: true }))
         const result = loadFromStorage()
         expect(result.nodes).toEqual([])
         expect(result.edges).toEqual([])
-        expect(result.error).toBeDefined()
-        expect(typeof result.error).toBe('string')
-        expect(result.error.length).toBeGreaterThan(0)
+        expect(result.error).toBe('存储数据格式无效，已重置为空图')
       })
 
-      it('localStorage 异常时应返回错误信息', () => {
+      it('localStorage 异常时应返回用户友好的错误信息', () => {
         const originalGetItem = localStorage.getItem
         vi.spyOn(localStorage, 'getItem').mockImplementation(() => {
           throw new Error('Quota exceeded')
@@ -701,8 +697,7 @@ describe('taskDagCore', () => {
         const result = loadFromStorage()
         expect(result.nodes).toEqual([])
         expect(result.edges).toEqual([])
-        expect(result.error).toBeDefined()
-        expect(result.error).toContain('读取本地存储失败')
+        expect(result.error).toBe('读取本地存储失败，已重置为空图')
         localStorage.getItem = originalGetItem
       })
     })

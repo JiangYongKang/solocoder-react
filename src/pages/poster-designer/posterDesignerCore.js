@@ -303,13 +303,14 @@ export function drawPoster(ctx, state, canvasWidth, canvasHeight) {
     ctx.fillStyle = bgColor
     ctx.fillRect(0, 0, canvasWidth, canvasHeight)
     if (bg.image && isHTMLImageElement(bg.image)) {
+      ctx.save()
       try {
-        ctx.save()
         ctx.globalAlpha = clampBgOpacity(bg.imageOpacity)
         ctx.drawImage(bg.image, 0, 0, canvasWidth, canvasHeight)
-        ctx.restore()
       } catch {
         // image draw failed, color fill already in place as fallback
+      } finally {
+        ctx.restore()
       }
     }
   }

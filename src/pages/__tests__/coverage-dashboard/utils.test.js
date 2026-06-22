@@ -871,9 +871,9 @@ describe('coverage-dashboard utils', () => {
       expect(current.children[0].type).toBe('file')
     })
 
-    it('每个节点只遍历一次（O(n) 单次遍历验证）', () => {
+    it('每个节点只遍历一次（Proxy O(n) 访问计数验证）', () => {
       const makeLines = (count) => Array.from({ length: count }, (_, i) => ({ line: i + 1, code: '' }))
-      const visitedPaths = new Set()
+      const typeAccessLog = []
 
       const makeFile = (path, coverage, lineCount) => {
         const file = {
@@ -886,7 +886,7 @@ describe('coverage-dashboard utils', () => {
         return new Proxy(file, {
           get(target, prop, receiver) {
             if (prop === 'type') {
-              visitedPaths.add(target.path)
+              typeAccessLog.push(target.path)
             }
             return Reflect.get(target, prop, receiver)
           },
@@ -923,17 +923,26 @@ describe('coverage-dashboard utils', () => {
         'root/a/y/f3.js',
         'root/b/f4.js',
       ]
-      expect(visitedPaths.size).toBe(expectedFiles.length)
-      expectedFiles.forEach((p) => expect(visitedPaths.has(p)).toBe(true))
+      const EXPECTED_ACCESSES_PER_FILE = 2
+
+      const accessCounts = {}
+      typeAccessLog.forEach((p) => {
+        accessCounts[p] = (accessCounts[p] || 0) + 1
+      })
+
+      expect(typeAccessLog.length).toBe(expectedFiles.length * EXPECTED_ACCESSES_PER_FILE)
+      expectedFiles.forEach((p) => {
+        expect(accessCounts[p]).toBe(EXPECTED_ACCESSES_PER_FILE)
+      })
     })
 
-    it('每个节点只遍历一次（文件访问计数验证）', () => {
+    it('每个节点只遍历一次（getter 精确访问计数验证）', () => {
       const makeLines = (count) => Array.from({ length: count }, (_, i) => ({ line: i + 1, code: '' }))
-      const visitedPaths = new Set()
+      const typeAccessLog = []
 
       const countingFile = (path, cov, lineCount) => ({
         get type() {
-          visitedPaths.add(path)
+          typeAccessLog.push(path)
           return 'file'
         },
         name: path.split('/').pop(),
@@ -977,11 +986,23 @@ describe('coverage-dashboard utils', () => {
 
       buildDirectoryCoverage(tree)
 
-      expect(visitedPaths.size).toBe(4)
-      expect(visitedPaths.has('root/sub1/a.js')).toBe(true)
-      expect(visitedPaths.has('root/sub1/b.js')).toBe(true)
-      expect(visitedPaths.has('root/sub2/c.js')).toBe(true)
-      expect(visitedPaths.has('root/sub2/subsub/d.js')).toBe(true)
+      const EXPECTED_ACCESSES_PER_FILE = 2
+      const filePaths = [
+        'root/sub1/a.js',
+        'root/sub1/b.js',
+        'root/sub2/c.js',
+        'root/sub2/subsub/d.js',
+      ]
+
+      const accessCounts = {}
+      typeAccessLog.forEach((p) => {
+        accessCounts[p] = (accessCounts[p] || 0) + 1
+      })
+
+      expect(typeAccessLog.length).toBe(filePaths.length * EXPECTED_ACCESSES_PER_FILE)
+      filePaths.forEach((p) => {
+        expect(accessCounts[p]).toBe(EXPECTED_ACCESSES_PER_FILE)
+      })
     })
   })
 

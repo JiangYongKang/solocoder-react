@@ -1,0 +1,4 @@
+你实现的海报设计器页面在背景图片绘制异常时的处理逻辑还存在缺陷，需要修复：
+
+1. drawPoster 函数在绘制背景图片时，try 块中先调了 ctx.save 再调 ctx.drawImage，但如果 drawImage 抛出异常，对应的 ctx.restore 不会被执行，catch 块也没有补充 restore，导致 Canvas 上下文的 save/restore 调用次数不平衡。
+2. 对应的测试用例"图片绘制异常不崩溃"只验证了 drawPoster 不会抛异常以及 fillRect 执行过，没有校验异常场景下 Canvas 上下文状态的一致性。需要让测试能够暴露出这种 save/restore 不配对的问题。
